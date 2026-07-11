@@ -1,0 +1,66 @@
+/** 主进程入口：协议注册（必须在 ready 前）→ 预置角色 → 窗口/托盘/IPC */
+import { app, net, protocol } from 'electron';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { charactersDir, getCharacter, listCharacters, seedPresets } from './characters';
+import { getSettings, setSettings } from './config';
+import { registerIpc } from './ipc';
+import { rebuildTray } from './tray';
+import { createPetWindow, getPetWindow } from './windows';
+
+// qbot-asset://<dirId>/<relPath> → userData/characters/<dirId>/<relPath>
+// stream: true 缺失时 <video> 对协议 URL 静默不播（必须 ready 前注册）
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'qbot-asset',
+    privileges: { stream: true, supportFetchAPI: true, bypassCSP: true },
+  },
+]);
+
+// 桌宠常驻单实例
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
+
+app.whenReady().then(async () => {
+  protocol.handle('qbot-asset', (req) => {
+    const url = new URL(req.url);
+    const base = charactersDir();
+    const full = path.normalize(
+      path.join(base, url.hostname, decodeURIComponent(url.pathname)),
+    );
+    if (!full.startsWith(base + path.sep) || !existsSync(full)) {
+      return new Response('not found', { status: 404 });
+    }
+    return net.fetch(pathToFileURL(full).toString());
+  });
+
+  if (process.platform === 'darwin') app.dock?.hide();
+
+  registerIpc();
+  await seedPresets();
+  await rebuildTray();
+
+  // 启动即上桌：优先上次激活的角色，否则第一只可用角色
+  const settings = await getSettings();
+  const characters = (await listCharacters()).filter((c) => c.manifest);
+  const initial =
+    characters.find((c) => c.dirId === settings.activeCharacter) ?? characters[0];
+  const pet = createPetWindow();
+  if (initial) {
+    await setSettings({ activeCharacter: initial.dirId });
+    pet.webContents.once('did-finish-load', async () => {
+      pet.webContents.send('characters:activated', await getCharacter(initial.dirId));
+    });
+  }
+});
+
+// 桌宠应用：全部窗口关闭不退出（托盘常驻）
+app.on('window-all-closed', () => {
+  /* keep alive */
+});
+
+app.on('activate', () => {
+  if (!getPetWindow()) createPetWindow();
+});

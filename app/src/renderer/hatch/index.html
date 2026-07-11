@@ -1,0 +1,206 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>QBot 孵化室</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, 'PingFang SC', sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #faf7f0;
+        color: #3a3a3a;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      .screen {
+        display: none;
+        flex: 1;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 32px;
+      }
+      .screen.active {
+        display: flex;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 0;
+      }
+      .hint {
+        color: #8a8a8a;
+        font-size: 13px;
+        text-align: center;
+        line-height: 1.7;
+      }
+      /* drop 屏 */
+      #dropzone {
+        width: 420px;
+        height: 260px;
+        border: 3px dashed #c9c0ae;
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        font-size: 15px;
+        color: #9a917e;
+        transition: all 0.15s;
+      }
+      #dropzone.over {
+        border-color: #7cc47f;
+        background: #f0f8f0;
+        color: #5aa05e;
+      }
+      /* pick 屏 */
+      #candidates {
+        display: flex;
+        gap: 16px;
+      }
+      #candidates img {
+        width: 200px;
+        border-radius: 12px;
+        border: 3px solid transparent;
+        cursor: pointer;
+        background: white;
+        transition: border-color 0.15s;
+      }
+      #candidates img:hover {
+        border-color: #7cc47f;
+      }
+      button {
+        font-size: 14px;
+        padding: 9px 22px;
+        border-radius: 10px;
+        border: 1px solid #d4cbb8;
+        background: white;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #7cc47f;
+        border-color: #7cc47f;
+        color: white;
+      }
+      /* progress 屏 */
+      #action-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 120px);
+        gap: 16px;
+      }
+      .action-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 14px 8px;
+        border-radius: 12px;
+        background: #f1ece0;
+        opacity: 0.45;
+        font-size: 13px;
+        transition: all 0.3s;
+      }
+      .action-cell .dot {
+        font-size: 26px;
+      }
+      .action-cell.done {
+        opacity: 1;
+        background: #e6f4e6;
+      }
+      .action-cell.failed {
+        opacity: 1;
+        background: #fbe9e7;
+      }
+      .action-cell.working {
+        opacity: 0.8;
+      }
+      /* certificate 屏 */
+      #card {
+        display: flex;
+        gap: 24px;
+        align-items: center;
+        background: white;
+        border-radius: 20px;
+        padding: 28px 36px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07);
+      }
+      #card img,
+      #card video {
+        width: 200px;
+        height: 200px;
+        object-fit: contain;
+      }
+      #card .arrow {
+        font-size: 28px;
+        color: #c9c0ae;
+      }
+      #error-banner {
+        display: none;
+        background: #fbe9e7;
+        color: #b3413a;
+        padding: 10px 16px;
+        font-size: 13px;
+        text-align: center;
+      }
+      #pet-name {
+        font-size: 15px;
+        padding: 9px 14px;
+        border-radius: 10px;
+        border: 1px solid #d4cbb8;
+        width: 220px;
+        text-align: center;
+        outline-color: #7cc47f;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="error-banner"></div>
+
+    <section id="screen-drop" class="screen active">
+      <h1>孵化一只新桌宠</h1>
+      <div id="dropzone">
+        <div style="font-size: 40px">🥚</div>
+        <div>把角色图片拖到这里</div>
+      </div>
+      <p class="hint">
+        一张图一个角色，画面清晰、全身或半身为佳<br />
+        孵化约需 20 分钟，期间可以关掉这个窗口
+      </p>
+      <div id="resume-area"></div>
+    </section>
+
+    <section id="screen-pick" class="screen">
+      <h1>挑一张你最喜欢的设定图</h1>
+      <div id="candidates"></div>
+      <button id="regen">都不满意，重新生成</button>
+      <p class="hint">这张三视图决定角色所有动作的一致性，选对最重要</p>
+    </section>
+
+    <section id="screen-progress" class="screen">
+      <h1>孵化中…</h1>
+      <div id="action-grid"></div>
+      <p class="hint">小家伙正在学习怎么动，关掉窗口也不会打断孵化</p>
+    </section>
+
+    <section id="screen-certificate" class="screen">
+      <h1>出生证明</h1>
+      <div id="card">
+        <img id="card-source" alt="原图" />
+        <div class="arrow">→</div>
+        <video id="card-idle" muted autoplay loop playsinline></video>
+      </div>
+      <input id="pet-name" type="text" placeholder="给它起个名字…" maxlength="12" />
+      <div style="display: flex; gap: 12px">
+        <button id="save-card">保存卡片</button>
+        <button id="go-desk" class="primary">上桌！</button>
+      </div>
+    </section>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
