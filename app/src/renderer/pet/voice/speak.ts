@@ -56,6 +56,8 @@ export class Speaker {
   private bubbleTimers: ReturnType<typeof setTimeout>[] = [];
   private playback: PlaybackHandle | null = null;
   private speaking = false;
+  /** 发言代际：新发言/打断使旧 speakNow 的续体失效，避免收尾竞态 */
+  private gen = 0;
   private lastUtteranceId: string | undefined;
   private utterances: Utterance[] = (utterancesData as { utterances: Utterance[] }).utterances;
 
@@ -81,14 +83,25 @@ export class Speaker {
 
   /** 拖拽等打断：气泡立即消失、语音停止、定时器重排 */
   interrupt(): void {
+    this.gen++;
     this.playback?.stop();
     this.playback = null;
     this.speaking = false;
     this.hideBubbleNow();
-    if (this.timer) this.scheduleNext();
+    this.scheduleNext();
+  }
+
+  /** 用户主动触发（双击/右键菜单）：打断正在说的，立即说一句 */
+  forceSpeak(): void {
+    this.playback?.stop();
+    this.playback = null;
+    this.speaking = false;
+    this.hideBubbleNow();
+    void this.speakNow(true);
   }
 
   stop(): void {
+    this.gen++;
     this.playback?.stop();
     this.playback = null;
     this.speaking = false;
@@ -103,10 +116,11 @@ export class Speaker {
     this.timer = setTimeout(() => void this.speakNow(), delay);
   }
 
-  private async speakNow(): Promise<void> {
+  private async speakNow(force = false): Promise<void> {
     this.timer = null;
-    // 非 idle / 已在说 → 本轮跳过，直接排下一轮
-    if (this.speaking || !this.voice || !this.hooks.canSpeak()) {
+    const myGen = ++this.gen;
+    // 非 idle / 已在说 → 本轮跳过，直接排下一轮（force = 用户主动触发，跳过检查）
+    if (!this.voice || (!force && (this.speaking || !this.hooks.canSpeak()))) {
       this.scheduleNext();
       return;
     }
@@ -129,6 +143,7 @@ export class Speaker {
     if (this.settings.voiceEnabled) {
       this.playback = play(blips, this.settings.voiceVolume / 100);
       await this.playback.finished;
+      if (myGen !== this.gen) return; // 已被新发言/打断取代，收尾归它
       this.playback = null;
     }
     this.speaking = false;

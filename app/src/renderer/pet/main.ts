@@ -67,11 +67,10 @@ window.qbot.characters.onActivated((meta) => {
 
 // ── 指针交互 ─────────────────────────────────────────────
 // 移动 >4px 才算拖拽（否则 pointerdown 会闪一下 drag 动画）；
-// 未拖拽的 pointerup = 点击 → 250ms 内第二击算双击。
+// 未拖拽的 pointerup = 点击 → 250ms 内第二击算双击（双击 = 立即说一句）。
 const DRAG_THRESHOLD = 4;
 const DBLCLICK_MS = 250;
 const CLICK_ACTION: ActionId = 'talk_happy';
-const DBLCLICK_ACTION: ActionId = 'talk_annoyed';
 
 let pointerDown = false;
 let dragStarted = false;
@@ -132,7 +131,7 @@ stage.addEventListener('pointerup', (e) => {
   if (clickTimer) {
     clearTimeout(clickTimer);
     clickTimer = null;
-    dispatch({ type: 'PLAY_ACTION', action: DBLCLICK_ACTION });
+    speaker.forceSpeak();
   } else {
     clickTimer = setTimeout(() => {
       clickTimer = null;
@@ -157,6 +156,15 @@ function hideMenu(): void {
 stage.addEventListener('contextmenu', (e) => {
   e.preventDefault();
   menu.replaceChildren();
+  // 固定项：立即说一句（实验/演示语音冒泡）
+  const speakItem = document.createElement('div');
+  speakItem.className = 'menu-item';
+  speakItem.textContent = '说句话';
+  speakItem.addEventListener('click', () => {
+    hideMenu();
+    speaker.forceSpeak();
+  });
+  menu.appendChild(speakItem);
   for (const id of available) {
     const label = ACTION_LABELS[id];
     if (!label) continue; // idle/drag 不进菜单
