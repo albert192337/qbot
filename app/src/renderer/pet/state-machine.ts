@@ -14,7 +14,8 @@ export type PetEvent =
   | { type: 'POINTER_DOWN' }
   | { type: 'POINTER_UP' }
   | { type: 'TIMER_FIRE' } // 调度定时器到点
-  | { type: 'VIDEO_ENDED' }; // 当前（非 loop）视频播完一遍
+  | { type: 'VIDEO_ENDED' } // 当前（非 loop）视频播完一遍
+  | { type: 'PLAY_ACTION'; action: ActionId }; // 用户点击/菜单指定播放
 
 export interface StepResult {
   state: PetState;
@@ -87,6 +88,17 @@ export function step(
       }
       // 还要再播：同一动作重播（play 同值让播放器 restart）
       return { state: { ...state, loopsLeft: left }, play: state.action };
+    }
+
+    case 'PLAY_ACTION': {
+      // 用户主动触发：拖拽中忽略，其余状态立即切（播 1 遍回 idle）
+      if (state.kind === 'drag') return { state };
+      if (!ctx.available.includes(event.action)) return { state };
+      return {
+        state: { kind: 'auto', action: event.action, loopsLeft: 1 },
+        play: event.action,
+        clearTimer: true,
+      };
     }
   }
 }

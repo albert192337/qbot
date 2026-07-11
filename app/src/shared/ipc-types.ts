@@ -12,6 +12,8 @@ export interface CharacterMeta {
 export interface Settings {
   arkApiKey?: string;
   activeCharacter?: string;
+  /** 桌宠缩放倍数（0.5~2，默认 1 = 360px 窗口） */
+  petScale?: number;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */

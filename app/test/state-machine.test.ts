@@ -74,6 +74,27 @@ describe('pet state machine', () => {
     expect(picked?.action).toBe('sleep');
   });
 
+  it('PLAY_ACTION 立即切换指定动作播 1 遍，drag 中忽略', () => {
+    const r = step({ kind: 'idle' }, { type: 'PLAY_ACTION', action: 'tea' }, { available: ALL, rng: rng(0) });
+    expect(r.state).toEqual({ kind: 'auto', action: 'tea', loopsLeft: 1 });
+    expect(r.play).toBe('tea');
+    expect(r.clearTimer).toBe(true);
+
+    // 播完自动回 idle
+    const r2 = step(r.state, { type: 'VIDEO_ENDED' }, { available: ALL, rng: rng(0) });
+    expect(r2.state.kind).toBe('idle');
+
+    // drag 中忽略
+    const r3 = step({ kind: 'drag' }, { type: 'PLAY_ACTION', action: 'tea' }, { available: ALL, rng: rng(0) });
+    expect(r3.state.kind).toBe('drag');
+    expect(r3.play).toBeUndefined();
+
+    // 不可用动作忽略
+    const r4 = step({ kind: 'idle' }, { type: 'PLAY_ACTION', action: 'tea' }, { available: ['idle'], rng: rng(0) });
+    expect(r4.state.kind).toBe('idle');
+    expect(r4.play).toBeUndefined();
+  });
+
   it('randomDelay 在 30s~3min 区间', () => {
     expect(randomDelay(rng(0))).toBe(SCHEDULE_MIN_MS);
     expect(randomDelay(rng(0.999999))).toBeLessThan(SCHEDULE_MAX_MS);

@@ -41,31 +41,53 @@ window.qbot.characters.onActivated((meta) => {
   scheduleTimer();
 });
 
-// ── 拖拽：screenX/Y（窗口自己在动，clientX 是移动参考系会正反馈抖动）──
-let dragging = false;
+// ── 指针交互 ─────────────────────────────────────────────
+// 移动 >4px 才算拖拽（否则 pointerdown 会闪一下 drag 动画）；
+// 未拖拽的 pointerup = 点击 → 250ms 内第二击算双击。
+const DRAG_THRESHOLD = 4;
+const DBLCLICK_MS = 250;
+const CLICK_ACTION: ActionId = 'talk_happy';
+const DBLCLICK_ACTION: ActionId = 'talk_annoyed';
+
+let pointerDown = false;
+let dragStarted = false;
+let downClientX = 0;
+let downClientY = 0;
 let offsetX = 0;
 let offsetY = 0;
 let rafPending = false;
 let lastScreenX = 0;
 let lastScreenY = 0;
+let clickTimer: ReturnType<typeof setTimeout> | null = null;
 
 stage.addEventListener('pointerdown', (e) => {
-  dragging = true;
+  if (e.button !== 0) return; // 右键走 contextmenu
+  pointerDown = true;
+  dragStarted = false;
+  downClientX = e.clientX;
+  downClientY = e.clientY;
   offsetX = e.clientX;
   offsetY = e.clientY;
   stage.setPointerCapture(e.pointerId);
-  dispatch({ type: 'POINTER_DOWN' });
+  hideMenu();
 });
 
 stage.addEventListener('pointermove', (e) => {
-  if (!dragging) return;
+  if (!pointerDown) return;
+  if (!dragStarted) {
+    const dx = e.clientX - downClientX;
+    const dy = e.clientY - downClientY;
+    if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD) return;
+    dragStarted = true;
+    dispatch({ type: 'POINTER_DOWN' });
+  }
   lastScreenX = e.screenX;
   lastScreenY = e.screenY;
   if (!rafPending) {
     rafPending = true;
     requestAnimationFrame(() => {
       rafPending = false;
-      if (dragging) {
+      if (dragStarted) {
         window.qbot.pet.move(lastScreenX - offsetX, lastScreenY - offsetY);
       }
     });
@@ -73,7 +95,63 @@ stage.addEventListener('pointermove', (e) => {
 });
 
 stage.addEventListener('pointerup', (e) => {
-  dragging = false;
+  if (e.button !== 0 || !pointerDown) return;
+  pointerDown = false;
   stage.releasePointerCapture(e.pointerId);
-  dispatch({ type: 'POINTER_UP' });
+  if (dragStarted) {
+    dragStarted = false;
+    dispatch({ type: 'POINTER_UP' });
+    return;
+  }
+  // 点击：等 250ms 判断是否双击
+  if (clickTimer) {
+    clearTimeout(clickTimer);
+    clickTimer = null;
+    dispatch({ type: 'PLAY_ACTION', action: DBLCLICK_ACTION });
+  } else {
+    clickTimer = setTimeout(() => {
+      clickTimer = null;
+      dispatch({ type: 'PLAY_ACTION', action: CLICK_ACTION });
+    }, DBLCLICK_MS);
+  }
+});
+
+// ── 右键菜单：指定播放任意动作 ───────────────────────────
+const ACTION_LABELS: Partial<Record<ActionId, string>> = {
+  sleep: '睡觉',
+  tea: '喝茶',
+  talk_happy: '聊天·开心',
+  talk_annoyed: '聊天·嫌弃',
+};
+const menu = document.getElementById('menu')!;
+
+function hideMenu(): void {
+  menu.style.display = 'none';
+}
+
+stage.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  menu.replaceChildren();
+  for (const id of available) {
+    const label = ACTION_LABELS[id];
+    if (!label) continue; // idle/drag 不进菜单
+    const item = document.createElement('div');
+    item.className = 'menu-item';
+    item.textContent = label;
+    item.addEventListener('click', () => {
+      hideMenu();
+      dispatch({ type: 'PLAY_ACTION', action: id });
+    });
+    menu.appendChild(item);
+  }
+  if (!menu.children.length) return;
+  menu.style.display = 'block';
+  // 贴着指针弹出，越界收回窗口内
+  const mw = 120;
+  menu.style.left = `${Math.min(e.clientX, window.innerWidth - mw - 4)}px`;
+  menu.style.top = `${Math.min(e.clientY, window.innerHeight - menu.children.length * 34 - 8)}px`;
+});
+
+document.addEventListener('click', (e) => {
+  if (!menu.contains(e.target as Node)) hideMenu();
 });

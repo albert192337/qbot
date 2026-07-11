@@ -7,7 +7,7 @@ import { charactersDir, getCharacter, listCharacters, seedPresets } from './char
 import { getSettings, setSettings } from './config';
 import { registerIpc } from './ipc';
 import { rebuildTray } from './tray';
-import { createPetWindow, getPetWindow } from './windows';
+import { createPetWindow, getPetWindow, setPetScale } from './windows';
 
 // qbot-asset://<dirId>/<relPath> → userData/characters/<dirId>/<relPath>
 // stream: true 缺失时 <video> 对协议 URL 静默不播（必须 ready 前注册）
@@ -44,6 +44,7 @@ app.whenReady().then(async () => {
 
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
+  if (settings.petScale) setPetScale(settings.petScale);
   const characters = (await listCharacters()).filter((c) => c.manifest);
   const initial =
     characters.find((c) => c.dirId === settings.activeCharacter) ?? characters[0];

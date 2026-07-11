@@ -5,6 +5,14 @@ export { runPipeline, runTurnaround, pickTurnaround, runActions, runPackage } fr
 export type { PipelineHooks } from './stages.js';
 export { createArkClient, toDataUrl } from './ark.js';
 export type { ArkClient } from './ark.js';
-export { resolveFfmpegPath, sampleKeyColor, toWebm, toGif } from './chroma.js';
+export {
+  resolveFfmpegPath,
+  sampleKeyColor,
+  toWebm,
+  toGif,
+  computeAlphaBBox,
+  normalizeFilter,
+  probeSize,
+} from './chroma.js';
 export { checkGreenFrame, checkVideoDrift, classifyDrift } from './qc.js';
 export { turnaroundPrompt, framePrompt, videoPrompt, ACTIONS, DEFAULT_CHARACTER_DESC } from './prompts.js';

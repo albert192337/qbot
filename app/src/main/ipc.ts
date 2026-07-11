@@ -5,7 +5,7 @@ import { writeFile } from 'node:fs/promises';
 import { app } from 'electron';
 import { getCharacter, listCharacters, renameCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { movePetWindow, getPetWindow, createPetWindow } from './windows';
+import { movePetWindow, getPetWindow, createPetWindow, setPetScale } from './windows';
 import { pickTurnaround, redoFailed, resumeHatch, startHatch } from './pipeline-bridge';
 import { rebuildTray } from './tray';
 
@@ -53,5 +53,8 @@ export function registerIpc(): void {
 
   // ── settings ───────────────────────────────────────────
   ipcMain.handle('settings:get', () => getSettings());
-  ipcMain.handle('settings:set', (_ev, patch) => setSettings(patch));
+  ipcMain.handle('settings:set', async (_ev, patch) => {
+    await setSettings(patch);
+    if (typeof patch?.petScale === 'number') setPetScale(patch.petScale); // 实时生效
+  });
 }

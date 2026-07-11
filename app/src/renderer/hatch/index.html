@@ -131,9 +131,30 @@
       }
       #card img,
       #card video {
-        width: 200px;
-        height: 200px;
+        width: 132px;
+        height: 132px;
         object-fit: contain;
+      }
+      /* 全动作画廊：2×3 小视频，棋盘格底衬出透明 */
+      #card-actions {
+        display: grid;
+        grid-template-columns: repeat(3, 132px);
+        gap: 10px;
+      }
+      #card-actions figure {
+        margin: 0;
+        text-align: center;
+        font-size: 12px;
+        color: #8a8a8a;
+      }
+      #card-actions video {
+        width: 132px;
+        height: 132px;
+        object-fit: contain;
+        border-radius: 10px;
+        background:
+          conic-gradient(#eee 90deg, #fff 90deg 180deg, #eee 180deg 270deg, #fff 270deg)
+          0 0/16px 16px;
       }
       #card .arrow {
         font-size: 28px;
@@ -193,7 +214,7 @@
       <div id="card">
         <img id="card-source" alt="原图" />
         <div class="arrow">→</div>
-        <video id="card-idle" muted autoplay loop playsinline></video>
+        <div id="card-actions"></div>
       </div>
       <input id="pet-name" type="text" placeholder="给它起个名字…" maxlength="12" />
       <div style="display: flex; gap: 12px">
@@ -206,6 +227,8 @@
       <h1>设置</h1>
       <label class="hint" for="api-key">火山方舟 Ark API Key（孵化新角色时使用）</label>
       <input id="api-key" type="password" placeholder="粘贴你的 API Key" style="width: 340px" />
+      <label class="hint" for="pet-scale">桌宠大小 <span id="pet-scale-value">100%</span></label>
+      <input id="pet-scale" type="range" min="0.5" max="2" step="0.1" value="1" style="width: 260px" />
       <div style="display: flex; gap: 12px">
         <button id="settings-back">返回</button>
         <button id="settings-save" class="primary">保存</button>

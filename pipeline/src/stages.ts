@@ -7,7 +7,15 @@
 import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createArkClient, toDataUrl, type ArkClient } from './ark.js';
-import { resolveFfmpegPath, sampleKeyColor, toGif, toWebm } from './chroma.js';
+import {
+  computeAlphaBBox,
+  normalizeFilter,
+  probeSize,
+  resolveFfmpegPath,
+  sampleKeyColor,
+  toGif,
+  toWebm,
+} from './chroma.js';
 import { framePrompt, turnaroundPrompt, videoPrompt, ACTIONS } from './prompts.js';
 import { checkGreenFrame, checkVideoDrift } from './qc.js';
 import { Job } from './job.js';
@@ -162,10 +170,14 @@ async function runAction(
     const keys = drift.needDoubleKey ? drift.keys : [await sampleKeyColor(videoAbs, ffmpegPath)];
     a.keyColors = keys;
     await job.save();
+    // 尺寸归一化：各动作角色 bbox 高度统一、底边对齐（空 bbox 跳过）
+    const bbox = await computeAlphaBBox(videoAbs, keys, ffmpegPath);
+    const size = await probeSize(videoAbs, ffmpegPath);
+    const normVf = bbox ? normalizeFilter(bbox, size.width, size.height) : undefined;
     const webmAbs = path.join(job.outDir, 'actions', `${action}.webm`);
     const gifAbs = path.join(job.outDir, 'actions', `${action}.gif`);
-    await toWebm(videoAbs, webmAbs, keys, ffmpegPath);
-    await toGif(videoAbs, gifAbs, keys, ffmpegPath);
+    await toWebm(videoAbs, webmAbs, keys, ffmpegPath, normVf);
+    await toGif(videoAbs, gifAbs, keys, ffmpegPath, normVf);
     await job.transition(action, 'done');
   } catch (err) {
     const msg = err instanceof ArkApiError ? `[${err.status}] ${err.message}` : String(err);

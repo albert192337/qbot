@@ -139,11 +139,27 @@ function updateCell(action: ActionId, status: string): void {
 }
 
 // ── certificate 屏 ───────────────────────────────────────
-function showCertificate(): void {
+/** 全动作画廊：生成完的每个动作一个小视频，确认满意再上桌 */
+async function showCertificate(): Promise<void> {
   const source = document.getElementById('card-source') as HTMLImageElement;
-  const idle = document.getElementById('card-idle') as HTMLVideoElement;
   source.src = `qbot-asset://${currentDirId}/source.png`;
-  idle.src = `qbot-asset://${currentDirId}/actions/idle.webm`;
+  const box = document.getElementById('card-actions')!;
+  box.replaceChildren();
+  const meta = (await window.qbot.characters.list()).find((c) => c.dirId === currentDirId);
+  for (const [id, action] of Object.entries(meta?.manifest?.actions ?? {})) {
+    if (action.status !== 'done') continue;
+    const fig = document.createElement('figure');
+    const video = document.createElement('video');
+    video.src = `qbot-asset://${currentDirId}/${action.webm}`;
+    video.muted = true;
+    video.autoplay = true;
+    video.loop = true;
+    video.playsInline = true;
+    const cap = document.createElement('figcaption');
+    cap.textContent = ACTION_LABELS[id as ActionId] ?? id;
+    fig.append(video, cap);
+    box.appendChild(fig);
+  }
   showScreen('certificate');
 }
 
@@ -169,11 +185,27 @@ document.getElementById('go-desk')!.addEventListener('click', async () => {
 // ── settings 屏 ──────────────────────────────────────────
 async function openSettings(): Promise<void> {
   const input = document.getElementById('api-key') as HTMLInputElement;
+  const scale = document.getElementById('pet-scale') as HTMLInputElement;
   const settings = await window.qbot.settings.get();
   input.value = settings.arkApiKey ?? '';
+  scale.value = String(settings.petScale ?? 1);
+  updateScaleLabel();
   document.getElementById('settings-status')!.textContent = '';
   showScreen('settings');
 }
+
+function updateScaleLabel(): void {
+  const scale = document.getElementById('pet-scale') as HTMLInputElement;
+  document.getElementById('pet-scale-value')!.textContent =
+    `${Math.round(parseFloat(scale.value) * 100)}%`;
+}
+
+// 拖滑块实时生效（窗口即画布，直接看到大小变化）
+document.getElementById('pet-scale')!.addEventListener('input', async () => {
+  const scale = document.getElementById('pet-scale') as HTMLInputElement;
+  updateScaleLabel();
+  await window.qbot.settings.set({ petScale: parseFloat(scale.value) });
+});
 
 document.getElementById('settings-save')!.addEventListener('click', async () => {
   const input = document.getElementById('api-key') as HTMLInputElement;
@@ -202,7 +234,7 @@ window.qbot.hatch.onProgress((ev: HatchProgress) => {
       if (ev.action && ev.status) updateCell(ev.action, ev.status);
       break;
     case 'done':
-      showCertificate();
+      void showCertificate();
       break;
     case 'failed':
       showError(`孵化失败：${ev.error ?? '未知错误'}（可回到首页重试）`);

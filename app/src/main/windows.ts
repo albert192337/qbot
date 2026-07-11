@@ -6,6 +6,20 @@ const PET_SIZE = 360;
 
 let petWindow: BrowserWindow | null = null;
 let hatchWindow: BrowserWindow | null = null;
+let petScale = 1;
+
+/** 桌宠缩放（0.5~2）：窗口即画布，改窗口尺寸即改桌宠大小；右下角锚定 */
+export function setPetScale(scale: number): void {
+  petScale = Math.min(2, Math.max(0.5, scale || 1));
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const size = Math.round(PET_SIZE * petScale);
+  const [x, y] = petWindow.getPosition();
+  const [w, h] = petWindow.getSize();
+  // resizable:false 会拦 setSize → 临时放开
+  petWindow.setResizable(true);
+  petWindow.setBounds({ x: x + w - size, y: y + h - size, width: size, height: size });
+  petWindow.setResizable(false);
+}
 
 function rendererUrl(page: 'pet' | 'hatch'): { url?: string; file?: string } {
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -31,11 +45,12 @@ export function getHatchWindow(): BrowserWindow | null {
 export function createPetWindow(): BrowserWindow {
   if (petWindow && !petWindow.isDestroyed()) return petWindow;
   const { workArea } = screen.getPrimaryDisplay();
+  const size = Math.round(PET_SIZE * petScale);
   petWindow = new BrowserWindow({
-    width: PET_SIZE,
-    height: PET_SIZE,
-    x: workArea.x + workArea.width - PET_SIZE - 40,
-    y: workArea.y + workArea.height - PET_SIZE - 20,
+    width: size,
+    height: size,
+    x: workArea.x + workArea.width - size - 40,
+    y: workArea.y + workArea.height - size - 20,
     transparent: true,
     frame: false,
     hasShadow: false, // 不显式关会有残影阴影框

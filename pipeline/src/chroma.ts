@@ -13,9 +13,18 @@ import { promisify } from 'node:util';
 
 const execFileP = promisify(execFile);
 
-/** colorkey 生产参数（DESIGN.md §3.4） */
-export const COLORKEY_SIMILARITY = 0.24;
-export const COLORKEY_BLEND = 0.06;
+/**
+ * colorkey 参数。DESIGN.md §3.4 原值 0.24:0.06，实测会误抠绿色系角色本体
+ * （小青薄荷绿身体出现镂空），收紧到 0.15:0.04 后边缘与本体两头都干净。
+ */
+export const COLORKEY_SIMILARITY = 0.15;
+export const COLORKEY_BLEND = 0.04;
+
+/** 归一化目标：角色包围盒高度占画布比例 / 底边基线位置（所有动作一致 → 视觉等大） */
+export const NORM_TARGET_H = 0.68;
+export const NORM_BASELINE = 0.86;
+const NORM_SCALE_MIN = 0.5;
+const NORM_SCALE_MAX = 2.5;
 
 /** 运行 ffmpeg，args 数组传参（不拼 shell 字符串，免转义问题） */
 async function runFfmpeg(
@@ -108,6 +117,87 @@ function colorkeyFilters(keys: string[]): string {
     .join(',');
 }
 
+/** 视频像素尺寸（解析 ffmpeg stderr，ffmpeg-static 不带 ffprobe） */
+export async function probeSize(
+  videoPath: string,
+  ffmpegPath: string,
+): Promise<{ width: number; height: number }> {
+  const res = await execFileP(ffmpegPath, ['-i', videoPath], {
+    encoding: 'utf8',
+  }).catch((e: { stderr?: string }) => ({ stdout: '', stderr: e.stderr ?? '' }));
+  const stderr = (res as { stderr: string }).stderr ?? '';
+  const m = stderr.match(/Video:.* (\d{2,5})x(\d{2,5})/);
+  if (!m) throw new Error(`cannot probe video size: ${videoPath}`);
+  return { width: parseInt(m[1]!, 10), height: parseInt(m[2]!, 10) };
+}
+
+/**
+ * 抠像后 alpha 包围盒（全帧 union，归一化 [0,1] 坐标）。
+ * 低清代理（160px、4fps）扫 alpha > 32 的像素，误差 <1% 对归一化足够。
+ * 全透明（空内容）返回 null，调用方跳过归一化。
+ */
+export async function computeAlphaBBox(
+  videoPath: string,
+  keys: string[],
+  ffmpegPath: string,
+): Promise<{ x0: number; y0: number; x1: number; y1: number } | null> {
+  const P = 160;
+  const raw = await runFfmpeg(ffmpegPath, [
+    '-i', videoPath,
+    '-vf', `fps=4,${colorkeyFilters(keys)},format=yuva420p,alphaextract,scale=${P}:${P}`,
+    '-f', 'rawvideo',
+    '-pix_fmt', 'gray',
+    'pipe:1',
+  ]);
+  const frameBytes = P * P;
+  let minX = P;
+  let minY = P;
+  let maxX = -1;
+  let maxY = -1;
+  for (let off = 0; off + frameBytes <= raw.length; off += frameBytes) {
+    for (let y = 0; y < P; y++) {
+      for (let x = 0; x < P; x++) {
+        if (raw[off + y * P + x]! > 32) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  return { x0: minX / P, y0: minY / P, x1: (maxX + 1) / P, y1: (maxY + 1) / P };
+}
+
+/**
+ * 由包围盒算归一化滤镜段：缩放使 bbox 高 = NORM_TARGET_H×画布，
+ * 底边对齐 NORM_BASELINE、水平居中。透明 pad 出安全边再裁回原画布。
+ */
+export function normalizeFilter(
+  bbox: { x0: number; y0: number; x1: number; y1: number },
+  width: number,
+  height: number,
+): string {
+  const bboxH = (bbox.y1 - bbox.y0) * height;
+  const s = Math.min(
+    NORM_SCALE_MAX,
+    Math.max(NORM_SCALE_MIN, (NORM_TARGET_H * height) / bboxH),
+  );
+  const even = (v: number) => 2 * Math.round(v / 2);
+  const sw = even(width * s);
+  const sh = even(height * s);
+  const M = Math.max(width, height) * 4; // 安全边，保证 crop 不越界
+  const cx = ((bbox.x0 + bbox.x1) / 2) * width * s;
+  const yb = bbox.y1 * height * s;
+  const cropX = Math.round(cx + M - width / 2);
+  const cropY = Math.round(yb + M - NORM_BASELINE * height);
+  return (
+    `scale=${sw}:${sh},pad=iw+${2 * M}:ih+${2 * M}:${M}:${M}:color=black@0,` +
+    `crop=${width}:${height}:${cropX}:${cropY}`
+  );
+}
+
 /**
  * 绿幕 mp4 → 透明 WebM（VP9 + yuva420p）。
  * 两个不显眼但致命的参数：
@@ -119,11 +209,13 @@ export async function toWebm(
   outPath: string,
   keys: string[],
   ffmpegPath: string,
+  normVf?: string,
 ): Promise<void> {
+  const vf = `${colorkeyFilters(keys)},format=yuva420p${normVf ? `,${normVf}` : ''}`;
   await runFfmpeg(ffmpegPath, [
     '-y',
     '-i', inPath,
-    '-vf', `${colorkeyFilters(keys)},format=yuva420p`,
+    '-vf', vf,
     '-c:v', 'libvpx-vp9',
     '-pix_fmt', 'yuva420p',
     '-auto-alt-ref', '0',
@@ -141,10 +233,11 @@ export async function toGif(
   outPath: string,
   keys: string[],
   ffmpegPath: string,
+  normVf?: string,
 ): Promise<void> {
   const vf =
+    `${colorkeyFilters(keys)},format=yuva420p${normVf ? `,${normVf}` : ''},` +
     `fps=20,scale=320:-1:flags=lanczos,` +
-    `${colorkeyFilters(keys)},` +
     `split[a][b];[a]palettegen=reserve_transparent=1:stats_mode=full[p];` +
     `[b][p]paletteuse=alpha_threshold=128:dither=none`;
   await runFfmpeg(ffmpegPath, [
