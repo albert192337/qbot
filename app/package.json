@@ -7,16 +7,19 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dist": "electron-vite build && electron-builder --config electron-builder.yml"
   },
   "dependencies": {
-    "@qbot/pipeline": "*"
+    "ffmpeg-static": "^5.2.0"
   },
   "devDependencies": {
+    "@qbot/pipeline": "*",
+    "@types/node": "^22.0.0",
     "electron": "^37.0.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^4.0.0",
     "vite": "^7.0.0",
-    "vitest": "^3.0.0",
-    "@types/node": "^22.0.0"
+    "vitest": "^3.0.0"
   }
 }

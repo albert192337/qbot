@@ -1,0 +1,20 @@
+appId: dev.qbot.app
+productName: QBot
+# monorepo 提升的 node_modules 里 electron 版本无法从 range 推断 → 显式钉死
+electronVersion: 37.10.3
+directories:
+  output: release
+files:
+  - out/**
+extraResources:
+  - from: resources/presets
+    to: presets
+asarUnpack:
+  - "**/node_modules/ffmpeg-static/**"
+mac:
+  category: public.app-category.entertainment
+  target:
+    - dmg
+  # 本地分发暂不签名；上架/公证时再配 identity + notarize
+  identity: null
+npmRebuild: false
