@@ -14,6 +14,7 @@ import {
   type ActionId,
   type ActionState,
   type ActionStatus,
+  type ImageProvider,
   type JobState,
   type ProgressEvent,
   type Stage,
@@ -46,7 +47,7 @@ export class Job extends EventEmitter {
 
   static async create(
     outDir: string,
-    opts: { refImagePath: string; tier?: 'S' },
+    opts: { refImagePath: string; tier?: 'S'; imageProvider?: ImageProvider },
   ): Promise<Job> {
     const jobDir = path.join(outDir, JOB_DIR);
     await mkdir(jobDir, { recursive: true });
@@ -61,6 +62,7 @@ export class Job extends EventEmitter {
       createdAt: new Date().toISOString(),
       stage: 'turnaround',
       refImage: 'source.png',
+      imageProvider: opts.imageProvider,
       turnaround: { candidates: [], picked: null },
       actions: Object.fromEntries(
         ACTION_IDS.map((id) => [id, initialActionState()]),

@@ -262,6 +262,8 @@ export async function runPipeline(
   cfg: PipelineConfig,
   hooks: PipelineHooks = {},
 ): Promise<Manifest> {
+  // job 创建时选定的生图后端优先（resume/redo 沿用，避免中途换模型串风格）
+  if (job.state.imageProvider) cfg = { ...cfg, imageProvider: job.state.imageProvider };
   const ark = hooks.arkClient ?? createArkClient(cfg);
   const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
   const sleep = hooks.sleep ?? defaultSleep;

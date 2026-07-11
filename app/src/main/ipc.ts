@@ -3,6 +3,7 @@ import { BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { app } from 'electron';
+import type { ImageProvider } from '@qbot/pipeline';
 import { getCharacter, listCharacters, renameCharacter } from './characters';
 import { getSettings, setSettings } from './config';
 import { movePetWindow, getPetWindow, createPetWindow, setPetScale } from './windows';
@@ -11,7 +12,9 @@ import { rebuildTray } from './tray';
 
 export function registerIpc(): void {
   // ── hatch ──────────────────────────────────────────────
-  ipcMain.handle('hatch:start', (_ev, refImagePath: string) => startHatch(refImagePath));
+  ipcMain.handle('hatch:start', (_ev, refImagePath: string, imageProvider?: ImageProvider) =>
+    startHatch(refImagePath, imageProvider),
+  );
   ipcMain.handle('hatch:resume', (_ev, dirId: string) => resumeHatch(dirId));
   ipcMain.handle('hatch:redo', (_ev, dirId: string) => redoFailed(dirId));
   ipcMain.handle('hatch:pickTurnaround', (_ev, dirId: string, index: number) =>

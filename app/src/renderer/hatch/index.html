@@ -189,6 +189,11 @@
         <div style="font-size: 40px">🥚</div>
         <div>把角色图片拖到这里</div>
       </div>
+      <div id="provider-row" class="hint">
+        生图模型：
+        <label><input type="radio" name="image-provider" value="seedream" checked /> 火山 Seedream</label>
+        <label><input type="radio" name="image-provider" value="gpt-image-2" /> GPT-Image-2（慢，约 5 分钟/张）</label>
+      </div>
       <p class="hint">
         一张图一个角色，画面清晰、全身或半身为佳<br />
         孵化约需 20 分钟，期间可以关掉这个窗口
@@ -227,6 +232,8 @@
       <h1>设置</h1>
       <label class="hint" for="api-key">火山方舟 Ark API Key（孵化新角色时使用）</label>
       <input id="api-key" type="password" placeholder="粘贴你的 API Key" style="width: 340px" />
+      <label class="hint" for="gpt-image-key">GPT-Image-2 API Key（选用该生图模型时需要）</label>
+      <input id="gpt-image-key" type="password" placeholder="sk-…" style="width: 340px" />
       <label class="hint" for="pet-scale">桌宠大小 <span id="pet-scale-value">100%</span></label>
       <input id="pet-scale" type="range" min="0.5" max="2" step="0.1" value="1" style="width: 260px" />
       <div style="display: flex; gap: 12px">

@@ -5,6 +5,7 @@
  * - 轮询节奏由 stages 层控制，这里只提供单次 getVideoTask（断点续跑需要）。
  */
 import { writeFile } from 'node:fs/promises';
+import { createGptImageGenerator } from './gpt-image.js';
 import {
   ArkApiError,
   DEFAULTS,
@@ -39,6 +40,9 @@ export function createArkClient(
   fetchImpl: typeof fetch = globalThis.fetch,
 ): ArkClient {
   const baseUrl = cfg.baseUrl ?? DEFAULTS.baseUrl;
+  // 生图可切后端；视频始终走 Ark Seedance
+  const gptImage =
+    cfg.imageProvider === 'gpt-image-2' ? createGptImageGenerator(cfg) : null;
   const headers = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${cfg.apiKey}`,
@@ -73,6 +77,7 @@ export function createArkClient(
 
   return {
     async generateImage(opts) {
+      if (gptImage) return gptImage(opts);
       const body: Record<string, unknown> = {
         model: cfg.imageModel ?? DEFAULTS.imageModel,
         prompt: opts.prompt,

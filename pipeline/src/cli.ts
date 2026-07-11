@@ -26,6 +26,11 @@ function getApiKey(optKey?: string): string {
   return key;
 }
 
+/** gpt-image-2 的 key：--gpt-image-key > GPT_IMAGE_API_KEY 环境变量（选了该后端才必需） */
+function gptImageKey(optKey?: string): string | undefined {
+  return optKey ?? process.env.GPT_IMAGE_API_KEY;
+}
+
 function printProgress(ev: ProgressEvent): void {
   const parts = [`[${ev.stage}]`];
   if (ev.action) parts.push(`${ev.action} → ${ev.status}`);
@@ -64,10 +69,16 @@ program
   .option('--tier <tier>', '动作档位', 'S')
   .option('--auto-pick <n>', '自动选择第 N 张三视图候选（跳过交互）')
   .option('--api-key <key>', 'Ark API key（默认读 ARK_API_KEY）')
+  .option('--image-provider <p>', '生图后端 seedream|gpt-image-2', 'seedream')
+  .option('--gpt-image-key <key>', 'gpt-image-2 API key（默认读 GPT_IMAGE_API_KEY）')
   .action(async (opts) => {
-    const cfg: PipelineConfig = { apiKey: getApiKey(opts.apiKey) };
+    const cfg: PipelineConfig = {
+      apiKey: getApiKey(opts.apiKey),
+      gptImageApiKey: gptImageKey(opts.gptImageKey),
+    };
     const job = await Job.create(path.resolve(opts.out), {
       refImagePath: path.resolve(opts.ref),
+      imageProvider: opts.imageProvider === 'gpt-image-2' ? 'gpt-image-2' : undefined,
     });
     job.on('progress', printProgress);
     const pickCandidate =
@@ -89,8 +100,12 @@ program
   .requiredOption('--job <dir>', '资产包目录')
   .option('--auto-pick <n>', '自动选择三视图候选')
   .option('--api-key <key>', 'Ark API key')
+  .option('--gpt-image-key <key>', 'gpt-image-2 API key（job 用该后端时需要）')
   .action(async (opts) => {
-    const cfg: PipelineConfig = { apiKey: getApiKey(opts.apiKey) };
+    const cfg: PipelineConfig = {
+      apiKey: getApiKey(opts.apiKey),
+      gptImageApiKey: gptImageKey(opts.gptImageKey),
+    };
     const job = await Job.load(path.resolve(opts.job));
     job.on('progress', printProgress);
     const pickCandidate =
@@ -107,14 +122,20 @@ program
   .requiredOption('--job <dir>', '资产包目录')
   .requiredOption('--action <id>', `动作 ID（${ACTION_IDS.join('/')}）`)
   .option('--api-key <key>', 'Ark API key')
+  .option('--gpt-image-key <key>', 'gpt-image-2 API key（job 用该后端时需要）')
   .action(async (opts) => {
     const action = opts.action as ActionId;
     if (!ACTION_IDS.includes(action)) {
       console.error(`error: unknown action ${action}`);
       process.exit(1);
     }
-    const cfg: PipelineConfig = { apiKey: getApiKey(opts.apiKey) };
+    const cfg: PipelineConfig = {
+      apiKey: getApiKey(opts.apiKey),
+      gptImageApiKey: gptImageKey(opts.gptImageKey),
+    };
     const job = await Job.load(path.resolve(opts.job));
+    // 沿用 job 创建时选定的生图后端
+    if (job.state.imageProvider) cfg.imageProvider = job.state.imageProvider;
     job.on('progress', printProgress);
     // 重置该动作后走正常 actions 流程（其余动作已 done 会被跳过）
     job.state.actions[action] = {

@@ -5,6 +5,8 @@ export { runPipeline, runTurnaround, pickTurnaround, runActions, runPackage } fr
 export type { PipelineHooks } from './stages.js';
 export { createArkClient, toDataUrl } from './ark.js';
 export type { ArkClient } from './ark.js';
+export { createGptImageGenerator } from './gpt-image.js';
+export type { HttpPost } from './gpt-image.js';
 export {
   resolveFfmpegPath,
   sampleKeyColor,

@@ -14,6 +14,7 @@ import {
   createArkClient,
   resolveFfmpegPath,
   ACTION_IDS,
+  type ImageProvider,
   type PipelineConfig,
   type ProgressEvent,
 } from '@qbot/pipeline';
@@ -52,6 +53,7 @@ async function buildConfig(): Promise<PipelineConfig> {
   const ffmpegPath = await resolveFfmpegPath();
   return {
     apiKey: settings.arkApiKey,
+    gptImageApiKey: settings.gptImageApiKey,
     // 打包后 ffmpeg-static 在 asar 里不可执行 → 换 unpacked 路径
     ffmpegPath: ffmpegPath.replace('app.asar', 'app.asar.unpacked'),
   };
@@ -103,11 +105,17 @@ function runJob(dirId: string, job: Job): void {
 }
 
 /** 丢图开始孵化：新建角色目录 + job，返回 dirId */
-export async function startHatch(refImagePath: string): Promise<string> {
+export async function startHatch(
+  refImagePath: string,
+  imageProvider?: ImageProvider,
+): Promise<string> {
+  if (imageProvider === 'gpt-image-2' && !(await getSettings()).gptImageApiKey) {
+    throw new Error('未配置 gpt-image-2 API key（托盘 → 设置）');
+  }
   const dirId = randomUUID();
   const outDir = path.join(charactersDir(), dirId);
   await mkdir(outDir, { recursive: true });
-  const job = await Job.create(outDir, { refImagePath });
+  const job = await Job.create(outDir, { refImagePath, imageProvider });
   runJob(dirId, job);
   return dirId;
 }
@@ -145,6 +153,8 @@ export async function redoFailed(dirId: string): Promise<void> {
   job.on('progress', (ev: ProgressEvent) => broadcast(dirId, ev));
   try {
     const cfg = await buildConfig();
+    // 沿用 job 创建时选定的生图后端
+    if (job.state.imageProvider) cfg.imageProvider = job.state.imageProvider;
     const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
     await runActions(job, createArkClient(cfg), ffmpegPath);
     await runPackage(job);

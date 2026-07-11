@@ -41,6 +41,12 @@ export interface PipelineConfig {
   baseUrl?: string;
   /** ffmpeg 可执行文件路径；默认 fallback 到 ffmpeg-static（app 打包时需替换 asar.unpacked 路径后注入） */
   ffmpegPath?: string;
+  /** 生图后端：默认 seedream（Ark）；gpt-image-2 走 aiartmirror（慢但风格不同） */
+  imageProvider?: ImageProvider;
+  /** gpt-image-2 的 API key（imageProvider = gpt-image-2 时必填） */
+  gptImageApiKey?: string;
+  /** 默认 https://www.aiartmirror.com/v1 */
+  gptImageBaseUrl?: string;
   /** 默认 doubao-seedream-5.0-lite */
   imageModel?: string;
   /** 默认 doubao-seedance-1.5-pro */
@@ -48,6 +54,9 @@ export interface PipelineConfig {
   /** 动作并发数，默认 6 */
   concurrency?: number;
 }
+
+/** 生图后端；视频始终走 Ark Seedance */
+export type ImageProvider = 'seedream' | 'gpt-image-2';
 
 /** manifest.json 中单动作条目（spec §4） */
 export interface ManifestAction {
@@ -106,6 +115,8 @@ export interface JobState {
   stage: Stage;
   /** 相对资产包根目录 */
   refImage: string;
+  /** 创建时选定的生图后端（resume/redo 沿用，避免中途换模型串风格）；缺省 = seedream */
+  imageProvider?: ImageProvider;
   turnaround: {
     /** 相对 .job/ 的候选图路径 */
     candidates: string[];
@@ -139,6 +150,8 @@ export const DEFAULTS = {
   imageModel: 'doubao-seedream-5.0-lite',
   // 注意：1.5-pro 不支持 duration 3，动作时长至少 5s
   videoModel: 'doubao-seedance-1.5-pro',
+  gptImageBaseUrl: 'https://www.aiartmirror.com/v1',
+  gptImageModel: 'gpt-image-2',
   concurrency: 6,
 } as const;
 

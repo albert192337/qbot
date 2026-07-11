@@ -1,5 +1,5 @@
 /** 渲染进程与主进程共享的 IPC 类型（preload 契约） */
-import type { Manifest, ProgressEvent } from '@qbot/pipeline';
+import type { ImageProvider, Manifest, ProgressEvent } from '@qbot/pipeline';
 
 export interface CharacterMeta {
   /** 目录名（qbot-asset:// 的 host） */
@@ -11,6 +11,8 @@ export interface CharacterMeta {
 
 export interface Settings {
   arkApiKey?: string;
+  /** gpt-image-2 生图后端的 API key（选了该后端才需要） */
+  gptImageApiKey?: string;
   activeCharacter?: string;
   /** 桌宠缩放倍数（0.5~2，默认 1 = 360px 窗口） */
   petScale?: number;
@@ -25,8 +27,8 @@ export interface HatchProgress extends ProgressEvent {
 
 export interface QBotApi {
   hatch: {
-    /** 丢图开始孵化，返回角色目录 ID */
-    start(refImagePath: string): Promise<string>;
+    /** 丢图开始孵化，返回角色目录 ID；imageProvider 缺省 = seedream */
+    start(refImagePath: string, imageProvider?: ImageProvider): Promise<string>;
     /** 续跑一个未完成的孵化 */
     resume(dirId: string): Promise<void>;
     /** 重试已完成角色的失败动作 */

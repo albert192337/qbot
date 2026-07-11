@@ -44,7 +44,18 @@ dropzone.addEventListener('drop', async (e) => {
   }
   showError(null);
   const refPath = window.qbot.hatch.getPathForFile(file);
-  currentDirId = await window.qbot.hatch.start(refPath);
+  const provider = (
+    document.querySelector('input[name="image-provider"]:checked') as HTMLInputElement
+  )?.value;
+  try {
+    currentDirId = await window.qbot.hatch.start(
+      refPath,
+      provider === 'gpt-image-2' ? 'gpt-image-2' : undefined,
+    );
+  } catch (err) {
+    showError(String(err instanceof Error ? err.message : err));
+    return;
+  }
   buildProgressGrid();
   showScreen('progress'); // 三视图生成中；awaiting_pick 事件到达后切 pick 屏
 });
@@ -144,8 +155,8 @@ async function showCertificate(): Promise<void> {
   const source = document.getElementById('card-source') as HTMLImageElement;
   source.src = `qbot-asset://${currentDirId}/source.png`;
   const box = document.getElementById('card-actions')!;
-  box.replaceChildren();
   const meta = (await window.qbot.characters.list()).find((c) => c.dirId === currentDirId);
+  const figs: HTMLElement[] = [];
   for (const [id, action] of Object.entries(meta?.manifest?.actions ?? {})) {
     if (action.status !== 'done') continue;
     const fig = document.createElement('figure');
@@ -158,8 +169,10 @@ async function showCertificate(): Promise<void> {
     const cap = document.createElement('figcaption');
     cap.textContent = ACTION_LABELS[id as ActionId] ?? id;
     fig.append(video, cap);
-    box.appendChild(fig);
+    figs.push(fig);
   }
+  // 一次性原子替换：done 事件重复触发时两次 await 交错也不会翻倍
+  box.replaceChildren(...figs);
   showScreen('certificate');
 }
 
@@ -185,9 +198,11 @@ document.getElementById('go-desk')!.addEventListener('click', async () => {
 // ── settings 屏 ──────────────────────────────────────────
 async function openSettings(): Promise<void> {
   const input = document.getElementById('api-key') as HTMLInputElement;
+  const gptInput = document.getElementById('gpt-image-key') as HTMLInputElement;
   const scale = document.getElementById('pet-scale') as HTMLInputElement;
   const settings = await window.qbot.settings.get();
   input.value = settings.arkApiKey ?? '';
+  gptInput.value = settings.gptImageApiKey ?? '';
   scale.value = String(settings.petScale ?? 1);
   updateScaleLabel();
   document.getElementById('settings-status')!.textContent = '';
@@ -209,7 +224,11 @@ document.getElementById('pet-scale')!.addEventListener('input', async () => {
 
 document.getElementById('settings-save')!.addEventListener('click', async () => {
   const input = document.getElementById('api-key') as HTMLInputElement;
-  await window.qbot.settings.set({ arkApiKey: input.value.trim() });
+  const gptInput = document.getElementById('gpt-image-key') as HTMLInputElement;
+  await window.qbot.settings.set({
+    arkApiKey: input.value.trim(),
+    gptImageApiKey: gptInput.value.trim(),
+  });
   document.getElementById('settings-status')!.textContent = '已保存 ✓';
 });
 
