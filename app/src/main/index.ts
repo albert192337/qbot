@@ -18,6 +18,12 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
+// 多开支持：QBOT_USER_DATA 指定独立数据目录（单实例锁按 userData 隔离，
+// 各实例有自己的角色库/配置/托盘 → 桌面同时养多只）
+if (process.env.QBOT_USER_DATA) {
+  app.setPath('userData', path.resolve(process.env.QBOT_USER_DATA));
+}
+
 // 桌宠常驻单实例
 if (!app.requestSingleInstanceLock()) {
   app.quit();

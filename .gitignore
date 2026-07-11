@@ -9,3 +9,6 @@ config*.local.json
 pipeline/test/tmp/
 app/resources/presets/**/.job/
 assets/*/.job/
+
+# brainstorming visual companion sessions
+.superpowers/
