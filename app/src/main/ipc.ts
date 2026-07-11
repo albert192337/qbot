@@ -59,7 +59,8 @@ export function registerIpc(): void {
   // ── settings ───────────────────────────────────────────
   ipcMain.handle('settings:get', () => getSettings());
   ipcMain.handle('settings:set', async (_ev, patch) => {
-    await setSettings(patch);
+    const next = await setSettings(patch);
     if (typeof patch?.petScale === 'number') setPetScale(patch.petScale); // 实时生效
+    getPetWindow()?.webContents.send('settings:changed', next); // 语音设置实时生效
   });
 }

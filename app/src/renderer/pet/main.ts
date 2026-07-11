@@ -1,7 +1,8 @@
-/** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 */
+/** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 */
 import type { ActionId } from '@qbot/pipeline';
 import { Player } from './player';
 import { randomDelay, step, type PetState } from './state-machine';
+import { DEFAULT_VOICE_SETTINGS, Speaker, type VoiceSettings } from './voice/speak';
 
 const stage = document.getElementById('stage')!;
 const rng = { random: () => Math.random() };
@@ -11,6 +12,28 @@ let available: ActionId[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 const player = new Player(stage, () => dispatch({ type: 'VIDEO_ENDED' }));
+
+const speaker = new Speaker({
+  bubble: document.getElementById('bubble')!,
+  canSpeak: () => state.kind === 'idle',
+  playAction: (action) => dispatch({ type: 'PLAY_ACTION', action }),
+  hasAction: (action) => available.includes(action),
+});
+
+function voiceSettings(s: {
+  voiceEnabled?: boolean;
+  voiceVolume?: number;
+  talkFrequency?: VoiceSettings['talkFrequency'];
+}): VoiceSettings {
+  return {
+    voiceEnabled: s.voiceEnabled ?? DEFAULT_VOICE_SETTINGS.voiceEnabled,
+    voiceVolume: s.voiceVolume ?? DEFAULT_VOICE_SETTINGS.voiceVolume,
+    talkFrequency: s.talkFrequency ?? DEFAULT_VOICE_SETTINGS.talkFrequency,
+  };
+}
+
+void window.qbot.settings.get().then((s) => speaker.setSettings(voiceSettings(s)));
+window.qbot.settings.onChanged((s) => speaker.setSettings(voiceSettings(s)));
 
 function scheduleTimer(): void {
   clearTimer();
@@ -39,6 +62,7 @@ window.qbot.characters.onActivated((meta) => {
   state = { kind: 'idle' };
   player.play('idle');
   scheduleTimer();
+  speaker.setCharacter(meta.manifest.id, meta.manifest.voice);
 });
 
 // ── 指针交互 ─────────────────────────────────────────────
@@ -79,6 +103,7 @@ stage.addEventListener('pointermove', (e) => {
     const dy = e.clientY - downClientY;
     if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD) return;
     dragStarted = true;
+    speaker.interrupt(); // 拖拽瞬间：气泡消失、语音停止
     dispatch({ type: 'POINTER_DOWN' });
   }
   lastScreenX = e.screenX;

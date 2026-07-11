@@ -55,6 +55,11 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
     }
     try {
       const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest;
+      if (!manifest.voice) {
+        // 声线懒迁移：老角色首次被列出时按 id 哈希分配并写回，之后永久稳定
+        manifest.voice = assignVoice(manifest.id);
+        await writeManifest(manifestPath, manifest);
+      }
       out.push({ dirId: entry.name, manifest, hasUnfinishedJob: false });
     } catch {
       /* 损坏的包跳过 */
@@ -68,12 +73,17 @@ export async function getCharacter(dirId: string): Promise<CharacterMeta | null>
   return all.find((c) => c.dirId === dirId) ?? null;
 }
 
+/** 原子写 manifest（避免读到半截 JSON） */
+async function writeManifest(manifestPath: string, manifest: Manifest): Promise<void> {
+  const tmp = `${manifestPath}.tmp`;
+  await writeFile(tmp, JSON.stringify(manifest, null, 2));
+  await rename(tmp, manifestPath);
+}
+
 /** 改名：写回 manifest.json（原子写，避免读到半截 JSON） */
 export async function renameCharacter(dirId: string, name: string): Promise<void> {
   const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest;
   manifest.name = name.trim() || manifest.name;
-  const tmp = `${manifestPath}.tmp`;
-  await writeFile(tmp, JSON.stringify(manifest, null, 2));
-  await rename(tmp, manifestPath);
+  await writeManifest(manifestPath, manifest);
 }

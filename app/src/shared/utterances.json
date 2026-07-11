@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "utterances": [
+    { "id": "idle-001", "text": "今天也要加油哦！", "mood": "happy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-002", "text": "嘿嘿，被你发现啦～", "mood": "happy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-003", "text": "干活干活，冲鸭！", "mood": "happy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-004", "text": "哼哼哼哼～", "mood": "happy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-005", "text": "今天天气真不错呀！", "mood": "happy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-006", "text": "转圈圈，转圈圈～", "mood": "happy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-007", "text": "你在的话，我就开心！", "mood": "happy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-008", "text": "耶！又是新的一天！", "mood": "happy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-009", "text": "我跳个舞给你看！", "mood": "happy", "scenes": ["idle"], "weight": 1 },
+
+    { "id": "idle-101", "text": "唔……在想事情。", "mood": "neutral", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-102", "text": "桌面今天也很宽敞。", "mood": "neutral", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-103", "text": "我就在这儿待着。", "mood": "neutral", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-104", "text": "嗯，一切正常。", "mood": "neutral", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-105", "text": "数一数，一二三四。", "mood": "neutral", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-106", "text": "喝口茶休息一下吧。", "mood": "neutral", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-107", "text": "今天做了什么呀。", "mood": "neutral", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-108", "text": "风从哪边吹来的呢。", "mood": "neutral", "scenes": ["idle"], "weight": 1 },
+
+    { "id": "idle-201", "text": "有点困了呢……", "mood": "sleepy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-202", "text": "呼啊……打个哈欠。", "mood": "sleepy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-203", "text": "眯一会儿，就一会儿。", "mood": "sleepy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-204", "text": "梦里有好多小鱼干。", "mood": "sleepy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-205", "text": "枕头呢，我的枕头呢。", "mood": "sleepy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-206", "text": "晚安要早点说哦。", "mood": "sleepy", "scenes": ["idle"], "weight": 1 },
+
+    { "id": "idle-301", "text": "你在忙什么呀？", "mood": "curious", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-302", "text": "那个是什么呀？", "mood": "curious", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-303", "text": "今天有什么新鲜事？", "mood": "curious", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-304", "text": "咦？刚刚有声音吗？", "mood": "curious", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-305", "text": "点我一下会怎样呢？", "mood": "curious", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-306", "text": "外面是什么样子的？", "mood": "curious", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-307", "text": "你猜我在想什么？", "mood": "curious", "scenes": ["idle"], "weight": 1 },
+
+    { "id": "idle-401", "text": "哼，不理你了。", "mood": "annoyed", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-402", "text": "怎么还不下班呀！", "mood": "annoyed", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-403", "text": "好无聊啊……", "mood": "annoyed", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-404", "text": "都没人陪我玩。", "mood": "annoyed", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-405", "text": "唔，今天有点烦躁。", "mood": "annoyed", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-406", "text": "喂，看我一眼嘛！", "mood": "annoyed", "scenes": ["idle"], "weight": 1 }
+  ]
+}

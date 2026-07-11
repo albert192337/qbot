@@ -241,6 +241,24 @@
       <input id="gpt-image-key" type="password" placeholder="sk-…" style="width: 340px" />
       <label class="hint" for="pet-scale">桌宠大小 <span id="pet-scale-value">100%</span></label>
       <input id="pet-scale" type="range" min="0.5" max="2" step="0.1" value="1" style="width: 260px" />
+      <label class="hint">语音</label>
+      <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+        <label style="display: flex; gap: 6px; align-items: center; font-size: 13px">
+          <input id="voice-enabled" type="checkbox" checked /> 开启叽歪语音
+        </label>
+        <label style="display: flex; gap: 6px; align-items: center; font-size: 13px">
+          音量 <input id="voice-volume" type="range" min="0" max="100" step="5" value="70" style="width: 120px" />
+          <span id="voice-volume-value">70</span>
+        </label>
+        <label style="display: flex; gap: 6px; align-items: center; font-size: 13px">
+          说话频率
+          <select id="talk-frequency">
+            <option value="quiet">安静</option>
+            <option value="normal" selected>正常</option>
+            <option value="chatty">话痨</option>
+          </select>
+        </label>
+      </div>
       <div style="display: flex; gap: 12px">
         <button id="settings-back">返回</button>
         <button id="settings-save" class="primary">保存</button>

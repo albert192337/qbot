@@ -209,6 +209,14 @@ async function openSettings(): Promise<void> {
   gptInput.value = settings.gptImageApiKey ?? '';
   scale.value = String(settings.petScale ?? 1);
   updateScaleLabel();
+  (document.getElementById('voice-enabled') as HTMLInputElement).checked =
+    settings.voiceEnabled ?? true;
+  (document.getElementById('voice-volume') as HTMLInputElement).value = String(
+    settings.voiceVolume ?? 70,
+  );
+  updateVolumeLabel();
+  (document.getElementById('talk-frequency') as HTMLSelectElement).value =
+    settings.talkFrequency ?? 'normal';
   document.getElementById('settings-status')!.textContent = '';
   showScreen('settings');
 }
@@ -224,6 +232,29 @@ document.getElementById('pet-scale')!.addEventListener('input', async () => {
   const scale = document.getElementById('pet-scale') as HTMLInputElement;
   updateScaleLabel();
   await window.qbot.settings.set({ petScale: parseFloat(scale.value) });
+});
+
+// ── 语音设置：改动即生效（settings:changed 推给 pet 窗口） ──
+function updateVolumeLabel(): void {
+  const vol = document.getElementById('voice-volume') as HTMLInputElement;
+  document.getElementById('voice-volume-value')!.textContent = vol.value;
+}
+
+document.getElementById('voice-enabled')!.addEventListener('change', async (e) => {
+  await window.qbot.settings.set({ voiceEnabled: (e.target as HTMLInputElement).checked });
+});
+
+document.getElementById('voice-volume')!.addEventListener('input', async (e) => {
+  updateVolumeLabel();
+  await window.qbot.settings.set({
+    voiceVolume: parseInt((e.target as HTMLInputElement).value, 10),
+  });
+});
+
+document.getElementById('talk-frequency')!.addEventListener('change', async (e) => {
+  await window.qbot.settings.set({
+    talkFrequency: (e.target as HTMLSelectElement).value as 'quiet' | 'normal' | 'chatty',
+  });
 });
 
 document.getElementById('settings-save')!.addEventListener('click', async () => {

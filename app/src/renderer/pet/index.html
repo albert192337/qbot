@@ -32,6 +32,34 @@
         object-fit: contain;
         pointer-events: none;
       }
+      #bubble {
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 80%;
+        z-index: 5;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        padding: 7px 12px;
+        font-family: -apple-system, 'PingFang SC', sans-serif;
+        font-size: 13px;
+        line-height: 1.4;
+        color: #3a3a3a;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+        word-break: break-word;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 200ms;
+      }
+      #bubble.show {
+        visibility: visible;
+        opacity: 1;
+      }
+      #bubble.show.fade-out {
+        opacity: 0;
+      }
       #menu {
         display: none;
         position: absolute;
@@ -58,6 +86,7 @@
   </head>
   <body>
     <div id="stage"></div>
+    <div id="bubble"></div>
     <div id="menu"></div>
     <script type="module" src="./main.ts"></script>
   </body>

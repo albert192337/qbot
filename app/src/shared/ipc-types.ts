@@ -16,6 +16,12 @@ export interface Settings {
   activeCharacter?: string;
   /** 桌宠缩放倍数（0.5~2，默认 1 = 360px 窗口） */
   petScale?: number;
+  /** 语音开关（默认 true；关闭时气泡照常出现） */
+  voiceEnabled?: boolean;
+  /** 语音音量 0~100（默认 70） */
+  voiceVolume?: number;
+  /** 自言自语频率（默认 normal） */
+  talkFrequency?: 'quiet' | 'normal' | 'chatty';
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */
@@ -59,6 +65,8 @@ export interface QBotApi {
   settings: {
     get(): Promise<Settings>;
     set(patch: Partial<Settings>): Promise<void>;
+    /** pet 窗口订阅：设置变更实时生效（语音开关/音量/频率等） */
+    onChanged(cb: (settings: Settings) => void): () => void;
   };
   ui: {
     /** 主进程要求切屏（托盘「设置」→ settings 屏） */

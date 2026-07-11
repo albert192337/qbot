@@ -36,6 +36,11 @@ const api: QBotApi = {
   settings: {
     get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
     set: (patch) => ipcRenderer.invoke('settings:set', patch),
+    onChanged: (cb) => {
+      const listener = (_ev: unknown, settings: Settings) => cb(settings);
+      ipcRenderer.on('settings:changed', listener);
+      return () => ipcRenderer.removeListener('settings:changed', listener);
+    },
   },
   ui: {
     onShowScreen: (cb) => {
