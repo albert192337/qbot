@@ -147,7 +147,8 @@
         font-size: 13px;
         text-align: center;
       }
-      #pet-name {
+      #pet-name,
+      #api-key {
         font-size: 15px;
         padding: 9px 14px;
         border-radius: 10px;
@@ -199,6 +200,17 @@
         <button id="save-card">保存卡片</button>
         <button id="go-desk" class="primary">上桌！</button>
       </div>
+    </section>
+
+    <section id="screen-settings" class="screen">
+      <h1>设置</h1>
+      <label class="hint" for="api-key">火山方舟 Ark API Key（孵化新角色时使用）</label>
+      <input id="api-key" type="password" placeholder="粘贴你的 API Key" style="width: 340px" />
+      <div style="display: flex; gap: 12px">
+        <button id="settings-back">返回</button>
+        <button id="settings-save" class="primary">保存</button>
+      </div>
+      <p class="hint" id="settings-status"></p>
     </section>
 
     <script type="module" src="./main.ts"></script>

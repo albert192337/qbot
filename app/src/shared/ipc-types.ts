@@ -27,6 +27,8 @@ export interface QBotApi {
     start(refImagePath: string): Promise<string>;
     /** 续跑一个未完成的孵化 */
     resume(dirId: string): Promise<void>;
+    /** 重试已完成角色的失败动作 */
+    redo(dirId: string): Promise<void>;
     pickTurnaround(dirId: string, index: number): Promise<void>;
     /** index=-1 表示重新生成一轮 */
     onProgress(cb: (ev: HatchProgress) => void): () => void;
@@ -49,6 +51,10 @@ export interface QBotApi {
   settings: {
     get(): Promise<Settings>;
     set(patch: Partial<Settings>): Promise<void>;
+  };
+  ui: {
+    /** 主进程要求切屏（托盘「设置」→ settings 屏） */
+    onShowScreen(cb: (name: string) => void): () => void;
   };
 }
 

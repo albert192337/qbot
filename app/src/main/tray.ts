@@ -1,6 +1,5 @@
 /** 托盘：孵化新角色 / 切换角色 / 设置 / 退出 */
-import { Menu, Tray, app, nativeImage, shell } from 'electron';
-import path from 'node:path';
+import { Menu, Tray, app, nativeImage } from 'electron';
 import { listCharacters } from './characters';
 import { getSettings, setSettings } from './config';
 import { createHatchWindow, createPetWindow, getPetWindow } from './windows';
@@ -57,12 +56,8 @@ export async function rebuildTray(): Promise<void> {
     },
     { type: 'separator' },
     {
-      label: '设置（API key）…',
-      click: async () => {
-        // MVP：引导编辑 config.json（设置页 UI 在切片 5）
-        await setSettings({}); // 确保文件存在
-        void shell.showItemInFolder(path.join(app.getPath('userData'), 'config.json'));
-      },
+      label: '设置…',
+      click: () => createHatchWindow('settings'),
     },
     { type: 'separator' },
     { label: '退出 QBot', click: () => app.quit() },

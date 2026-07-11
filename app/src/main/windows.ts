@@ -56,9 +56,10 @@ export function createPetWindow(): BrowserWindow {
   return petWindow;
 }
 
-export function createHatchWindow(): BrowserWindow {
+export function createHatchWindow(screenName?: 'settings'): BrowserWindow {
   if (hatchWindow && !hatchWindow.isDestroyed()) {
     hatchWindow.focus();
+    if (screenName) hatchWindow.webContents.send('ui:showScreen', screenName);
     return hatchWindow;
   }
   // dock 隐藏时常规窗口聚焦行为异常 → 开孵化窗时临时显示 dock
@@ -81,6 +82,11 @@ export function createHatchWindow(): BrowserWindow {
     void shell.openExternal(url);
     return { action: 'deny' };
   });
+  if (screenName) {
+    hatchWindow.webContents.once('did-finish-load', () => {
+      hatchWindow?.webContents.send('ui:showScreen', screenName);
+    });
+  }
   load(hatchWindow, 'hatch');
   return hatchWindow;
 }

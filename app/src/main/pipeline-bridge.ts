@@ -9,7 +9,11 @@ import path from 'node:path';
 import {
   Job,
   runPipeline,
+  runActions,
+  runPackage,
+  createArkClient,
   resolveFfmpegPath,
+  ACTION_IDS,
   type PipelineConfig,
   type ProgressEvent,
 } from '@qbot/pipeline';
@@ -122,4 +126,37 @@ export function pickTurnaround(dirId: string, index: number): void {
   if (!entry) throw new Error(`no active hatch for ${dirId}`);
   if (!entry.pickResolver) throw new Error('not awaiting pick');
   entry.pickResolver(index);
+}
+
+/** 重试失败动作：重置 failed → pending，走 runActions + runPackage（同 CLI redo） */
+export async function redoFailed(dirId: string): Promise<void> {
+  if (active.has(dirId)) return; // 已在跑
+  const outDir = path.join(charactersDir(), dirId);
+  const job = await Job.load(outDir);
+  const failed = ACTION_IDS.filter((id) => job.state.actions[id]?.status === 'failed');
+  if (!failed.length) return;
+  for (const id of failed) {
+    job.state.actions[id] = { status: 'pending', attempts: { frame: 0, video: 0 } };
+  }
+  await job.save();
+
+  const entry: ActiveHatch = { dirId, job, pickResolver: null, lastCandidates: [] };
+  active.set(dirId, entry);
+  job.on('progress', (ev: ProgressEvent) => broadcast(dirId, ev));
+  try {
+    const cfg = await buildConfig();
+    const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
+    await runActions(job, createArkClient(cfg), ffmpegPath);
+    await runPackage(job);
+    broadcast(dirId, { jobId: job.state.jobId, stage: 'done' });
+    await rebuildTray();
+  } catch (err) {
+    broadcast(dirId, {
+      jobId: job.state.jobId,
+      stage: 'failed',
+      error: String(err instanceof Error ? err.message : err),
+    });
+  } finally {
+    active.delete(dirId);
+  }
 }

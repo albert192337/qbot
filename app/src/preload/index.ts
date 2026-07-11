@@ -6,6 +6,7 @@ const api: QBotApi = {
   hatch: {
     start: (refImagePath) => ipcRenderer.invoke('hatch:start', refImagePath),
     resume: (dirId) => ipcRenderer.invoke('hatch:resume', dirId),
+    redo: (dirId) => ipcRenderer.invoke('hatch:redo', dirId),
     pickTurnaround: (dirId, index) =>
       ipcRenderer.invoke('hatch:pickTurnaround', dirId, index),
     onProgress: (cb) => {
@@ -34,6 +35,13 @@ const api: QBotApi = {
   settings: {
     get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
     set: (patch) => ipcRenderer.invoke('settings:set', patch),
+  },
+  ui: {
+    onShowScreen: (cb) => {
+      const listener = (_ev: unknown, name: string) => cb(name);
+      ipcRenderer.on('ui:showScreen', listener);
+      return () => ipcRenderer.removeListener('ui:showScreen', listener);
+    },
   },
 };
 

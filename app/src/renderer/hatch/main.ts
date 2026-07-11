@@ -14,7 +14,7 @@ const ACTION_LABELS: Record<ActionId, string> = {
 let currentDirId: string | null = null;
 
 // ── 屏幕切换 ─────────────────────────────────────────────
-type ScreenName = 'drop' | 'pick' | 'progress' | 'certificate';
+type ScreenName = 'drop' | 'pick' | 'progress' | 'certificate' | 'settings';
 function showScreen(name: ScreenName): void {
   for (const s of document.querySelectorAll<HTMLElement>('.screen')) {
     s.classList.toggle('active', s.id === `screen-${name}`);
@@ -49,14 +49,12 @@ dropzone.addEventListener('drop', async (e) => {
   showScreen('progress'); // 三视图生成中；awaiting_pick 事件到达后切 pick 屏
 });
 
-/** 启动时检查未完成孵化，提供续跑入口 */
+/** 启动时检查未完成孵化与失败动作，提供续跑/修复入口 */
 async function offerResume(): Promise<void> {
-  const unfinished = (await window.qbot.characters.list()).filter(
-    (c) => c.hasUnfinishedJob,
-  );
+  const characters = await window.qbot.characters.list();
   const area = document.getElementById('resume-area')!;
   area.replaceChildren();
-  for (const c of unfinished) {
+  for (const c of characters.filter((c) => c.hasUnfinishedJob)) {
     const btn = document.createElement('button');
     btn.textContent = `继续上次的孵化（${c.dirId.slice(0, 8)}…）`;
     btn.addEventListener('click', async () => {
@@ -64,6 +62,22 @@ async function offerResume(): Promise<void> {
       buildProgressGrid();
       showScreen('progress');
       await window.qbot.hatch.resume(c.dirId);
+    });
+    area.appendChild(btn);
+  }
+  // 已完成但有失败动作的角色 → 修复入口（重置 failed 后走同一 actions 流程）
+  for (const c of characters.filter((c) => c.manifest)) {
+    const failed = Object.values(c.manifest.actions).filter(
+      (a) => a.status === 'failed',
+    ).length;
+    if (!failed) continue;
+    const btn = document.createElement('button');
+    btn.textContent = `修复「${c.manifest.name}」的 ${failed} 个失败动作`;
+    btn.addEventListener('click', async () => {
+      currentDirId = c.dirId;
+      buildProgressGrid();
+      showScreen('progress');
+      await window.qbot.hatch.redo(c.dirId);
     });
     area.appendChild(btn);
   }
@@ -150,6 +164,30 @@ document.getElementById('go-desk')!.addEventListener('click', async () => {
   const name = (document.getElementById('pet-name') as HTMLInputElement).value.trim();
   if (name) await window.qbot.characters.rename(currentDirId!, name);
   await window.qbot.characters.activate(currentDirId!);
+});
+
+// ── settings 屏 ──────────────────────────────────────────
+async function openSettings(): Promise<void> {
+  const input = document.getElementById('api-key') as HTMLInputElement;
+  const settings = await window.qbot.settings.get();
+  input.value = settings.arkApiKey ?? '';
+  document.getElementById('settings-status')!.textContent = '';
+  showScreen('settings');
+}
+
+document.getElementById('settings-save')!.addEventListener('click', async () => {
+  const input = document.getElementById('api-key') as HTMLInputElement;
+  await window.qbot.settings.set({ arkApiKey: input.value.trim() });
+  document.getElementById('settings-status')!.textContent = '已保存 ✓';
+});
+
+document.getElementById('settings-back')!.addEventListener('click', () => {
+  showScreen('drop');
+  void offerResume();
+});
+
+window.qbot.ui.onShowScreen((name) => {
+  if (name === 'settings') void openSettings();
 });
 
 // ── 进度事件总线 ─────────────────────────────────────────
