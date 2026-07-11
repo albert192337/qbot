@@ -1,0 +1,17 @@
+{
+  "name": "qbot",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "pipeline",
+    "app"
+  ],
+  "scripts": {
+    "test": "npm run test -w pipeline",
+    "dev": "npm run dev -w app",
+    "build": "npm run build -w pipeline && npm run build -w app"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
