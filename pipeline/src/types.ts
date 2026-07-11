@@ -69,6 +69,16 @@ export interface ManifestAction {
   status: 'done' | 'failed';
 }
 
+/** 角色声线（voice spec §5）：首次加载时按 id 哈希分配后写回，永久稳定 */
+export interface ManifestVoice {
+  /** 语音包 id（soft/bouncy/baby，未来可扩）；未知值由客户端按哈希回退 */
+  pack: string;
+  /** 包内音高微调 [0.85, 1.15] */
+  pitchScale: number;
+  /** 包内语速微调 [0.9, 1.1] */
+  rateScale: number;
+}
+
 /** 角色资产包 manifest.json（spec §4，两模块唯一接口） */
 export interface Manifest {
   id: string;
@@ -79,6 +89,8 @@ export interface Manifest {
   turnaround: string;
   actions: Record<ActionId, ManifestAction>;
   pipelineVersion: '1';
+  /** 缺省 = 尚未迁移，app 首次加载时补写 */
+  voice?: ManifestVoice;
 }
 
 /** job 进度事件，pipeline 内部 emit，app 经 IPC 转发给孵化 UI */

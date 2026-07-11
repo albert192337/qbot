@@ -8,6 +8,7 @@ import { cp, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promise
 import path from 'node:path';
 import type { Manifest } from '@qbot/pipeline';
 import type { CharacterMeta } from '../shared/ipc-types';
+import { assignVoice } from '../shared/voice-assign';
 
 export function charactersDir(): string {
   return path.join(app.getPath('userData'), 'characters');

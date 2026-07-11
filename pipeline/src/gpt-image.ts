@@ -18,8 +18,10 @@ export type HttpPost = (
   body: Buffer,
 ) => Promise<{ status: number; body: Buffer }>;
 
-const TIMEOUT_MS = 420_000;
+const TIMEOUT_MS = 900_000; // 1536x1024 实测可能远超 1024 的 288s；420s 会掐在半路（2026-07-11 实翻车）
 const RETRY_DELAYS_MS = [2000, 8000];
+/** 服务端同账号疑似串行处理，并发挂太多只会占着连接排队直到超时 → 客户端限流 */
+const MAX_CONCURRENT = 2;
 
 /** gpt-image 尺寸白名单只有 1024/1536 系；管线内部尺寸按长宽比就近映射 */
 const SIZE_MAP: Record<GenerateImageOpts['size'], string> = {
@@ -89,6 +91,20 @@ export function createGptImageGenerator(
     throw new ArkApiError('gpt-image-2 requires gptImageApiKey', 0, false);
   }
 
+  // 简易信号量：每次 HTTP 尝试占一个槽（退避等待期间让出）
+  let running = 0;
+  const waiters: Array<() => void> = [];
+  async function acquire(): Promise<void> {
+    while (running >= MAX_CONCURRENT) {
+      await new Promise<void>((r) => waiters.push(r));
+    }
+    running++;
+  }
+  function release(): void {
+    running--;
+    waiters.shift()?.();
+  }
+
   async function post(
     url: string,
     headers: Record<string, string>,
@@ -100,11 +116,14 @@ export function createGptImageGenerator(
         await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt - 1]));
       }
       let res: { status: number; body: Buffer };
+      await acquire();
       try {
         res = await httpImpl(url, { Authorization: `Bearer ${apiKey}`, ...headers }, body);
       } catch (err) {
         lastErr = err; // 网络错误/超时 → 重试
         continue;
+      } finally {
+        release();
       }
       const text = res.body.toString('utf8');
       if (res.status >= 200 && res.status < 300) {
