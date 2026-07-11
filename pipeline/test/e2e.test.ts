@@ -69,7 +69,7 @@ describe('pipeline 全流程（fake 模式）', () => {
       ) as Manifest;
       expect(parsed.pipelineVersion).toBe('1');
       expect(parsed.tier).toBe('S');
-      expect(parsed.actions.idle.durationSec).toBe(3);
+      expect(parsed.actions.idle.durationSec).toBe(5);
       expect(parsed.actions.tea.durationSec).toBe(5);
 
       await rm(out, { recursive: true, force: true });

@@ -37,13 +37,13 @@ export type Stage =
 
 export interface PipelineConfig {
   apiKey: string;
-  /** 默认 https://ark.cn-beijing.volces.com/api/v3 */
+  /** 默认 https://ark.cn-beijing.volces.com/api/plan/v3 */
   baseUrl?: string;
   /** ffmpeg 可执行文件路径；默认 fallback 到 ffmpeg-static（app 打包时需替换 asar.unpacked 路径后注入） */
   ffmpegPath?: string;
-  /** 默认 doubao-seedream-5-0-260128 */
+  /** 默认 doubao-seedream-5.0-lite */
   imageModel?: string;
-  /** 默认 doubao-seedance-1-0-pro-250528 */
+  /** 默认 doubao-seedance-1.5-pro */
   videoModel?: string;
   /** 动作并发数，默认 6 */
   concurrency?: number;
@@ -134,9 +134,11 @@ export class ArkApiError extends Error {
 }
 
 export const DEFAULTS = {
-  baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-  imageModel: 'doubao-seedream-5-0-260128',
-  videoModel: 'doubao-seedance-1-0-pro-250528',
+  // plan 端点 + 新 key（2026-07-11 切换）；实测支持 b64_json/图生图/首尾帧/3072x1536
+  baseUrl: 'https://ark.cn-beijing.volces.com/api/plan/v3',
+  imageModel: 'doubao-seedream-5.0-lite',
+  // 注意：1.5-pro 不支持 duration 3，动作时长至少 5s
+  videoModel: 'doubao-seedance-1.5-pro',
   concurrency: 6,
 } as const;
 

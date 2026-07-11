@@ -36,9 +36,9 @@ describe('prompts', () => {
     }
   });
 
-  it('视频模板尾部参数正确（idle/sleep 3s，其余 5s）', () => {
-    expect(videoPrompt('idle')).toContain('--resolution 480p --duration 3 --camerafixed true');
-    expect(videoPrompt('sleep')).toContain('--duration 3');
+  it('视频模板尾部参数正确（seedance 1.5-pro 最短 5s，全部 5s）', () => {
+    expect(videoPrompt('idle')).toContain('--resolution 480p --duration 5 --camerafixed true');
+    expect(videoPrompt('sleep')).toContain('--duration 5');
     expect(videoPrompt('tea')).toContain('--duration 5');
     expect(videoPrompt('drag')).toContain('--duration 5');
   });

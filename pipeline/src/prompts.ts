@@ -33,7 +33,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
       '角色自然站立，双臂自然下垂，表情平静放松。没有手、没有其他任何人物或物体。',
     motionDesc:
       '角色站立原地，身体随呼吸轻微起伏，偶尔眨眼，耳朵和尾巴轻微自然摆动。动作幅度很小。',
-    durationSec: 3,
+    durationSec: 5, // seedance 1.5-pro 最短 5s（3 会 400）
   },
   drag: {
     poseDesc:
@@ -47,7 +47,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
       '角色蜷缩侧躺姿势闭眼熟睡，表情安详。画面中绝对没有床、没有枕头、没有被子，只有角色悬浮在纯绿背景上。没有手、没有其他任何人物或物体。',
     motionDesc:
       '角色闭眼熟睡，身体随呼吸缓慢起伏，耳朵偶尔轻颤。动作幅度很小，安静祥和。',
-    durationSec: 3,
+    durationSec: 5, // seedance 1.5-pro 最短 5s
   },
   tea: {
     poseDesc:
