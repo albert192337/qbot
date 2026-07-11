@@ -17,4 +17,4 @@ export {
   probeSize,
 } from './chroma.js';
 export { checkGreenFrame, checkVideoDrift, classifyDrift } from './qc.js';
-export { turnaroundPrompt, framePrompt, videoPrompt, ACTIONS, DEFAULT_CHARACTER_DESC } from './prompts.js';
+export { turnaroundPrompt, framePrompt, videoPrompt, actionSpec, ACTIONS, ABSTRACT_ACTIONS, DEFAULT_CHARACTER_DESC } from './prompts.js';

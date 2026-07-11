@@ -47,10 +47,14 @@ dropzone.addEventListener('drop', async (e) => {
   const provider = (
     document.querySelector('input[name="image-provider"]:checked') as HTMLInputElement
   )?.value;
+  const form = (
+    document.querySelector('input[name="character-form"]:checked') as HTMLInputElement
+  )?.value;
   try {
     currentDirId = await window.qbot.hatch.start(
       refPath,
       provider === 'gpt-image-2' ? 'gpt-image-2' : undefined,
+      form === 'abstract' ? 'abstract' : undefined,
     );
   } catch (err) {
     showError(String(err instanceof Error ? err.message : err));

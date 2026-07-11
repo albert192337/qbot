@@ -55,7 +55,7 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 export async function runTurnaround(job: Job, ark: ArkClient): Promise<string[]> {
   await job.setStage('turnaround');
   const refPng = await readFile(path.join(job.outDir, job.state.refImage));
-  const prompt = turnaroundPrompt();
+  const prompt = turnaroundPrompt(undefined, job.state.characterForm);
   const buffers = await Promise.all(
     Array.from({ length: TURNAROUND_CANDIDATES }, () =>
       ark.generateImage({
@@ -107,7 +107,7 @@ async function runAction(
           attempts: { ...a.attempts, frame: a.attempts.frame + 1 },
         });
         const frameBuf = await ark.generateImage({
-          prompt: framePrompt(action),
+          prompt: framePrompt(action, undefined, job.state.characterForm),
           refImageDataUrl: toDataUrl(turnaroundPng),
           size: IMAGE_SIZES.frame,
         });
@@ -133,7 +133,7 @@ async function runAction(
         });
         const frameBuf = await readFile(job.jobPath(a.framePath!));
         const taskId = await ark.submitVideoTask({
-          prompt: videoPrompt(action),
+          prompt: videoPrompt(action, job.state.characterForm),
           frameDataUrl: toDataUrl(frameBuf),
         });
         await job.transition(action, 'generating_video', { videoTaskId: taskId });

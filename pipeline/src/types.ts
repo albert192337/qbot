@@ -58,6 +58,9 @@ export interface PipelineConfig {
 /** 生图后端；视频始终走 Ark Seedance */
 export type ImageProvider = 'seedream' | 'gpt-image-2';
 
+/** 角色形态：humanoid = 人形/兽形具象（默认）；abstract = 线条小狗、简笔涂鸦等抽象角色 */
+export type CharacterForm = 'humanoid' | 'abstract';
+
 /** manifest.json 中单动作条目（spec §4） */
 export interface ManifestAction {
   webm: string;
@@ -117,6 +120,8 @@ export interface JobState {
   refImage: string;
   /** 创建时选定的生图后端（resume/redo 沿用，避免中途换模型串风格）；缺省 = seedream */
   imageProvider?: ImageProvider;
+  /** 创建时选定的角色形态（决定整套 prompt 措辞）；缺省 = humanoid */
+  characterForm?: CharacterForm;
   turnaround: {
     /** 相对 .job/ 的候选图路径 */
     candidates: string[];

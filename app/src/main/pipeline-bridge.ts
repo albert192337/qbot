@@ -14,6 +14,7 @@ import {
   createArkClient,
   resolveFfmpegPath,
   ACTION_IDS,
+  type CharacterForm,
   type ImageProvider,
   type PipelineConfig,
   type ProgressEvent,
@@ -108,6 +109,7 @@ function runJob(dirId: string, job: Job): void {
 export async function startHatch(
   refImagePath: string,
   imageProvider?: ImageProvider,
+  characterForm?: CharacterForm,
 ): Promise<string> {
   if (imageProvider === 'gpt-image-2' && !(await getSettings()).gptImageApiKey) {
     throw new Error('未配置 gpt-image-2 API key（托盘 → 设置）');
@@ -115,7 +117,7 @@ export async function startHatch(
   const dirId = randomUUID();
   const outDir = path.join(charactersDir(), dirId);
   await mkdir(outDir, { recursive: true });
-  const job = await Job.create(outDir, { refImagePath, imageProvider });
+  const job = await Job.create(outDir, { refImagePath, imageProvider, characterForm });
   runJob(dirId, job);
   return dirId;
 }

@@ -1,5 +1,5 @@
 /** 渲染进程与主进程共享的 IPC 类型（preload 契约） */
-import type { ImageProvider, Manifest, ProgressEvent } from '@qbot/pipeline';
+import type { CharacterForm, ImageProvider, Manifest, ProgressEvent } from '@qbot/pipeline';
 
 export interface CharacterMeta {
   /** 目录名（qbot-asset:// 的 host） */
@@ -27,8 +27,12 @@ export interface HatchProgress extends ProgressEvent {
 
 export interface QBotApi {
   hatch: {
-    /** 丢图开始孵化，返回角色目录 ID；imageProvider 缺省 = seedream */
-    start(refImagePath: string, imageProvider?: ImageProvider): Promise<string>;
+    /** 丢图开始孵化，返回角色目录 ID；imageProvider 缺省 = seedream，characterForm 缺省 = humanoid */
+    start(
+      refImagePath: string,
+      imageProvider?: ImageProvider,
+      characterForm?: CharacterForm,
+    ): Promise<string>;
     /** 续跑一个未完成的孵化 */
     resume(dirId: string): Promise<void>;
     /** 重试已完成角色的失败动作 */

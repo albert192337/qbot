@@ -71,6 +71,7 @@ program
   .option('--api-key <key>', 'Ark API key（默认读 ARK_API_KEY）')
   .option('--image-provider <p>', '生图后端 seedream|gpt-image-2', 'seedream')
   .option('--gpt-image-key <key>', 'gpt-image-2 API key（默认读 GPT_IMAGE_API_KEY）')
+  .option('--form <form>', '角色形态 humanoid|abstract（抽象角色如线条小狗选 abstract）', 'humanoid')
   .action(async (opts) => {
     const cfg: PipelineConfig = {
       apiKey: getApiKey(opts.apiKey),
@@ -79,6 +80,7 @@ program
     const job = await Job.create(path.resolve(opts.out), {
       refImagePath: path.resolve(opts.ref),
       imageProvider: opts.imageProvider === 'gpt-image-2' ? 'gpt-image-2' : undefined,
+      characterForm: opts.form === 'abstract' ? 'abstract' : undefined,
     });
     job.on('progress', printProgress);
     const pickCandidate =

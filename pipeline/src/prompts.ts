@@ -3,7 +3,7 @@
  * 模板文本逐字取自 DESIGN.md §3.3（实测有效），不要随意改写措辞。
  * 纯函数模块，无 IO。
  */
-import type { ActionId, ActionSpec } from './types.js';
+import type { ActionId, ActionSpec, CharacterForm } from './types.js';
 
 /**
  * MVP 用固定通用描述填槽（spec §8 风险项：还原度不够时接 VLM 自动提取）。
@@ -72,8 +72,69 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   },
 };
 
+/**
+ * 抽象档动作文案：适配线条小狗、简笔涂鸦、几何形等非人形角色。
+ * 铁律：绝不提及双臂/双腿/坐姿/发型/服装/耳尾等部位假设——模型会顺着描述凭空长出这些部位；
+ * 一律用"整体""姿态""轮廓"级别的措辞，防翻车排除项与人形档保持一致。
+ */
+export const ABSTRACT_ACTIONS: Record<ActionId, ActionSpec> = {
+  idle: {
+    poseDesc: '角色保持参考图中原本的自然姿态，安静放松。没有其他任何人物或物体。',
+    motionDesc:
+      '角色停在原地，整体随呼吸轻微起伏，轮廓微微颤动，偶尔小幅晃动。动作幅度很小。',
+    durationSec: 5,
+  },
+  drag: {
+    poseDesc:
+      '角色悬浮在半空中，整体微微倾斜，显得轻盈。没有绳索、没有其他任何人物或物体，角色周围完全空无一物。',
+    motionDesc: '角色悬浮在半空，整体轻轻摇晃摆动，像被微风吹动。角色不位移。',
+    durationSec: 5,
+  },
+  sleep: {
+    poseDesc:
+      '角色蜷缩成一团安睡，姿态安详。画面中绝对没有床、没有枕头、没有被子，只有角色悬浮在纯绿背景上。没有其他任何人物或物体。',
+    motionDesc: '角色安睡，整体随呼吸缓慢起伏。动作幅度很小，安静祥和。',
+    durationSec: 5,
+  },
+  tea: {
+    poseDesc:
+      '角色身前放着一只小茶杯，角色凑向茶杯，姿态惬意。画面中只有角色和茶杯，没有桌子、没有椅子、没有其他任何人物或物体。',
+    motionDesc: '角色凑近茶杯小口喝茶，随后满足地轻轻晃动。角色不位移。',
+    durationSec: 5,
+  },
+  talk_happy: {
+    poseDesc: '角色朝向画面右侧，整体姿态欢快，像在愉快地表达。没有其他任何人物或物体。',
+    motionDesc:
+      '角色朝画面右侧欢快地表达，整体节奏轻快地晃动点动，姿态生动。角色不位移。',
+    durationSec: 5,
+  },
+  talk_annoyed: {
+    poseDesc: '角色朝向画面右侧，整体姿态显得不耐烦。没有其他任何人物或物体。',
+    motionDesc:
+      '角色朝画面右侧不耐烦地表达，整体急促地小幅晃动扭动，偶尔别开。角色不位移。',
+    durationSec: 5,
+  },
+};
+
+/** 按角色形态取动作文案 */
+export function actionSpec(action: ActionId, form: CharacterForm = 'humanoid'): ActionSpec {
+  return (form === 'abstract' ? ABSTRACT_ACTIONS : ACTIONS)[action];
+}
+
 /** 三视图 prompt（图生图，参考图=用户输入） */
-export function turnaroundPrompt(desc: CharacterDesc = DEFAULT_CHARACTER_DESC): string {
+export function turnaroundPrompt(
+  desc: CharacterDesc = DEFAULT_CHARACTER_DESC,
+  form: CharacterForm = 'humanoid',
+): string {
+  if (form === 'abstract') {
+    return (
+      `角色三视图设定表：参考图中的角色，完全保持参考图中角色的形态、线条风格、颜色、比例与画风。` +
+      `不要拟人化，不要添加参考图中没有的四肢、五官、服装或任何部位。` +
+      `画面从左到右水平排列三个完整全身视角：正面、正侧面、正背面，` +
+      `三个视角的角色细节完全一致。` +
+      `纯白色背景，无阴影，无文字，无水印`
+    );
+  }
   return (
     `角色三视图设定表：参考图中的角色，${desc.summary}。` +
     `画面从左到右水平排列三个完整站立全身视角：正面、正侧面、正背面，` +
@@ -86,10 +147,15 @@ export function turnaroundPrompt(desc: CharacterDesc = DEFAULT_CHARACTER_DESC): 
 export function framePrompt(
   action: ActionId,
   desc: CharacterDesc = DEFAULT_CHARACTER_DESC,
+  form: CharacterForm = 'humanoid',
 ): string {
+  const keep =
+    form === 'abstract'
+      ? `参考图中的角色，完全保持其形态、线条、颜色、画风等所有细节一致，不要添加参考图中没有的部位。`
+      : `参考图中的角色，保持发型、眼睛、服装、耳尾等所有细节完全一致。`;
   return (
-    `参考图中的角色，保持发型、眼睛、服装、耳尾等所有细节完全一致。` +
-    `${ACTIONS[action].poseDesc}` +
+    keep +
+    `${actionSpec(action, form).poseDesc}` +
     `画面中只有这一个角色，没有其他人物、没有手、没有家具、没有白色贴纸描边。` +
     `背景为纯色绿幕（纯正绿色，无渐变无阴影无纹理），角色边缘描线清晰，全身完整可见，` +
     `角色占画面高度约70%，粗描边贴纸插画风格，无文字无水印`
@@ -97,8 +163,8 @@ export function framePrompt(
 }
 
 /** 循环视频 prompt（i2v，首帧=尾帧），参数走 1.0 系列的 prompt 尾部约定 */
-export function videoPrompt(action: ActionId): string {
-  const spec = ACTIONS[action];
+export function videoPrompt(action: ActionId, form: CharacterForm = 'humanoid'): string {
+  const spec = actionSpec(action, form);
   return (
     `${spec.motionDesc}` +
     `镜头完全固定不动，静止镜头，角色不位移不走出画面，绿幕背景纯绿色保持不变，` +
