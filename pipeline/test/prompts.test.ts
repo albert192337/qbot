@@ -94,7 +94,21 @@ describe('prompts', () => {
       const p = framePrompt(id);
       expect(p).toContain('纯色绿幕');
       expect(p).toContain('没有手');
-      expect(p).toContain('保持发型、眼睛、服装、耳尾等所有细节完全一致');
+      expect(p).toContain('保持发型、眼睛、服装、耳朵等所有细节完全一致');
+    }
+  });
+
+  it('全档禁提尾巴：任何形态/风格/模板都不含「尾巴」', () => {
+    const styles = [undefined, 'chibi', 'faithful'] as const;
+    const forms = ['humanoid', 'abstract'] as const;
+    for (const form of forms) {
+      for (const style of styles) {
+        expect(turnaroundPrompt(undefined, form, style)).not.toContain('尾巴');
+        for (const id of ACTION_IDS) {
+          expect(framePrompt(id, undefined, form, style), `frame ${form}/${style}/${id}`).not.toContain('尾巴');
+          expect(videoPrompt(id, form, style), `video ${form}/${style}/${id}`).not.toContain('尾巴');
+        }
+      }
     }
   });
 
