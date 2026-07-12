@@ -1,6 +1,6 @@
-/** hatch 渲染进程：drop → pick → progress → certificate 四屏线性流转 */
-import type { ActionId } from '@qbot/pipeline';
-import type { HatchProgress } from '../../shared/ipc-types';
+/** hatch 渲染进程：drop → brewing → pick → progress → certificate 五屏线性流转 */
+import type { ActionId, ActionStatus, ImageProvider } from '@qbot/pipeline';
+import type { HatchProgress, HatchStatus } from '../../shared/ipc-types';
 
 const ACTION_LABELS: Record<ActionId, string> = {
   idle: '呼吸',
@@ -11,11 +11,50 @@ const ACTION_LABELS: Record<ActionId, string> = {
   talk_annoyed: '聊天·嫌弃',
 };
 
+/** 子阶段文案（spec §5.2） */
+const STATUS_LABELS: Record<ActionStatus, string> = {
+  pending: '排队中',
+  generating_frame: '首帧生成中',
+  frame_qc: '首帧质检',
+  generating_video: '视频生成中',
+  keying: '抠像转码中',
+  done: '完成',
+  failed: '失败',
+};
+
+/** 各状态映射的固定进度点（视频任务 API 无百分比，只能按阶段权重折算，spec §5.3） */
+const STATUS_PROGRESS: Record<ActionStatus, number> = {
+  pending: 0,
+  generating_frame: 5,
+  frame_qc: 25,
+  generating_video: 30,
+  keying: 85,
+  done: 100,
+  failed: 100,
+};
+
+/** 进行中状态（卡片显示"已等 m:ss"的那些） */
+const WORKING_STATUSES: ReadonlySet<ActionStatus> = new Set([
+  'generating_frame',
+  'frame_qc',
+  'generating_video',
+  'keying',
+]);
+
 let currentDirId: string | null = null;
+let currentProvider: ImageProvider | undefined;
+/** brewing 屏计时起点；null = 不在 brewing */
+let brewingSince: number | null = null;
+/** actions 阶段计时起点（本地会话内计时，重开窗口从零起算，spec §六） */
+let actionsSince: number | null = null;
+/** 每动作当前状态与进入该状态的时刻 */
+const cellStates = new Map<ActionId, { status: ActionStatus; since: number }>();
+let packageDone = false;
 
 // ── 屏幕切换 ─────────────────────────────────────────────
-type ScreenName = 'drop' | 'pick' | 'progress' | 'certificate' | 'settings';
+type ScreenName = 'drop' | 'brewing' | 'pick' | 'progress' | 'certificate' | 'settings';
 function showScreen(name: ScreenName): void {
+  if (name !== 'brewing') brewingSince = null;
   for (const s of document.querySelectorAll<HTMLElement>('.screen')) {
     s.classList.toggle('active', s.id === `screen-${name}`);
   }
@@ -65,8 +104,8 @@ dropzone.addEventListener('drop', async (e) => {
     showError(String(err instanceof Error ? err.message : err));
     return;
   }
-  buildProgressGrid();
-  showScreen('progress'); // 三视图生成中；awaiting_pick 事件到达后切 pick 屏
+  currentProvider = provider === 'gpt-image-2' ? 'gpt-image-2' : 'seedream';
+  showBrewing(); // 三视图生成中；awaiting_pick 事件到达后切 pick 屏
 });
 
 // 抽象档没有头身比概念 → 隐藏生成风格选项
@@ -91,9 +130,9 @@ async function offerResume(): Promise<void> {
     btn.textContent = `继续上次的孵化（${c.dirId.slice(0, 8)}…）`;
     btn.addEventListener('click', async () => {
       currentDirId = c.dirId;
-      buildProgressGrid();
-      showScreen('progress');
       await window.qbot.hatch.resume(c.dirId);
+      // resume 只是把 job 挂起来跑，立刻返回；快照铺底后事件接管
+      await seedFromStatus(c.dirId);
     });
     area.appendChild(btn);
   }
@@ -109,7 +148,16 @@ async function offerResume(): Promise<void> {
       currentDirId = c.dirId;
       buildProgressGrid();
       showScreen('progress');
-      await window.qbot.hatch.redo(c.dirId);
+      // 铺当前状态（done 的显示完成、failed 的马上被 redo 重置为排队中）
+      const st = await window.qbot.hatch.getStatus(c.dirId);
+      if (st) {
+        actionsSince = Date.now();
+        seedCells(st);
+      }
+      // redo 的 promise 到整轮跑完才回来，不能 await；期间靠事件驱动 UI
+      window.qbot.hatch.redo(c.dirId).catch((err) => {
+        showError(String(err instanceof Error ? err.message : err));
+      });
     });
     area.appendChild(btn);
   }
@@ -135,40 +183,177 @@ function renderCandidates(urls: string[]): void {
 }
 
 document.getElementById('regen')!.addEventListener('click', async () => {
-  buildProgressGrid();
-  showScreen('progress');
+  brewingSince = null; // 重新生成一轮，计时清零
+  showBrewing();
   await window.qbot.hatch.pickTurnaround(currentDirId!, -1);
 });
+
+// ── brewing 屏（三视图生成等待，spec §5.1） ──────────────
+function showBrewing(): void {
+  if (brewingSince === null) brewingSince = Date.now();
+  document.getElementById('brewing-hint')!.textContent =
+    currentProvider === 'gpt-image-2'
+      ? '同时画 3 张候选。gpt-image-2 比较慢，通常 5–10 分钟，去喝杯茶吧'
+      : '同时画 3 张候选，通常 1 分钟左右，画好就让你挑';
+  document.getElementById('brewing-elapsed')!.textContent = '0:00';
+  showScreen('brewing');
+}
 
 // ── progress 屏 ──────────────────────────────────────────
 function buildProgressGrid(): void {
   const grid = document.getElementById('action-grid')!;
   grid.replaceChildren();
+  cellStates.clear();
+  actionsSince = null;
+  packageDone = false;
   for (const [id, label] of Object.entries(ACTION_LABELS)) {
     const cell = document.createElement('div');
     cell.className = 'action-cell';
     cell.id = `cell-${id}`;
-    cell.innerHTML = `<div class="dot">🥚</div><div>${label}</div>`;
+    cell.innerHTML =
+      '<div class="thumb"><span class="dot">🥚</span><img hidden alt="" /><span class="badge" hidden>🐣</span></div>' +
+      `<div>${label}</div><div class="substatus">排队中</div><div class="elapsed"></div>`;
     grid.appendChild(cell);
+  }
+  updateOverall();
+}
+
+function updateCell(
+  action: ActionId,
+  status: ActionStatus,
+  frameUrl?: string,
+  error?: string,
+): void {
+  const cell = document.getElementById(`cell-${action}`);
+  if (!cell) return;
+  const prev = cellStates.get(action);
+  if (!prev || prev.status !== status) {
+    cellStates.set(action, { status, since: Date.now() });
+  }
+  cell.classList.remove('done', 'failed', 'working');
+  if (status === 'done') cell.classList.add('done');
+  else if (status === 'failed') cell.classList.add('failed');
+  else if (status !== 'pending') cell.classList.add('working');
+
+  const dot = cell.querySelector<HTMLElement>('.dot')!;
+  const img = cell.querySelector('img')!;
+  const badge = cell.querySelector<HTMLElement>('.badge')!;
+  if (frameUrl && img.getAttribute('src') !== frameUrl) {
+    img.onload = () => {
+      img.hidden = false;
+      dot.style.display = 'none';
+    };
+    img.onerror = () => {
+      // 缩略图加载失败回退 🥚（spec §六）
+      img.hidden = true;
+      dot.style.display = '';
+    };
+    img.src = frameUrl;
+  }
+  dot.textContent = status === 'failed' ? '💔' : '🥚';
+  badge.hidden = status !== 'done';
+  cell.querySelector('.substatus')!.textContent = STATUS_LABELS[status] ?? status;
+  // failed 卡片 hover 直接看到错误原因，不用翻日志
+  cell.title = status === 'failed' && error ? error : '';
+  renderTimers();
+  updateOverall();
+}
+
+/** 快照铺格子（进度屏刚进入时；之后增量事件幂等覆盖） */
+function seedCells(st: HatchStatus): void {
+  for (const id of Object.keys(ACTION_LABELS) as ActionId[]) {
+    const a = st.actions[id];
+    if (a) updateCell(id, a.status, a.frameUrl, a.error);
   }
 }
 
-function updateCell(action: ActionId, status: string): void {
-  const cell = document.getElementById(`cell-${action}`);
-  if (!cell) return;
-  cell.classList.remove('done', 'failed', 'working');
-  const dot = cell.querySelector('.dot')!;
-  if (status === 'done') {
-    cell.classList.add('done');
-    dot.textContent = '🐣';
-  } else if (status === 'failed') {
-    cell.classList.add('failed');
-    dot.textContent = '💔';
-  } else {
-    cell.classList.add('working');
-    dot.textContent = '🥚';
+/**
+ * 快照恢复：进入进度相关屏幕的所有路径先播快照再消费增量事件（spec §5.4）。
+ * 续跑/中途重开窗口都从这里进，按 stage 落到正确的屏。
+ */
+async function seedFromStatus(dirId: string): Promise<void> {
+  const st = await window.qbot.hatch.getStatus(dirId);
+  if (!st) {
+    showError('找不到该孵化任务的状态文件');
+    showScreen('drop');
+    return;
+  }
+  currentProvider = st.imageProvider ?? currentProvider;
+  switch (st.stage) {
+    case 'turnaround':
+      showBrewing();
+      break;
+    case 'awaiting_pick':
+      if (st.candidateUrls?.length) renderCandidates(st.candidateUrls);
+      else showBrewing(); // 候选丢失时管线会回退重新生成
+      break;
+    case 'done':
+      void showCertificate();
+      break;
+    default: // actions / package / failed（failed 续跑会重置重跑，先铺现状）
+      buildProgressGrid();
+      actionsSince = Date.now();
+      seedCells(st);
+      showScreen('progress');
   }
 }
+
+// ── 总进度 + 计时（spec §5.3） ────────────────────────────
+function cellStatus(id: ActionId): ActionStatus {
+  return cellStates.get(id)?.status ?? 'pending';
+}
+
+function updateOverall(): void {
+  const ids = Object.keys(ACTION_LABELS) as ActionId[];
+  const mean =
+    ids.reduce((sum, id) => sum + STATUS_PROGRESS[cellStatus(id)], 0) / ids.length;
+  const pct = packageDone ? 100 : mean * 0.95;
+  document.getElementById('progress-bar-fill')!.style.width = `${pct}%`;
+  renderProgressText();
+}
+
+function renderProgressText(): void {
+  const ids = Object.keys(ACTION_LABELS) as ActionId[];
+  const done = ids.filter((id) => cellStatus(id) === 'done').length;
+  const failed = ids.filter((id) => cellStatus(id) === 'failed').length;
+  let text = `${done}/${ids.length} 个动作完成`;
+  if (failed) text += `（${failed} 个失败）`;
+  if (actionsSince !== null) text += ` · 已用时 ${fmtElapsed(Date.now() - actionsSince)}`;
+  document.getElementById('progress-text')!.textContent = text;
+}
+
+function fmtElapsed(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/** 视频轮询超过这个时长，子阶段文字追加安抚（管线 15 分钟才超时，spec §六） */
+const SLOW_VIDEO_MS = 10 * 60 * 1000;
+
+/** 每秒刷新所有计时文本（brewing 已用时 / 卡片已等时长 / 总耗时） */
+function renderTimers(): void {
+  if (brewingSince !== null) {
+    document.getElementById('brewing-elapsed')!.textContent = fmtElapsed(
+      Date.now() - brewingSince,
+    );
+  }
+  for (const [action, st] of cellStates) {
+    const cell = document.getElementById(`cell-${action}`);
+    if (!cell) continue;
+    const elapsedEl = cell.querySelector('.elapsed')!;
+    if (!WORKING_STATUSES.has(st.status)) {
+      elapsedEl.textContent = '';
+      continue;
+    }
+    const waited = Date.now() - st.since;
+    elapsedEl.textContent = `已等 ${fmtElapsed(waited)}`;
+    if (st.status === 'generating_video' && waited > SLOW_VIDEO_MS) {
+      cell.querySelector('.substatus')!.textContent = '视频生成中（比平时久，仍在等待）';
+    }
+  }
+  renderProgressText();
+}
+setInterval(renderTimers, 1000);
 
 // ── certificate 屏 ───────────────────────────────────────
 /** 全动作画廊：生成完的每个动作一个小视频，确认满意再上桌 */
@@ -298,13 +483,25 @@ window.qbot.hatch.onProgress((ev: HatchProgress) => {
   if (currentDirId && ev.dirId !== currentDirId) return;
   currentDirId = ev.dirId;
   switch (ev.stage) {
+    case 'turnaround':
+      showBrewing(); // 重新生成一轮 / 续跑仍在三视图阶段
+      break;
     case 'awaiting_pick':
       if (ev.candidateUrls?.length) renderCandidates(ev.candidateUrls);
       break;
-    case 'actions':
-      if (ev.action && ev.status) updateCell(ev.action, ev.status);
+    case 'actions': {
+      // setStage('actions') 的无 action 事件 = 动作阶段开始；中途重开窗口时格子可能还没铺
+      if (!document.getElementById('action-grid')!.childElementCount) buildProgressGrid();
+      actionsSince ??= Date.now();
+      if (document.getElementById('screen-brewing')!.classList.contains('active')) {
+        showScreen('progress');
+      }
+      if (ev.action && ev.status) updateCell(ev.action, ev.status, ev.frameUrl, ev.error);
       break;
+    }
     case 'done':
+      packageDone = true;
+      updateOverall();
       void showCertificate();
       break;
     case 'failed':

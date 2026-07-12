@@ -10,6 +10,7 @@ const api: QBotApi = {
     redo: (dirId) => ipcRenderer.invoke('hatch:redo', dirId),
     pickTurnaround: (dirId, index) =>
       ipcRenderer.invoke('hatch:pickTurnaround', dirId, index),
+    getStatus: (dirId) => ipcRenderer.invoke('hatch:getStatus', dirId),
     onProgress: (cb) => {
       const listener = (_ev: unknown, payload: HatchProgress) => cb(payload);
       ipcRenderer.on('hatch:progress', listener);

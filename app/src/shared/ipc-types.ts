@@ -1,5 +1,14 @@
 /** 渲染进程与主进程共享的 IPC 类型（preload 契约） */
-import type { CharacterForm, CharacterStyle, ImageProvider, Manifest, ProgressEvent } from '@qbot/pipeline';
+import type {
+  ActionId,
+  ActionStatus,
+  CharacterForm,
+  CharacterStyle,
+  ImageProvider,
+  Manifest,
+  ProgressEvent,
+  Stage,
+} from '@qbot/pipeline';
 
 export interface CharacterMeta {
   /** 目录名（qbot-asset:// 的 host） */
@@ -29,6 +38,18 @@ export interface HatchProgress extends ProgressEvent {
   dirId: string;
   /** awaiting_pick 时：候选图的 qbot-asset URL */
   candidateUrls?: string[];
+  /** 首帧已落盘时：缩略图的 qbot-asset URL（由 framePath 转换） */
+  frameUrl?: string;
+}
+
+/** 孵化状态快照（进度屏进入时铺底，之后消费增量事件；见 hatch-progress-ux spec §四） */
+export interface HatchStatus {
+  stage: Stage;
+  /** 三视图等待态文案需要区分后端（Seedream/gpt-image-2 时长差 10 倍） */
+  imageProvider?: ImageProvider;
+  /** stage 为 awaiting_pick 时：候选图 qbot-asset URL（中途重开窗口也能直接挑选） */
+  candidateUrls?: string[];
+  actions: Record<ActionId, { status: ActionStatus; frameUrl?: string; error?: string }>;
 }
 
 /** 小房间装饰摆放（room-decor.json，按房间名键控） */
@@ -57,6 +78,8 @@ export interface QBotApi {
     /** 重试已完成角色的失败动作 */
     redo(dirId: string): Promise<void>;
     pickTurnaround(dirId: string, index: number): Promise<void>;
+    /** 当前孵化状态快照；目录无 state.json（非法 dirId/已清理）返回 null */
+    getStatus(dirId: string): Promise<HatchStatus | null>;
     /** index=-1 表示重新生成一轮 */
     onProgress(cb: (ev: HatchProgress) => void): () => void;
     /** File 对象 → 真实路径（webUtils.getPathForFile 包装） */

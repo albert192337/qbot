@@ -7,7 +7,7 @@ import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipelin
 import { getCharacter, listCharacters, renameCharacter } from './characters';
 import { getSettings, setSettings } from './config';
 import { movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse } from './windows';
-import { pickTurnaround, redoFailed, resumeHatch, startHatch } from './pipeline-bridge';
+import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import { rebuildTray } from './tray';
 
@@ -28,6 +28,7 @@ export function registerIpc(): void {
   ipcMain.handle('hatch:pickTurnaround', (_ev, dirId: string, index: number) =>
     pickTurnaround(dirId, index),
   );
+  ipcMain.handle('hatch:getStatus', (_ev, dirId: string) => getHatchStatus(dirId));
   ipcMain.handle(
     'hatch:saveCard',
     async (ev, rect: { x: number; y: number; width: number; height: number }) => {

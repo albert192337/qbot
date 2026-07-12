@@ -44,6 +44,21 @@ describe('Job', () => {
     expect(['generating_frame', 'pending']).toContain(reloaded.state.actions.idle.status);
   });
 
+  it('transition 事件携带 framePath（UI 缩略图依赖）', async () => {
+    const out = path.join(tmpDir, 'char');
+    await mkdir(out, { recursive: true });
+    const job = await Job.create(out, { refImagePath: await makeRefImage() });
+    const events: Array<{ framePath?: string }> = [];
+    job.on('progress', (ev) => events.push(ev));
+    await job.transition('idle', 'generating_frame');
+    expect(events[0].framePath).toBeUndefined();
+    await job.transition('idle', 'frame_qc', { framePath: 'idle_frame.png' });
+    expect(events[1].framePath).toBe('idle_frame.png');
+    // 后续转移不带 patch 也要继续携带（视频/抠像阶段缩略图不消失）
+    await job.transition('idle', 'generating_video');
+    expect(events[2].framePath).toBe('idle_frame.png');
+  });
+
   it('load 后 videoTaskId 保留（恢复轮询而非重提）', async () => {
     const out = path.join(tmpDir, 'char');
     await mkdir(out, { recursive: true });

@@ -188,6 +188,12 @@ export class Job extends EventEmitter {
     const a = this.state.actions[action];
     Object.assign(a, patch, { status });
     await this.save();
-    this.emitProgress({ stage: this.state.stage, action, status, error: a.error });
+    this.emitProgress({
+      stage: this.state.stage,
+      action,
+      status,
+      framePath: a.framePath,
+      error: a.error,
+    });
   }
 }
