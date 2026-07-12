@@ -4,8 +4,10 @@ import {
   hexToRgb,
   isGreen,
   rgbToHsv,
+  selectKeyColors,
   DRIFT_SINGLE_KEY_MAX,
   DRIFT_DOUBLE_KEY_MAX,
+  KEY_MAX_COUNT,
 } from '../src/qc.js';
 
 describe('qc 纯逻辑', () => {
@@ -48,5 +50,24 @@ describe('qc 纯逻辑', () => {
 
   it('hexToRgb 解析正确', () => {
     expect(hexToRgb('3bfa2c')).toEqual([0x3b, 0xfa, 0x2c]);
+  });
+
+  it('selectKeyColors：相近色聚成一簇，梯度色保留多 key', () => {
+    // 平涂贴纸风：8 点几乎同色 → 1 个 key
+    expect(
+      selectKeyColors(['3bfa2c', '3cfa2d', '3bf82c', '3efa2e', '3bfa2c', '3cf92b']),
+    ).toEqual(['3bfa2c']);
+    // 写实影棚绿幕（实测样本）：暗角 → 亮中心，聚成多簇
+    const keys = selectKeyColors([
+      '034b25', '075f36', '05744a', '0e815c', '085e32', '15805e', '034b27', '137b56',
+    ]);
+    expect(keys.length).toBeGreaterThanOrEqual(3);
+    expect(keys.length).toBeLessThanOrEqual(KEY_MAX_COUNT);
+    expect(keys[0]).toBe('034b25');
+  });
+
+  it('selectKeyColors：过滤非绿样本（采样点落在角色上不会当 key）', () => {
+    expect(selectKeyColors(['1a1a1a', 'f5e6d0', '3bfa2c'])).toEqual(['3bfa2c']);
+    expect(selectKeyColors(['1a1a1a', 'ffffff'])).toEqual([]);
   });
 });

@@ -14,11 +14,15 @@ import { promisify } from 'node:util';
 const execFileP = promisify(execFile);
 
 /**
- * colorkey 参数。DESIGN.md §3.4 原值 0.24:0.06，实测会误抠绿色系角色本体
- * （小青薄荷绿身体出现镂空），收紧到 0.15:0.04 后边缘与本体两头都干净。
+ * colorkey 参数演进（全部实测）：
+ * - DESIGN.md §3.4 原值 0.24:0.06 → 误抠绿色系角色本体（小青薄荷绿身体镂空）
+ * - 0.15:0.04 → 高保真影棚绿幕四角 key 色极暗（如 rgb(3,76,38)），RGB 空间贴近黑色，
+ *   0.15 半径把黑皮衣抠成半透明洞
+ * - 现值 0.11:0.02 + 多点采样多 key：空间渐变靠多 key 覆盖而非放大半径，
+ *   贴纸风与写实风实测两头干净
  */
-export const COLORKEY_SIMILARITY = 0.15;
-export const COLORKEY_BLEND = 0.04;
+export const COLORKEY_SIMILARITY = 0.11;
+export const COLORKEY_BLEND = 0.02;
 
 /** 归一化目标：角色包围盒高度占画布比例 / 底边基线位置（所有动作一致 → 视觉等大） */
 export const NORM_TARGET_H = 0.68;
@@ -75,6 +79,18 @@ export async function sampleKeyColor(
   return meanRgbHex(raw);
 }
 
+/** 视频总帧数（解析 ffmpeg stderr，ffmpeg-static 不带 ffprobe） */
+async function countFrames(videoPath: string, ffmpegPath: string): Promise<number> {
+  const durRaw = await execFileP(
+    ffmpegPath,
+    ['-i', videoPath, '-map', '0:v:0', '-c', 'copy', '-f', 'null', '-'],
+    { encoding: 'utf8' },
+  ).catch((e: { stderr?: string }) => ({ stdout: '', stderr: e.stderr ?? '' }));
+  const stderr = (durRaw as { stderr: string }).stderr ?? '';
+  const m = stderr.match(/frame=\s*(\d+)/g);
+  return m ? parseInt(m[m.length - 1]!.replace(/\D/g, ''), 10) : 0;
+}
+
 /**
  * 采样视频首/中/尾三帧的角落色，供 qc 计算背景漂移。
  * 用 select 表达式抽 3 帧，一次 ffmpeg 调用输出 3×(8×8×3) bytes。
@@ -83,15 +99,7 @@ export async function sampleCornerAcrossFrames(
   videoPath: string,
   ffmpegPath: string,
 ): Promise<string[]> {
-  // 先取总帧数（用 ffmpeg 统计而非 ffprobe：ffmpeg-static 不带 ffprobe）
-  const durRaw = await execFileP(
-    ffmpegPath,
-    ['-i', videoPath, '-map', '0:v:0', '-c', 'copy', '-f', 'null', '-'],
-    { encoding: 'utf8' },
-  ).catch((e: { stderr?: string }) => ({ stdout: '', stderr: e.stderr ?? '' }));
-  const stderr = (durRaw as { stderr: string }).stderr ?? '';
-  const m = stderr.match(/frame=\s*(\d+)/g);
-  const total = m ? parseInt(m[m.length - 1]!.replace(/\D/g, ''), 10) : 0;
+  const total = await countFrames(videoPath, ffmpegPath);
   const last = Math.max(total - 1, 2);
   const mid = Math.floor(last / 2);
 
@@ -107,6 +115,61 @@ export async function sampleCornerAcrossFrames(
   const colors: string[] = [];
   for (let off = 0; off + frameBytes <= raw.length; off += frameBytes) {
     colors.push(meanRgbHex(raw.subarray(off, off + frameBytes)));
+  }
+  return colors;
+}
+
+/** 背景采样点（8×8 块左上角坐标）：四角 + 四边中点 */
+function backgroundSamplePoints(w: number, h: number): Array<[number, number]> {
+  const cx = Math.floor(w / 2) - 4;
+  const cy = Math.floor(h / 2) - 4;
+  return [
+    [8, 8], [w - 16, 8], [8, h - 16], [w - 16, h - 16],
+    [cx, 8], [cx, h - 16], [8, cy], [w - 16, cy],
+  ];
+}
+
+/**
+ * 采样首/尾帧各 8 个背景点（四角 + 四边中点）的 8×8 平均色。
+ * 写实风绿幕带光照渐变：角落暗、中心亮，同帧空间色距可超过 colorkey 半径，
+ * 单点采样必漏。结果交给 qc.selectKeyColors 过滤聚类成多 key。
+ */
+export async function sampleBackgroundColors(
+  videoPath: string,
+  ffmpegPath: string,
+): Promise<string[]> {
+  const { width, height } = await probeSize(videoPath, ffmpegPath);
+  const total = await countFrames(videoPath, ffmpegPath);
+  const last = Math.max(total - 1, 1);
+  const raw = await runFfmpeg(ffmpegPath, [
+    '-i', videoPath,
+    '-vf', `select='eq(n\\,0)+eq(n\\,${last})'`,
+    '-fps_mode', 'passthrough',
+    '-f', 'rawvideo',
+    '-pix_fmt', 'rgb24',
+    'pipe:1',
+  ]);
+  const frameBytes = width * height * 3;
+  const colors: string[] = [];
+  for (let off = 0; off + frameBytes <= raw.length; off += frameBytes) {
+    for (const [px, py] of backgroundSamplePoints(width, height)) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (let y = py; y < py + 8; y++) {
+        for (let x = px; x < px + 8; x++) {
+          const i = off + (y * width + x) * 3;
+          r += raw[i]!;
+          g += raw[i + 1]!;
+          b += raw[i + 2]!;
+        }
+      }
+      const hex = (v: number) =>
+        Math.round(v / 64)
+          .toString(16)
+          .padStart(2, '0');
+      colors.push(`${hex(r)}${hex(g)}${hex(b)}`);
+    }
   }
   return colors;
 }

@@ -116,9 +116,56 @@ export const ABSTRACT_ACTIONS: Record<ActionId, ActionSpec> = {
   },
 };
 
-/** 按角色形态取动作文案 */
-export function actionSpec(action: ActionId, form: CharacterForm = 'humanoid'): ActionSpec {
-  return (form === 'abstract' ? ABSTRACT_ACTIONS : ACTIONS)[action];
+/**
+ * 高保真档动作文案：姿势与 ACTIONS 相同，运动描述去掉耳朵/尾巴——
+ * 高保真多为真人/写实角色，命令式的「尾巴摆动」会让模型凭空长出尾巴（悬空动作实测翻车），
+ * 一律换成头发/衣角级别的自然运动。
+ */
+export const FAITHFUL_ACTIONS: Record<ActionId, ActionSpec> = {
+  idle: {
+    poseDesc: ACTIONS.idle.poseDesc,
+    motionDesc:
+      '角色站立原地，身体随呼吸轻微起伏，偶尔眨眼，头发轻微自然飘动。动作幅度很小。',
+    durationSec: 5,
+  },
+  drag: {
+    poseDesc: ACTIONS.drag.poseDesc,
+    motionDesc:
+      '角色悬浮在半空，身体轻微摇晃，双腿自然晃动，头发轻轻飘动，表情略带惊讶地眨眼。角色不位移。',
+    durationSec: 5,
+  },
+  sleep: {
+    poseDesc: ACTIONS.sleep.poseDesc,
+    motionDesc: '角色闭眼熟睡，身体随呼吸缓慢起伏。动作幅度很小，安静祥和。',
+    durationSec: 5,
+  },
+  tea: {
+    poseDesc: ACTIONS.tea.poseDesc,
+    motionDesc: '角色捧着茶杯小口喝茶，喝完满足地眯眼微笑。角色不位移。',
+    durationSec: 5,
+  },
+  talk_happy: {
+    poseDesc: ACTIONS.talk_happy.poseDesc,
+    motionDesc:
+      '角色朝画面右侧开心地说话，嘴巴一张一合，表情生动，偶尔点头，头发随动作轻轻晃动。角色不位移。',
+    durationSec: 5,
+  },
+  talk_annoyed: {
+    poseDesc: ACTIONS.talk_annoyed.poseDesc,
+    motionDesc:
+      '角色朝画面右侧不耐烦地抱怨，嘴巴撇着动，偶尔翻白眼或扭头。角色不位移。',
+    durationSec: 5,
+  },
+};
+
+/** 按角色形态与生成风格取动作文案 */
+export function actionSpec(
+  action: ActionId,
+  form: CharacterForm = 'humanoid',
+  style?: CharacterStyle,
+): ActionSpec {
+  if (form === 'abstract') return ABSTRACT_ACTIONS[action];
+  return (style === 'faithful' ? FAITHFUL_ACTIONS : ACTIONS)[action];
 }
 
 /** 三视图 prompt（图生图，参考图=用户输入）
@@ -174,12 +221,14 @@ export function framePrompt(
     form === 'abstract'
       ? `参考图中的角色，完全保持其形态、线条、颜色、画风等所有细节一致，不要添加参考图中没有的部位。`
       : faithful
-        ? `参考图中的角色，保持发型、眼睛、服装、耳尾、画风、头身比等所有细节完全一致。`
+        ? `参考图中的角色，保持发型、眼睛、服装、画风、头身比等所有细节完全一致。`
         : `参考图中的角色，保持发型、眼睛、服装、耳尾等所有细节完全一致。`;
   return (
     keep +
-    `${actionSpec(action, form).poseDesc}` +
+    `${actionSpec(action, form, style).poseDesc}` +
     `画面中只有这一个角色，没有其他人物、没有手、没有家具、没有白色贴纸描边。` +
+    // 写实风模型爱画接触阴影，阴影是暗绿色、抠像永远处理不掉，必须在生成端排除
+    (faithful ? `角色不投射任何阴影，地面和背景上没有任何阴影。` : '') +
     `背景为纯色绿幕（纯正绿色，无渐变无阴影无纹理），` +
     (faithful ? `角色边缘清晰锐利，` : `角色边缘描线清晰，`) +
     `全身完整可见，角色占画面高度约70%，` +
@@ -188,12 +237,20 @@ export function framePrompt(
   );
 }
 
-/** 循环视频 prompt（i2v，首帧=尾帧），参数走 1.0 系列的 prompt 尾部约定 */
-export function videoPrompt(action: ActionId, form: CharacterForm = 'humanoid'): string {
-  const spec = actionSpec(action, form);
+/** 循环视频 prompt（i2v，首帧=尾帧），参数走 1.0 系列的 prompt 尾部约定
+ * style 只在「人形 + faithful」时生效：动作文案换成无耳尾版本，并排除接触阴影。
+ */
+export function videoPrompt(
+  action: ActionId,
+  form: CharacterForm = 'humanoid',
+  style?: CharacterStyle,
+): string {
+  const spec = actionSpec(action, form, style);
+  const faithful = form !== 'abstract' && style === 'faithful';
   return (
     `${spec.motionDesc}` +
     `镜头完全固定不动，静止镜头，角色不位移不走出画面，绿幕背景纯绿色保持不变，` +
+    (faithful ? `角色不投射任何阴影，画面中没有任何阴影，` : '') +
     `画面中始终只有这一个角色，绝对不出现其他人物、手或物体。丝滑流畅循环动画。` +
     ` --resolution 480p --duration ${spec.durationSec} --camerafixed true`
   );

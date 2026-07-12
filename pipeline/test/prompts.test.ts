@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ABSTRACT_ACTIONS,
   ACTIONS,
+  FAITHFUL_ACTIONS,
   framePrompt,
   turnaroundPrompt,
   videoPrompt,
@@ -54,6 +55,38 @@ describe('prompts', () => {
   it('chibi 与缺省 style 首帧维持贴纸风尾巴（旧 job 兼容）', () => {
     expect(framePrompt('idle', undefined, 'humanoid', 'chibi')).toBe(framePrompt('idle'));
     expect(framePrompt('idle')).toContain('粗描边贴纸插画风格');
+  });
+
+  it('faithful 动作文案不含耳朵/尾巴（写实角色会被凭空长出尾巴）', () => {
+    for (const id of ACTION_IDS) {
+      const text =
+        FAITHFUL_ACTIONS[id].poseDesc +
+        FAITHFUL_ACTIONS[id].motionDesc +
+        framePrompt(id, undefined, 'humanoid', 'faithful') +
+        videoPrompt(id, 'humanoid', 'faithful');
+      for (const kw of ['耳朵', '尾巴', '耳尾']) {
+        expect(text, `${id} faithful 不应包含「${kw}」`).not.toContain(kw);
+      }
+    }
+  });
+
+  it('faithful 首帧与视频排除阴影，chibi/缺省不受影响', () => {
+    for (const id of ACTION_IDS) {
+      expect(framePrompt(id, undefined, 'humanoid', 'faithful')).toContain('不投射任何阴影');
+      expect(videoPrompt(id, 'humanoid', 'faithful')).toContain('不投射任何阴影');
+    }
+    expect(videoPrompt('idle')).not.toContain('不投射任何阴影');
+    expect(videoPrompt('idle', 'humanoid', 'chibi')).toBe(videoPrompt('idle'));
+    expect(videoPrompt('idle', 'abstract', 'faithful')).toBe(videoPrompt('idle', 'abstract'));
+  });
+
+  it('faithful 视频保留固定镜头/循环/时长约束', () => {
+    for (const id of ACTION_IDS) {
+      const v = videoPrompt(id, 'humanoid', 'faithful');
+      expect(v).toContain('镜头完全固定不动');
+      expect(v).toContain('丝滑流畅循环动画');
+      expect(v).toContain('--duration 5');
+    }
   });
 
   it('每个动作的首帧模板含绿幕与排除约束', () => {

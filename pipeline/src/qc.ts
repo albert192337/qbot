@@ -96,6 +96,40 @@ export function classifyDrift(cornerColors: string[]): {
   return { maxDrift, needDoubleKey, fail, keys: [...new Set(keys)] };
 }
 
+/** 多点采样选 key：同簇判定的 RGB 分量最大差 / key 数量上限 */
+export const KEY_MERGE_MAX_DIFF = 12;
+export const KEY_MAX_COUNT = 4;
+
+/**
+ * 从背景采样色（chroma.sampleBackgroundColors）中选 colorkey 的 key 色：
+ * 1. 过滤非绿样本——采样点可能落在角色或阴影上，绝不能把角色色当 key
+ * 2. 按 RGB 分量最大差 ≤ KEY_MERGE_MAX_DIFF 聚类去重，每簇取首个样本为代表
+ * 3. 上限 KEY_MAX_COUNT 个（写实绿幕的光照渐变一般 2-3 簇就够）
+ * 返回空数组 = 无可用绿样本，调用方回退左上角单点采样。
+ */
+export function selectKeyColors(samples: string[]): string[] {
+  const keys: string[] = [];
+  for (const c of samples) {
+    if (!isGreen(c)) continue;
+    const rgb = hexToRgb(c);
+    const close = keys.some((k) => {
+      const kr = hexToRgb(k);
+      return (
+        Math.max(
+          Math.abs(rgb[0] - kr[0]),
+          Math.abs(rgb[1] - kr[1]),
+          Math.abs(rgb[2] - kr[2]),
+        ) <= KEY_MERGE_MAX_DIFF
+      );
+    });
+    if (!close) {
+      keys.push(c);
+      if (keys.length >= KEY_MAX_COUNT) break;
+    }
+  }
+  return keys;
+}
+
 export interface DriftQcResult {
   maxDrift: number;
   needDoubleKey: boolean;

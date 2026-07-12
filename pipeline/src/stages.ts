@@ -12,12 +12,13 @@ import {
   normalizeFilter,
   probeSize,
   resolveFfmpegPath,
+  sampleBackgroundColors,
   sampleKeyColor,
   toGif,
   toWebm,
 } from './chroma.js';
 import { framePrompt, turnaroundPrompt, videoPrompt, ACTIONS } from './prompts.js';
-import { checkGreenFrame, checkVideoDrift } from './qc.js';
+import { checkGreenFrame, checkVideoDrift, selectKeyColors } from './qc.js';
 import { Job } from './job.js';
 import {
   ACTION_IDS,
@@ -87,6 +88,36 @@ export async function pickTurnaround(job: Job, index: number): Promise<void> {
   await job.save();
 }
 
+/**
+ * Stage 4 抠像转码（runAction 与 CLI rekey 共用）：绿幕 mp4 → 透明 webm/gif 资产。
+ * key 色 = 首/尾帧 8 点背景采样聚类（写实绿幕带光照渐变，单点 key 必漏），
+ * 无绿样本时回退左上角单点。不改动作状态，只更新 keyColors。
+ */
+export async function keyActionVideo(
+  job: Job,
+  action: ActionId,
+  ffmpegPath: string,
+): Promise<void> {
+  const a = job.state.actions[action];
+  const videoAbs = job.jobPath(a.videoPath!);
+  const drift = await checkVideoDrift(videoAbs, ffmpegPath);
+  if (drift.fail) {
+    throw new Error(`background drift ${drift.maxDrift}/255 exceeds limit, video unusable`);
+  }
+  let keys = selectKeyColors(await sampleBackgroundColors(videoAbs, ffmpegPath));
+  if (keys.length === 0) keys = [await sampleKeyColor(videoAbs, ffmpegPath)];
+  a.keyColors = keys;
+  await job.save();
+  // 尺寸归一化：各动作角色 bbox 高度统一、底边对齐（空 bbox 跳过）
+  const bbox = await computeAlphaBBox(videoAbs, keys, ffmpegPath);
+  const size = await probeSize(videoAbs, ffmpegPath);
+  const normVf = bbox ? normalizeFilter(bbox, size.width, size.height) : undefined;
+  const webmAbs = path.join(job.outDir, 'actions', `${action}.webm`);
+  const gifAbs = path.join(job.outDir, 'actions', `${action}.gif`);
+  await toWebm(videoAbs, webmAbs, keys, ffmpegPath, normVf);
+  await toGif(videoAbs, gifAbs, keys, ffmpegPath, normVf);
+}
+
 /** 单动作完整链：frame → qc → video 提交 → 轮询 → 下载 → keying → 资产落盘 */
 async function runAction(
   job: Job,
@@ -133,7 +164,7 @@ async function runAction(
         });
         const frameBuf = await readFile(job.jobPath(a.framePath!));
         const taskId = await ark.submitVideoTask({
-          prompt: videoPrompt(action, job.state.characterForm),
+          prompt: videoPrompt(action, job.state.characterForm, job.state.characterStyle),
           frameDataUrl: toDataUrl(frameBuf),
         });
         await job.transition(action, 'generating_video', { videoTaskId: taskId });
@@ -161,23 +192,8 @@ async function runAction(
       await job.transition(action, 'keying');
     }
 
-    // ── Stage 4: 抠像转码（漂移分档：单 key / 双 key / 判废）─────────
-    const videoAbs = job.jobPath(a.videoPath!);
-    const drift = await checkVideoDrift(videoAbs, ffmpegPath);
-    if (drift.fail) {
-      throw new Error(`background drift ${drift.maxDrift}/255 exceeds limit, video unusable`);
-    }
-    const keys = drift.needDoubleKey ? drift.keys : [await sampleKeyColor(videoAbs, ffmpegPath)];
-    a.keyColors = keys;
-    await job.save();
-    // 尺寸归一化：各动作角色 bbox 高度统一、底边对齐（空 bbox 跳过）
-    const bbox = await computeAlphaBBox(videoAbs, keys, ffmpegPath);
-    const size = await probeSize(videoAbs, ffmpegPath);
-    const normVf = bbox ? normalizeFilter(bbox, size.width, size.height) : undefined;
-    const webmAbs = path.join(job.outDir, 'actions', `${action}.webm`);
-    const gifAbs = path.join(job.outDir, 'actions', `${action}.gif`);
-    await toWebm(videoAbs, webmAbs, keys, ffmpegPath, normVf);
-    await toGif(videoAbs, gifAbs, keys, ffmpegPath, normVf);
+    // ── Stage 4: 抠像转码（多点采样多 key，keyActionVideo 内含判废门槛）──
+    await keyActionVideo(job, action, ffmpegPath);
     await job.transition(action, 'done');
   } catch (err) {
     const msg = err instanceof ArkApiError ? `[${err.status}] ${err.message}` : String(err);
