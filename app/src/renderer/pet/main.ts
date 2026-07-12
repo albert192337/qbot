@@ -68,9 +68,9 @@ window.qbot.characters.onActivated((meta) => {
 // ── 指针交互 ─────────────────────────────────────────────
 // 移动 >4px 才算拖拽（否则 pointerdown 会闪一下 drag 动画）；
 // 未拖拽的 pointerup = 点击 → 250ms 内第二击算双击（双击 = 立即说一句）。
+// 单击 = 角色走进小房间（talk_happy 保留在右键菜单和房间内点角色）。
 const DRAG_THRESHOLD = 4;
 const DBLCLICK_MS = 250;
-const CLICK_ACTION: ActionId = 'talk_happy';
 
 let pointerDown = false;
 let dragStarted = false;
@@ -135,7 +135,7 @@ stage.addEventListener('pointerup', (e) => {
   } else {
     clickTimer = setTimeout(() => {
       clickTimer = null;
-      dispatch({ type: 'PLAY_ACTION', action: CLICK_ACTION });
+      window.qbot.room.open();
     }, DBLCLICK_MS);
   }
 });

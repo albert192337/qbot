@@ -28,10 +28,14 @@ const api: QBotApi = {
       ipcRenderer.on('characters:activated', listener);
       return () => ipcRenderer.removeListener('characters:activated', listener);
     },
+    getActive: () => ipcRenderer.invoke('characters:getActive'),
   },
   pet: {
     // 高频拖拽走 send（不等待回包）
     move: (x, y) => ipcRenderer.send('pet:move', x, y),
+  },
+  room: {
+    open: () => ipcRenderer.send('room:open'),
   },
   settings: {
     get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),

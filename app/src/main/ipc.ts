@@ -6,7 +6,7 @@ import { app } from 'electron';
 import type { CharacterForm, ImageProvider } from '@qbot/pipeline';
 import { getCharacter, listCharacters, renameCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { movePetWindow, getPetWindow, createPetWindow, setPetScale } from './windows';
+import { movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow } from './windows';
 import { pickTurnaround, redoFailed, resumeHatch, startHatch } from './pipeline-bridge';
 import { rebuildTray } from './tray';
 
@@ -44,9 +44,12 @@ export function registerIpc(): void {
     const meta = await getCharacter(dirId);
     if (!meta || !meta.manifest) throw new Error(`character not found: ${dirId}`);
     await setSettings({ activeCharacter: dirId });
-    const pet = getPetWindow() ?? createPetWindow();
-    pet.webContents.send('characters:activated', meta);
+    broadcastCharacterActivated(meta);
     await rebuildTray(); // 切换后菜单 radio 状态同步
+  });
+  ipcMain.handle('characters:getActive', async () => {
+    const { activeCharacter } = await getSettings();
+    return activeCharacter ? getCharacter(activeCharacter) : null;
   });
   ipcMain.handle('characters:rename', async (_ev, dirId: string, name: string) => {
     await renameCharacter(dirId, name);
@@ -56,11 +59,21 @@ export function registerIpc(): void {
   // ── pet ────────────────────────────────────────────────
   ipcMain.on('pet:move', (_ev, x: number, y: number) => movePetWindow(x, y));
 
+  // ── room ───────────────────────────────────────────────
+  ipcMain.on('room:open', async () => {
+    const { activeCharacter } = await getSettings();
+    const meta = activeCharacter ? await getCharacter(activeCharacter) : null;
+    const name = meta?.manifest?.name;
+    openRoomWindow(name && name !== '未命名' ? `${name}的家` : '小房间');
+  });
+
   // ── settings ───────────────────────────────────────────
   ipcMain.handle('settings:get', () => getSettings());
   ipcMain.handle('settings:set', async (_ev, patch) => {
     const next = await setSettings(patch);
     if (typeof patch?.petScale === 'number') setPetScale(patch.petScale); // 实时生效
-    getPetWindow()?.webContents.send('settings:changed', next); // 语音设置实时生效
+    // 语音设置实时生效（pet + room）
+    getPetWindow()?.webContents.send('settings:changed', next);
+    getRoomWindow()?.webContents.send('settings:changed', next);
   });
 }

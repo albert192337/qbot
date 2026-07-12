@@ -7,7 +7,7 @@
 | 路径 | 职责 |
 |---|---|
 | `pipeline/` | 生成管线，**纯 Node 零 Electron 依赖**，可独立 CLI 使用（`npx tsx pipeline/src/cli.ts`） |
-| `app/` | Electron 客户端（electron-vite；main / preload / 双 renderer：pet + hatch） |
+| `app/` | Electron 客户端（electron-vite；main / preload / 三 renderer：pet + hatch + room 小房间） |
 | `app/src/main/pipeline-bridge.ts` | **唯一** import `@qbot/pipeline` 的地方 |
 | `assets/mascot/` | 官方预置角色源（同步于 `app/resources/presets/mascot/`） |
 | `docs/superpowers/specs/` | 已批准的设计 spec（权威）；`DESIGN.md` 是最初的产品/技术调研 |

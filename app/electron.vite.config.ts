@@ -21,6 +21,7 @@ export default defineConfig({
         input: {
           pet: resolve(__dirname, 'src/renderer/pet/index.html'),
           hatch: resolve(__dirname, 'src/renderer/hatch/index.html'),
+          room: resolve(__dirname, 'src/renderer/room/index.html'),
         },
       },
     },

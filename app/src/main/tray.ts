@@ -2,7 +2,7 @@
 import { Menu, Tray, app, nativeImage } from 'electron';
 import { listCharacters } from './characters';
 import { getSettings, setSettings } from './config';
-import { createHatchWindow, createPetWindow, getPetWindow } from './windows';
+import { createHatchWindow, broadcastCharacterActivated } from './windows';
 import { getCharacter } from './characters';
 
 let tray: Tray | null = null;
@@ -47,8 +47,7 @@ export async function rebuildTray(): Promise<void> {
             click: async () => {
               await setSettings({ activeCharacter: c.dirId });
               const meta = await getCharacter(c.dirId);
-              const pet = getPetWindow() ?? createPetWindow();
-              pet.webContents.send('characters:activated', meta);
+              if (meta) broadcastCharacterActivated(meta);
               void rebuildTray();
             },
           }))

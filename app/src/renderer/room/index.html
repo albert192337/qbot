@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>小房间</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: #f3ead6;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      /* 房间画布按 RoomSpec 设计尺寸布局，整体 scale 适配窗口（--fit 由 JS 计算） */
+      #stage {
+        position: absolute;
+        left: 0;
+        top: 0;
+        transform: scale(var(--fit, 1));
+        transform-origin: 0 0;
+      }
+      #bg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      /* 角色：#char 定位（脚底锚点平移），#charScale 远近缩放（锚点 = 底边中点） */
+      #char {
+        position: absolute;
+        left: 0;
+        top: 0;
+        cursor: pointer;
+        will-change: transform;
+      }
+      #charScale {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        transform-origin: 50% 100%;
+        will-change: transform;
+      }
+      #charStage {
+        position: absolute;
+        inset: 0;
+      }
+      #charStage video {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        pointer-events: none;
+      }
+      #bubble {
+        position: absolute;
+        bottom: 96%;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 220px;
+        width: max-content;
+        z-index: 5;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        padding: 7px 12px;
+        font-family: -apple-system, 'PingFang SC', sans-serif;
+        font-size: 16px;
+        line-height: 1.4;
+        color: #3a3a3a;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+        word-break: break-word;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 200ms;
+      }
+      #bubble.show {
+        visibility: visible;
+        opacity: 1;
+      }
+      #bubble.show.fade-out {
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <img id="bg" alt="" />
+      <div id="char">
+        <div id="charScale">
+          <div id="charStage"></div>
+          <div id="bubble"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -55,12 +55,18 @@ export interface QBotApi {
     activate(dirId: string): Promise<void>;
     /** 改名（写回 manifest.json） */
     rename(dirId: string, name: string): Promise<void>;
-    /** pet 窗口订阅：激活角色变化 */
+    /** pet / room 窗口订阅：激活角色变化 */
     onActivated(cb: (meta: CharacterMeta) => void): () => void;
+    /** 当前激活角色（room 窗口启动时主动拉取，不依赖广播时序） */
+    getActive(): Promise<CharacterMeta | null>;
   };
   pet: {
     /** 高频拖拽移动（send，不走 invoke） */
     move(screenX: number, screenY: number): void;
+  };
+  room: {
+    /** 单击桌宠：角色走进小房间（pet 窗隐藏 → room 窗弹出） */
+    open(): void;
   };
   settings: {
     get(): Promise<Settings>;
