@@ -65,6 +65,16 @@ window.qbot.characters.onActivated((meta) => {
   speaker.setCharacter(meta.manifest.id, meta.manifest.voice);
 });
 
+// 窗口隐藏期间（角色进小房间）Chromium 会自动暂停 <video> 且不派发 ended，
+// 状态机会卡死在半路 → 恢复可见时整体重置回 idle 循环。
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || available.length === 0) return;
+  speaker.interrupt();
+  state = { kind: 'idle' };
+  player.play('idle');
+  scheduleTimer();
+});
+
 // ── 指针交互 ─────────────────────────────────────────────
 // 移动 >4px 才算拖拽（否则 pointerdown 会闪一下 drag 动画）；
 // 未拖拽的 pointerup = 点击 → 250ms 内第二击算双击（双击 = 立即说一句）。
