@@ -4,11 +4,9 @@
  * acting（播一遍动作回 resting）。点角色 = 任何状态打断，播 talk_happy。
  */
 import type { ActionId } from '@qbot/pipeline';
+import { randomPointInPolygon, type Point } from './geometry';
 
-export interface Point {
-  x: number;
-  y: number;
-}
+export type { Point } from './geometry';
 
 export interface RoamGeom {
   floor: Array<[number, number]>;
@@ -53,47 +51,6 @@ export const CLICK_ACTION: ActionId = 'talk_happy';
 
 export function randomRestMs(rng: RoamRng): number {
   return REST_MIN_MS + Math.floor(rng.random() * (REST_MAX_MS - REST_MIN_MS));
-}
-
-/** 射线法点在多边形内（边上视为在内即可，漫游精度足够） */
-export function pointInPolygon(p: Point, poly: Array<[number, number]>): boolean {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i];
-    const [xj, yj] = poly[j];
-    if (yi > p.y !== yj > p.y && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
-
-export function polygonCentroid(poly: Array<[number, number]>): Point {
-  let x = 0;
-  let y = 0;
-  for (const [px, py] of poly) {
-    x += px;
-    y += py;
-  }
-  return { x: x / poly.length, y: y / poly.length };
-}
-
-/** 地板内随机点：bbox 内 rejection sampling（凸多边形几次就中），兜底质心 */
-export function randomPointInPolygon(poly: Array<[number, number]>, rng: RoamRng): Point {
-  const xs = poly.map((p) => p[0]);
-  const ys = poly.map((p) => p[1]);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  for (let i = 0; i < 30; i++) {
-    const p = {
-      x: minX + rng.random() * (maxX - minX),
-      y: minY + rng.random() * (maxY - minY),
-    };
-    if (pointInPolygon(p, poly)) return p;
-  }
-  return polygonCentroid(poly);
 }
 
 /** 等距假透视：y 越靠地板下缘越大（近），线性插值缩放 */

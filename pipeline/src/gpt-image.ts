@@ -153,9 +153,10 @@ export function createGptImageGenerator(
   return async (opts) => {
     const model = DEFAULTS.gptImageModel;
     const size = SIZE_MAP[opts.size];
+    const extra: Record<string, string> = opts.background ? { background: opts.background } : {};
     if (opts.refImageDataUrl) {
       const { contentType, body } = buildMultipart(
-        { model, prompt: opts.prompt, n: '1', size },
+        { model, prompt: opts.prompt, n: '1', size, ...extra },
         {
           field: 'image',
           filename: 'ref.png',
@@ -168,7 +169,7 @@ export function createGptImageGenerator(
     return post(
       `${baseUrl}/images/generations`,
       { 'Content-Type': 'application/json' },
-      Buffer.from(JSON.stringify({ model, prompt: opts.prompt, n: 1, size })),
+      Buffer.from(JSON.stringify({ model, prompt: opts.prompt, n: 1, size, ...extra })),
     );
   };
 }

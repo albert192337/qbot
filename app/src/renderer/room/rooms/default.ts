@@ -57,7 +57,8 @@ const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
   </g>
 </svg>`;
 
-export const DEFAULT_ROOM: RoomSpec = {
+/** SVG 手绘房间：默认 PNG 背景加载失败时的兜底（几何为 800 坐标系） */
+export const FALLBACK_ROOM: RoomSpec = {
   name: 'default',
   background: `data:image/svg+xml;utf8,${encodeURIComponent(SVG)}`,
   width: 800,
@@ -69,7 +70,76 @@ export const DEFAULT_ROOM: RoomSpec = {
     [400, 620],
     [160, 510],
   ],
+  // 房间实体六边形外轮廓（描边外扩 6px 余量）
+  outline: [
+    [74, 234],
+    [400, 72],
+    [726, 234],
+    [726, 496],
+    [400, 658],
+    [74, 496],
+  ],
+  // 左右墙面（装饰 drop 判定）：墙体全高四边形
+  wallL: [
+    [80, 490],
+    [400, 330],
+    [400, 80],
+    [80, 240],
+  ],
+  wallR: [
+    [400, 330],
+    [720, 490],
+    [720, 240],
+    [400, 80],
+  ],
+  // 等距墙面仿射：沿墙 x 方向每 1px 水平位移伴随 ∓0.5px 垂直位移（2:1 等距）
+  wallMatrixL: [1, -0.5, 0, 1],
+  wallMatrixR: [1, 0.5, 0, 1],
   scaleNear: 1,
   scaleFar: 0.62,
   petHeight: 230,
+};
+
+/**
+ * 默认房间：gpt-image-2 生成（scripts/gen-room.mts，room-1 候选），透明底 PNG。
+ * 几何坐标按图片 alpha 轮廓实测（1024 坐标系）：
+ * 六边形顶点 (98,305)(511,99)(924,304)(924,653)(516,842)(98,652)，角柱底 ≈(513,447)。
+ */
+export const DEFAULT_ROOM: RoomSpec = {
+  name: 'default',
+  background: new URL('./default-bg.png', import.meta.url).href,
+  width: 1024,
+  height: 1024,
+  // 地板菱形向质心内收 ~15%，留踢脚线与脚底余量
+  floor: [
+    [513, 477],
+    [862, 652],
+    [515, 813],
+    [160, 652],
+  ],
+  outline: [
+    [92, 300],
+    [511, 93],
+    [930, 299],
+    [930, 658],
+    [516, 848],
+    [92, 657],
+  ],
+  wallL: [
+    [98, 652],
+    [513, 447],
+    [511, 99],
+    [98, 305],
+  ],
+  wallR: [
+    [513, 447],
+    [924, 653],
+    [924, 304],
+    [511, 99],
+  ],
+  wallMatrixL: [1, -0.5, 0, 1],
+  wallMatrixR: [1, 0.5, 0, 1],
+  scaleNear: 1,
+  scaleFar: 0.62,
+  petHeight: 290,
 };

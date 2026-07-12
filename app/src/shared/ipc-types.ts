@@ -31,6 +31,18 @@ export interface HatchProgress extends ProgressEvent {
   candidateUrls?: string[];
 }
 
+/** 小房间装饰摆放（room-decor.json，按房间名键控） */
+export interface DecorPlacement {
+  id: string;
+  stickerId: string;
+  /** 贴纸中心点（房间坐标系） */
+  x: number;
+  y: number;
+  scale: number;
+  /** 摆放区域：左/右墙自动透视变形，free 平面贴纸 */
+  zone: 'wallL' | 'wallR' | 'free';
+}
+
 export interface QBotApi {
   hatch: {
     /** 丢图开始孵化，返回角色目录 ID；imageProvider 缺省 = seedream，characterForm 缺省 = humanoid */
@@ -67,6 +79,16 @@ export interface QBotApi {
   room: {
     /** 单击桌宠：角色走进小房间（pet 窗隐藏 → room 窗弹出） */
     open(): void;
+    /** 贴纸窗拖拽移动（send，不走 invoke） */
+    move(screenX: number, screenY: number): void;
+    /** 鼠标出入房间实体轮廓：透明区穿透开关 */
+    setIgnoreMouse(ignore: boolean): void;
+  };
+  decor: {
+    /** 读某房间的装饰摆放（文件损坏/不存在 = 空数组） */
+    get(roomName: string): Promise<DecorPlacement[]>;
+    /** 覆盖写某房间的装饰摆放（退出编辑态时调用） */
+    set(roomName: string, placements: DecorPlacement[]): Promise<void>;
   };
   settings: {
     get(): Promise<Settings>;

@@ -29,6 +29,11 @@ npm run dist -w app          # 打包 dmg（配置就绪但从未验证成功过
 
 # 多开第二只桌宠（数据目录隔离，单实例锁按目录生效）
 QBOT_USER_DATA="$HOME/Library/Application Support/@qbot/app-2" npm run dev -w app
+
+# 离线生成房间背景/装饰贴纸（gpt-image-2，花钱，key 在 config.local.json）
+npx tsx scripts/gen-room.mts room --ref assets/rooms/ref.png --n 3   # 房间候选
+npx tsx scripts/gen-room.mts decor                                    # 贴纸包
+npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 重抠（免费）
 ```
 
 运行时数据：`~/Library/Application Support/@qbot/app/`（`characters/*/` 角色包、`config.json` 设置）。
