@@ -16,6 +16,26 @@ describe('prompts', () => {
     expect(p).toContain('无文字，无水印');
   });
 
+  it('chibi 风格三视图含二头身Q版约束与特征保留', () => {
+    const p = turnaroundPrompt(undefined, 'humanoid', 'chibi');
+    expect(p).toContain('二头身Q版chibi风格');
+    expect(p).toContain('大头圆脸小身体');
+    expect(p).toContain('被一眼认出是同一个角色');
+    expect(p).toContain('正面、正侧面、正背面');
+    expect(p).toContain('纯白色背景');
+  });
+
+  it('faithful 风格与缺省 style 输出一致（旧 job resume 兼容）', () => {
+    expect(turnaroundPrompt()).toBe(turnaroundPrompt(undefined, 'humanoid', 'faithful'));
+    expect(turnaroundPrompt()).not.toContain('二头身');
+  });
+
+  it('抽象档忽略 style（chibi 与 faithful 输出相同）', () => {
+    expect(turnaroundPrompt(undefined, 'abstract', 'chibi')).toBe(
+      turnaroundPrompt(undefined, 'abstract', 'faithful'),
+    );
+  });
+
   it('每个动作的首帧模板含绿幕与排除约束', () => {
     for (const id of ACTION_IDS) {
       const p = framePrompt(id);

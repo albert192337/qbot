@@ -50,11 +50,16 @@ dropzone.addEventListener('drop', async (e) => {
   const form = (
     document.querySelector('input[name="character-form"]:checked') as HTMLInputElement
   )?.value;
+  const style = (
+    document.querySelector('input[name="character-style"]:checked') as HTMLInputElement
+  )?.value;
   try {
     currentDirId = await window.qbot.hatch.start(
       refPath,
       provider === 'gpt-image-2' ? 'gpt-image-2' : undefined,
       form === 'abstract' ? 'abstract' : undefined,
+      // 抽象档无头身比概念，不传风格
+      form === 'abstract' ? undefined : style === 'faithful' ? 'faithful' : 'chibi',
     );
   } catch (err) {
     showError(String(err instanceof Error ? err.message : err));
@@ -63,6 +68,18 @@ dropzone.addEventListener('drop', async (e) => {
   buildProgressGrid();
   showScreen('progress'); // 三视图生成中；awaiting_pick 事件到达后切 pick 屏
 });
+
+// 抽象档没有头身比概念 → 隐藏生成风格选项
+for (const radio of document.querySelectorAll<HTMLInputElement>(
+  'input[name="character-form"]',
+)) {
+  radio.addEventListener('change', () => {
+    const form = (
+      document.querySelector('input[name="character-form"]:checked') as HTMLInputElement
+    )?.value;
+    document.getElementById('style-row')!.style.display = form === 'abstract' ? 'none' : '';
+  });
+}
 
 /** 启动时检查未完成孵化与失败动作，提供续跑/修复入口 */
 async function offerResume(): Promise<void> {

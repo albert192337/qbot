@@ -72,6 +72,7 @@ program
   .option('--image-provider <p>', '生图后端 seedream|gpt-image-2', 'seedream')
   .option('--gpt-image-key <key>', 'gpt-image-2 API key（默认读 GPT_IMAGE_API_KEY）')
   .option('--form <form>', '角色形态 humanoid|abstract（抽象角色如线条小狗选 abstract）', 'humanoid')
+  .option('--style <style>', '人形档生成风格 chibi|faithful（chibi=二头身Q版，faithful=保持原图头身比）', 'chibi')
   .action(async (opts) => {
     const cfg: PipelineConfig = {
       apiKey: getApiKey(opts.apiKey),
@@ -81,6 +82,8 @@ program
       refImagePath: path.resolve(opts.ref),
       imageProvider: opts.imageProvider === 'gpt-image-2' ? 'gpt-image-2' : undefined,
       characterForm: opts.form === 'abstract' ? 'abstract' : undefined,
+      characterStyle:
+        opts.form === 'abstract' ? undefined : opts.style === 'faithful' ? 'faithful' : 'chibi',
     });
     job.on('progress', printProgress);
     const pickCandidate =

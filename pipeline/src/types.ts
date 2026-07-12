@@ -61,6 +61,14 @@ export type ImageProvider = 'seedream' | 'gpt-image-2';
 /** 角色形态：humanoid = 人形/兽形具象（默认）；abstract = 线条小狗、简笔涂鸦等抽象角色 */
 export type CharacterForm = 'humanoid' | 'abstract';
 
+/**
+ * 人形档生成风格（只影响三视图；首帧/视频引用已选三视图，风格自然沿袭）：
+ * - chibi = 二头身 Q 版（默认）：任意素材（照片、复杂插画）都重绘成大头圆脸小身体，桌宠贴纸感强
+ * - faithful = 高保真：保持原图头身比与画风（旧行为）
+ * 抽象档无头身比概念，忽略此选项。
+ */
+export type CharacterStyle = 'chibi' | 'faithful';
+
 /** manifest.json 中单动作条目（spec §4） */
 export interface ManifestAction {
   webm: string;
@@ -134,6 +142,8 @@ export interface JobState {
   imageProvider?: ImageProvider;
   /** 创建时选定的角色形态（决定整套 prompt 措辞）；缺省 = humanoid */
   characterForm?: CharacterForm;
+  /** 创建时选定的生成风格（只影响三视图 prompt）；缺省 = 本字段引入前的旧 job = faithful */
+  characterStyle?: CharacterStyle;
   turnaround: {
     /** 相对 .job/ 的候选图路径 */
     candidates: string[];

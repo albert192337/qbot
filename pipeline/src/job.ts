@@ -15,6 +15,7 @@ import {
   type ActionState,
   type ActionStatus,
   type CharacterForm,
+  type CharacterStyle,
   type ImageProvider,
   type JobState,
   type ProgressEvent,
@@ -53,6 +54,7 @@ export class Job extends EventEmitter {
       tier?: 'S';
       imageProvider?: ImageProvider;
       characterForm?: CharacterForm;
+      characterStyle?: CharacterStyle;
     },
   ): Promise<Job> {
     const jobDir = path.join(outDir, JOB_DIR);
@@ -70,6 +72,7 @@ export class Job extends EventEmitter {
       refImage: 'source.png',
       imageProvider: opts.imageProvider,
       characterForm: opts.characterForm,
+      characterStyle: opts.characterStyle,
       turnaround: { candidates: [], picked: null },
       actions: Object.fromEntries(
         ACTION_IDS.map((id) => [id, initialActionState()]),

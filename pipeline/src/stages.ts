@@ -55,7 +55,7 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 export async function runTurnaround(job: Job, ark: ArkClient): Promise<string[]> {
   await job.setStage('turnaround');
   const refPng = await readFile(path.join(job.outDir, job.state.refImage));
-  const prompt = turnaroundPrompt(undefined, job.state.characterForm);
+  const prompt = turnaroundPrompt(undefined, job.state.characterForm, job.state.characterStyle);
   const buffers = await Promise.all(
     Array.from({ length: TURNAROUND_CANDIDATES }, () =>
       ark.generateImage({

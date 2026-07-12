@@ -3,7 +3,7 @@ import { BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { app } from 'electron';
-import type { CharacterForm, ImageProvider } from '@qbot/pipeline';
+import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import { getCharacter, listCharacters, renameCharacter } from './characters';
 import { getSettings, setSettings } from './config';
 import { movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow } from './windows';
@@ -14,8 +14,13 @@ export function registerIpc(): void {
   // ── hatch ──────────────────────────────────────────────
   ipcMain.handle(
     'hatch:start',
-    (_ev, refImagePath: string, imageProvider?: ImageProvider, characterForm?: CharacterForm) =>
-      startHatch(refImagePath, imageProvider, characterForm),
+    (
+      _ev,
+      refImagePath: string,
+      imageProvider?: ImageProvider,
+      characterForm?: CharacterForm,
+      characterStyle?: CharacterStyle,
+    ) => startHatch(refImagePath, imageProvider, characterForm, characterStyle),
   );
   ipcMain.handle('hatch:resume', (_ev, dirId: string) => resumeHatch(dirId));
   ipcMain.handle('hatch:redo', (_ev, dirId: string) => redoFailed(dirId));

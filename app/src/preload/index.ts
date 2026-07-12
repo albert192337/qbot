@@ -4,8 +4,8 @@ import type { CharacterMeta, HatchProgress, QBotApi, Settings } from '../shared/
 
 const api: QBotApi = {
   hatch: {
-    start: (refImagePath, imageProvider, characterForm) =>
-      ipcRenderer.invoke('hatch:start', refImagePath, imageProvider, characterForm),
+    start: (refImagePath, imageProvider, characterForm, characterStyle) =>
+      ipcRenderer.invoke('hatch:start', refImagePath, imageProvider, characterForm, characterStyle),
     resume: (dirId) => ipcRenderer.invoke('hatch:resume', dirId),
     redo: (dirId) => ipcRenderer.invoke('hatch:redo', dirId),
     pickTurnaround: (dirId, index) =>

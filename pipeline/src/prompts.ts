@@ -3,7 +3,7 @@
  * 模板文本逐字取自 DESIGN.md §3.3（实测有效），不要随意改写措辞。
  * 纯函数模块，无 IO。
  */
-import type { ActionId, ActionSpec, CharacterForm } from './types.js';
+import type { ActionId, ActionSpec, CharacterForm, CharacterStyle } from './types.js';
 
 /**
  * MVP 用固定通用描述填槽（spec §8 风险项：还原度不够时接 VLM 自动提取）。
@@ -121,10 +121,15 @@ export function actionSpec(action: ActionId, form: CharacterForm = 'humanoid'): 
   return (form === 'abstract' ? ABSTRACT_ACTIONS : ACTIONS)[action];
 }
 
-/** 三视图 prompt（图生图，参考图=用户输入） */
+/** 三视图 prompt（图生图，参考图=用户输入）
+ * style 只作用于人形档：chibi 把任意素材重绘成二头身 Q 版；faithful 保持原图头身比与画风（旧行为）。
+ * 函数缺省 faithful 以兼容旧 job resume；新建入口（UI/CLI）默认传 chibi。
+ * 首帧/视频 prompt 不需要 style——它们以已选三视图为参考图，风格自然沿袭。
+ */
 export function turnaroundPrompt(
   desc: CharacterDesc = DEFAULT_CHARACTER_DESC,
   form: CharacterForm = 'humanoid',
+  style: CharacterStyle = 'faithful',
 ): string {
   if (form === 'abstract') {
     return (
@@ -133,6 +138,16 @@ export function turnaroundPrompt(
       `画面从左到右水平排列三个完整全身视角：正面、正侧面、正背面，` +
       `三个视角的角色细节完全一致。` +
       `纯白色背景，无阴影，无文字，无水印`
+    );
+  }
+  if (style === 'chibi') {
+    return (
+      `角色三视图设定表：把参考图中的角色重新设计为二头身Q版chibi风格：大头圆脸小身体，圆润可爱，` +
+      `保留参考图中角色的发型、发色、眼睛颜色、耳朵尾巴等标志性特征和服装的主要配色与元素，` +
+      `使其可以被一眼认出是同一个角色。` +
+      `画面从左到右水平排列三个完整站立全身视角：正面、正侧面、正背面，` +
+      `三个视角的角色比例、发型、服装细节完全一致，双臂自然下垂，表情为${desc.defaultExpression}。` +
+      `可爱贴纸插画风格，纯白色背景，无阴影，无文字，无水印`
     );
   }
   return (

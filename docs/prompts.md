@@ -2,23 +2,30 @@
 
 本文档梳理 QBot 生成管线用到的全部 prompt，源码位于 `pipeline/src/prompts.ts`（模板文本逐字取自 DESIGN.md §3.3，实测有效，不要随意改写措辞）。
 
-整体结构是 **3 个模板 × 2 种角色形态 × 6 个动作**：
+整体结构是 **3 个模板 × 2 种角色形态 × 6 个动作**（人形档三视图另有 2 种生成风格）：
 
 - 三个模板：三视图（`turnaroundPrompt`）→ 视频首帧（`framePrompt`）→ 循环视频（`videoPrompt`），分别在 `pipeline/src/stages.ts` 的三个阶段调用。
 - 两种形态（`CharacterForm`）：`humanoid` 人形档、`abstract` 抽象档（线条小狗、简笔涂鸦、几何形等非人形角色）。
+- 两种风格（`CharacterStyle`，仅人形档三视图）：`chibi` 二头身 Q 版（新建默认）、`faithful` 高保真。首帧/视频以已选三视图为参考图，风格自然沿袭，无需感知此选项。
 - 六个动作（`ActionId`）：`idle`、`drag`、`sleep`、`tea`、`talk_happy`、`talk_annoyed`。
 
 ## 一、三视图 prompt（`turnaroundPrompt`）
 
 图生图，参考图 = 用户上传的原图。
 
-**人形档：**
+**人形档 · Q 版（`chibi`，UI/CLI 新建时的默认）：**
+
+> 角色三视图设定表：把参考图中的角色重新设计为二头身Q版chibi风格：大头圆脸小身体，圆润可爱，保留参考图中角色的发型、发色、眼睛颜色、耳朵尾巴等标志性特征和服装的主要配色与元素，使其可以被一眼认出是同一个角色。画面从左到右水平排列三个完整站立全身视角：正面、正侧面、正背面，三个视角的角色比例、发型、服装细节完全一致，双臂自然下垂，表情为自然平静的默认表情。可爱贴纸插画风格，纯白色背景，无阴影，无文字，无水印
+
+设计动机：用户输入可能是任意素材（照片、复杂插画、非贴纸风角色），Q 版重绘对任意输入都稳定，且桌宠场景贴纸感更强。
+
+**人形档 · 高保真（`faithful`，函数缺省值——旧 job resume 时沿用旧行为）：**
 
 > 角色三视图设定表：参考图中的角色，保持参考图中角色的发型、眼睛、神态、耳朵尾巴等特征、服装、头身比、画风完全一致。画面从左到右水平排列三个完整站立全身视角：正面、正侧面、正背面，三个视角的角色比例、发型、服装细节完全一致，双臂自然下垂，表情为自然平静的默认表情。纯白色背景，无阴影，无文字，无水印
 
-其中「保持参考图中角色的发型……完全一致」和「自然平静的默认表情」是 `CharacterDesc` 的两个槽位（`summary` / `defaultExpression`），MVP 阶段用固定默认值 `DEFAULT_CHARACTER_DESC` 填充；还原度不够时的后续方案是接 VLM 自动提取角色描述（spec §8 风险项）。
+其中「保持参考图中角色的发型……完全一致」和「自然平静的默认表情」是 `CharacterDesc` 的两个槽位（`summary` / `defaultExpression`），MVP 阶段用固定默认值 `DEFAULT_CHARACTER_DESC` 填充；还原度不够时的后续方案是接 VLM 自动提取角色描述（spec §8 风险项）。注意 chibi 档不使用 `summary` 槽位（重绘语义与逐字保持冲突），只保留 `defaultExpression`。
 
-**抽象档：**
+**抽象档**（无头身比概念，忽略风格选项）：
 
 > 角色三视图设定表：参考图中的角色，完全保持参考图中角色的形态、线条风格、颜色、比例与画风。不要拟人化，不要添加参考图中没有的四肢、五官、服装或任何部位。画面从左到右水平排列三个完整全身视角：正面、正侧面、正背面，三个视角的角色细节完全一致。纯白色背景，无阴影，无文字，无水印
 
@@ -112,7 +119,7 @@ i2v，首帧 = 尾帧，走 Ark 1.0 系列的 prompt 尾部参数约定。
 
 | 模板 | 函数 | 调用位置 |
 |---|---|---|
-| 三视图 | `turnaroundPrompt(desc?, form?)` | `pipeline/src/stages.ts:58` |
+| 三视图 | `turnaroundPrompt(desc?, form?, style?)` | `pipeline/src/stages.ts:58` |
 | 视频首帧 | `framePrompt(action, desc?, form?)` | `pipeline/src/stages.ts:110` |
 | 循环视频 | `videoPrompt(action, form?)` | `pipeline/src/stages.ts:136` |
 
