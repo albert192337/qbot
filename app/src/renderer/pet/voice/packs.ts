@@ -17,7 +17,7 @@ export interface VoicePack {
 }
 
 export const VOICE_PACKS: Record<VoicePackId, VoicePack> = {
-  soft: { id: 'soft', basePitch: 400, stepSec: 0.135, vibrato: false, melodic: false },
-  bouncy: { id: 'bouncy', basePitch: 430, stepSec: 0.115, vibrato: false, melodic: true },
-  baby: { id: 'baby', basePitch: 520, stepSec: 0.145, vibrato: true, melodic: false },
+  soft: { id: 'soft', basePitch: 415, stepSec: 0.17, vibrato: false, melodic: false },
+  bouncy: { id: 'bouncy', basePitch: 445, stepSec: 0.145, vibrato: false, melodic: true },
+  baby: { id: 'baby', basePitch: 540, stepSec: 0.18, vibrato: true, melodic: false },
 };

@@ -105,7 +105,7 @@ export function plan(
     if ((question || mood === 'curious') && i >= chars.length - 2) {
       f0 *= i === chars.length - 1 ? 1.26 : 1.12;
     }
-    const dur = step * (pack.melodic ? (i % 2 ? 0.62 : 0.8) : 0.72);
+    const dur = step * (pack.melodic ? (i % 2 ? 0.68 : 0.85) : 0.78);
     blips.push({ t, f0, vowel, dur, vibrato: pack.vibrato });
     t += step * (pack.melodic && i % 3 === 2 ? 1.25 : 1);
   });
@@ -174,11 +174,11 @@ function scheduleBlip(ctx: AudioContext, out: GainNode, t0: number, b: Blip): vo
   osc.type = 'triangle';
   const osc2 = ctx.createOscillator();
   osc2.type = 'sine';
-  // 起音上滑（×0.85 快速滑到目标）——"鸟啼感"
-  osc.frequency.setValueAtTime(b.f0 * 0.85, t0);
-  osc.frequency.exponentialRampToValueAtTime(b.f0, t0 + 0.035);
-  osc2.frequency.setValueAtTime(b.f0 * 1.7, t0);
-  osc2.frequency.exponentialRampToValueAtTime(b.f0 * 2, t0 + 0.035);
+  // 起音上滑（×0.8 快速滑到目标）——"鸟啼感"
+  osc.frequency.setValueAtTime(b.f0 * 0.8, t0);
+  osc.frequency.exponentialRampToValueAtTime(b.f0, t0 + 0.05);
+  osc2.frequency.setValueAtTime(b.f0 * 1.6, t0);
+  osc2.frequency.exponentialRampToValueAtTime(b.f0 * 2, t0 + 0.05);
   if (b.vibrato) {
     const lfo = ctx.createOscillator();
     lfo.frequency.value = 7;
@@ -204,8 +204,8 @@ function scheduleBlip(ctx: AudioContext, out: GainNode, t0: number, b: Blip): vo
   lp.frequency.value = 3800;
   const g = ctx.createGain();
   g.gain.setValueAtTime(0, t0);
-  g.gain.linearRampToValueAtTime(0.45, t0 + 0.018);
-  g.gain.setTargetAtTime(0, t0 + b.dur - 0.03, 0.015);
+  g.gain.linearRampToValueAtTime(0.45, t0 + 0.025);
+  g.gain.setTargetAtTime(0, t0 + b.dur - 0.03, 0.022);
   const g2 = ctx.createGain();
   g2.gain.value = 0.12;
   osc.connect(bp1);
