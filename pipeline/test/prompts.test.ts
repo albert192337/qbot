@@ -34,6 +34,26 @@ describe('prompts', () => {
     expect(turnaroundPrompt(undefined, 'abstract', 'chibi')).toBe(
       turnaroundPrompt(undefined, 'abstract', 'faithful'),
     );
+    expect(framePrompt('idle', undefined, 'abstract', 'faithful')).toBe(
+      framePrompt('idle', undefined, 'abstract'),
+    );
+  });
+
+  it('faithful 首帧去掉贴纸风尾巴，改为保持参考图画风与头身比', () => {
+    for (const id of ACTION_IDS) {
+      const p = framePrompt(id, undefined, 'humanoid', 'faithful');
+      expect(p).not.toContain('贴纸插画风格');
+      expect(p).toContain('完全保持参考图的画风与头身比不变');
+      expect(p).toContain('画风、头身比等所有细节完全一致');
+      // 防翻车排除与绿幕约束不受风格影响
+      expect(p).toContain('纯色绿幕');
+      expect(p).toContain('没有白色贴纸描边');
+    }
+  });
+
+  it('chibi 与缺省 style 首帧维持贴纸风尾巴（旧 job 兼容）', () => {
+    expect(framePrompt('idle', undefined, 'humanoid', 'chibi')).toBe(framePrompt('idle'));
+    expect(framePrompt('idle')).toContain('粗描边贴纸插画风格');
   });
 
   it('每个动作的首帧模板含绿幕与排除约束', () => {

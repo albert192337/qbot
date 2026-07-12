@@ -107,7 +107,7 @@ async function runAction(
           attempts: { ...a.attempts, frame: a.attempts.frame + 1 },
         });
         const frameBuf = await ark.generateImage({
-          prompt: framePrompt(action, undefined, job.state.characterForm),
+          prompt: framePrompt(action, undefined, job.state.characterForm, job.state.characterStyle),
           refImageDataUrl: toDataUrl(turnaroundPng),
           size: IMAGE_SIZES.frame,
         });

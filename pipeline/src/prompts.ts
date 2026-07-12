@@ -158,22 +158,33 @@ export function turnaroundPrompt(
   );
 }
 
-/** 绿幕首帧 prompt（图生图，参考图=选定三视图） */
+/** 绿幕首帧 prompt（图生图，参考图=选定三视图）
+ * style 只在「人形 + faithful」时生效：把风格尾巴从「粗描边贴纸插画风格」换成保持参考图画风——
+ * 贴纸风尾巴的正面引导足以把高保真三视图拉回卡通插画风（甚至引出白色贴纸描边）。
+ * chibi / 缺省（旧 job）/ 抽象档维持原措辞。
+ */
 export function framePrompt(
   action: ActionId,
   desc: CharacterDesc = DEFAULT_CHARACTER_DESC,
   form: CharacterForm = 'humanoid',
+  style?: CharacterStyle,
 ): string {
+  const faithful = form !== 'abstract' && style === 'faithful';
   const keep =
     form === 'abstract'
       ? `参考图中的角色，完全保持其形态、线条、颜色、画风等所有细节一致，不要添加参考图中没有的部位。`
-      : `参考图中的角色，保持发型、眼睛、服装、耳尾等所有细节完全一致。`;
+      : faithful
+        ? `参考图中的角色，保持发型、眼睛、服装、耳尾、画风、头身比等所有细节完全一致。`
+        : `参考图中的角色，保持发型、眼睛、服装、耳尾等所有细节完全一致。`;
   return (
     keep +
     `${actionSpec(action, form).poseDesc}` +
     `画面中只有这一个角色，没有其他人物、没有手、没有家具、没有白色贴纸描边。` +
-    `背景为纯色绿幕（纯正绿色，无渐变无阴影无纹理），角色边缘描线清晰，全身完整可见，` +
-    `角色占画面高度约70%，粗描边贴纸插画风格，无文字无水印`
+    `背景为纯色绿幕（纯正绿色，无渐变无阴影无纹理），` +
+    (faithful ? `角色边缘清晰锐利，` : `角色边缘描线清晰，`) +
+    `全身完整可见，角色占画面高度约70%，` +
+    (faithful ? `完全保持参考图的画风与头身比不变，` : `粗描边贴纸插画风格，`) +
+    `无文字无水印`
   );
 }
 

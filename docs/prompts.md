@@ -6,7 +6,7 @@
 
 - 三个模板：三视图（`turnaroundPrompt`）→ 视频首帧（`framePrompt`）→ 循环视频（`videoPrompt`），分别在 `pipeline/src/stages.ts` 的三个阶段调用。
 - 两种形态（`CharacterForm`）：`humanoid` 人形档、`abstract` 抽象档（线条小狗、简笔涂鸦、几何形等非人形角色）。
-- 两种风格（`CharacterStyle`，仅人形档三视图）：`chibi` 二头身 Q 版（新建默认）、`faithful` 高保真。首帧/视频以已选三视图为参考图，风格自然沿袭，无需感知此选项。
+- 两种风格（`CharacterStyle`，仅人形档）：`chibi` 二头身 Q 版（新建默认）、`faithful` 高保真。影响三视图与首帧的措辞（faithful 需要去掉首帧的贴纸风尾巴，否则会被拉回卡通风）；视频 prompt 只描述运动，无需感知。
 - 六个动作（`ActionId`）：`idle`、`drag`、`sleep`、`tea`、`talk_happy`、`talk_annoyed`。
 
 ## 一、三视图 prompt（`turnaroundPrompt`）
@@ -37,12 +37,19 @@
 
 **保持一致性开头：**
 
-- 人形档：`参考图中的角色，保持发型、眼睛、服装、耳尾等所有细节完全一致。`
+- 人形档（chibi / 缺省）：`参考图中的角色，保持发型、眼睛、服装、耳尾等所有细节完全一致。`
+- 人形档（faithful 高保真）：`参考图中的角色，保持发型、眼睛、服装、耳尾、画风、头身比等所有细节完全一致。`
 - 抽象档：`参考图中的角色，完全保持其形态、线条、颜色、画风等所有细节一致，不要添加参考图中没有的部位。`
 
-**固定尾部（两档共用）：**
+**固定尾部（chibi / 缺省 / 抽象档）：**
 
 > 画面中只有这一个角色，没有其他人物、没有手、没有家具、没有白色贴纸描边。背景为纯色绿幕（纯正绿色，无渐变无阴影无纹理），角色边缘描线清晰，全身完整可见，角色占画面高度约70%，粗描边贴纸插画风格，无文字无水印
+
+**固定尾部（人形档 faithful 高保真）**——把「粗描边贴纸插画风格」换成保持参考图画风，「描线清晰」换成「清晰锐利」（描线是线稿词汇，会往插画风引导）：
+
+> 画面中只有这一个角色，没有其他人物、没有手、没有家具、没有白色贴纸描边。背景为纯色绿幕（纯正绿色，无渐变无阴影无纹理），角色边缘清晰锐利，全身完整可见，角色占画面高度约70%，完全保持参考图的画风与头身比不变，无文字无水印
+
+经验教训：贴纸风尾巴的正面引导（「粗描边贴纸插画风格」）足以在首帧阶段把高保真三视图重新拉回卡通插画风，甚至引出 prompt 明确排除的白色贴纸描边——正面风格描述的权重高于排除句。
 
 **人形档 poseDesc：**
 
@@ -120,7 +127,7 @@ i2v，首帧 = 尾帧，走 Ark 1.0 系列的 prompt 尾部参数约定。
 | 模板 | 函数 | 调用位置 |
 |---|---|---|
 | 三视图 | `turnaroundPrompt(desc?, form?, style?)` | `pipeline/src/stages.ts:58` |
-| 视频首帧 | `framePrompt(action, desc?, form?)` | `pipeline/src/stages.ts:110` |
+| 视频首帧 | `framePrompt(action, desc?, form?, style?)` | `pipeline/src/stages.ts:110` |
 | 循环视频 | `videoPrompt(action, form?)` | `pipeline/src/stages.ts:136` |
 
 动作文案按形态由 `actionSpec(action, form)` 从 `ACTIONS` / `ABSTRACT_ACTIONS` 中选取。
