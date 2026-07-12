@@ -158,6 +158,8 @@ const editor = new DecorEditor({
     clearTimer();
     speaker.stop(); // 气泡收起、自主发言停
     hideMenu();
+    window.qbot.room.setIgnoreMouse(false); // 编辑期整窗可交互（装饰栏在轮廓外）
+    inRoom = true;
   },
   onExit: (placements) => {
     void window.qbot.decor.set(spec.name, placements);
@@ -178,9 +180,10 @@ void window.qbot.decor
 // ── 贴纸窗交互 ───────────────────────────────────────────
 // 外沿透明区穿透：鼠标出入房间实体轮廓时切换 setIgnoreMouseEvents（forward 保证
 // 穿透期间 mousemove 仍进来，能判定回归）；同一状态只发一次 IPC。
+// 编辑态整窗保持可交互：装饰栏 fixed 在轮廓外的透明区，穿透会让它点不到。
 let inRoom = false;
 document.addEventListener('mousemove', (e) => {
-  const inside = pointInPolygon(toRoom(e.clientX, e.clientY), spec.outline);
+  const inside = editing || pointInPolygon(toRoom(e.clientX, e.clientY), spec.outline);
   if (inside === inRoom) return;
   inRoom = inside;
   window.qbot.room.setIgnoreMouse(!inside);

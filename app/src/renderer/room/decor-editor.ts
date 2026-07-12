@@ -153,99 +153,97 @@ export class DecorEditor {
     bar.appendChild(done);
   }
 
+  /** 拖拽通用骨架：down 后挂 window 级 move/up。不依赖 setPointerCapture ——
+   * 指针快速移出源元素或走 CDP 合成事件时 capture 不可靠。 */
+  private static drag(
+    onMove: (e: PointerEvent) => void,
+    onUp: (e: PointerEvent) => void,
+  ): void {
+    const move = (e: PointerEvent) => onMove(e);
+    const up = (e: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      onUp(e);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
   private bindThumbDrag(thumb: HTMLElement, stickerId: string, defaultW: number): void {
-    let ghost: HTMLImageElement | null = null;
     thumb.addEventListener('pointerdown', (e) => {
       if (!this.active || e.button !== 0) return;
-      thumb.setPointerCapture(e.pointerId);
-      ghost = document.createElement('img');
+      e.preventDefault();
+      const ghost = document.createElement('img');
       ghost.src = DECOR_BY_ID.get(stickerId)!.image;
       ghost.className = 'decor-ghost';
       ghost.style.width = `${defaultW}px`; // 视觉近似即可，落点按房间坐标计算
+      ghost.style.left = `${e.clientX}px`;
+      ghost.style.top = `${e.clientY}px`;
       document.body.appendChild(ghost);
-      ghost.style.left = `${e.clientX}px`;
-      ghost.style.top = `${e.clientY}px`;
-    });
-    thumb.addEventListener('pointermove', (e) => {
-      if (!ghost) return;
-      ghost.style.left = `${e.clientX}px`;
-      ghost.style.top = `${e.clientY}px`;
-    });
-    thumb.addEventListener('pointerup', (e) => {
-      if (!ghost) return;
-      ghost.remove();
-      ghost = null;
-      thumb.releasePointerCapture(e.pointerId);
-      const pos = this.hooks.toRoom(e.clientX, e.clientY);
-      if (!pointInPolygon(pos, this.hooks.spec.outline)) return; // 丢在房间外 = 取消
-      this.placements = addPlacement(this.placements, stickerId, pos, this.hooks.spec);
-      this.select(this.placements[this.placements.length - 1].id);
-      this.render();
+      DecorEditor.drag(
+        (ev) => {
+          ghost.style.left = `${ev.clientX}px`;
+          ghost.style.top = `${ev.clientY}px`;
+        },
+        (ev) => {
+          ghost.remove();
+          const pos = this.hooks.toRoom(ev.clientX, ev.clientY);
+          if (!pointInPolygon(pos, this.hooks.spec.outline)) return; // 丢在房间外 = 取消
+          this.placements = addPlacement(this.placements, stickerId, pos, this.hooks.spec);
+          this.select(this.placements[this.placements.length - 1].id);
+          this.render();
+        },
+      );
     });
   }
 
   /** 装饰选中与拖动（事件挂 layer，编辑态 CSS 才放开 pointer-events） */
   private bindLayerDrag(): void {
-    let draggingId: string | null = null;
     this.hooks.layer.addEventListener('pointerdown', (e) => {
       if (!this.active || e.button !== 0) return;
       const id = (e.target as HTMLElement).dataset?.id;
       if (!id) return;
       e.stopPropagation(); // 别触发窗口拖动
-      draggingId = id;
       this.select(id);
-      this.hooks.layer.setPointerCapture(e.pointerId);
-    });
-    this.hooks.layer.addEventListener('pointermove', (e) => {
-      if (!draggingId) return;
-      this.placements = movePlacement(
-        this.placements,
-        draggingId,
-        this.hooks.toRoom(e.clientX, e.clientY),
-        this.hooks.spec,
+      DecorEditor.drag(
+        (ev) => {
+          this.placements = movePlacement(
+            this.placements,
+            id,
+            this.hooks.toRoom(ev.clientX, ev.clientY),
+            this.hooks.spec,
+          );
+          this.render();
+        },
+        () => {},
       );
-      this.render();
-    });
-    this.hooks.layer.addEventListener('pointerup', (e) => {
-      if (!draggingId) return;
-      draggingId = null;
-      this.hooks.layer.releasePointerCapture(e.pointerId);
     });
   }
 
   /** 右下手柄：拖动改缩放（指针到贴纸中心距离比例） */
   private bindScaleHandle(): void {
-    let base: { dist: number; scale: number } | null = null;
-    const center = (): Point => {
-      const p = this.placements.find((x) => x.id === this.selectedId)!;
-      return { x: p.x, y: p.y };
-    };
     this.selHandle.addEventListener('pointerdown', (e) => {
       if (!this.selectedId || e.button !== 0) return;
       e.stopPropagation();
-      const p = this.placements.find((x) => x.id === this.selectedId);
+      const id = this.selectedId;
+      const p = this.placements.find((x) => x.id === id);
       if (!p) return;
-      const c = center();
-      const pos = this.hooks.toRoom(e.clientX, e.clientY);
-      base = { dist: Math.max(8, Math.hypot(pos.x - c.x, pos.y - c.y)), scale: p.scale };
-      this.selHandle.setPointerCapture(e.pointerId);
-    });
-    this.selHandle.addEventListener('pointermove', (e) => {
-      if (!base || !this.selectedId) return;
-      const c = center();
-      const pos = this.hooks.toRoom(e.clientX, e.clientY);
-      const dist = Math.hypot(pos.x - c.x, pos.y - c.y);
-      this.placements = scalePlacement(
-        this.placements,
-        this.selectedId,
-        base.scale * (dist / base.dist),
+      const down = this.hooks.toRoom(e.clientX, e.clientY);
+      const base = {
+        dist: Math.max(8, Math.hypot(down.x - p.x, down.y - p.y)),
+        scale: p.scale,
+      };
+      DecorEditor.drag(
+        (ev) => {
+          const cur = this.placements.find((x) => x.id === id);
+          if (!cur) return;
+          const pos = this.hooks.toRoom(ev.clientX, ev.clientY);
+          const dist = Math.hypot(pos.x - cur.x, pos.y - cur.y);
+          this.placements = scalePlacement(this.placements, id, base.scale * (dist / base.dist));
+          this.render();
+        },
+        () => {},
       );
-      this.render();
-    });
-    this.selHandle.addEventListener('pointerup', (e) => {
-      if (!base) return;
-      base = null;
-      this.selHandle.releasePointerCapture(e.pointerId);
     });
   }
 }

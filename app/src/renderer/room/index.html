@@ -196,6 +196,9 @@
         bottom: 10px;
         transform: translateX(-50%);
         align-items: center;
+        justify-content: center;
+        flex-wrap: wrap; /* 10 贴纸 + 完成钮超出窗宽 → 换行，禁止溢出到窗外 */
+        max-width: calc(100vw - 24px);
         gap: 10px;
         padding: 8px 12px;
         background: rgba(255, 255, 255, 0.95);
