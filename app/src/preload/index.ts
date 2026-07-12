@@ -36,6 +36,12 @@ const api: QBotApi = {
   },
   room: {
     open: () => ipcRenderer.send('room:open'),
+    move: (x, y) => ipcRenderer.send('room:move', x, y),
+    setIgnoreMouse: (ignore) => ipcRenderer.send('room:setIgnoreMouse', ignore),
+  },
+  decor: {
+    get: (roomName) => ipcRenderer.invoke('decor:get', roomName),
+    set: (roomName, placements) => ipcRenderer.invoke('decor:set', roomName, placements),
   },
   settings: {
     get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ActionId } from '@qbot/pipeline';
 import {
-  ACT_PROB,
-  CLICK_ACTION,
   pointInPolygon,
   polygonCentroid,
   randomPointInPolygon,
+} from '../src/renderer/room/geometry';
+import {
+  ACT_PROB,
+  CLICK_ACTION,
   scaleForY,
   step,
   walkDurationMs,

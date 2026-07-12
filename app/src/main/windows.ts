@@ -128,6 +128,15 @@ export function movePetWindow(x: number, y: number): void {
   petWindow?.setPosition(Math.round(x), Math.round(y), false);
 }
 
+export function moveRoomWindow(x: number, y: number): void {
+  roomWindow?.setPosition(Math.round(x), Math.round(y), false);
+}
+
+/** 房间外沿透明区穿透：forward 让 mousemove 继续进 renderer 以便判定回归实体 */
+export function setRoomIgnoreMouse(ignore: boolean): void {
+  roomWindow?.setIgnoreMouseEvents(ignore, { forward: true });
+}
+
 /**
  * 开小房间：角色「走进房间」——pet 窗隐藏，room 窗关闭（含渲染进程崩溃、Cmd+W）
  * 统一走 closed 事件恢复 pet 窗。
@@ -142,9 +151,13 @@ export function openRoomWindow(title: string): BrowserWindow {
   roomWindow = new BrowserWindow({
     width: ROOM_SIZE,
     height: ROOM_SIZE,
-    useContentSize: true, // 房间画布按内容区铺满，不被标题栏挤掉
+    useContentSize: true,
     title,
-    resizable: false,
+    // 贴纸小屋：只显示房间实体，外沿透明；关闭/拖动由 renderer 自绘
+    transparent: true,
+    frame: false,
+    hasShadow: false, // 不显式关会有残影阴影框（同 pet 窗）
+    resizable: false, // 透明窗 resize 有渲染 bug
     fullscreenable: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

@@ -17,6 +17,8 @@ export interface GenerateImageOpts {
   /** data URL（base64）；三视图阶段传用户参考图，首帧阶段传选定三视图 */
   refImageDataUrl?: string;
   size: '3072x1536' | '2048x2048';
+  /** 透明底输出（仅 gpt-image-2 后端透传；服务端不支持时会 4xx，由调用方回退） */
+  background?: 'transparent';
 }
 
 export interface VideoTaskStatus {

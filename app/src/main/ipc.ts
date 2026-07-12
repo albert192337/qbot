@@ -6,8 +6,9 @@ import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import { getCharacter, listCharacters, renameCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow } from './windows';
+import { movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse } from './windows';
 import { pickTurnaround, redoFailed, resumeHatch, startHatch } from './pipeline-bridge';
+import { getDecor, setDecor } from './decor';
 import { rebuildTray } from './tray';
 
 export function registerIpc(): void {
@@ -70,6 +71,18 @@ export function registerIpc(): void {
     const meta = activeCharacter ? await getCharacter(activeCharacter) : null;
     const name = meta?.manifest?.name;
     openRoomWindow(name && name !== '未命名' ? `${name}的家` : '小房间');
+  });
+  ipcMain.on('room:move', (_ev, x: number, y: number) => moveRoomWindow(x, y));
+  ipcMain.on('room:setIgnoreMouse', (_ev, ignore: boolean) => setRoomIgnoreMouse(ignore));
+
+  // ── decor ──────────────────────────────────────────────
+  ipcMain.handle('decor:get', (_ev, roomName: string) => getDecor(roomName));
+  ipcMain.handle('decor:set', async (_ev, roomName: string, placements) => {
+    try {
+      await setDecor(roomName, placements);
+    } catch (err) {
+      console.error('decor:set failed', err); // 写失败不阻塞 UI
+    }
   });
 
   // ── settings ───────────────────────────────────────────

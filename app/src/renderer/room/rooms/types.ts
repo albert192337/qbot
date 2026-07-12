@@ -9,6 +9,14 @@ export interface RoomSpec {
   height: number;
   /** 地板可行走区多边形（背景图坐标系，顺时针，凸多边形） */
   floor: Array<[number, number]>;
+  /** 房间实体外轮廓（透明贴纸窗：轮廓外穿透点击、隐藏悬停控件） */
+  outline: Array<[number, number]>;
+  /** 左/右墙面区域（装饰 drop 判定用） */
+  wallL: Array<[number, number]>;
+  wallR: Array<[number, number]>;
+  /** 左/右墙贴合变形（CSS matrix 的 a,b,c,d；等距墙面是仿射变换，无需 3D） */
+  wallMatrixL: [number, number, number, number];
+  wallMatrixR: [number, number, number, number];
   /** 角色在地板最下缘的缩放（近处） */
   scaleNear: number;
   /** 角色在地板最上缘的缩放（远处） */
