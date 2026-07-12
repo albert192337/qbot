@@ -6,9 +6,9 @@
  */
 import { sampleCornerAcrossFrames, sampleImageCorners } from './chroma.js';
 
-/** 绿区间色相（度） */
+/** 绿区间色相（度）。上界 165：写实绿幕的亮部往青偏（实测 160.7°），160 会把最佳 key 滤掉 */
 export const GREEN_HUE_MIN = 80;
-export const GREEN_HUE_MAX = 160;
+export const GREEN_HUE_MAX = 165;
 export const GREEN_SAT_MIN = 0.35;
 export const GREEN_VAL_MIN = 0.25;
 
@@ -96,38 +96,28 @@ export function classifyDrift(cornerColors: string[]): {
   return { maxDrift, needDoubleKey, fail, keys: [...new Set(keys)] };
 }
 
-/** 多点采样选 key：同簇判定的 RGB 分量最大差 / key 数量上限 */
-export const KEY_MERGE_MAX_DIFF = 12;
-export const KEY_MAX_COUNT = 4;
-
 /**
- * 从背景采样色（chroma.sampleBackgroundColors）中选 colorkey 的 key 色：
- * 1. 过滤非绿样本——采样点可能落在角色或阴影上，绝不能把角色色当 key
- * 2. 按 RGB 分量最大差 ≤ KEY_MERGE_MAX_DIFF 聚类去重，每簇取首个样本为代表
- * 3. 上限 KEY_MAX_COUNT 个（写实绿幕的光照渐变一般 2-3 簇就够）
- * 返回空数组 = 无可用绿样本，调用方回退左上角单点采样。
+ * 从背景采样色（chroma.sampleBackgroundColors）中选 chromakey 的 key 色：
+ * 取「最饱和最亮」的绿（saturation × value 最大）。
+ * - 过滤非绿样本——采样点可能落在角色或阴影上，绝不能把角色色当 key
+ * - chromakey 在 UV 色度空间工作、对亮度不敏感：一个高色度 key 能覆盖
+ *   同一色度的全部亮暗渐变与颗粒；反之暗绿 key 的 UV 贴近中性灰，
+ *   会连深色衣服一起吃掉，所以必须选最「绿」的那个样本
+ * 返回 null = 无可用绿样本，调用方回退左上角单点采样。
  */
-export function selectKeyColors(samples: string[]): string[] {
-  const keys: string[] = [];
+export function selectChromaKey(samples: string[]): string | null {
+  let best: string | null = null;
+  let bestScore = -1;
   for (const c of samples) {
     if (!isGreen(c)) continue;
-    const rgb = hexToRgb(c);
-    const close = keys.some((k) => {
-      const kr = hexToRgb(k);
-      return (
-        Math.max(
-          Math.abs(rgb[0] - kr[0]),
-          Math.abs(rgb[1] - kr[1]),
-          Math.abs(rgb[2] - kr[2]),
-        ) <= KEY_MERGE_MAX_DIFF
-      );
-    });
-    if (!close) {
-      keys.push(c);
-      if (keys.length >= KEY_MAX_COUNT) break;
+    const [, s, v] = rgbToHsv(...hexToRgb(c));
+    const score = s * v;
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
     }
   }
-  return keys;
+  return best;
 }
 
 export interface DriftQcResult {

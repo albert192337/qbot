@@ -18,7 +18,7 @@ import {
   toWebm,
 } from './chroma.js';
 import { framePrompt, turnaroundPrompt, videoPrompt, ACTIONS } from './prompts.js';
-import { checkGreenFrame, checkVideoDrift, selectKeyColors } from './qc.js';
+import { checkGreenFrame, checkVideoDrift, selectChromaKey } from './qc.js';
 import { Job } from './job.js';
 import {
   ACTION_IDS,
@@ -90,8 +90,9 @@ export async function pickTurnaround(job: Job, index: number): Promise<void> {
 
 /**
  * Stage 4 抠像转码（runAction 与 CLI rekey 共用）：绿幕 mp4 → 透明 webm/gif 资产。
- * key 色 = 首/尾帧 8 点背景采样聚类（写实绿幕带光照渐变，单点 key 必漏），
- * 无绿样本时回退左上角单点。不改动作状态，只更新 keyColors。
+ * key 色 = 首/尾帧 8 点背景采样中最饱和的亮绿（chromakey 对亮度不敏感，
+ * 一个高色度 key 覆盖写实绿幕的全部光照渐变与颗粒），无绿样本时回退左上角单点。
+ * 不改动作状态，只更新 keyColors。
  */
 export async function keyActionVideo(
   job: Job,
@@ -104,8 +105,8 @@ export async function keyActionVideo(
   if (drift.fail) {
     throw new Error(`background drift ${drift.maxDrift}/255 exceeds limit, video unusable`);
   }
-  let keys = selectKeyColors(await sampleBackgroundColors(videoAbs, ffmpegPath));
-  if (keys.length === 0) keys = [await sampleKeyColor(videoAbs, ffmpegPath)];
+  const chromaKey = selectChromaKey(await sampleBackgroundColors(videoAbs, ffmpegPath));
+  const keys = [chromaKey ?? (await sampleKeyColor(videoAbs, ffmpegPath))];
   a.keyColors = keys;
   await job.save();
   // 尺寸归一化：各动作角色 bbox 高度统一、底边对齐（空 bbox 跳过）

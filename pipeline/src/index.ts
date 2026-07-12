@@ -17,5 +17,5 @@ export {
   normalizeFilter,
   probeSize,
 } from './chroma.js';
-export { checkGreenFrame, checkVideoDrift, classifyDrift, selectKeyColors } from './qc.js';
+export { checkGreenFrame, checkVideoDrift, classifyDrift, selectChromaKey } from './qc.js';
 export { turnaroundPrompt, framePrompt, videoPrompt, actionSpec, ACTIONS, ABSTRACT_ACTIONS, FAITHFUL_ACTIONS, DEFAULT_CHARACTER_DESC } from './prompts.js';

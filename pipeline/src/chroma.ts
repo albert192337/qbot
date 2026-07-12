@@ -14,15 +14,18 @@ import { promisify } from 'node:util';
 const execFileP = promisify(execFile);
 
 /**
- * colorkey 参数演进（全部实测）：
- * - DESIGN.md §3.4 原值 0.24:0.06 → 误抠绿色系角色本体（小青薄荷绿身体镂空）
- * - 0.15:0.04 → 高保真影棚绿幕四角 key 色极暗（如 rgb(3,76,38)），RGB 空间贴近黑色，
- *   0.15 半径把黑皮衣抠成半透明洞
- * - 现值 0.11:0.02 + 多点采样多 key：空间渐变靠多 key 覆盖而非放大半径，
- *   贴纸风与写实风实测两头干净
+ * 抠像参数演进（全部实测）：
+ * - colorkey 0.24:0.06（DESIGN.md §3.4 原值）→ 误抠绿色系角色本体（小青薄荷绿身体镂空）
+ * - colorkey 0.15:0.04 → 高保真影棚绿幕的暗角 key 色（如 rgb(3,76,38)）在 RGB 空间贴近黑色，
+ *   把黑皮衣抠成半透明洞
+ * - colorkey 0.11 + 多 key → 写实渲染的暗部胶片颗粒单像素散布大，RGB 距离覆盖不住，
+ *   「暗部颗粒要大半径、深色衣服要小半径」在 RGB 空间无解
+ * - 现方案 chromakey 0.10:0.04 + 单个「最饱和亮绿」key：UV 色度空间对亮度不敏感，
+ *   同一色度的亮暗渐变和颗粒一个 key 全覆盖；必须选最饱和的绿做 key——
+ *   暗绿的 UV 弱（贴近中性灰），会连深色衣服一起吃掉
  */
-export const COLORKEY_SIMILARITY = 0.11;
-export const COLORKEY_BLEND = 0.02;
+export const CHROMAKEY_SIMILARITY = 0.1;
+export const CHROMAKEY_BLEND = 0.04;
 
 /** 归一化目标：角色包围盒高度占画布比例 / 底边基线位置（所有动作一致 → 视觉等大） */
 export const NORM_TARGET_H = 0.68;
@@ -132,7 +135,7 @@ function backgroundSamplePoints(w: number, h: number): Array<[number, number]> {
 /**
  * 采样首/尾帧各 8 个背景点（四角 + 四边中点）的 8×8 平均色。
  * 写实风绿幕带光照渐变：角落暗、中心亮，同帧空间色距可超过 colorkey 半径，
- * 单点采样必漏。结果交给 qc.selectKeyColors 过滤聚类成多 key。
+ * 单点采样必漏。结果交给 qc.selectChromaKey 选出最饱和的亮绿做 chromakey key。
  */
 export async function sampleBackgroundColors(
   videoPath: string,
@@ -174,9 +177,9 @@ export async function sampleBackgroundColors(
   return colors;
 }
 
-function colorkeyFilters(keys: string[]): string {
+function keyFilters(keys: string[]): string {
   return keys
-    .map((k) => `colorkey=0x${k}:${COLORKEY_SIMILARITY}:${COLORKEY_BLEND}`)
+    .map((k) => `chromakey=0x${k}:${CHROMAKEY_SIMILARITY}:${CHROMAKEY_BLEND}`)
     .join(',');
 }
 
@@ -207,7 +210,7 @@ export async function computeAlphaBBox(
   const P = 160;
   const raw = await runFfmpeg(ffmpegPath, [
     '-i', videoPath,
-    '-vf', `fps=4,${colorkeyFilters(keys)},format=yuva420p,alphaextract,scale=${P}:${P}`,
+    '-vf', `fps=4,${keyFilters(keys)},format=yuva420p,alphaextract,scale=${P}:${P}`,
     '-f', 'rawvideo',
     '-pix_fmt', 'gray',
     'pipe:1',
@@ -274,7 +277,7 @@ export async function toWebm(
   ffmpegPath: string,
   normVf?: string,
 ): Promise<void> {
-  const vf = `${colorkeyFilters(keys)},format=yuva420p${normVf ? `,${normVf}` : ''}`;
+  const vf = `${keyFilters(keys)},format=yuva420p${normVf ? `,${normVf}` : ''}`;
   await runFfmpeg(ffmpegPath, [
     '-y',
     '-i', inPath,
@@ -299,7 +302,7 @@ export async function toGif(
   normVf?: string,
 ): Promise<void> {
   const vf =
-    `${colorkeyFilters(keys)},format=yuva420p${normVf ? `,${normVf}` : ''},` +
+    `${keyFilters(keys)},format=yuva420p${normVf ? `,${normVf}` : ''},` +
     `fps=20,scale=320:-1:flags=lanczos,` +
     `split[a][b];[a]palettegen=reserve_transparent=1:stats_mode=full[p];` +
     `[b][p]paletteuse=alpha_threshold=128:dither=none`;

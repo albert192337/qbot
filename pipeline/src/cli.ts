@@ -14,7 +14,7 @@ import path from 'node:path';
 import { Job } from './job.js';
 import { runPipeline, runActions, runPackage, keyActionVideo } from './stages.js';
 import { resolveFfmpegPath, sampleBackgroundColors, sampleKeyColor, toGif, toWebm } from './chroma.js';
-import { checkVideoDrift, selectKeyColors } from './qc.js';
+import { checkVideoDrift, selectChromaKey } from './qc.js';
 import { ACTION_IDS, type ActionId, type PipelineConfig, type ProgressEvent } from './types.js';
 
 function getApiKey(optKey?: string): string {
@@ -194,8 +194,8 @@ program
       }`,
     );
     if (drift.fail) process.exit(1);
-    let keys = selectKeyColors(await sampleBackgroundColors(inPath, ffmpegPath));
-    if (keys.length === 0) keys = [await sampleKeyColor(inPath, ffmpegPath)];
+    const chromaKey = selectChromaKey(await sampleBackgroundColors(inPath, ffmpegPath));
+    const keys = [chromaKey ?? (await sampleKeyColor(inPath, ffmpegPath))];
     console.log(`key 色: ${keys.map((k) => `#${k}`).join(', ')}`);
     const outPath = path.resolve(opts.out);
     if (outPath.endsWith('.gif')) {
