@@ -4,7 +4,7 @@
  */
 import { webContents } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   Job,
@@ -17,9 +17,11 @@ import {
   type CharacterForm,
   type CharacterStyle,
   type ImageProvider,
+  type JobState,
   type PipelineConfig,
   type ProgressEvent,
 } from '@qbot/pipeline';
+import type { HatchStatus } from '../shared/ipc-types';
 import { charactersDir } from './characters';
 import { getSettings } from './config';
 import { rebuildTray } from './tray';
@@ -34,10 +36,16 @@ interface ActiveHatch {
 
 const active = new Map<string, ActiveHatch>();
 
+/** .job/ 内相对路径 → qbot-asset URL（协议服务整个角色目录，含 .job/） */
+function jobAssetUrl(dirId: string, rel: string): string {
+  return `qbot-asset://${dirId}/.job/${rel}`;
+}
+
 function broadcast(dirId: string, ev: ProgressEvent, candidates?: string[]): void {
   const payload = {
     ...ev,
     dirId,
+    frameUrl: ev.framePath ? jobAssetUrl(dirId, ev.framePath) : undefined,
     candidateUrls: candidates?.map(
       (abs) =>
         // 候选图在角色目录内（.job/xxx.png）→ 转 qbot-asset URL
@@ -138,6 +146,49 @@ export function pickTurnaround(dirId: string, index: number): void {
   if (!entry) throw new Error(`no active hatch for ${dirId}`);
   if (!entry.pickResolver) throw new Error('not awaiting pick');
   entry.pickResolver(index);
+}
+
+/**
+ * 孵化状态快照：进度屏进入时铺底（新孵化/续跑/中途重开窗口），之后消费增量事件。
+ * active 的读内存 state；不 active 的裸读 state.json（不走 Job.load，避免 reconcile 落盘副作用）。
+ */
+export async function getHatchStatus(dirId: string): Promise<HatchStatus | null> {
+  let state: JobState;
+  const entry = active.get(dirId);
+  if (entry) {
+    state = entry.job.state;
+  } else {
+    try {
+      const raw = await readFile(
+        path.join(charactersDir(), dirId, '.job', 'state.json'),
+        'utf8',
+      );
+      state = JSON.parse(raw) as JobState;
+    } catch {
+      return null;
+    }
+  }
+  return {
+    stage: state.stage,
+    imageProvider: state.imageProvider,
+    candidateUrls:
+      state.stage === 'awaiting_pick'
+        ? state.turnaround.candidates.map((rel) => jobAssetUrl(dirId, rel))
+        : undefined,
+    actions: Object.fromEntries(
+      ACTION_IDS.map((id) => {
+        const a = state.actions[id];
+        return [
+          id,
+          {
+            status: a?.status ?? 'pending',
+            frameUrl: a?.framePath ? jobAssetUrl(dirId, a.framePath) : undefined,
+            error: a?.error,
+          },
+        ];
+      }),
+    ) as HatchStatus['actions'],
+  };
 }
 
 /** 重试失败动作：重置 failed → pending，走 runActions + runPackage（同 CLI redo） */

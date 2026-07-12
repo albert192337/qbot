@@ -108,6 +108,8 @@ export interface ProgressEvent {
   /** stage 为 actions 时携带 */
   action?: ActionId;
   status?: ActionStatus;
+  /** 该动作首帧已落盘时携带（相对 .job/ 的路径），UI 用作缩略图 */
+  framePath?: string;
   /** stage 为 awaiting_pick 时携带候选图绝对路径 */
   candidates?: string[];
   error?: string;

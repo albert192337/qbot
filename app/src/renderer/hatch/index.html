@@ -87,7 +87,44 @@
         border-color: #7cc47f;
         color: white;
       }
+      /* brewing 屏（三视图生成等待） */
+      #brewing-egg {
+        font-size: 56px;
+        animation: egg-wobble 1.6s ease-in-out infinite;
+      }
+      @keyframes egg-wobble {
+        0%,
+        100% {
+          transform: rotate(-7deg);
+        }
+        50% {
+          transform: rotate(7deg);
+        }
+      }
       /* progress 屏 */
+      #progress-summary {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      #progress-bar-track {
+        width: 408px;
+        height: 8px;
+        border-radius: 4px;
+        background: #e8e2d4;
+        overflow: hidden;
+      }
+      #progress-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: #7cc47f;
+        border-radius: 4px;
+        transition: width 0.6s ease;
+      }
+      #progress-text {
+        margin: 0;
+      }
       #action-grid {
         display: grid;
         grid-template-columns: repeat(3, 120px);
@@ -97,16 +134,47 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 6px;
-        padding: 14px 8px;
+        gap: 4px;
+        padding: 12px 8px;
         border-radius: 12px;
         background: #f1ece0;
         opacity: 0.45;
         font-size: 13px;
         transition: all 0.3s;
       }
+      .action-cell .thumb {
+        position: relative;
+        width: 92px;
+        height: 92px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: white;
+        overflow: hidden;
+      }
+      .action-cell .thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .action-cell .thumb .badge {
+        position: absolute;
+        right: 3px;
+        bottom: 1px;
+        font-size: 20px;
+      }
       .action-cell .dot {
         font-size: 26px;
+      }
+      .action-cell .substatus {
+        font-size: 12px;
+        color: #8a8a8a;
+      }
+      .action-cell .elapsed {
+        font-size: 11px;
+        color: #b0a890;
+        min-height: 13px;
       }
       .action-cell.done {
         opacity: 1;
@@ -117,7 +185,7 @@
         background: #fbe9e7;
       }
       .action-cell.working {
-        opacity: 0.8;
+        opacity: 0.9;
       }
       /* certificate 屏 */
       #card {
@@ -211,6 +279,15 @@
       <div id="resume-area"></div>
     </section>
 
+    <section id="screen-brewing" class="screen">
+      <h1>正在绘制角色设定图…</h1>
+      <div id="brewing-egg">🥚</div>
+      <p class="hint">
+        <span id="brewing-hint">同时画 3 张候选，画好就让你挑</span><br />
+        已用时 <span id="brewing-elapsed">0:00</span>
+      </p>
+    </section>
+
     <section id="screen-pick" class="screen">
       <h1>挑一张你最喜欢的设定图</h1>
       <div id="candidates"></div>
@@ -220,8 +297,15 @@
 
     <section id="screen-progress" class="screen">
       <h1>孵化中…</h1>
+      <div id="progress-summary">
+        <div id="progress-bar-track"><div id="progress-bar-fill"></div></div>
+        <p id="progress-text" class="hint">0/6 个动作完成</p>
+      </div>
       <div id="action-grid"></div>
-      <p class="hint">小家伙正在学习怎么动，关掉窗口也不会打断孵化</p>
+      <p class="hint">
+        视频生成是最久的一步，每个动作通常 3–6 分钟<br />
+        关掉窗口也不会打断孵化
+      </p>
     </section>
 
     <section id="screen-certificate" class="screen">
