@@ -9,6 +9,8 @@ files:
 extraResources:
   - from: resources/presets
     to: presets
+  - from: resources/tray-win.png
+    to: tray-win.png
 asarUnpack:
   - "**/node_modules/ffmpeg-static/**"
 mac:
@@ -17,4 +19,13 @@ mac:
     - dmg
   # 本地分发暂不签名；上架/公证时再配 identity + notarize
   identity: null
+# 图标：build/icon.png（512，由 app/build/make-icon.mts 从预置吉祥物生成），
+# electron-builder 自动转各平台格式（win ico / mac icns）
+win:
+  target:
+    - nsis
+    - zip # 免安装绿色版
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
 npmRebuild: false

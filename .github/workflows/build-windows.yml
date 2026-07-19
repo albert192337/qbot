@@ -1,0 +1,43 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build pipeline (app 引用 dist)
+        run: npm run build -w pipeline
+
+      - name: Run pipeline tests
+        run: npm test -w pipeline
+
+      - name: Type check app
+        run: npx tsc --noEmit -p app
+
+      - name: Package (nsis + zip)
+        run: npm run dist -w app
+        env:
+          # electron-builder 无签名证书时跳过签名
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qbot-windows
+          path: |
+            app/release/*.exe
+            app/release/*.zip
+          if-no-files-found: error

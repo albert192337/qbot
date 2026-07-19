@@ -1,5 +1,6 @@
 /** 托盘：孵化新角色 / 切换角色 / 设置 / 退出 */
 import { Menu, Tray, app, nativeImage } from 'electron';
+import path from 'node:path';
 import { listCharacters } from './characters';
 import { getSettings, setSettings } from './config';
 import { createHatchWindow, broadcastCharacterActivated } from './windows';
@@ -7,9 +8,9 @@ import { getCharacter } from './characters';
 
 let tray: Tray | null = null;
 
-/** 16x16 模板图（占位）：深色圆点，Retina 下略糊但可用；正式图标后置 */
-function trayIcon(): Electron.NativeImage {
-  // 16x16 实心圆 PNG（ffmpeg 预生成），setTemplateImage 适配深浅色菜单栏
+/** mac：16x16 模板图（占位）——深色圆点，setTemplateImage 适配深浅色菜单栏 */
+function macTrayIcon(): Electron.NativeImage {
+  // 16x16 实心圆 PNG（ffmpeg 预生成）
   const png = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAABAAAAAQBPJcTW' +
       'AAAAMklEQVR4nGNgGMzgPxomWyNJBhHSTNAQigwgVjNOQ4aBAaQYghNQbAAxhhANyNZIXwAA' +
@@ -21,10 +22,26 @@ function trayIcon(): Electron.NativeImage {
   return img;
 }
 
+/** Windows/Linux：template 机制是 mac 独有的，深色圆点在深色任务栏上不可见 → 用彩色吉祥物图 */
+function colorTrayIcon(): Electron.NativeImage {
+  const p = app.isPackaged
+    ? path.join(process.resourcesPath, 'tray-win.png')
+    : path.resolve(__dirname, '../../resources/tray-win.png');
+  return nativeImage.createFromPath(p);
+}
+
+function trayIcon(): Electron.NativeImage {
+  return process.platform === 'darwin' ? macTrayIcon() : colorTrayIcon();
+}
+
 export async function rebuildTray(): Promise<void> {
   if (!tray) {
     tray = new Tray(trayIcon());
     tray.setToolTip('QBot');
+    // Windows 习惯左键单击托盘有反应；mac 上 click 本来就弹菜单，不用管
+    if (process.platform !== 'darwin') {
+      tray.on('click', () => tray?.popUpContextMenu());
+    }
   }
   const characters = (await listCharacters()).filter((c) => c.manifest);
   const settings = await getSettings();

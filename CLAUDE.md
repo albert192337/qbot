@@ -25,7 +25,9 @@ pkill -f "QBot/node_modules/electron"   # 关闭
 npm test -w pipeline         # 管线单测（全 mock，不花钱）
 npm run build -w pipeline    # tsc 编译 dist/（app 引用的是 dist，改 pipeline 后必须 build）
 npx tsc --noEmit -p app      # app 类型检查
-npm run dist -w app          # 打包 dmg（配置就绪但从未验证成功过）
+npm run dist -w app          # 打包当前平台（mac→dmg / win→nsis+zip；mac 从未验证成功过）
+                             # Windows 包必须在 Windows 上构建（ffmpeg-static 装机时按平台下载）
+                             # → GitHub Actions build-windows.yml（手动触发或打 v* tag）
 
 # 多开第二只桌宠（数据目录隔离，单实例锁按目录生效）
 QBOT_USER_DATA="$HOME/Library/Application Support/@qbot/app-2" npm run dev -w app
