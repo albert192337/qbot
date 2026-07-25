@@ -10,6 +10,7 @@ import { movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastChara
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import { rebuildTray } from './tray';
+import { getAgentStatus } from './agent-server';
 
 export function registerIpc(): void {
   // ── hatch ──────────────────────────────────────────────
@@ -87,12 +88,14 @@ export function registerIpc(): void {
   });
 
   // ── settings ───────────────────────────────────────────
-  ipcMain.handle('settings:get', () => getSettings());
-  ipcMain.handle('settings:set', async (_ev, patch) => {
+  ipcMain.handle('settings:get', () => getSettings());  ipcMain.handle('settings:set', async (_ev, patch) => {
     const next = await setSettings(patch);
     if (typeof patch?.petScale === 'number') setPetScale(patch.petScale); // 实时生效
     // 语音设置实时生效（pet + room）
     getPetWindow()?.webContents.send('settings:changed', next);
     getRoomWindow()?.webContents.send('settings:changed', next);
   });
+
+  // ── agent 联动 ─────────────────────────────────────────
+  ipcMain.handle('agent:getStatus', () => getAgentStatus());
 }

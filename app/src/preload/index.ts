@@ -1,6 +1,6 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { CharacterMeta, HatchProgress, QBotApi, Settings } from '../shared/ipc-types';
+import type { AgentStatus, CharacterMeta, HatchProgress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
@@ -58,6 +58,14 @@ const api: QBotApi = {
       const listener = (_ev: unknown, name: string) => cb(name);
       ipcRenderer.on('ui:showScreen', listener);
       return () => ipcRenderer.removeListener('ui:showScreen', listener);
+    },
+  },
+  agent: {
+    getStatus: () => ipcRenderer.invoke('agent:getStatus'),
+    onStatus: (cb) => {
+      const listener = (_ev: unknown, status: AgentStatus) => cb(status);
+      ipcRenderer.on('agent:status', listener);
+      return () => ipcRenderer.removeListener('agent:status', listener);
     },
   },
 };

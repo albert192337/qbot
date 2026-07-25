@@ -1,5 +1,6 @@
-/** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 */
+/** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 + agent 联动 */
 import type { ActionId } from '@qbot/pipeline';
+import type { AgentActivity } from '../../shared/ipc-types';
 import { Player } from './player';
 import { randomDelay, step, type PetState } from './state-machine';
 import { DEFAULT_VOICE_SETTINGS, Speaker, type VoiceSettings } from './voice/speak';
@@ -10,6 +11,8 @@ const rng = { random: () => Math.random() };
 let state: PetState = { kind: 'idle' };
 let available: ActionId[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
+/** 最新 agent 活动（done 是一次性事件，派发后立即视为 idle） */
+let agentActivity: AgentActivity = 'idle';
 
 const player = new Player(stage, () => dispatch({ type: 'VIDEO_ENDED' }));
 
@@ -53,7 +56,23 @@ function dispatch(event: Parameters<typeof step>[1]): void {
   if (result.play) player.play(result.play);
   if (result.clearTimer) clearTimer();
   if (result.rescheduleTimer) scheduleTimer();
+  // agent 活动进行中却落回 idle（拖拽松手/庆祝播完/用户动作播完）→ 恢复 agent 视觉。
+  // AGENT_STATUS(非 idle) 必不落回 idle，递归至多一层。
+  if (state.kind === 'idle' && agentActivity !== 'idle' && event.type !== 'AGENT_STATUS') {
+    dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
+  }
 }
+
+// ── agent 联动 ───────────────────────────────────────────
+function onAgentStatus(activity: AgentActivity): void {
+  // done 一次性庆祝：记忆位立即归 idle，庆祝播完自然回 idle 不再重触发
+  agentActivity = activity === 'done' ? 'idle' : activity;
+  if (available.length === 0) return; // 角色未加载完不驱动
+  dispatch({ type: 'AGENT_STATUS', activity });
+}
+
+window.qbot.agent.onStatus((s) => onAgentStatus(s.activity));
+void window.qbot.agent.getStatus().then((s) => onAgentStatus(s.activity));
 
 // ── 角色加载 ─────────────────────────────────────────────
 window.qbot.characters.onActivated((meta) => {
@@ -63,16 +82,18 @@ window.qbot.characters.onActivated((meta) => {
   player.play('idle');
   scheduleTimer();
   speaker.setCharacter(meta.manifest.id, meta.manifest.voice);
+  if (agentActivity !== 'idle') dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
 });
 
 // 窗口隐藏期间（角色进小房间）Chromium 会自动暂停 <video> 且不派发 ended，
-// 状态机会卡死在半路 → 恢复可见时整体重置回 idle 循环。
+// 状态机会卡死在半路 → 恢复可见时整体重置回 idle 循环（agent 活动进行中则恢复 agent 视觉）。
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || available.length === 0) return;
   speaker.interrupt();
   state = { kind: 'idle' };
   player.play('idle');
   scheduleTimer();
+  if (agentActivity !== 'idle') dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
 });
 
 // ── 指针交互 ─────────────────────────────────────────────

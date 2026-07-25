@@ -1,21 +1,42 @@
 /**
  * 桌宠状态机：纯逻辑，不碰 DOM（vitest 可单测）。
- * 状态：idle（loop 常驻）/ auto（随机动作，播 1~3 遍回 idle）/ drag（指针按住）。
+ * 状态：idle（loop 常驻）/ auto（随机动作，播 1~3 遍回 idle）/ drag（指针按住）
+ *      / agent（Claude Code 等在干活，粘性循环直到活动结束）。
  * 调度：idle 时随机 30s~3min 触发一次 auto。
+ * 优先级：drag > agent > auto/idle（drag 中忽略 agent 事件，由入口层在
+ * POINTER_UP 后重发最新 AGENT_STATUS 恢复）。
  */
 import type { ActionId } from '@qbot/pipeline';
+import type { AgentActivity } from '../../shared/ipc-types';
 
 export type PetState =
   | { kind: 'idle' }
   | { kind: 'auto'; action: ActionId; loopsLeft: number }
-  | { kind: 'drag' };
+  | { kind: 'drag' }
+  | { kind: 'agent'; activity: AgentActivity; action: ActionId };
 
 export type PetEvent =
   | { type: 'POINTER_DOWN' }
   | { type: 'POINTER_UP' }
   | { type: 'TIMER_FIRE' } // 调度定时器到点
   | { type: 'VIDEO_ENDED' } // 当前（非 loop）视频播完一遍
-  | { type: 'PLAY_ACTION'; action: ActionId }; // 用户点击/菜单指定播放
+  | { type: 'PLAY_ACTION'; action: ActionId } // 用户点击/菜单指定播放
+  | { type: 'AGENT_STATUS'; activity: AgentActivity }; // agent-server 合成状态
+
+/** agent 活动 → 桌宠动作（done 走一次性庆祝，idle 走退出，不在表内） */
+export const AGENT_ACTION: Record<
+  Exclude<AgentActivity, 'idle' | 'done'>,
+  ActionId
+> = {
+  thinking: 'tea',
+  working: 'talk_happy',
+  waiting: 'drag', // 悬空蹦跳 = 求关注（要授权/等输入）
+  error: 'talk_annoyed',
+};
+
+/** 回合完成的庆祝动作与遍数 */
+export const DONE_ACTION: ActionId = 'talk_happy';
+export const DONE_LOOPS = 2;
 
 export interface StepResult {
   state: PetState;
@@ -81,6 +102,8 @@ export function step(
     }
 
     case 'VIDEO_ENDED': {
+      // agent 态的动作多为非 loop（tea/talk_*）：播完手动重播，形成粘性循环
+      if (state.kind === 'agent') return { state, play: state.action };
       if (state.kind !== 'auto') return { state }; // idle 是 loop，drag 播完接着循环
       const left = state.loopsLeft - 1;
       if (left <= 0) {
@@ -91,12 +114,49 @@ export function step(
     }
 
     case 'PLAY_ACTION': {
-      // 用户主动触发：拖拽中忽略，其余状态立即切（播 1 遍回 idle）
+      // 用户主动触发：拖拽中忽略，其余状态（含 agent）立即切（播 1 遍回 idle）
       if (state.kind === 'drag') return { state };
       if (!ctx.available.includes(event.action)) return { state };
       return {
         state: { kind: 'auto', action: event.action, loopsLeft: 1 },
         play: event.action,
+        clearTimer: true,
+      };
+    }
+
+    case 'AGENT_STATUS': {
+      // drag 优先：入口层会在 POINTER_UP 后重发最新状态
+      if (state.kind === 'drag') return { state };
+      const { activity } = event;
+      if (activity === 'idle') {
+        // 活动结束：只有 agent 态需要退出；auto/idle 不受影响
+        if (state.kind !== 'agent') return { state };
+        return { state: { kind: 'idle' }, play: 'idle', rescheduleTimer: true };
+      }
+      if (activity === 'done') {
+        // 一次性庆祝：入口层收到 done 后即视为 idle，不会重复触发
+        const action = ctx.available.includes(DONE_ACTION) ? DONE_ACTION : null;
+        if (!action) {
+          if (state.kind !== 'agent') return { state };
+          return { state: { kind: 'idle' }, play: 'idle', rescheduleTimer: true };
+        }
+        return {
+          state: { kind: 'auto', action, loopsLeft: DONE_LOOPS },
+          play: action,
+          clearTimer: true,
+        };
+      }
+      // 进行中的活动：映射动作缺失（生成失败的角色）退化为 idle 动画但保持 agent 态
+      const mapped = AGENT_ACTION[activity];
+      const action = ctx.available.includes(mapped) ? mapped : 'idle';
+      if (state.kind === 'agent' && state.action === action) {
+        // 动作不变只更新语义（如 working→thinking 同动作时不重播）
+        if (state.activity === activity) return { state };
+        return { state: { ...state, activity } };
+      }
+      return {
+        state: { kind: 'agent', activity, action },
+        play: action,
         clearTimer: true,
       };
     }

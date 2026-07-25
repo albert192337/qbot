@@ -31,6 +31,8 @@ export interface Settings {
   voiceVolume?: number;
   /** 自言自语频率（默认 normal） */
   talkFrequency?: 'quiet' | 'normal' | 'chatty';
+  /** Claude Code 联动 hooks 已安装（托盘开关的记忆位） */
+  claudeHooksInstalled?: boolean;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */
@@ -50,6 +52,16 @@ export interface HatchStatus {
   /** stage 为 awaiting_pick 时：候选图 qbot-asset URL（中途重开窗口也能直接挑选） */
   candidateUrls?: string[];
   actions: Record<ActionId, { status: ActionStatus; frameUrl?: string; error?: string }>;
+}
+
+/** Agent 会话合成后的活动状态（优先级 error > waiting > working > thinking > done > idle） */
+export type AgentActivity = 'idle' | 'thinking' | 'working' | 'waiting' | 'done' | 'error';
+
+/** 主进程 agent-server 广播给 pet 窗口的合成状态 */
+export interface AgentStatus {
+  activity: AgentActivity;
+  /** 当前活跃会话数（0 = 无 agent 在干活） */
+  sessions: number;
 }
 
 /** 小房间装饰摆放（room-decor.json，按房间名键控） */
@@ -119,6 +131,12 @@ export interface QBotApi {
     set(patch: Partial<Settings>): Promise<void>;
     /** pet 窗口订阅：设置变更实时生效（语音开关/音量/频率等） */
     onChanged(cb: (settings: Settings) => void): () => void;
+  };
+  agent: {
+    /** 当前合成状态（pet 窗口加载时铺底） */
+    getStatus(): Promise<AgentStatus>;
+    /** 订阅合成状态变化（agent-server 有变化才广播） */
+    onStatus(cb: (status: AgentStatus) => void): () => void;
   };
   ui: {
     /** 主进程要求切屏（托盘「设置」→ settings 屏） */

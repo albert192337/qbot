@@ -8,6 +8,7 @@ import { getSettings, setSettings } from './config';
 import { registerIpc } from './ipc';
 import { rebuildTray } from './tray';
 import { createPetWindow, getPetWindow, setPetScale } from './windows';
+import { startAgentServer } from './agent-server';
 
 // qbot-asset://<dirId>/<relPath> → userData/characters/<dirId>/<relPath>
 // stream: true 缺失时 <video> 对协议 URL 静默不播（必须 ready 前注册）
@@ -47,6 +48,7 @@ app.whenReady().then(async () => {
   registerIpc();
   await seedPresets();
   await rebuildTray();
+  void startAgentServer(); // agent 联动状态服务（失败不阻塞桌宠本体）
 
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
