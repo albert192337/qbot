@@ -5,10 +5,17 @@ import type { CharacterMeta } from '../shared/ipc-types';
 
 const PET_SIZE = 360;
 const ROOM_SIZE = 560;
+/** 气泡窗：固定尺寸，创建后只 setPosition 永不改大小（绕开透明窗 resize 渲染 bug） */
+const BUBBLE_W = 340;
+const BUBBLE_H = 500;
+/** 气泡栈底边压进桌宠窗顶边的像素（桌宠窗顶部本就是 contain 留白） */
+const BUBBLE_OVERLAP = 24;
 
 let petWindow: BrowserWindow | null = null;
 let hatchWindow: BrowserWindow | null = null;
 let roomWindow: BrowserWindow | null = null;
+let bubbleWindow: BrowserWindow | null = null;
+let bubbleSide: 'above' | 'below' = 'above';
 let petScale = 1;
 
 /** 桌宠缩放（0.5~2）：窗口即画布，改窗口尺寸即改桌宠大小；右下角锚定 */
@@ -22,16 +29,19 @@ export function setPetScale(scale: number): void {
   petWindow.setResizable(true);
   petWindow.setBounds({ x: x + w - size, y: y + h - size, width: size, height: size });
   petWindow.setResizable(false);
+  syncBubbleBounds(); // 不依赖 resize 事件的投递时机
 }
 
-function rendererUrl(page: 'pet' | 'hatch' | 'room'): { url?: string; file?: string } {
+type RendererPage = 'pet' | 'hatch' | 'room' | 'bubble';
+
+function rendererUrl(page: RendererPage): { url?: string; file?: string } {
   if (process.env.ELECTRON_RENDERER_URL) {
     return { url: `${process.env.ELECTRON_RENDERER_URL}/${page}/index.html` };
   }
   return { file: path.join(__dirname, `../renderer/${page}/index.html`) };
 }
 
-function load(win: BrowserWindow, page: 'pet' | 'hatch' | 'room'): void {
+function load(win: BrowserWindow, page: RendererPage): void {
   const target = rendererUrl(page);
   if (target.url) void win.loadURL(target.url);
   else void win.loadFile(target.file!);
@@ -81,10 +91,108 @@ export function createPetWindow(): BrowserWindow {
   });
   petWindow.setAlwaysOnTop(true, 'floating'); // 盖普通窗，不盖 Mission Control
   petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // 气泡窗跟随：move 覆盖拖拽与 OS 侧移动，resize 覆盖缩放
+  petWindow.on('move', syncBubbleBounds);
+  petWindow.on('resize', syncBubbleBounds);
   petWindow.once('ready-to-show', () => petWindow?.show());
-  petWindow.on('closed', () => (petWindow = null));
+  petWindow.on('closed', () => {
+    petWindow = null;
+    closeBubbleWindow();
+  });
   load(petWindow, 'pet');
   return petWindow;
+}
+
+export function getBubbleWindow(): BrowserWindow | null {
+  return bubbleWindow;
+}
+
+export function isRoomOpen(): boolean {
+  return !!roomWindow && !roomWindow.isDestroyed();
+}
+
+/** 气泡栈的锚定位置：默认贴桌宠头顶，顶部放不下就翻到脚下 */
+function bubbleAnchor(pet: Electron.Rectangle): { x: number; y: number; side: 'above' | 'below' } {
+  const wa = screen.getDisplayMatching(pet).workArea;
+  const x = Math.round(
+    Math.min(Math.max(pet.x + pet.width / 2 - BUBBLE_W / 2, wa.x), wa.x + wa.width - BUBBLE_W),
+  );
+  const above = pet.y - BUBBLE_H + BUBBLE_OVERLAP;
+  if (above >= wa.y) return { x, y: Math.round(above), side: 'above' };
+  const below = Math.min(pet.y + pet.height - BUBBLE_OVERLAP, wa.y + wa.height - BUBBLE_H);
+  return { x, y: Math.round(Math.max(below, wa.y)), side: 'below' };
+}
+
+export function syncBubbleBounds(): void {
+  const b = bubbleWindow;
+  if (!b || b.isDestroyed() || !b.isVisible()) return; // 隐藏时不做功（常态）
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const { x, y, side } = bubbleAnchor(petWindow.getBounds());
+  b.setPosition(x, y, false); // 只移不改尺寸
+  if (side !== bubbleSide) {
+    bubbleSide = side;
+    b.webContents.send('bubble:anchor', side);
+  }
+}
+
+/** 懒创建：桌宠 99% 时间没有 agent 消息，不预先吃一个 renderer 进程 */
+function createBubbleWindow(): BrowserWindow {
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) return bubbleWindow;
+  bubbleWindow = new BrowserWindow({
+    width: BUBBLE_W,
+    height: BUBBLE_H,
+    transparent: true,
+    frame: false,
+    hasShadow: false, // 同 pet/room：不显式关会有残影阴影框
+    resizable: false, // 透明窗 resize 有渲染 bug
+    focusable: false, // 纯展示层，绝不抢焦点
+    skipTaskbar: true,
+    fullscreenable: false,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      sandbox: false,
+    },
+  });
+  bubbleWindow.setIgnoreMouseEvents(true); // 全穿透：不吃桌面点击
+  bubbleWindow.setAlwaysOnTop(true, 'floating');
+  bubbleWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  bubbleWindow.on('closed', () => (bubbleWindow = null));
+  load(bubbleWindow, 'bubble');
+  return bubbleWindow;
+}
+
+/** 显示气泡窗（先摆位再 show，避免在旧坐标闪一帧） */
+export function showBubbleWindow(): BrowserWindow {
+  const win = createBubbleWindow();
+  if (!win.isVisible()) {
+    if (petWindow && !petWindow.isDestroyed()) {
+      const { x, y, side } = bubbleAnchor(petWindow.getBounds());
+      win.setPosition(x, y, false);
+      bubbleSide = side;
+    }
+    win.showInactive(); // 不抢焦点
+  }
+  syncBubbleBounds();
+  return win;
+}
+
+/**
+ * 隐藏气泡窗。先发 clear 再 hide 是必须的，不是省事：
+ * Chromium 对隐藏窗口做定时器节流，留着 pending 的淡出定时器会导致
+ * 回到桌面时一次性冒出一堆过期气泡。
+ */
+export function hideBubbleWindow(): void {
+  const b = bubbleWindow;
+  if (!b || b.isDestroyed()) return;
+  b.webContents.send('bubble:clear');
+  b.hide();
+}
+
+function closeBubbleWindow(): void {
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) bubbleWindow.close();
+  bubbleWindow = null;
 }
 
 export function createHatchWindow(screenName?: 'settings'): BrowserWindow {
@@ -147,6 +255,7 @@ export function openRoomWindow(title: string): BrowserWindow {
     return roomWindow;
   }
   petWindow?.hide();
+  hideBubbleWindow(); // 角色进小房间：气泡跟着走
   if (process.platform === 'darwin') void app.dock?.show();
   roomWindow = new BrowserWindow({
     width: ROOM_SIZE,

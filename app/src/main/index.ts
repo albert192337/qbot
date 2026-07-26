@@ -1,5 +1,5 @@
 /** 主进程入口：协议注册（必须在 ready 前）→ 预置角色 → 窗口/托盘/IPC */
-import { app, net, protocol } from 'electron';
+import { app, net, protocol, screen } from 'electron';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -7,7 +7,7 @@ import { charactersDir, getCharacter, listCharacters, seedPresets } from './char
 import { getSettings, setSettings } from './config';
 import { registerIpc } from './ipc';
 import { rebuildTray } from './tray';
-import { createPetWindow, getPetWindow, setPetScale } from './windows';
+import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds } from './windows';
 import { startAgentServer } from './agent-server';
 
 // qbot-asset://<dirId>/<relPath> → userData/characters/<dirId>/<relPath>
@@ -44,6 +44,10 @@ app.whenReady().then(async () => {
   });
 
   if (process.platform === 'darwin') app.dock?.hide();
+
+  // 工作区变化（拔显示器/改分辨率）后气泡的边界钳制要重算
+  screen.on('display-metrics-changed', syncBubbleBounds);
+  screen.on('display-removed', syncBubbleBounds);
 
   registerIpc();
   await seedPresets();

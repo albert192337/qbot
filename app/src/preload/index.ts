@@ -1,6 +1,6 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { AgentStatus, CharacterMeta, HatchProgress, QBotApi, Settings } from '../shared/ipc-types';
+import type { AgentMessage, AgentStatus, CharacterMeta, HatchProgress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
@@ -66,6 +66,24 @@ const api: QBotApi = {
       const listener = (_ev: unknown, status: AgentStatus) => cb(status);
       ipcRenderer.on('agent:status', listener);
       return () => ipcRenderer.removeListener('agent:status', listener);
+    },
+    onMessage: (cb) => {
+      const listener = (_ev: unknown, msg: AgentMessage) => cb(msg);
+      ipcRenderer.on('agent:message', listener);
+      return () => ipcRenderer.removeListener('agent:message', listener);
+    },
+  },
+  bubble: {
+    reportEmpty: () => ipcRenderer.send('bubble:empty'),
+    onClear: (cb) => {
+      const listener = () => cb();
+      ipcRenderer.on('bubble:clear', listener);
+      return () => ipcRenderer.removeListener('bubble:clear', listener);
+    },
+    onAnchor: (cb) => {
+      const listener = (_ev: unknown, side: 'above' | 'below') => cb(side);
+      ipcRenderer.on('bubble:anchor', listener);
+      return () => ipcRenderer.removeListener('bubble:anchor', listener);
     },
   },
 };

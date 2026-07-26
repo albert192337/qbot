@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>QBot Bubble</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: transparent;
+        -webkit-user-select: none;
+        user-select: none;
+        pointer-events: none; /* 窗口本身已 setIgnoreMouseEvents，这里再兜一层 */
+      }
+      #stack {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end; /* 贴底 = 贴桌宠头顶；最新的在最下面 */
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        height: 100%;
+        padding: 0 10px;
+        box-sizing: border-box;
+      }
+      body.below #stack {
+        justify-content: flex-start; /* 桌宠贴屏幕顶部时气泡翻到脚下 */
+      }
+      .bubble {
+        max-width: 100%;
+        box-sizing: border-box;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        padding: 6px 12px 8px;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+        font-family: -apple-system, 'PingFang SC', sans-serif;
+        border-left: 3px solid #7cc47f;
+        opacity: 0;
+        transform: translateY(4px);
+        transition: opacity 180ms, transform 180ms;
+      }
+      .bubble.attention {
+        border-left-color: #e0a33e;
+      }
+      .bubble.show {
+        opacity: 1;
+        transform: none;
+      }
+      .bubble.fade-out {
+        opacity: 0;
+        transition-duration: 260ms;
+      }
+      .src {
+        font-size: 10px;
+        color: #9a9a9a;
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .bubble.attention .src {
+        color: #d08a2c;
+      }
+      .text {
+        font-size: 13px;
+        line-height: 1.4;
+        color: #3a3a3a;
+        word-break: break-word;
+        /* 字符截断管不了中英混排的像素高度，line-clamp 才是几何硬约束 */
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 7;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stack"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

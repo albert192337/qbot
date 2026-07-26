@@ -64,6 +64,28 @@ export interface AgentStatus {
   sessions: number;
 }
 
+/** 气泡类型：done = 回合完成（Stop）；attention = 需要你处理（Notification） */
+export type AgentMessageKind = 'done' | 'attention';
+
+/**
+ * Stop / Notification 触发的一次性提示消息（bubble 窗消费）。
+ * 与 AgentStatus 的「状态」语义正交：状态是幂等可重放的，消息是一次性事件，
+ * 所以走独立通道——塞进 AgentStatus 会被 broadcastIfChanged 的去重吞掉。
+ */
+export interface AgentMessage {
+  /** 会话键，与 agent-server 会话表同键：`${agentId}:${sessionId}` */
+  sessionKey: string;
+  /** 来源标签（cwd 的目录名，回落 agentId） */
+  source: string;
+  /** session_id 前 4 位；同名来源并存时用于区分 */
+  sessionShort: string;
+  kind: AgentMessageKind;
+  /** 已展平 + 截断的正文 */
+  text: string;
+  /** 主进程时钟；renderer 据此计时淡出 */
+  at: number;
+}
+
 /** 小房间装饰摆放（room-decor.json，按房间名键控） */
 export interface DecorPlacement {
   id: string;
@@ -137,6 +159,16 @@ export interface QBotApi {
     getStatus(): Promise<AgentStatus>;
     /** 订阅合成状态变化（agent-server 有变化才广播） */
     onStatus(cb: (status: AgentStatus) => void): () => void;
+    /** bubble 窗订阅：agent 一次性提示消息 */
+    onMessage(cb: (msg: AgentMessage) => void): () => void;
+  };
+  bubble: {
+    /** 气泡全部消散 → 主进程隐藏气泡窗 */
+    reportEmpty(): void;
+    /** 主进程要求清空（角色进小房间等） */
+    onClear(cb: () => void): () => void;
+    /** 气泡栈贴桌宠上方还是下方（桌宠贴屏幕顶部时翻转） */
+    onAnchor(cb: (side: 'above' | 'below') => void): () => void;
   };
   ui: {
     /** 主进程要求切屏（托盘「设置」→ settings 屏） */

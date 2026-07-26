@@ -6,7 +6,7 @@ import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import { getCharacter, listCharacters, renameCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse } from './windows';
+import { movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, hideBubbleWindow } from './windows';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import { rebuildTray } from './tray';
@@ -98,4 +98,7 @@ export function registerIpc(): void {
 
   // ── agent 联动 ─────────────────────────────────────────
   ipcMain.handle('agent:getStatus', () => getAgentStatus());
+
+  // ── bubble ─────────────────────────────────────────────
+  ipcMain.on('bubble:empty', () => hideBubbleWindow());
 }
