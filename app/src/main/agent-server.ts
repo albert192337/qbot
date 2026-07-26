@@ -15,34 +15,16 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
-import type { AgentActivity, AgentStatus } from '../shared/ipc-types';
+import type { AgentStatus } from '../shared/ipc-types';
+import { EVENT_ACTIVITY, mergeSessions, type SessionEntry } from './agent-merge';
 import { getPetWindow } from './windows';
 
 const PORTS = [24242, 24243, 24244, 24245, 24246];
 const BODY_LIMIT = 64 * 1024;
-/** Stop（回合完成）展示 done 的时长，之后衰减为 idle */
-const DONE_DECAY_MS = 45_000;
 /** 会话无事件超时（CLI 崩溃/断网收不到 SessionEnd） */
 const STALE_MS = 10 * 60_000;
-const SWEEP_MS = 30_000;
-
-/** Claude Code hook_event_name → 会话活动状态；SessionEnd 特殊处理（删会话） */
-const EVENT_ACTIVITY: Record<string, AgentActivity> = {
-  SessionStart: 'idle',
-  UserPromptSubmit: 'thinking',
-  PreToolUse: 'working',
-  PostToolUse: 'working',
-  Notification: 'waiting', // 权限确认 / 等输入
-  Stop: 'done',
-};
-
-/** 合成优先级：越靠前越优先对外展示 */
-const PRIORITY: AgentActivity[] = ['error', 'waiting', 'working', 'thinking', 'done', 'idle'];
-
-interface SessionEntry {
-  activity: AgentActivity;
-  updatedAt: number;
-}
+/** 扫描周期：TTL 衰减靠它兑现，所以要明显小于最短 TTL（done 45s） */
+const SWEEP_MS = 10_000;
 
 const sessions = new Map<string, SessionEntry>();
 let lastBroadcast: AgentStatus = { activity: 'idle', sessions: 0 };
@@ -58,16 +40,7 @@ export function getAgentStatus(): AgentStatus {
 }
 
 function merge(): AgentStatus {
-  const now = Date.now();
-  let best: AgentActivity = 'idle';
-  let active = 0;
-  for (const s of sessions.values()) {
-    let a = s.activity;
-    if (a === 'done' && now - s.updatedAt > DONE_DECAY_MS) a = 'idle';
-    if (a !== 'idle') active++;
-    if (PRIORITY.indexOf(a) < PRIORITY.indexOf(best)) best = a;
-  }
-  return { activity: best, sessions: active };
+  return mergeSessions(sessions.values(), Date.now());
 }
 
 function broadcastIfChanged(): void {
@@ -106,7 +79,7 @@ function sweep(): void {
   for (const [key, s] of sessions) {
     if (now - s.updatedAt > STALE_MS) sessions.delete(key);
   }
-  broadcastIfChanged(); // done 衰减也靠周期扫描兑现
+  broadcastIfChanged(); // TTL 衰减（done/waiting/working…）也靠周期扫描兑现
 }
 
 function listen(port: number): Promise<http.Server> {

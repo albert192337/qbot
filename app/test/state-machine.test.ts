@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AGENT_ACTION,
   pickAutoAction,
   randomDelay,
   step,
@@ -106,7 +107,7 @@ describe('agent 联动', () => {
     const cases: Array<[string, ActionId]> = [
       ['thinking', 'tea'],
       ['working', 'talk_happy'],
-      ['waiting', 'drag'],
+      ['waiting', 'talk_annoyed'],
       ['error', 'talk_annoyed'],
     ];
     for (const [activity, action] of cases) {
@@ -118,6 +119,12 @@ describe('agent 联动', () => {
       expect(r.state).toEqual({ kind: 'agent', activity, action });
       expect(r.play).toBe(action);
       expect(r.clearTimer).toBe(true);
+    }
+  });
+
+  it('回归：agent 活动一律不映射到 drag（粘性循环 + drag 动画 = 无限蹦跳）', () => {
+    for (const action of Object.values(AGENT_ACTION)) {
+      expect(action).not.toBe('drag');
     }
   });
 

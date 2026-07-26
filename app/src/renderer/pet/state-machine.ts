@@ -23,14 +23,20 @@ export type PetEvent =
   | { type: 'PLAY_ACTION'; action: ActionId } // 用户点击/菜单指定播放
   | { type: 'AGENT_STATUS'; activity: AgentActivity }; // agent-server 合成状态
 
-/** agent 活动 → 桌宠动作（done 走一次性庆祝，idle 走退出，不在表内） */
+/**
+ * agent 活动 → 桌宠动作（done 走一次性庆祝，idle 走退出，不在表内）。
+ * waiting 不用 drag：drag 是「被指针按住」的动画，粘性循环下表现为无限蹦跳，
+ * 看着像卡死而不是在等人；talk_annoyed（催一下）更贴「该你了」。
+ * error 目前无事件可达（EVENT_ACTIVITY 里没有映射到 error 的 hook），
+ * 所以与 waiting 共用动作暂不产生歧义。
+ */
 export const AGENT_ACTION: Record<
   Exclude<AgentActivity, 'idle' | 'done'>,
   ActionId
 > = {
   thinking: 'tea',
   working: 'talk_happy',
-  waiting: 'drag', // 悬空蹦跳 = 求关注（要授权/等输入）
+  waiting: 'talk_annoyed',
   error: 'talk_annoyed',
 };
 
