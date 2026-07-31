@@ -4,6 +4,7 @@ import path from 'node:path';
 import { listCharacters } from './characters';
 import { getSettings, setSettings } from './config';
 import { createHatchWindow, broadcastCharacterActivated } from './windows';
+import { toggleClaudeHooks } from './hooks/claude';
 import { getCharacter } from './characters';
 
 let tray: Tray | null = null;
@@ -71,6 +72,15 @@ export async function rebuildTray(): Promise<void> {
         : [{ label: '（暂无角色）', enabled: false }],
     },
     { type: 'separator' },
+    {
+      // 显式同意入口：点击弹确认框，绝不静默改 ~/.claude/settings.json
+      label: settings.claudeHooksInstalled ? '✓ Claude Code 联动' : '接入 Claude Code 联动…',
+      click: async () => {
+        const installed = await toggleClaudeHooks(!!settings.claudeHooksInstalled);
+        await setSettings({ claudeHooksInstalled: installed });
+        void rebuildTray();
+      },
+    },
     {
       label: '设置…',
       click: () => createHatchWindow('settings'),

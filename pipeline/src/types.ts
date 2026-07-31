@@ -16,6 +16,12 @@ export const ACTION_IDS = [
 
 export type ActionId = (typeof ACTION_IDS)[number];
 
+/**
+ * 可播放动作 id：6 个标准动作 **或** 用户自定义动作名（manifest.customActions 的 key）。
+ * `string & {}` 的写法保留 ActionId 的编辑器自动补全，同时接受任意自定义名。
+ */
+export type PlayableId = ActionId | (string & {});
+
 /** 单动作生成状态机（spec §2 错误处理） */
 export type ActionStatus =
   | 'pending'
@@ -74,7 +80,17 @@ export interface ManifestAction {
   webm: string;
   gif: string;
   durationSec: number;
-  status: 'done' | 'failed';
+  /** pending = 自定义动作正在后台生成（标准动作只有 done/failed） */
+  status: 'done' | 'failed' | 'pending';
+  /** 角色在画面中的朝向：left = 面朝左，right = 面朝右（默认）。
+   *  串门时用于决定是否翻转，确保两人面对面。
+   *  缺省 = 旧数据，默认向右。 */
+  facing?: 'left' | 'right';
+  /** 自定义姿势描述（覆盖默认 actionSpec.poseDesc）。
+   *  保存后仅影响未来的生成；已生成的 webm/gif 不受影响。 */
+  poseDesc?: string;
+  /** 自定义动作描述（覆盖默认 actionSpec.motionDesc） */
+  motionDesc?: string;
 }
 
 /** 角色声线（voice spec §5）：首次加载时按 id 哈希分配后写回，永久稳定 */
@@ -99,6 +115,22 @@ export interface Manifest {
   pipelineVersion: '1';
   /** 缺省 = 尚未迁移，app 首次加载时补写 */
   voice?: ManifestVoice;
+  /** 角色人设：生成动作时注入 prompt，影响姿势/表情/风格 */
+  persona?: string;
+  /** 自定义动作（用户新增的额外动作，key 为 action name） */
+  customActions?: Record<string, ManifestAction>;
+  /** Claude Code 联动时 agent 活动→动作的映射。缺省时各活动使用 state-machine 内置默认值。 */
+  agentActions?: AgentActionConfig;
+}
+
+/** Claude Code 联动：agent 活动→桌宠动作的可配置映射（可指向自定义动作） */
+export interface AgentActionConfig {
+  thinking?: PlayableId;
+  working?: PlayableId;
+  waiting?: PlayableId;
+  error?: PlayableId;
+  doneAction?: PlayableId;
+  doneLoops?: number;
 }
 
 /** job 进度事件，pipeline 内部 emit，app 经 IPC 转发给孵化 UI */
@@ -189,3 +221,24 @@ export const IMAGE_SIZES = {
   turnaround: '3072x1536',
   frame: '2048x2048',
 } as const;
+
+/** 生成提示重建数据（供工作室配置面板展示）。
+ *  根据 .job/state.json 的参数调用 prompt 函数重建。 */
+export interface PromptData {
+  characterForm?: CharacterForm;
+  characterStyle?: CharacterStyle;
+  imageProvider?: ImageProvider;
+  persona?: string;
+  /** Claude Code 联动动作配置（来自 manifest.agentActions） */
+  agentActions?: AgentActionConfig;
+  turnaroundPrompt: string;
+  actions: Record<
+    ActionId,
+    {
+      poseDesc: string;
+      motionDesc: string;
+      framePrompt: string;
+      videoPrompt: string;
+    }
+  >;
+}

@@ -22,6 +22,8 @@ export default defineConfig({
           pet: resolve(__dirname, 'src/renderer/pet/index.html'),
           hatch: resolve(__dirname, 'src/renderer/hatch/index.html'),
           room: resolve(__dirname, 'src/renderer/room/index.html'),
+          studio: resolve(__dirname, 'src/renderer/studio/index.html'),
+          bubble: resolve(__dirname, 'src/renderer/bubble/index.html'),
         },
       },
     },

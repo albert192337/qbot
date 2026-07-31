@@ -4,7 +4,7 @@
  */
 import { app } from 'electron';
 import { existsSync } from 'node:fs';
-import { cp, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Manifest } from '@qbot/pipeline';
 import type { CharacterMeta } from '../shared/ipc-types';
@@ -86,4 +86,11 @@ export async function renameCharacter(dirId: string, name: string): Promise<void
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest;
   manifest.name = name.trim() || manifest.name;
   await writeManifest(manifestPath, manifest);
+}
+
+/** 删除角色目录及所有资产 */
+export async function deleteCharacter(dirId: string): Promise<void> {
+  const dir = path.join(charactersDir(), dirId);
+  if (!existsSync(dir)) throw new Error(`character not found: ${dirId}`);
+  await rm(dir, { recursive: true, force: true });
 }

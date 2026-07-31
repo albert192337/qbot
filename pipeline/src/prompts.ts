@@ -32,21 +32,21 @@ export const DEFAULT_CHARACTER_DESC: CharacterDesc = {
 export const ACTIONS: Record<ActionId, ActionSpec> = {
   idle: {
     poseDesc:
-      '角色自然站立，双臂自然下垂，表情平静放松。没有手、没有其他任何人物或物体。',
+      '角色自然站立，双臂自然下垂，表情平静放松。画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
     motionDesc:
       '角色站立原地，身体随呼吸轻微起伏，偶尔眨眼，耳朵轻微自然摆动。动作幅度很小。',
     durationSec: 5, // seedance 1.5-pro 最短 5s（3 会 400）
   },
   drag: {
     poseDesc:
-      '角色悬浮在半空中，身体微微前倾，双腿自然下垂放松，表情略带惊讶。没有手、没有绳索、没有其他任何人物或物体，角色周围完全空无一物。',
+      '角色悬浮在半空中，身体微微前倾，双腿自然下垂放松，表情略带惊讶。没有绳索、没有其他任何人物或物体，角色周围完全空无一物。',
     motionDesc:
       '角色悬浮在半空，身体轻微摇晃，双腿自然晃动，表情略带惊讶地眨眼。角色不位移。',
     durationSec: 5,
   },
   sleep: {
     poseDesc:
-      '角色蜷缩侧躺姿势闭眼熟睡，表情安详。画面中绝对没有床、没有枕头、没有被子，只有角色悬浮在纯绿背景上。没有手、没有其他任何人物或物体。',
+      '角色蜷缩侧躺姿势闭眼熟睡，表情安详。画面中绝对没有床、没有枕头、没有被子，只有角色悬浮在纯绿背景上。不出现其他人的手或身体部位，不出现任何额外人物或物体。',
     motionDesc:
       '角色闭眼熟睡，身体随呼吸缓慢起伏，耳朵偶尔轻颤。动作幅度很小，安静祥和。',
     durationSec: 5, // seedance 1.5-pro 最短 5s
@@ -60,14 +60,14 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   },
   talk_happy: {
     poseDesc:
-      '角色四分之三侧身朝向画面右侧，表情开心，眼睛明亮，嘴巴微张像在愉快说话。没有手、没有其他任何人物或物体。',
+      '角色四分之三侧身朝向画面右侧，表情开心，眼睛明亮，嘴巴微张像在愉快说话。角色自身的手和双臂保持自然可见，画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
     motionDesc:
       '角色朝画面右侧开心地说话，嘴巴一张一合，表情生动，偶尔点头，耳朵竖起。角色不位移。',
     durationSec: 5,
   },
   talk_annoyed: {
     poseDesc:
-      '角色四分之三侧身朝向画面右侧，表情不耐烦，眉头微皱，嘴角向下撇。没有手、没有其他任何人物或物体。',
+      '角色四分之三侧身朝向画面右侧，表情不耐烦，眉头微皱，嘴角向下撇。角色自身的手和双臂保持自然可见，画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
     motionDesc:
       '角色朝画面右侧不耐烦地抱怨，嘴巴撇着动，偶尔翻白眼或扭头，耳朵向后压。角色不位移。',
     durationSec: 5,
@@ -208,15 +208,16 @@ export function turnaroundPrompt(
 }
 
 /** 绿幕首帧 prompt（图生图，参考图=选定三视图）
- * style 只在「人形 + faithful」时生效：把风格尾巴从「粗描边贴纸插画风格」换成保持参考图画风——
- * 贴纸风尾巴的正面引导足以把高保真三视图拉回卡通插画风（甚至引出白色贴纸描边）。
- * chibi / 缺省（旧 job）/ 抽象档维持原措辞。
+ * persona 可选：角色人设，用于影响姿势/表情/风格。
  */
 export function framePrompt(
   action: ActionId,
   desc: CharacterDesc = DEFAULT_CHARACTER_DESC,
   form: CharacterForm = 'humanoid',
   style?: CharacterStyle,
+  persona?: string,
+  /** 自定义姿势描述（覆盖默认 actionSpec.poseDesc），来自 manifest.json 中该动作的 poseDesc 字段 */
+  poseOverride?: string,
 ): string {
   const faithful = form !== 'abstract' && style === 'faithful';
   const keep =
@@ -225,10 +226,13 @@ export function framePrompt(
       : faithful
         ? `参考图中的角色，保持发型、眼睛、服装、画风、头身比等所有细节完全一致。`
         : `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。`;
+  const personaSuffix = persona ? `角色人设：${persona}。按照此设定表现角色。` : '';
+  const poseDesc = poseOverride ?? actionSpec(action, form, style).poseDesc;
   return (
     keep +
-    `${actionSpec(action, form, style).poseDesc}` +
-    `画面中只有这一个角色，没有其他人物、没有手、没有家具、没有白色贴纸描边。` +
+    poseDesc +
+    personaSuffix +
+    `画面中只有这一个角色，不出现其他人的手或身体部位，没有家具、没有白色贴纸描边。` +
     // 写实风模型爱画接触阴影，阴影是暗绿色、抠像永远处理不掉，必须在生成端排除
     (faithful ? `角色不投射任何阴影，地面和背景上没有任何阴影。` : '') +
     `背景为纯色绿幕（纯正绿色，无渐变无阴影无纹理），` +
@@ -241,16 +245,31 @@ export function framePrompt(
 
 /** 循环视频 prompt（i2v，首帧=尾帧），参数走 1.0 系列的 prompt 尾部约定
  * style 只在「人形 + faithful」时生效：动作文案换成连耳朵也不提的版本，并排除接触阴影。
+ * desc 缺省沿用 DEFAULT_CHARACTER_DESC（向后兼容）
  */
 export function videoPrompt(
   action: ActionId,
+  desc: CharacterDesc = DEFAULT_CHARACTER_DESC,
   form: CharacterForm = 'humanoid',
   style?: CharacterStyle,
+  persona?: string,
+  /** 自定义动作描述（覆盖默认 actionSpec.motionDesc），来自 manifest.json 中该动作的 motionDesc 字段 */
+  motionOverride?: string,
 ): string {
   const spec = actionSpec(action, form, style);
   const faithful = form !== 'abstract' && style === 'faithful';
+  const keep =
+    form === 'abstract'
+      ? `参考图中的角色，完全保持其形态、线条、颜色、画风等所有细节一致，不要添加参考图中没有的部位。`
+      : faithful
+        ? `参考图中的角色，保持发型、眼睛、服装、画风、头身比等所有细节完全一致。`
+        : `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。`;
+  const personaSuffix = persona ? `角色人设：${persona}。按照此设定表现角色。` : '';
+  const motionDesc = motionOverride ?? spec.motionDesc;
   return (
-    `${spec.motionDesc}` +
+    keep +
+    motionDesc +
+    personaSuffix +
     `镜头完全固定不动，静止镜头，角色不位移不走出画面，绿幕背景纯绿色保持不变，` +
     (faithful ? `角色不投射任何阴影，画面中没有任何阴影，` : '') +
     `画面中始终只有这一个角色，绝对不出现其他人物、手或物体。丝滑流畅循环动画。` +
