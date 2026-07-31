@@ -11,6 +11,7 @@ import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, sa
 import { getDecor, setDecor } from './decor';
 import { rebuildTray } from './tray';
 import { getAgentStatus } from './agent-server';
+import { getMusicStatus } from './music-monitor';
 
 export function registerIpc(): void {
   // ── hatch ──────────────────────────────────────────────
@@ -130,6 +131,9 @@ export function registerIpc(): void {
 
   // ── agent 联动 ─────────────────────────────────────────
   ipcMain.handle('agent:getStatus', () => getAgentStatus());
+
+  // ── music 联动 ─────────────────────────────────────────
+  ipcMain.handle('music:getStatus', () => getMusicStatus());
 
   // ── bubble ─────────────────────────────────────────────
   ipcMain.on('bubble:empty', () => hideBubbleWindow());

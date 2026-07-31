@@ -130,6 +130,17 @@ function render(m: Manifest, dirId: string, prompts?: PromptData): void {
   html += `<span style="font-size:12px;color:#555;margin-left:8px">遍数:</span>`;
   html += `<input id="done-loops" type="number" value="${ac.doneLoops ?? 1}" min="1" max="5" style="width:50px;margin-left:4px;text-align:center" />`;
   html += `</div>`;
+  // music action
+  html += `<div style="display:flex;align-items:center;margin:6px 0">`;
+  html += `<span style="flex:0 0 120px;font-size:12px;color:#555">听歌摇摆</span>`;
+  html += `<select id="music-action" class="agent-action-select" style="margin-left:8px">`;
+  for (const id of actionOptions) {
+    const label = STD_LABELS[id as ActionId] ?? id;
+    const selected = (ac.musicAction ?? 'talk_happy') === id ? ' selected' : '';
+    html += `<option value="${esc(id)}"${selected}>${esc(label ?? '')}</option>`;
+  }
+  html += `</select>`;
+  html += `</div>`;
   html += `<div class="btn-row"><button id="save-agent-config" class="primary">保存联动配置</button></div>`;
   html += `</div>`;
 
@@ -241,6 +252,8 @@ function bindEvents(dirId: string, m: Manifest): void {
         (config as Record<string, ActionId>)[key] = s.value as ActionId;
       }
     });
+    const musicAction = (document.getElementById('music-action') as HTMLSelectElement)?.value;
+    if (musicAction) config.musicAction = musicAction as ActionId;
     const doneLoops = parseInt((document.getElementById('done-loops') as HTMLInputElement)?.value ?? '1', 10);
     config.doneLoops = doneLoops > 0 ? doneLoops : 1;
     await window.qbot.studio.saveAgentActions(dirId, config);

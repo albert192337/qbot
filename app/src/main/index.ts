@@ -9,6 +9,7 @@ import { registerIpc } from './ipc';
 import { rebuildTray } from './tray';
 import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds } from './windows';
 import { startAgentServer } from './agent-server';
+import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
 
 // qbot-asset://<dirId>/<relPath> → userData/characters/<dirId>/<relPath>
 // stream: true 缺失时 <video> 对协议 URL 静默不播（必须 ready 前注册）
@@ -53,6 +54,7 @@ app.whenReady().then(async () => {
   await seedPresets();
   await rebuildTray();
   void startAgentServer(); // agent 联动状态服务（失败不阻塞桌宠本体）
+  startMusicMonitor(); // 网易云音乐播放监控（Windows only，失败不阻塞）
 
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
@@ -72,6 +74,11 @@ app.whenReady().then(async () => {
 // 桌宠应用：全部窗口关闭不退出（托盘常驻）
 app.on('window-all-closed', () => {
   /* keep alive */
+});
+
+// 退出前收掉常驻的 powershell 监控进程，避免留孤儿
+app.on('before-quit', () => {
+  stopMusicMonitor();
 });
 
 app.on('activate', () => {

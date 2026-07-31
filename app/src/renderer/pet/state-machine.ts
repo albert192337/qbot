@@ -14,7 +14,8 @@ export type PetState =
   | { kind: 'auto'; action: PlayableId; loopsLeft: number }
   | { kind: 'drag' }
   | { kind: 'visit'; action: PlayableId; loopsLeft: number }
-  | { kind: 'agent'; activity: AgentActivity; action: PlayableId };
+  | { kind: 'agent'; activity: AgentActivity; action: PlayableId }
+  | { kind: 'music'; action: PlayableId };
 
 export type PetEvent =
   | { type: 'POINTER_DOWN' }
@@ -24,7 +25,8 @@ export type PetEvent =
   | { type: 'PLAY_ACTION'; action: PlayableId }
   | { type: 'VISIT_START'; action: PlayableId; loops: number }
   | { type: 'VISIT_END' }
-  | { type: 'AGENT_STATUS'; activity: AgentActivity };
+  | { type: 'AGENT_STATUS'; activity: AgentActivity }
+  | { type: 'MUSIC_STATUS'; playing: boolean };
 
 /**
  * agent 活动 → 桌宠动作（done 走一次性庆祝，idle 走退出，不在表内）。
@@ -46,6 +48,9 @@ export const AGENT_ACTION: Record<
 /** 回合完成的庆祝动作与遍数 */
 export const DONE_ACTION: ActionId = 'sleep';
 export const DONE_LOOPS = 1;
+
+/** 音乐播放时的默认摇摆动作 */
+export const DEFAULT_MUSIC_ACTION: ActionId = 'talk_happy';
 
 export interface StepResult {
   state: PetState;
@@ -87,6 +92,8 @@ export interface StepContext {
   doneAction?: PlayableId;
   /** 庆祝动作遍数覆盖（缺省 DONE_LOOPS） */
   doneLoops?: number;
+  /** 音乐摇摆动作覆盖（缺省 DEFAULT_MUSIC_ACTION） */
+  musicAction?: PlayableId;
 }
 
 export function randomDelay(rng: SchedulerRng): number {
@@ -127,7 +134,7 @@ export function step(
       return { state: { kind: 'idle' }, play: 'idle', rescheduleTimer: true };
 
     case 'TIMER_FIRE': {
-      if (state.kind !== 'idle') return { state }; // 非 idle（含 agent）忽略迟到的定时器
+      if (state.kind !== 'idle') return { state }; // 非 idle（含 agent/music）忽略迟到的定时器
       const picked = pickAutoAction(ctx.available, ctx.rng);
       if (!picked) return { state, rescheduleTimer: true };
       return {
@@ -138,8 +145,9 @@ export function step(
     }
 
     case 'VIDEO_ENDED': {
-      // agent 态的动作多为非 loop（tea/talk_*）：播完手动重播，形成粘性循环
+      // agent / music 态粘性循环：播完手动重播
       if (state.kind === 'agent') return { state, play: state.action };
+      if (state.kind === 'music') return { state, play: state.action };
       if (state.kind === 'visit') {
         const left = state.loopsLeft - 1;
         if (left <= 0) {
@@ -157,7 +165,7 @@ export function step(
     }
 
     case 'PLAY_ACTION': {
-      // 用户主动触发：拖拽中/串门中忽略，其余状态（含 agent）立即切（播 1 遍回 idle）
+      // 用户主动触发：拖拽中/串门中忽略，其余状态（含 agent/music）立即切（播 1 遍回 idle）
       if (state.kind === 'drag' || state.kind === 'visit') return { state };
       if (!ctx.available.includes(event.action)) return { state };
       return {
@@ -224,5 +232,24 @@ export function step(
       };
     }
 
+    case 'MUSIC_STATUS': {
+      // 优先级：drag > agent > visit > music
+      if (state.kind === 'drag' || state.kind === 'agent' || state.kind === 'visit') return { state };
+      const { playing } = event;
+      if (!playing) {
+        // 音乐停止：只有 music 态回 idle
+        if (state.kind !== 'music') return { state };
+        return { state: { kind: 'idle' }, play: 'idle', rescheduleTimer: true };
+      }
+      // 音乐开始：播放音乐动作（优先用自定义，缺省走 talk_happy）
+      const musicAction = ctx.musicAction ?? DEFAULT_MUSIC_ACTION;
+      const action = ctx.available.includes(musicAction) ? musicAction : 'idle';
+      if (state.kind === 'music' && state.action === action) return { state };
+      return {
+        state: { kind: 'music', action },
+        play: action,
+        clearTimer: true,
+      };
+    }
   }
 }

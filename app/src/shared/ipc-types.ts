@@ -96,6 +96,15 @@ export interface CustomActionEvent {
   error?: string;
 }
 
+/** 音乐播放状态（来自 Windows SMTC API） */
+export interface MusicStatus {
+  playing: boolean;
+  /** 当前播放曲目标题 */
+  title?: string;
+  /** 当前播放曲目艺术家 */
+  artist?: string;
+}
+
 /** 小房间装饰摆放（room-decor.json，按房间名键控） */
 export interface DecorPlacement {
   id: string;
@@ -219,6 +228,12 @@ export interface QBotApi {
     onClear(cb: () => void): () => void;
     /** 气泡栈贴桌宠上方还是下方（桌宠贴屏幕顶部时翻转） */
     onAnchor(cb: (side: 'above' | 'below') => void): () => void;
+  };
+  music: {
+    /** 当前音乐播放状态（pet 窗口加载时铺底） */
+    getStatus(): Promise<MusicStatus>;
+    /** 订阅音乐播放状态变化 */
+    onStatus(cb: (status: MusicStatus) => void): () => void;
   };
 }
 

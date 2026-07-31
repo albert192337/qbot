@@ -1,6 +1,6 @@
 /** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 + 串门 + 调试面板 */
 import type { ActionId, PlayableId } from '@qbot/pipeline';
-import type { AgentActivity, CharacterMeta } from '../../shared/ipc-types';
+import type { AgentActivity, CharacterMeta, MusicStatus } from '../../shared/ipc-types';
 import { DebugPanel } from './debug-panel';
 import { Player } from './player';
 import { randomDelay, step, type PetState, type StepContext } from './state-machine';
@@ -19,6 +19,8 @@ let currentCharacter: CharacterMeta | null = null;
 let visitorCharacter: CharacterMeta | null = null;
 /** 最新 agent 活动（done 是一次性事件，派发后立即视为 idle） */
 let agentActivity: AgentActivity = 'idle';
+/** 最新音乐播放状态（曲名用于举牌，playing 用于状态机恢复） */
+let musicStatus: MusicStatus = { playing: false };
 
 /** step() 上下文：可用动作 + 可选的 agent/music 覆盖配置 */
 let stepCtx: StepContext = { available: [], rng };
@@ -176,7 +178,7 @@ function voiceSettings(s: {
 void window.qbot.settings.get().then((s) => speaker.setSettings(voiceSettings(s)));
 window.qbot.settings.onChanged((s) => speaker.setSettings(voiceSettings(s)));
 
-// ── 举牌文字：单一来源 ─────────────────────────────────
+// ── 举牌文字：单一来源，优先级 agent > music > 无 ─────────
 /** 一次性文字（如「工作完成！」），显示后由下一次 refresh 清掉 */
 let signboardOneShot: string | null = null;
 
@@ -189,6 +191,13 @@ function refreshSignboard(): void {
   }
   if (agentActivity !== 'idle') {
     hostSignboard.setText('工作中…');
+    hostSignboard.show();
+  } else if (musicStatus.playing) {
+    hostSignboard.setText(
+      musicStatus.title
+        ? `听歌中: ${musicStatus.title}${musicStatus.artist ? ` - ${musicStatus.artist}` : ''}`
+        : '听歌中…',
+    );
     hostSignboard.show();
   } else {
     hostSignboard.hide();
@@ -210,6 +219,16 @@ function onAgentStatus(activity: AgentActivity): void {
 window.qbot.agent.onStatus((s) => onAgentStatus(s.activity));
 void window.qbot.agent.getStatus().then((s) => onAgentStatus(s.activity));
 
+// ── music 联动 ────────────────────────────────────────────
+function onMusicStatus(status: MusicStatus): void {
+  musicStatus = status;
+  if (available.length === 0) return;
+  refreshSignboard();
+  dispatch({ type: 'MUSIC_STATUS', playing: status.playing });
+}
+
+window.qbot.music.onStatus(onMusicStatus);
+void window.qbot.music.getStatus().then(onMusicStatus);
 
 function scheduleTimer(): void {
   clearTimer();
@@ -303,6 +322,11 @@ function dispatch(event: Parameters<typeof step>[1]): void {
   if (state.kind === 'idle' && agentActivity !== 'idle' && event.type !== 'AGENT_STATUS') {
     dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
   }
+  // 音乐在播但落回 idle（agent 干完活/拖拽松手/串门结束）→ 恢复摇摆 + 举牌
+  if (state.kind === 'idle' && agentActivity === 'idle' && musicStatus.playing && event.type !== 'MUSIC_STATUS') {
+    refreshSignboard();
+    dispatch({ type: 'MUSIC_STATUS', playing: true });
+  }
 }
 
 // ── 角色加载 ─────────────────────────────────────────────
@@ -325,6 +349,7 @@ window.qbot.characters.onActivated((meta) => {
       : undefined,
     doneAction: meta.manifest?.agentActions?.doneAction,
     doneLoops: meta.manifest?.agentActions?.doneLoops,
+    musicAction: meta.manifest?.agentActions?.musicAction,
   };
   state = { kind: 'idle' };
   player.play('idle');
@@ -338,6 +363,7 @@ window.qbot.characters.onActivated((meta) => {
   endVisit();
   scheduleVisit();
   if (agentActivity !== 'idle') dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
+  if (musicStatus.playing && agentActivity === 'idle') dispatch({ type: 'MUSIC_STATUS', playing: true });
 });
 
 // 窗口隐藏期间（角色进小房间）Chromium 会自动暂停 <video> 且不派发 ended，
@@ -352,6 +378,7 @@ document.addEventListener('visibilitychange', () => {
   endVisit();
   scheduleVisit();
   if (agentActivity !== 'idle') dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
+  if (musicStatus.playing && agentActivity === 'idle') dispatch({ type: 'MUSIC_STATUS', playing: true });
 });
 
 // ── 指针交互 ─────────────────────────────────────────────

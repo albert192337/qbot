@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_ACTION,
+  DEFAULT_MUSIC_ACTION,
   pickAutoAction,
   randomDelay,
   step,
@@ -266,3 +267,80 @@ describe('可配置动作映射', () => {
   });
 });
 
+describe('music 联动', () => {
+  it('播放进入 music 态，默认 talk_happy', () => {
+    const r = step({ kind: 'idle' }, { type: 'MUSIC_STATUS', playing: true }, { available: ALL, rng: rng(0) });
+    expect(r.state).toEqual({ kind: 'music', action: DEFAULT_MUSIC_ACTION });
+    expect(r.play).toBe(DEFAULT_MUSIC_ACTION);
+    expect(r.clearTimer).toBe(true);
+  });
+
+  it('musicAction 可配置为自定义动作', () => {
+    const r = step(
+      { kind: 'idle' },
+      { type: 'MUSIC_STATUS', playing: true },
+      { available: [...ALL, '摇摆'], rng: rng(0), musicAction: '摇摆' },
+    );
+    expect(r.state).toEqual({ kind: 'music', action: '摇摆' });
+    expect(r.play).toBe('摇摆');
+  });
+
+  it('music 态 VIDEO_ENDED 粘性重播', () => {
+    const s: PetState = { kind: 'music', action: 'talk_happy' };
+    const r = step(s, { type: 'VIDEO_ENDED' }, { available: ALL, rng: rng(0) });
+    expect(r.state).toBe(s);
+    expect(r.play).toBe('talk_happy');
+  });
+
+  it('停止播放从 music 回 idle 并重排定时器', () => {
+    const r = step(
+      { kind: 'music', action: 'talk_happy' },
+      { type: 'MUSIC_STATUS', playing: false },
+      { available: ALL, rng: rng(0) },
+    );
+    expect(r.state.kind).toBe('idle');
+    expect(r.play).toBe('idle');
+    expect(r.rescheduleTimer).toBe(true);
+  });
+
+  it('非 music 态收到停止事件忽略', () => {
+    const r = step({ kind: 'idle' }, { type: 'MUSIC_STATUS', playing: false }, { available: ALL, rng: rng(0) });
+    expect(r.state.kind).toBe('idle');
+    expect(r.play).toBeUndefined();
+  });
+
+  it('agent 干活时音乐不打断（agent > music）', () => {
+    const s: PetState = { kind: 'agent', activity: 'working', action: 'tea' };
+    const r = step(s, { type: 'MUSIC_STATUS', playing: true }, { available: ALL, rng: rng(0) });
+    expect(r.state).toBe(s);
+    expect(r.play).toBeUndefined();
+  });
+
+  it('drag / visit 中音乐事件被忽略', () => {
+    for (const s of [
+      { kind: 'drag' },
+      { kind: 'visit', action: 'talk_happy', loopsLeft: 2 },
+    ] as PetState[]) {
+      const r = step(s, { type: 'MUSIC_STATUS', playing: true }, { available: ALL, rng: rng(0) });
+      expect(r.state).toBe(s);
+      expect(r.play).toBeUndefined();
+    }
+  });
+
+  it('POINTER_DOWN 可打断 music 进 drag', () => {
+    const r = step(
+      { kind: 'music', action: 'talk_happy' },
+      { type: 'POINTER_DOWN' },
+      { available: ALL, rng: rng(0) },
+    );
+    expect(r.state.kind).toBe('drag');
+    expect(r.play).toBe('drag');
+  });
+
+  it('同动作重复上报不重播（避免每次轮询都 restart）', () => {
+    const s: PetState = { kind: 'music', action: DEFAULT_MUSIC_ACTION };
+    const r = step(s, { type: 'MUSIC_STATUS', playing: true }, { available: ALL, rng: rng(0) });
+    expect(r.state).toBe(s);
+    expect(r.play).toBeUndefined();
+  });
+});
