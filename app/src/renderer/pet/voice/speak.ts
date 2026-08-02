@@ -44,6 +44,8 @@ export interface SpeakerHooks {
   playAction(action: ActionId): void;
   /** 动作是否可用（done 且已加载） */
   hasAction(action: ActionId): boolean;
+  /** 每次发言时回调（用于调试面板记录） */
+  onSpeak?(text: string, mood: string): void;
 }
 
 const BUBBLE_EXTRA_MS = 1000;
@@ -131,6 +133,8 @@ export class Speaker {
     }
     this.lastUtteranceId = utterance.id;
     this.speaking = true;
+
+    this.hooks.onSpeak?.(utterance.text, utterance.mood);
 
     const blips = plan(utterance.text, utterance.mood, this.voice);
     const durationMs = planDurationSec(blips) * 1000;

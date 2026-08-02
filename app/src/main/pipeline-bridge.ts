@@ -4,7 +4,7 @@
  */
 import { webContents } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   Job,
@@ -13,17 +13,31 @@ import {
   runPackage,
   createArkClient,
   resolveFfmpegPath,
+  sampleKeyColor,
+  toWebm,
+  createGptImageGenerator,
+  turnaroundPrompt,
+  framePrompt,
+  videoPrompt,
+  actionSpec,
+  DEFAULT_CHARACTER_DESC,
   ACTION_IDS,
   type CharacterForm,
   type CharacterStyle,
   type ImageProvider,
   type JobState,
+  type Manifest,
+  type ManifestAction,
   type PipelineConfig,
+  type PromptData,
   type ProgressEvent,
+  type ActionId,
+  type AgentActionConfig,
 } from '@qbot/pipeline';
 import type { HatchStatus } from '../shared/ipc-types';
-import { charactersDir } from './characters';
+import { charactersDir, getCharacter } from './characters';
 import { getSettings } from './config';
+import { broadcastCharacterActivated } from './windows';
 import { rebuildTray } from './tray';
 
 interface ActiveHatch {
@@ -224,4 +238,257 @@ export async function redoFailed(dirId: string): Promise<void> {
   } finally {
     active.delete(dirId);
   }
+}
+
+// ── studio: persona + custom actions ──────────────────────
+
+/** 保存角色人设到 manifest.json */
+export async function savePersona(dirId: string, persona: string): Promise<void> {
+  const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
+  const raw = await readFile(manifestPath, 'utf8');
+  const manifest = JSON.parse(raw) as Manifest;
+  manifest.persona = persona || undefined;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
+/** 动作名合法字符：字母数字下划线或中文（用作文件名，禁路径分隔符与保留字符） */
+const ACTION_NAME_RE = /^[\w一-鿿]+$/;
+
+/** 广播自定义动作生成进度（Studio 页据此刷新） */
+function broadcastCustomAction(
+  dirId: string,
+  name: string,
+  status: 'pending' | 'done' | 'failed',
+  error?: string,
+): void {
+  for (const wc of webContents.getAllWebContents()) {
+    wc.send('studio:customAction', { dirId, name, status, error });
+  }
+}
+
+/**
+ * 新增自定义动作：校验 + 写 pending 条目后**立即返回**，生成在后台跑。
+ * 生成耗时数分钟（视频轮询最长 15min），必须 detach 否则 UI 卡死没反馈。
+ * 进度经 studio:customAction 广播。
+ */
+export async function addCustomAction(
+  dirId: string,
+  name: string,
+  poseDesc: string,
+  motionDesc: string,
+  durationSec: number,
+): Promise<void> {
+  if (!ACTION_NAME_RE.test(name)) {
+    throw new Error('动作名称只能包含字母、数字、下划线或中文');
+  }
+  const outDir = path.join(charactersDir(), dirId);
+  const manifestPath = path.join(outDir, 'manifest.json');
+  const raw = await readFile(manifestPath, 'utf8');
+  const manifest = JSON.parse(raw) as Manifest;
+  if (manifest.customActions?.[name]) throw new Error(`动作 "${name}" 已存在`);
+
+  // API key 等配置在返回前校验：detach 后的错误渲染层拿不到
+  const cfg = await buildConfig();
+
+  // 写 manifest：标记 pending（Studio 显示黄色「生成中」）
+  manifest.customActions = {
+    ...manifest.customActions,
+    [name]: { webm: `actions/${name}.webm`, gif: `actions/${name}.gif`, durationSec, status: 'pending' },
+  };
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  broadcastCustomAction(dirId, name, 'pending');
+
+  // 后台生成，不阻塞 IPC 返回
+  void generateCustomAction({
+    dirId, outDir, manifestPath, name, poseDesc, motionDesc, durationSec,
+    persona: manifest.persona, manifest, cfg,
+  });
+}
+
+/** 自定义动作的实际生成流程（首帧 → 视频 → 抠像 → 回写 manifest） */
+async function generateCustomAction(a: {
+  dirId: string;
+  outDir: string;
+  manifestPath: string;
+  name: string;
+  poseDesc: string;
+  motionDesc: string;
+  durationSec: number;
+  persona?: string;
+  manifest: Manifest;
+  cfg: PipelineConfig;
+}): Promise<void> {
+  const { dirId, outDir, manifestPath, name, poseDesc, motionDesc, durationSec, persona, manifest, cfg } = a;
+  try {
+    const turnaround = await readFile(path.join(outDir, 'turnaround.png'));
+    const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
+    const ark = createArkClient(cfg);
+
+    // 生成首帧（注入 persona）
+    const frameBuf = await ark.generateImage({
+      prompt: buildCustomFramePrompt(poseDesc, manifest, persona),
+      refImageDataUrl: toDataUrl(turnaround),
+      size: '2048x2048',
+    });
+    const frameRel = `.job/${name}_frame.png`;
+    await writeFile(path.join(outDir, frameRel), frameBuf);
+
+    // 生成视频
+    const taskId = await ark.submitVideoTask({
+      prompt: buildCustomVideoPrompt(motionDesc, manifest, durationSec),
+      frameDataUrl: toDataUrl(frameBuf),
+    });
+    // 轮询
+    const deadline = Date.now() + 15 * 60 * 1000;
+    let videoUrl: string | undefined;
+    for (;;) {
+      const t = await ark.getVideoTask(taskId);
+      if (t.status === 'succeeded') { videoUrl = t.videoUrl; break; }
+      if (t.status === 'failed') throw new Error(`video task failed: ${t.error}`);
+      if (Date.now() > deadline) throw new Error('video poll timeout');
+      await new Promise(r => setTimeout(r, 5000));
+    }
+    // 下载视频
+    const videoRel = `.job/${name}.mp4`;
+    await ark.downloadVideo(videoUrl!, path.join(outDir, videoRel));
+
+    // 抠像转码
+    const key = await sampleKeyColor(path.join(outDir, videoRel), ffmpegPath);
+    await toWebm(path.join(outDir, videoRel), path.join(outDir, 'actions', `${name}.webm`), [key], ffmpegPath);
+
+    await patchCustomActionStatus(manifestPath, name, 'done');
+    broadcastCustomAction(dirId, name, 'done');
+    // 新动作要能播：重发 characters:activated 让 pet 重建 Player（否则新 webm 不会被加载）
+    const meta = await getCharacter(dirId);
+    if (meta?.manifest && (await getSettings()).activeCharacter === dirId) {
+      broadcastCharacterActivated(meta);
+    }
+    await rebuildTray();
+  } catch (err) {
+    const msg = String(err instanceof Error ? err.message : err);
+    console.error(`Custom action ${name} failed:`, err);
+    await patchCustomActionStatus(manifestPath, name, 'failed');
+    broadcastCustomAction(dirId, name, 'failed', msg);
+  }
+}
+
+/** 回写单个自定义动作的状态（重读 manifest 避免覆盖并发改动） */
+async function patchCustomActionStatus(
+  manifestPath: string,
+  name: string,
+  status: 'done' | 'failed' | 'pending',
+): Promise<void> {
+  const raw = await readFile(manifestPath, 'utf8');
+  const m = JSON.parse(raw) as Manifest;
+  if (m.customActions?.[name]) {
+    m.customActions[name].status = status;
+    await writeFile(manifestPath, JSON.stringify(m, null, 2));
+  }
+}
+
+/** 删除自定义动作 */
+export async function deleteCustomAction(dirId: string, name: string): Promise<void> {
+  const outDir = path.join(charactersDir(), dirId);
+  const manifestPath = path.join(outDir, 'manifest.json');
+  const raw = await readFile(manifestPath, 'utf8');
+  const manifest = JSON.parse(raw) as Manifest;
+  if (!manifest.customActions?.[name]) throw new Error(`动作 "${name}" 不存在`);
+  delete manifest.customActions[name];
+  if (Object.keys(manifest.customActions).length === 0) {
+    manifest.customActions = undefined;
+  }
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
+/** 保存单个动作的自定义 prompt（poseDesc / motionDesc）到 manifest.json */
+export async function saveActionPrompt(
+  dirId: string,
+  actionId: string,
+  poseDesc: string,
+  motionDesc: string,
+): Promise<void> {
+  const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
+  const raw = await readFile(manifestPath, 'utf8');
+  const manifest = JSON.parse(raw) as Manifest;
+  const a = manifest.actions[actionId as ActionId];
+  if (!a) throw new Error(`动作 "${actionId}" 不存在`);
+  a.poseDesc = poseDesc || undefined;
+  a.motionDesc = motionDesc || undefined;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
+/** 保存 Claude Code 联动动作配置到 manifest.json */
+export async function saveAgentActions(
+  dirId: string,
+  config: AgentActionConfig,
+): Promise<void> {
+  const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
+  const raw = await readFile(manifestPath, 'utf8');
+  const manifest = JSON.parse(raw) as Manifest;
+  manifest.agentActions = Object.keys(config).length > 0 ? config : undefined;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
+/** 重建生成 prompt 数据（供 Studio 配置面板展示） */
+export async function getPrompts(dirId: string): Promise<PromptData> {
+  const outDir = path.join(charactersDir(), dirId);
+
+  // 读 state.json → characterForm / characterStyle / imageProvider
+  let characterForm: CharacterForm | undefined;
+  let characterStyle: CharacterStyle | undefined;
+  let imageProvider: ImageProvider | undefined;
+  try {
+    const stateRaw = await readFile(path.join(outDir, '.job', 'state.json'), 'utf8');
+    const state = JSON.parse(stateRaw) as JobState;
+    characterForm = state.characterForm;
+    characterStyle = state.characterStyle;
+    imageProvider = state.imageProvider;
+  } catch {
+    // state.json 缺失（手动资产包）→ 使用默认值
+  }
+
+  // 读 manifest.json → persona + 自定义 prompt（poseDesc/motionDesc）
+  let persona: string | undefined;
+  let manifest: Manifest | undefined;
+  try {
+    const manifestRaw = await readFile(path.join(outDir, 'manifest.json'), 'utf8');
+    manifest = JSON.parse(manifestRaw) as Manifest;
+    persona = manifest.persona;
+  } catch {
+    // 无 manifest
+  }
+
+  const tp = turnaroundPrompt(DEFAULT_CHARACTER_DESC, characterForm, characterStyle);
+
+  const actions = Object.fromEntries(
+    ACTION_IDS.map((id) => {
+      const custom = manifest?.actions[id];
+      const spec = actionSpec(id, characterForm, characterStyle);
+      // 优先使用 manifest 中保存的自定义 prompt，未保存的用默认 actionSpec
+      const poseDesc = custom?.poseDesc || spec.poseDesc;
+      const motionDesc = custom?.motionDesc || spec.motionDesc;
+      const fp = framePrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.poseDesc);
+      const vp = videoPrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.motionDesc);
+      return [
+        id,
+        { poseDesc, motionDesc, framePrompt: fp, videoPrompt: vp },
+      ];
+    }),
+  ) as PromptData['actions'];
+
+  return { characterForm, characterStyle, imageProvider, persona, agentActions: manifest?.agentActions, turnaroundPrompt: tp, actions };
+}
+
+function toDataUrl(buf: Buffer): string {
+  return `data:image/png;base64,${buf.toString('base64')}`;
+}
+
+function buildCustomFramePrompt(poseDesc: string, manifest: Manifest, persona?: string): string {
+  const style = manifest.actions.talk_happy?.facing ? 'chibi' : 'faithful';
+  const personaSuffix = persona ? `角色人设：${persona}。按照此设定表现角色。` : '';
+  return `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。${poseDesc}${personaSuffix}画面中只有这一个角色，不出现其他人的手或身体部位，没有家具、没有白色贴纸描边。背景为纯色绿幕（纯正绿色，无渐变无阴影无纹理），角色边缘描线清晰，全身完整可见，角色占画面高度约70%，粗描边贴纸插画风格，无文字无水印`;
+}
+
+function buildCustomVideoPrompt(motionDesc: string, _manifest: Manifest, durationSec: number): string {
+  return `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。${motionDesc}镜头完全固定不动，静止镜头，角色不位移不走出画面，绿幕背景纯绿色保持不变，画面中始终只有这一个角色，绝对不出现其他人物、手或物体。丝滑流畅循环动画。 --resolution 480p --duration ${durationSec} --camerafixed true`;
 }

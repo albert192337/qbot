@@ -1,6 +1,6 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { AgentMessage, AgentStatus, CharacterMeta, HatchProgress, QBotApi, Settings } from '../shared/ipc-types';
+import type { AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, MusicStatus, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
@@ -24,6 +24,7 @@ const api: QBotApi = {
     list: () => ipcRenderer.invoke('characters:list'),
     activate: (dirId) => ipcRenderer.invoke('characters:activate', dirId),
     rename: (dirId, name) => ipcRenderer.invoke('characters:rename', dirId, name),
+    delete: (dirId) => ipcRenderer.invoke('characters:delete', dirId),
     onActivated: (cb) => {
       const listener = (_ev: unknown, meta: CharacterMeta) => cb(meta);
       ipcRenderer.on('characters:activated', listener);
@@ -34,6 +35,7 @@ const api: QBotApi = {
   pet: {
     // 高频拖拽走 send（不等待回包）
     move: (x, y) => ipcRenderer.send('pet:move', x, y),
+    setVisitMode: (enter) => ipcRenderer.send('pet:setVisitMode', enter),
   },
   room: {
     open: () => ipcRenderer.send('room:open'),
@@ -60,6 +62,24 @@ const api: QBotApi = {
       return () => ipcRenderer.removeListener('ui:showScreen', listener);
     },
   },
+  studio: {
+    open: () => ipcRenderer.send('studio:open'),
+    savePersona: (dirId, persona) => ipcRenderer.invoke('studio:savePersona', dirId, persona),
+    addCustomAction: (dirId, name, poseDesc, motionDesc, durationSec) =>
+      ipcRenderer.invoke('studio:addCustomAction', dirId, name, poseDesc, motionDesc, durationSec),
+    deleteCustomAction: (dirId, name) =>
+      ipcRenderer.invoke('studio:deleteCustomAction', dirId, name),
+    getPrompts: (dirId) => ipcRenderer.invoke('studio:getPrompts', dirId),
+    saveActionPrompt: (dirId, actionId, poseDesc, motionDesc) =>
+      ipcRenderer.invoke('studio:saveActionPrompt', dirId, actionId, poseDesc, motionDesc),
+    saveAgentActions: (dirId, config) =>
+      ipcRenderer.invoke('studio:saveAgentActions', dirId, config),
+    onCustomAction: (cb) => {
+      const listener = (_ev: unknown, payload: CustomActionEvent) => cb(payload);
+      ipcRenderer.on('studio:customAction', listener);
+      return () => ipcRenderer.removeListener('studio:customAction', listener);
+    },
+  },
   agent: {
     getStatus: () => ipcRenderer.invoke('agent:getStatus'),
     onStatus: (cb) => {
@@ -84,6 +104,14 @@ const api: QBotApi = {
       const listener = (_ev: unknown, side: 'above' | 'below') => cb(side);
       ipcRenderer.on('bubble:anchor', listener);
       return () => ipcRenderer.removeListener('bubble:anchor', listener);
+    },
+  },
+  music: {
+    getStatus: () => ipcRenderer.invoke('music:getStatus'),
+    onStatus: (cb) => {
+      const listener = (_ev: unknown, status: MusicStatus) => cb(status);
+      ipcRenderer.on('music:status', listener);
+      return () => ipcRenderer.removeListener('music:status', listener);
     },
   },
 };

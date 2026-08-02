@@ -130,6 +130,21 @@ async function runAction(
   const a = job.state.actions[action];
   const turnaroundPng = await readFile(path.join(job.outDir, 'turnaround.png'));
 
+  // 读取自定义 prompt（poseDesc/motionDesc）与人设（初次生成时 manifest 尚未写出，redo 时已有）
+  let persona: string | undefined;
+  let customPoseDesc: string | undefined;
+  let customMotionDesc: string | undefined;
+  try {
+    const manifestRaw = await readFile(path.join(job.outDir, 'manifest.json'), 'utf8');
+    const manifest = JSON.parse(manifestRaw) as Manifest;
+    persona = manifest.persona;
+    const custom = manifest.actions[action];
+    customPoseDesc = custom?.poseDesc;
+    customMotionDesc = custom?.motionDesc;
+  } catch {
+    // manifest 不存在 → 初次生成，无自定义 prompt
+  }
+
   try {
     // ── Stage 2: 绿幕首帧（QC 不过自动重试 1 次）─────────────────
     if (!a.framePath || a.status === 'pending' || a.status === 'generating_frame') {
@@ -139,7 +154,7 @@ async function runAction(
           attempts: { ...a.attempts, frame: a.attempts.frame + 1 },
         });
         const frameBuf = await ark.generateImage({
-          prompt: framePrompt(action, undefined, job.state.characterForm, job.state.characterStyle),
+          prompt: framePrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customPoseDesc),
           refImageDataUrl: toDataUrl(turnaroundPng),
           size: IMAGE_SIZES.frame,
         });
@@ -165,7 +180,7 @@ async function runAction(
         });
         const frameBuf = await readFile(job.jobPath(a.framePath!));
         const taskId = await ark.submitVideoTask({
-          prompt: videoPrompt(action, job.state.characterForm, job.state.characterStyle),
+          prompt: videoPrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customMotionDesc),
           frameDataUrl: toDataUrl(frameBuf),
         });
         await job.transition(action, 'generating_video', { videoTaskId: taskId });
@@ -257,6 +272,8 @@ export async function runPackage(job: Job): Promise<Manifest> {
           gif: `actions/${id}.gif`,
           durationSec: ACTIONS[id].durationSec,
           status: s.actions[id].status === 'done' ? 'done' : 'failed',
+          // 所有动作 prompt 都指定角色朝右（talk 显式写"朝向画面右侧"，其余从三视图自然右向）
+          facing: 'right',
         } satisfies ManifestAction,
       ]),
     ) as Record<ActionId, ManifestAction>,

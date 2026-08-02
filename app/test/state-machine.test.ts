@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_ACTION,
+  DEFAULT_MUSIC_ACTION,
   pickAutoAction,
   randomDelay,
   step,
@@ -106,7 +107,7 @@ describe('agent 联动', () => {
   it('AGENT_STATUS 进行中活动映射动作并进 agent 态', () => {
     const cases: Array<[string, ActionId]> = [
       ['thinking', 'tea'],
-      ['working', 'talk_happy'],
+      ['working', 'tea'],
       ['waiting', 'talk_annoyed'],
       ['error', 'talk_annoyed'],
     ];
@@ -137,13 +138,19 @@ describe('agent 联动', () => {
 
   it('活动切换换动作重播，同动作只换语义不重播', () => {
     const thinking: PetState = { kind: 'agent', activity: 'thinking', action: 'tea' };
+    // thinking → working 同动作 (tea/tea)，只换语义不重播
     const r = step(thinking, { type: 'AGENT_STATUS', activity: 'working' }, { available: ALL, rng: rng(0) });
-    expect(r.state).toEqual({ kind: 'agent', activity: 'working', action: 'talk_happy' });
-    expect(r.play).toBe('talk_happy');
+    expect(r.state).toEqual({ kind: 'agent', activity: 'working', action: 'tea' });
+    expect(r.play).toBeUndefined();
 
-    // working → done 庆祝 → talk_happy 已在播：done 走 auto 分支，动作相同也重播（从头庆祝）
+    // working → waiting 换动作 talk_annoyed，触发重播
+    const r2 = step(r.state, { type: 'AGENT_STATUS', activity: 'waiting' }, { available: ALL, rng: rng(0) });
+    expect(r2.state).toEqual({ kind: 'agent', activity: 'waiting', action: 'talk_annoyed' });
+    expect(r2.play).toBe('talk_annoyed');
+
+    // working → done 庆祝 → sleep：done 走 auto 分支，不管当前播放什么都切
     const same = step(
-      { kind: 'agent', activity: 'working', action: 'talk_happy' },
+      { kind: 'agent', activity: 'working', action: 'tea' },
       { type: 'AGENT_STATUS', activity: 'working' },
       { available: ALL, rng: rng(0) },
     );
@@ -153,7 +160,7 @@ describe('agent 联动', () => {
 
   it('idle 活动退出 agent 态回 idle；非 agent 态忽略', () => {
     const r = step(
-      { kind: 'agent', activity: 'working', action: 'talk_happy' },
+      { kind: 'agent', activity: 'working', action: 'tea' },
       { type: 'AGENT_STATUS', activity: 'idle' },
       { available: ALL, rng: rng(0) },
     );
@@ -166,16 +173,15 @@ describe('agent 联动', () => {
     expect(r2.play).toBeUndefined();
   });
 
-  it('done 一次性庆祝 2 遍后回 idle', () => {
+  it('done 一次性庆祝 1 遍后回 idle（sleep 动作）', () => {
     const r = step(
-      { kind: 'agent', activity: 'working', action: 'talk_happy' },
+      { kind: 'agent', activity: 'working', action: 'tea' },
       { type: 'AGENT_STATUS', activity: 'done' },
       { available: ALL, rng: rng(0) },
     );
-    expect(r.state).toEqual({ kind: 'auto', action: 'talk_happy', loopsLeft: 2 });
+    expect(r.state).toEqual({ kind: 'auto', action: 'sleep', loopsLeft: 1 });
     const r2 = step(r.state, { type: 'VIDEO_ENDED' }, { available: ALL, rng: rng(0) });
-    const r3 = step(r2.state, { type: 'VIDEO_ENDED' }, { available: ALL, rng: rng(0) });
-    expect(r3.state.kind).toBe('idle');
+    expect(r2.state.kind).toBe('idle');
   });
 
   it('drag 中忽略 AGENT_STATUS（由入口层松手后恢复）', () => {
@@ -196,7 +202,7 @@ describe('agent 联动', () => {
 
   it('POINTER_DOWN 可打断 agent 态进 drag', () => {
     const r = step(
-      { kind: 'agent', activity: 'working', action: 'talk_happy' },
+      { kind: 'agent', activity: 'working', action: 'tea' },
       { type: 'POINTER_DOWN' },
       { available: ALL, rng: rng(0) },
     );
@@ -207,6 +213,133 @@ describe('agent 联动', () => {
   it('TIMER_FIRE 在 agent 态忽略（不插播随机动作）', () => {
     const s: PetState = { kind: 'agent', activity: 'thinking', action: 'tea' };
     const r = step(s, { type: 'TIMER_FIRE' }, { available: ALL, rng: rng(0) });
+    expect(r.state).toBe(s);
+    expect(r.play).toBeUndefined();
+  });
+});
+
+describe('可配置动作映射', () => {
+  it('agentActionMap 覆盖内置映射', () => {
+    const r = step(
+      { kind: 'idle' },
+      { type: 'AGENT_STATUS', activity: 'working' },
+      { available: ALL, rng: rng(0), agentActionMap: { working: 'sleep' } },
+    );
+    expect(r.state).toEqual({ kind: 'agent', activity: 'working', action: 'sleep' });
+    expect(r.play).toBe('sleep');
+  });
+
+  it('未配置的活动回退到内置 AGENT_ACTION', () => {
+    const r = step(
+      { kind: 'idle' },
+      { type: 'AGENT_STATUS', activity: 'waiting' },
+      { available: ALL, rng: rng(0), agentActionMap: { working: 'sleep' } },
+    );
+    expect(r.state).toEqual({ kind: 'agent', activity: 'waiting', action: AGENT_ACTION.waiting });
+  });
+
+  it('doneAction / doneLoops 可覆盖', () => {
+    const r = step(
+      { kind: 'agent', activity: 'working', action: 'tea' },
+      { type: 'AGENT_STATUS', activity: 'done' },
+      { available: ALL, rng: rng(0), doneAction: 'talk_happy', doneLoops: 3 },
+    );
+    expect(r.state).toEqual({ kind: 'auto', action: 'talk_happy', loopsLeft: 3 });
+  });
+
+  it('映射到自定义动作名（非标准 ActionId）也能播', () => {
+    const r = step(
+      { kind: 'idle' },
+      { type: 'AGENT_STATUS', activity: 'working' },
+      { available: [...ALL, '摇摆'], rng: rng(0), agentActionMap: { working: '摇摆' } },
+    );
+    expect(r.state).toEqual({ kind: 'agent', activity: 'working', action: '摇摆' });
+    expect(r.play).toBe('摇摆');
+  });
+
+  it('配置的动作不在 available 里时退化为 idle 动画', () => {
+    const r = step(
+      { kind: 'idle' },
+      { type: 'AGENT_STATUS', activity: 'working' },
+      { available: ALL, rng: rng(0), agentActionMap: { working: '未生成的动作' } },
+    );
+    expect(r.state).toEqual({ kind: 'agent', activity: 'working', action: 'idle' });
+  });
+});
+
+describe('music 联动', () => {
+  it('播放进入 music 态，默认 talk_happy', () => {
+    const r = step({ kind: 'idle' }, { type: 'MUSIC_STATUS', playing: true }, { available: ALL, rng: rng(0) });
+    expect(r.state).toEqual({ kind: 'music', action: DEFAULT_MUSIC_ACTION });
+    expect(r.play).toBe(DEFAULT_MUSIC_ACTION);
+    expect(r.clearTimer).toBe(true);
+  });
+
+  it('musicAction 可配置为自定义动作', () => {
+    const r = step(
+      { kind: 'idle' },
+      { type: 'MUSIC_STATUS', playing: true },
+      { available: [...ALL, '摇摆'], rng: rng(0), musicAction: '摇摆' },
+    );
+    expect(r.state).toEqual({ kind: 'music', action: '摇摆' });
+    expect(r.play).toBe('摇摆');
+  });
+
+  it('music 态 VIDEO_ENDED 粘性重播', () => {
+    const s: PetState = { kind: 'music', action: 'talk_happy' };
+    const r = step(s, { type: 'VIDEO_ENDED' }, { available: ALL, rng: rng(0) });
+    expect(r.state).toBe(s);
+    expect(r.play).toBe('talk_happy');
+  });
+
+  it('停止播放从 music 回 idle 并重排定时器', () => {
+    const r = step(
+      { kind: 'music', action: 'talk_happy' },
+      { type: 'MUSIC_STATUS', playing: false },
+      { available: ALL, rng: rng(0) },
+    );
+    expect(r.state.kind).toBe('idle');
+    expect(r.play).toBe('idle');
+    expect(r.rescheduleTimer).toBe(true);
+  });
+
+  it('非 music 态收到停止事件忽略', () => {
+    const r = step({ kind: 'idle' }, { type: 'MUSIC_STATUS', playing: false }, { available: ALL, rng: rng(0) });
+    expect(r.state.kind).toBe('idle');
+    expect(r.play).toBeUndefined();
+  });
+
+  it('agent 干活时音乐不打断（agent > music）', () => {
+    const s: PetState = { kind: 'agent', activity: 'working', action: 'tea' };
+    const r = step(s, { type: 'MUSIC_STATUS', playing: true }, { available: ALL, rng: rng(0) });
+    expect(r.state).toBe(s);
+    expect(r.play).toBeUndefined();
+  });
+
+  it('drag / visit 中音乐事件被忽略', () => {
+    for (const s of [
+      { kind: 'drag' },
+      { kind: 'visit', action: 'talk_happy', loopsLeft: 2 },
+    ] as PetState[]) {
+      const r = step(s, { type: 'MUSIC_STATUS', playing: true }, { available: ALL, rng: rng(0) });
+      expect(r.state).toBe(s);
+      expect(r.play).toBeUndefined();
+    }
+  });
+
+  it('POINTER_DOWN 可打断 music 进 drag', () => {
+    const r = step(
+      { kind: 'music', action: 'talk_happy' },
+      { type: 'POINTER_DOWN' },
+      { available: ALL, rng: rng(0) },
+    );
+    expect(r.state.kind).toBe('drag');
+    expect(r.play).toBe('drag');
+  });
+
+  it('同动作重复上报不重播（避免每次轮询都 restart）', () => {
+    const s: PetState = { kind: 'music', action: DEFAULT_MUSIC_ACTION };
+    const r = step(s, { type: 'MUSIC_STATUS', playing: true }, { available: ALL, rng: rng(0) });
     expect(r.state).toBe(s);
     expect(r.play).toBeUndefined();
   });

@@ -86,6 +86,24 @@ export interface AgentMessage {
   at: number;
 }
 
+/** 自定义动作后台生成进度（Studio 页订阅，pending → done/failed） */
+export interface CustomActionEvent {
+  dirId: string;
+  name: string;
+  status: 'pending' | 'done' | 'failed';
+  /** status = failed 时的错误原因 */
+  error?: string;
+}
+
+/** 音乐播放状态（来自 Windows SMTC API） */
+export interface MusicStatus {
+  playing: boolean;
+  /** 当前播放曲目标题 */
+  title?: string;
+  /** 当前播放曲目艺术家 */
+  artist?: string;
+}
+
 /** 小房间装饰摆放（room-decor.json，按房间名键控） */
 export interface DecorPlacement {
   id: string;
@@ -125,6 +143,8 @@ export interface QBotApi {
     activate(dirId: string): Promise<void>;
     /** 改名（写回 manifest.json） */
     rename(dirId: string, name: string): Promise<void>;
+    /** 删除角色 */
+    delete(dirId: string): Promise<void>;
     /** pet / room 窗口订阅：激活角色变化 */
     onActivated(cb: (meta: CharacterMeta) => void): () => void;
     /** 当前激活角色（room 窗口启动时主动拉取，不依赖广播时序） */
@@ -133,6 +153,14 @@ export interface QBotApi {
   pet: {
     /** 高频拖拽移动（send，不走 invoke） */
     move(screenX: number, screenY: number): void;
+    /** 串门模式：拓宽/恢复窗口 */
+    setVisitMode(enter: boolean): void;
+  };
+  music: {
+    /** 当前音乐播放状态（pet 窗口加载时铺底） */
+    getStatus(): Promise<MusicStatus>;
+    /** pet 窗口订阅：音乐播放状态变化 */
+    onStatus(cb: (status: MusicStatus) => void): () => void;
   };
   room: {
     /** 单击桌宠：角色走进小房间（pet 窗隐藏 → room 窗弹出） */
@@ -173,6 +201,38 @@ export interface QBotApi {
   ui: {
     /** 主进程要求切屏（托盘「设置」→ settings 屏） */
     onShowScreen(cb: (name: string) => void): () => void;
+  };
+  studio: {
+    /** 打开生成配置面板 */
+    open(): void;
+    /** 保存角色人设到 manifest.json */
+    savePersona(dirId: string, persona: string): Promise<void>;
+    /** 新增自定义动作并开始生成 */
+    addCustomAction(
+      dirId: string,
+      name: string,
+      poseDesc: string,
+      motionDesc: string,
+      durationSec: number,
+    ): Promise<void>;
+    /** 删除自定义动作 */
+    deleteCustomAction(dirId: string, name: string): Promise<void>;
+    /** 重建生成 prompt 数据（从 state.json + manifest 重建） */
+    getPrompts(dirId: string): Promise<import('@qbot/pipeline').PromptData>;
+    /** 保存单个动作的自定义 prompt（poseDesc / motionDesc）到 manifest.json */
+    saveActionPrompt(
+      dirId: string,
+      actionId: string,
+      poseDesc: string,
+      motionDesc: string,
+    ): Promise<void>;
+    /** 保存 Claude Code 联动动作配置到 manifest.json */
+    saveAgentActions(
+      dirId: string,
+      config: import('@qbot/pipeline').AgentActionConfig,
+    ): Promise<void>;
+    /** 订阅自定义动作的后台生成进度（addCustomAction 立即返回，生成在后台跑） */
+    onCustomAction(cb: (ev: CustomActionEvent) => void): () => void;
   };
 }
 

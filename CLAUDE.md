@@ -7,11 +7,13 @@
 | 路径 | 职责 |
 |---|---|
 | `pipeline/` | 生成管线，**纯 Node 零 Electron 依赖**，可独立 CLI 使用（`npx tsx pipeline/src/cli.ts`） |
-| `app/` | Electron 客户端（electron-vite；main / preload / 四 renderer：pet + hatch + room 小房间 + bubble 气泡） |
+| `app/` | Electron 客户端（electron-vite；main / preload / 五 renderer：pet + hatch + room 小房间 + bubble 气泡 + studio 配置面板） |
 | `app/src/main/pipeline-bridge.ts` | **唯一** import `@qbot/pipeline` 的地方 |
 | `app/src/main/agent-server.ts` | agent 联动：127.0.0.1 HTTP 收 hook 事件 → 会话合成 → 广播 pet 窗 |
 | `app/src/main/agent-message.ts` | agent 消息纯逻辑：markdown 展平、截断、来源标签、transcript 解析（可单测） |
 | `app/src/main/hooks/claude.ts` | Claude Code hooks 安装器（托盘显式同意，写 ~/.claude/settings.json） |
+| `app/src/main/music-monitor.ts` | 网易云音乐监控（Windows SMTC，常驻 PowerShell 进程） |
+| `app/src/renderer/studio/` | Studio 配置面板：人设编辑、自定义动作、Claude Code 联动配置 |
 | `assets/mascot/` | 官方预置角色源（同步于 `app/resources/presets/mascot/`） |
 | `docs/superpowers/specs/` | 已批准的设计 spec（权威）；`DESIGN.md` 是最初的产品/技术调研 |
 | `config.local.json` | **gitignored**，存 API keys（arkApiKey / gptImageApiKey） |
@@ -34,6 +36,51 @@
 - 正文 140 字截断（markdown 展平成单行）、停留 10s 淡出、最多同时 3 枚、同会话就地替换不叠加
 - 来源标签 = `cwd` 的目录名（`cwd` 在 Stop 和 Notification 里都有；`gitBranch` 只有 transcript 里有故不用）；**同名来源并存时补 `#<session前4位>`**（worktree 场景必需）
 - 气泡窗是第 4 个 renderer：固定 340×500 透明置顶穿透窗，`focusable:false`，创建后**只 setPosition 永不改尺寸**；跟随桌宠靠 `petWindow.on('move'|'resize')`
+
+## Studio 配置面板（工作室）
+
+- **托盘菜单「生成配置」**打开独立配置窗口（第 5 个 renderer：`studio`）
+- **人设编辑**：角色 persona 可视化编辑，后续所有动作生成会注入人设到 prompt
+- **Claude Code 联动配置**：为每个 agent 活动（thinking/working/waiting/error/done）+ 听歌（music）指定播放的动作，支持自定义动作
+- **动作 Prompt 查看/编辑**：查看每个动作的 poseDesc/motionDesc，可修改后影响后续 redo
+- **自定义动作**：输入动作名（支持中文）+ poseDesc/motionDesc/时长 → 提交后后台生成（数分钟），完成后自动出现在联动下拉选项和桌宠右键菜单
+- **生成参数回溯**：查看当前角色的三视图 prompt、每个动作的首帧/视频 prompt（从 `.job/state.json` + `manifest.json` 重建）
+- 自定义动作生成进度通过 `studio:customAction` 事件广播，Studio 页自动刷新
+- 数据存储：`manifest.json` 新增 `persona`/`customActions`/`agentActions` 字段
+
+## 网易云音乐联动（Windows 专属）
+
+- 通过 **SMTC (SystemMediaTransportControls)** API 监控云音乐播放状态
+- 检测到播放时桌宠**举牌显示「曲名 - 歌手」**并切换到摇摆动作（默认 `talk_happy`，可在 Studio 配置）
+- 常驻一个 PowerShell 进程内部每 3 秒轮询，进程意外退出会退避重启
+- 状态机新增 **music 态**，优先级 `drag > agent > music > visit > auto/idle`（Claude 干活时音乐不打断 agent 动画）
+- 非 Windows 平台静默禁用，零新增 npm 依赖
+- 核心文件：`app/src/main/music-monitor.ts` (175 行)
+
+## 举牌功能
+
+- **长柄木牌**：牌子在上、杆在下，跟随角色显示在右侧
+- 拖拽时自动隐藏，松手后延时 1.5s 弹出（带 poof-in 特效）
+- 用途：听歌时显示曲目、未来可扩展显示自定义消息
+- 核心文件：`app/src/renderer/pet/signboard.ts` (84 行)
+
+## 串门功能
+
+- 两只桌宠互访聊天（已实现基础框架，对话逻辑待完善）
+- 串门频率：10~14 分钟一次（原 15~30s 已调整）
+- 状态机新增 **visit 态**，优先级 `drag > agent > music > visit > auto/idle`
+- 核心文件：`app/src/renderer/pet/visit.ts` (106 行)
+
+## 调试面板
+
+- 左上角齿轮图标触发，展开后显示：
+  - 当前状态机状态 + 串门状态
+  - 事件日志（最多 50 条）
+  - 角色管理（切换/删除）
+  - 举牌控制（输入文字 → 举牌/收牌）
+  - 串门触发/结束按钮
+- 纯开发工具，生产环境可隐藏
+- 核心文件：`app/src/renderer/pet/debug-panel.ts` (261 行)
 
 ## 常用命令
 

@@ -1,16 +1,17 @@
 /** IPC 注册：preload 契约的主进程实现 */
 import { BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'node:path';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
-import { getCharacter, listCharacters, renameCharacter } from './characters';
+import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, hideBubbleWindow } from './windows';
-import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch } from './pipeline-bridge';
+import { createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow } from './windows';
+import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import { rebuildTray } from './tray';
 import { getAgentStatus } from './agent-server';
+import { getMusicStatus } from './music-monitor';
 
 export function registerIpc(): void {
   // ── hatch ──────────────────────────────────────────────
@@ -63,9 +64,19 @@ export function registerIpc(): void {
     await renameCharacter(dirId, name);
     await rebuildTray();
   });
+  ipcMain.handle('characters:delete', async (_ev, dirId: string) => {
+    await deleteCharacter(dirId);
+    // 如果删的是当前激活角色，清空激活
+    const settings = await getSettings();
+    if (settings.activeCharacter === dirId) {
+      await setSettings({ activeCharacter: undefined });
+    }
+    await rebuildTray();
+  });
 
   // ── pet ────────────────────────────────────────────────
   ipcMain.on('pet:move', (_ev, x: number, y: number) => movePetWindow(x, y));
+  ipcMain.on('pet:setVisitMode', (_ev, enter: boolean) => setPetVisitMode(enter));
 
   // ── room ───────────────────────────────────────────────
   ipcMain.on('room:open', async () => {
@@ -88,7 +99,8 @@ export function registerIpc(): void {
   });
 
   // ── settings ───────────────────────────────────────────
-  ipcMain.handle('settings:get', () => getSettings());  ipcMain.handle('settings:set', async (_ev, patch) => {
+  ipcMain.handle('settings:get', () => getSettings());
+  ipcMain.handle('settings:set', async (_ev, patch) => {
     const next = await setSettings(patch);
     if (typeof patch?.petScale === 'number') setPetScale(patch.petScale); // 实时生效
     // 语音设置实时生效（pet + room）
@@ -96,8 +108,32 @@ export function registerIpc(): void {
     getRoomWindow()?.webContents.send('settings:changed', next);
   });
 
+  // ── studio ──────────────────────────────────────────────
+  ipcMain.on('studio:open', () => createStudioWindow());
+  ipcMain.handle('studio:savePersona', async (_ev, dirId: string, persona: string) => {
+    await savePersona(dirId, persona);
+  });
+  ipcMain.handle('studio:addCustomAction', async (_ev, dirId: string, name: string, poseDesc: string, motionDesc: string, durationSec: number) => {
+    await addCustomAction(dirId, name, poseDesc, motionDesc, durationSec);
+  });
+  ipcMain.handle('studio:deleteCustomAction', async (_ev, dirId: string, name: string) => {
+    await deleteCustomAction(dirId, name);
+  });
+  ipcMain.handle('studio:getPrompts', async (_ev, dirId: string) => {
+    return getPrompts(dirId);
+  });
+  ipcMain.handle('studio:saveActionPrompt', async (_ev, dirId: string, actionId: string, poseDesc: string, motionDesc: string) => {
+    await saveActionPrompt(dirId, actionId, poseDesc, motionDesc);
+  });
+  ipcMain.handle('studio:saveAgentActions', async (_ev, dirId: string, config) => {
+    await saveAgentActions(dirId, config);
+  });
+
   // ── agent 联动 ─────────────────────────────────────────
   ipcMain.handle('agent:getStatus', () => getAgentStatus());
+
+  // ── music 联动 ─────────────────────────────────────────
+  ipcMain.handle('music:getStatus', () => getMusicStatus());
 
   // ── bubble ─────────────────────────────────────────────
   ipcMain.on('bubble:empty', () => hideBubbleWindow());

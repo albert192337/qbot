@@ -1,11 +1,11 @@
-/** 托盘：孵化新角色 / 切换角色 / Claude Code 联动 / 设置 / 退出 */
+/** 托盘：孵化新角色 / 切换角色 / 设置 / 退出 */
 import { Menu, Tray, app, nativeImage } from 'electron';
 import path from 'node:path';
 import { listCharacters } from './characters';
 import { getSettings, setSettings } from './config';
 import { createHatchWindow, broadcastCharacterActivated } from './windows';
-import { getCharacter } from './characters';
 import { toggleClaudeHooks } from './hooks/claude';
+import { getCharacter } from './characters';
 
 let tray: Tray | null = null;
 

@@ -59,6 +59,8 @@ function toRoom(clientX: number, clientY: number): Point {
 // ── 状态机驱动 ───────────────────────────────────────────
 let state: RoamState = { kind: 'resting', pos: polygonCentroid(spec.floor) };
 let available: ActionId[] = [];
+/** 标准 6 动作（本地常量：renderer 不能 value-import pipeline，会把 node 依赖打进浏览器包） */
+const STD_ACTION_IDS: readonly string[] = ['idle', 'drag', 'sleep', 'tea', 'talk_happy', 'talk_annoyed'];
 let timer: ReturnType<typeof setTimeout> | null = null;
 let editing = false; // 编辑态：漫游/发言/互动/窗口拖动全部暂停
 
@@ -112,7 +114,10 @@ function dispatch(event: Parameters<typeof step>[1]): void {
 // ── 角色加载（启动主动拉取 + 切角色广播） ─────────────────
 function loadCharacter(meta: Awaited<ReturnType<typeof window.qbot.characters.getActive>>): void {
   if (!meta?.manifest) return; // 无激活角色：空房间照常展示
-  available = player.load(meta.dirId, meta.manifest);
+  // 小房间漫游只用标准动作，自定义动作（听歌摇摆等）不参与
+  available = player
+    .load(meta.dirId, meta.manifest)
+    .filter((id): id is ActionId => STD_ACTION_IDS.includes(id));
   clearTimer();
   state = { kind: 'resting', pos: polygonCentroid(spec.floor) };
   player.play('idle');

@@ -25,7 +25,7 @@ const execFileP = promisify(execFile);
  *   暗绿的 UV 弱（贴近中性灰），会连深色衣服一起吃掉
  */
 export const CHROMAKEY_SIMILARITY = 0.1;
-export const CHROMAKEY_BLEND = 0.04;
+export const CHROMAKEY_BLEND = 0.07;
 
 /** 归一化目标：角色包围盒高度占画布比例 / 底边基线位置（所有动作一致 → 视觉等大） */
 export const NORM_TARGET_H = 0.68;
