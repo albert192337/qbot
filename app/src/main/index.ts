@@ -10,6 +10,7 @@ import { rebuildTray } from './tray';
 import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds } from './windows';
 import { startAgentServer } from './agent-server';
 import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
+import { setLinkStatusListener, stopLink, createLinkRoom, joinLinkRoom } from './link/link';
 
 // qbot-asset://<dirId>/<relPath> → userData/characters/<dirId>/<relPath>
 // stream: true 缺失时 <video> 对协议 URL 静默不播（必须 ready 前注册）
@@ -52,6 +53,18 @@ app.whenReady().then(async () => {
 
   registerIpc();
   await seedPresets();
+  // 联机状态变化 → 托盘标签刷新（在这接线避免 link ↔ tray 循环 import）
+  setLinkStatusListener(() => void rebuildTray());
+  // dev 自动联机（QBOT_USER_DATA 双实例验证用；正常入口是托盘菜单）
+  if (process.env.QBOT_LINK_CREATE) {
+    void createLinkRoom()
+      .then((code) => console.log('[link] room code:', code))
+      .catch((err) => console.error('[link] create failed:', err));
+  } else if (process.env.QBOT_LINK_JOIN) {
+    void joinLinkRoom(process.env.QBOT_LINK_JOIN)
+      .then(() => console.log('[link] joined'))
+      .catch((err) => console.error('[link] join failed:', err));
+  }
   await rebuildTray();
   void startAgentServer(); // agent 联动状态服务（失败不阻塞桌宠本体）
   startMusicMonitor(); // 网易云音乐播放监控（Windows only，失败不阻塞）
@@ -76,9 +89,10 @@ app.on('window-all-closed', () => {
   /* keep alive */
 });
 
-// 退出前收掉常驻的 powershell 监控进程，避免留孤儿
+// 退出前收掉常驻的 powershell 监控进程，避免留孤儿；联机侧发 bye 让对端立即收窗
 app.on('before-quit', () => {
   stopMusicMonitor();
+  stopLink();
 });
 
 app.on('activate', () => {

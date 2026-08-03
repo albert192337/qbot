@@ -6,7 +6,8 @@ import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow } from './windows';
+import { createStudioWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow } from './windows';
+import { getLinkStatus, stopLink } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import { rebuildTray } from './tray';
@@ -75,8 +76,15 @@ export function registerIpc(): void {
   });
 
   // ── pet ────────────────────────────────────────────────
-  ipcMain.on('pet:move', (_ev, x: number, y: number) => movePetWindow(x, y));
+  // 按发送方窗口分派：本地宠和联机远端宠共用同一套拖拽代码
+  ipcMain.on('pet:move', (ev, x: number, y: number) => {
+    BrowserWindow.fromWebContents(ev.sender)?.setPosition(Math.round(x), Math.round(y), false);
+  });
   ipcMain.on('pet:setVisitMode', (_ev, enter: boolean) => setPetVisitMode(enter));
+
+  // ── link 联机 ──────────────────────────────────────────
+  ipcMain.handle('link:getStatus', () => getLinkStatus());
+  ipcMain.on('link:stop', () => stopLink());
 
   // ── room ───────────────────────────────────────────────
   ipcMain.on('room:open', async () => {

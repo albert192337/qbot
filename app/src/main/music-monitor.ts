@@ -17,6 +17,7 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { getPetWindow } from './windows';
+import { pushLocalMusic } from './link/link';
 import type { MusicStatus } from '../shared/ipc-types';
 
 /** 轮询间隔（PowerShell 进程内部循环） */
@@ -110,6 +111,7 @@ function updateStatus(next: MusicStatus): void {
   }
   currentStatus = next;
   getPetWindow()?.webContents.send('music:status', next);
+  pushLocalMusic(next); // 联机钩子：曲名是否出本机由 linkShareSong 开关在 link.ts 里把关
 }
 
 function scheduleRespawn(): void {

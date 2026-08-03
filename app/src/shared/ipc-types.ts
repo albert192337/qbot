@@ -33,6 +33,8 @@ export interface Settings {
   talkFrequency?: 'quiet' | 'normal' | 'chatty';
   /** Claude Code 联动 hooks 已安装（托盘开关的记忆位） */
   claudeHooksInstalled?: boolean;
+  /** 联机：把正在听的曲名分享给对端（默认 false，spec §一「同步粒度」） */
+  linkShareSong?: boolean;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */
@@ -104,6 +106,33 @@ export interface MusicStatus {
   artist?: string;
 }
 
+// ── 联机 presence（spec 2026-08-02-multiplayer-presence-design）──────────
+/** 对端高层状态：agent 活动 + 听歌（隐私边界见 spec §四，只有枚举/动作名/放行曲名出本机） */
+export type LinkMode = AgentActivity | 'music';
+
+/** 联机 state 帧（peer ↔ peer，经 relay 盲转） */
+export interface LinkPeerState {
+  mode: LinkMode;
+  /** 动作提示（对端 Studio 配了自定义动作时带上；缺省由接收端按替身角色自己的映射解析） */
+  action?: string;
+  /** 对端开了「分享曲名」才有 */
+  song?: string;
+}
+
+/** 联机 hello 帧（配对成功后互报） */
+export interface LinkPeerHello {
+  charName: string;
+}
+
+/** 联机链路状态（托盘菜单 + 远端窗右键菜单消费） */
+export interface LinkStatus {
+  phase: 'off' | 'connecting' | 'waiting' | 'paired';
+  /** waiting/paired 时：本房房间码（自己建的房才有） */
+  roomCode?: string;
+  /** paired 且收到 hello 后：对端角色名 */
+  peerName?: string;
+}
+
 /** 小房间装饰摆放（room-decor.json，按房间名键控） */
 export interface DecorPlacement {
   id: string;
@@ -161,6 +190,18 @@ export interface QBotApi {
     getStatus(): Promise<MusicStatus>;
     /** pet 窗口订阅：音乐播放状态变化 */
     onStatus(cb: (status: MusicStatus) => void): () => void;
+  };
+  link: {
+    /** 当前联机链路状态 */
+    getStatus(): Promise<LinkStatus>;
+    /** 断开联机（远端窗右键菜单；托盘走主进程直调） */
+    stop(): void;
+    /** 远端宠窗订阅：对端角色名（hello 帧） */
+    onPeerHello(cb: (info: LinkPeerHello) => void): () => void;
+    /** 远端宠窗订阅：对端状态帧（驱动 NetworkDriver） */
+    onPeerState(cb: (s: LinkPeerState) => void): () => void;
+    /** 远端宠窗订阅：对端掉线（打瞌睡；30s 未重连主进程会关窗） */
+    onPeerLeft(cb: () => void): () => void;
   };
   room: {
     /** 单击桌宠：角色走进小房间（pet 窗隐藏 → room 窗弹出） */

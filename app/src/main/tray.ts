@@ -1,11 +1,15 @@
-/** 托盘：孵化新角色 / 切换角色 / 设置 / 退出 */
-import { Menu, Tray, app, nativeImage } from 'electron';
+/** 托盘：孵化新角色 / 切换角色 / Claude 联动 / 联机 / 设置 / 退出 */
+import { Menu, Tray, app, clipboard, dialog, nativeImage } from 'electron';
 import path from 'node:path';
 import { listCharacters } from './characters';
 import { getSettings, setSettings } from './config';
 import { createHatchWindow, broadcastCharacterActivated } from './windows';
 import { toggleClaudeHooks } from './hooks/claude';
 import { getCharacter } from './characters';
+import { createLinkRoom, getLinkStatus, joinLinkRoom, stopLink } from './link/link';
+
+/** 房间码形状（relay 字符集：去易混 0O1I） */
+const ROOM_CODE_RE = /^[2-9A-HJ-NP-Z]{6}$/;
 
 let tray: Tray | null = null;
 
@@ -81,6 +85,7 @@ export async function rebuildTray(): Promise<void> {
         void rebuildTray();
       },
     },
+    linkMenuItem(),
     {
       label: '设置…',
       click: () => createHatchWindow('settings'),
@@ -89,4 +94,79 @@ export async function rebuildTray(): Promise<void> {
     { label: '退出 QBot', click: () => app.quit() },
   ]);
   tray.setContextMenu(menu);
+}
+
+/**
+ * 「联机」菜单（spec 2026-08-02 §一）：房间码走剪贴板收发，L0 不做输入 UI。
+ * 状态变化（配对/掉线）由 link.ts 的 statusListener 触发 rebuildTray 刷新标签。
+ */
+function linkMenuItem(): Electron.MenuItemConstructorOptions {
+  const link = getLinkStatus();
+  const label =
+    link.phase === 'paired'
+      ? `✓ 联机中${link.peerName ? ` · ${link.peerName}` : ''}`
+      : link.phase === 'waiting'
+        ? `联机 · 等对方加入（${link.roomCode}）`
+        : link.phase === 'connecting'
+          ? '联机 · 连接中…'
+          : '联机';
+  if (link.phase === 'off') {
+    return {
+      label,
+      submenu: [
+        {
+          label: '创建房间（房间码进剪贴板）',
+          click: async () => {
+            try {
+              const code = await createLinkRoom();
+              clipboard.writeText(code);
+              void dialog.showMessageBox({
+                type: 'info',
+                message: `房间码：${code}`,
+                detail: '已复制到剪贴板。发给好友，对方在托盘选「从剪贴板加入房间」。',
+              });
+            } catch (err) {
+              void dialog.showMessageBox({
+                type: 'error',
+                message: '联机服务器连不上',
+                detail: String(err instanceof Error ? err.message : err),
+              });
+            }
+          },
+        },
+        {
+          label: '从剪贴板加入房间',
+          click: async () => {
+            const code = clipboard.readText().trim().toUpperCase();
+            if (!ROOM_CODE_RE.test(code)) {
+              void dialog.showMessageBox({
+                type: 'warning',
+                message: '剪贴板里没有房间码',
+                detail: '先复制好友发来的 6 位房间码，再点这里。',
+              });
+              return;
+            }
+            try {
+              await joinLinkRoom(code);
+            } catch (err) {
+              void dialog.showMessageBox({
+                type: 'error',
+                message: `加入房间 ${code} 失败`,
+                detail: String(err instanceof Error ? err.message : err),
+              });
+            }
+          },
+        },
+      ],
+    };
+  }
+  return {
+    label,
+    submenu: [
+      ...(link.roomCode
+        ? [{ label: '复制房间码', click: () => clipboard.writeText(link.roomCode ?? '') }]
+        : []),
+      { label: '断开联机', click: () => stopLink() },
+    ],
+  };
 }

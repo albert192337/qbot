@@ -12,6 +12,9 @@ const BUBBLE_H = 500;
 const BUBBLE_OVERLAP = 24;
 
 let petWindow: BrowserWindow | null = null;
+/** 联机远端宠窗（?remote=1 复用 pet renderer；独立单例，绝不复用 petWindow——
+ *  否则 broadcastCharacterActivated 会把本地角色切换广播进远端窗） */
+let remotePetWindow: BrowserWindow | null = null;
 let hatchWindow: BrowserWindow | null = null;
 let roomWindow: BrowserWindow | null = null;
 let studioWindow: BrowserWindow | null = null;
@@ -35,17 +38,17 @@ export function setPetScale(scale: number): void {
 
 type RendererPage = 'pet' | 'hatch' | 'room' | 'studio' | 'bubble';
 
-function rendererUrl(page: RendererPage): { url?: string; file?: string } {
+function load(win: BrowserWindow, page: RendererPage, query?: Record<string, string>): void {
   if (process.env.ELECTRON_RENDERER_URL) {
-    return { url: `${process.env.ELECTRON_RENDERER_URL}/${page}/index.html` };
+    const qs = query ? `?${new URLSearchParams(query)}` : '';
+    void win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/${page}/index.html${qs}`);
+    return;
   }
-  return { file: path.join(__dirname, `../renderer/${page}/index.html`) };
-}
-
-function load(win: BrowserWindow, page: RendererPage): void {
-  const target = rendererUrl(page);
-  if (target.url) void win.loadURL(target.url);
-  else void win.loadFile(target.file!);
+  // 打包模式：loadFile 原生支持 query，location.search 两种模式行为一致
+  void win.loadFile(
+    path.join(__dirname, `../renderer/${page}/index.html`),
+    query ? { query } : undefined,
+  );
 }
 
 export function getPetWindow(): BrowserWindow | null {
@@ -134,6 +137,50 @@ export function createPetWindow(): BrowserWindow {
   });
   load(petWindow, 'pet');
   return petWindow;
+}
+
+// ── 联机远端宠窗（spec 2026-08-02 §二.3）─────────────────────
+
+export function getRemotePetWindow(): BrowserWindow | null {
+  return remotePetWindow;
+}
+
+export function createRemotePetWindow(): BrowserWindow {
+  if (remotePetWindow && !remotePetWindow.isDestroyed()) return remotePetWindow;
+  const { workArea } = screen.getPrimaryDisplay();
+  const size = Math.round(PET_SIZE * petScale);
+  // 默认落在本地宠左侧；本地宠不在（角色进房间等）就贴屏幕左下
+  const anchor = petWindow && !petWindow.isDestroyed() ? petWindow.getBounds() : null;
+  remotePetWindow = new BrowserWindow({
+    width: size,
+    height: size,
+    x: anchor ? Math.max(workArea.x, anchor.x - size - 24) : workArea.x + 40,
+    y: anchor ? anchor.y : workArea.y + workArea.height - size - 20,
+    transparent: true,
+    frame: false,
+    hasShadow: false, // 同 pet 窗：不显式关会有残影阴影框
+    resizable: false, // 透明窗 resize 有渲染 bug
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      sandbox: false,
+    },
+  });
+  remotePetWindow.setAlwaysOnTop(true, 'floating');
+  remotePetWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  remotePetWindow.once('ready-to-show', () => remotePetWindow?.show());
+  remotePetWindow.on('closed', () => {
+    remotePetWindow = null;
+  });
+  load(remotePetWindow, 'pet', { remote: '1' });
+  return remotePetWindow;
+}
+
+export function closeRemotePetWindow(): void {
+  if (remotePetWindow && !remotePetWindow.isDestroyed()) remotePetWindow.close();
+  remotePetWindow = null;
 }
 
 /** 懒创建：桌宠 99% 时间没有 agent 消息，不预先吃一个 renderer 进程 */

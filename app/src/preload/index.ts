@@ -1,6 +1,6 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, MusicStatus, QBotApi, Settings } from '../shared/ipc-types';
+import type { AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkPeerHello, LinkPeerState, MusicStatus, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
@@ -112,6 +112,25 @@ const api: QBotApi = {
       const listener = (_ev: unknown, status: MusicStatus) => cb(status);
       ipcRenderer.on('music:status', listener);
       return () => ipcRenderer.removeListener('music:status', listener);
+    },
+  },
+  link: {
+    getStatus: () => ipcRenderer.invoke('link:getStatus'),
+    stop: () => ipcRenderer.send('link:stop'),
+    onPeerHello: (cb) => {
+      const listener = (_ev: unknown, info: LinkPeerHello) => cb(info);
+      ipcRenderer.on('link:peerHello', listener);
+      return () => ipcRenderer.removeListener('link:peerHello', listener);
+    },
+    onPeerState: (cb) => {
+      const listener = (_ev: unknown, s: LinkPeerState) => cb(s);
+      ipcRenderer.on('link:peerState', listener);
+      return () => ipcRenderer.removeListener('link:peerState', listener);
+    },
+    onPeerLeft: (cb) => {
+      const listener = () => cb();
+      ipcRenderer.on('link:peerLeft', listener);
+      return () => ipcRenderer.removeListener('link:peerLeft', listener);
     },
   },
 };
