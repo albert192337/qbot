@@ -522,6 +522,16 @@ stage.addEventListener('contextmenu', (e) => {
     window.qbot.studio.open();
   });
   menu.appendChild(studioItem);
+  // 托盘同源原生菜单（孵化/切角色/Claude 联动/联机/设置/退出）——
+  // 刘海屏 mac 托盘图标可能被系统挤掉，这里是兜底配置入口
+  const moreItem = document.createElement('div');
+  moreItem.className = 'menu-item';
+  moreItem.textContent = '更多…';
+  moreItem.addEventListener('click', () => {
+    hideMenu();
+    window.qbot.appMenu.popup();
+  });
+  menu.appendChild(moreItem);
   if (!menu.children.length) return;
   menu.style.display = 'block';
   const mw = 120;

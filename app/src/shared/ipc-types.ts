@@ -268,6 +268,10 @@ export interface QBotApi {
     /** 主进程要求切屏（托盘「设置」→ settings 屏） */
     onShowScreen(cb: (name: string) => void): () => void;
   };
+  appMenu: {
+    /** 在鼠标处弹与托盘同源的原生菜单（托盘图标被菜单栏挤掉时的兜底入口） */
+    popup(): void;
+  };
   studio: {
     /** 打开生成配置面板 */
     open(): void;

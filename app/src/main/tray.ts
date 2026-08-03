@@ -6,7 +6,7 @@ import { getSettings, setSettings } from './config';
 import { createHatchWindow, broadcastCharacterActivated } from './windows';
 import { toggleClaudeHooks } from './hooks/claude';
 import { getCharacter } from './characters';
-import { createLinkRoom, getLinkStatus, joinLinkRoom, stopLink } from './link/link';
+import { createLinkRoom, getLinkStatus, joinLinkRoom, stopLink, notifyActiveCharacterChanged } from './link/link';
 
 /** 房间码形状（relay 字符集：去易混 0O1I） */
 const ROOM_CODE_RE = /^[2-9A-HJ-NP-Z]{6}$/;
@@ -48,9 +48,23 @@ export async function rebuildTray(): Promise<void> {
       tray.on('click', () => tray?.popUpContextMenu());
     }
   }
+  tray.setContextMenu(Menu.buildFromTemplate(await buildMenuTemplate()));
+}
+
+/**
+ * 桌宠右键「更多…」兜底入口：在鼠标处弹与托盘同源的原生菜单。
+ * 刘海屏 mac 菜单栏挤满时托盘图标会被系统静默隐藏，没有这个入口就没有配置入口。
+ */
+export async function popupAppMenu(win?: Electron.BrowserWindow): Promise<void> {
+  const menu = Menu.buildFromTemplate(await buildMenuTemplate());
+  menu.popup(win ? { window: win } : {});
+}
+
+/** 托盘与桌宠右键「更多…」共用的菜单模板（单一来源，改一处两边生效） */
+async function buildMenuTemplate(): Promise<Electron.MenuItemConstructorOptions[]> {
   const characters = (await listCharacters()).filter((c) => c.manifest);
   const settings = await getSettings();
-  const menu = Menu.buildFromTemplate([
+  return [
     {
       label: '孵化新角色…',
       click: () => createHatchWindow(),
@@ -70,6 +84,7 @@ export async function rebuildTray(): Promise<void> {
               await setSettings({ activeCharacter: c.dirId });
               const meta = await getCharacter(c.dirId);
               if (meta) broadcastCharacterActivated(meta);
+              notifyActiveCharacterChanged(); // 联机中：新形象重新 hello 给对端
               void rebuildTray();
             },
           }))
@@ -92,8 +107,7 @@ export async function rebuildTray(): Promise<void> {
     },
     { type: 'separator' },
     { label: '退出 QBot', click: () => app.quit() },
-  ]);
-  tray.setContextMenu(menu);
+  ];
 }
 
 /**

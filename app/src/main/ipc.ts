@@ -10,7 +10,7 @@ import { createStudioWindow, setPetScale, getPetWindow, getRoomWindow, broadcast
 import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
-import { rebuildTray } from './tray';
+import { rebuildTray, popupAppMenu } from './tray';
 import { getAgentStatus } from './agent-server';
 import { getMusicStatus } from './music-monitor';
 
@@ -120,6 +120,11 @@ export function registerIpc(): void {
 
   // ── studio ──────────────────────────────────────────────
   ipcMain.on('studio:open', () => createStudioWindow());
+  // 桌宠右键「更多…」→ 鼠标处弹托盘同源原生菜单（托盘被刘海屏挤掉时的兜底）
+  ipcMain.on('app:popupMenu', (ev) => {
+    const win = BrowserWindow.fromWebContents(ev.sender);
+    void popupAppMenu(win ?? undefined);
+  });
   ipcMain.handle('studio:savePersona', async (_ev, dirId: string, persona: string) => {
     await savePersona(dirId, persona);
   });

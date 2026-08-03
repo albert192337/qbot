@@ -62,6 +62,9 @@ const api: QBotApi = {
       return () => ipcRenderer.removeListener('ui:showScreen', listener);
     },
   },
+  appMenu: {
+    popup: () => ipcRenderer.send('app:popupMenu'),
+  },
   studio: {
     open: () => ipcRenderer.send('studio:open'),
     savePersona: (dirId, persona) => ipcRenderer.invoke('studio:savePersona', dirId, persona),
