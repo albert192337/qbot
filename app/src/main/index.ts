@@ -10,7 +10,7 @@ import { rebuildTray } from './tray';
 import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds } from './windows';
 import { startAgentServer } from './agent-server';
 import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
-import { setLinkStatusListener, stopLink, createLinkRoom, joinLinkRoom } from './link/link';
+import { setLinkStatusListener, stopLink, createLinkRoom, joinLinkRoom, notifyActiveCharacterChanged } from './link/link';
 
 // qbot-asset://<dirId>/<relPath> → userData/characters/<dirId>/<relPath>
 // stream: true 缺失时 <video> 对协议 URL 静默不播（必须 ready 前注册）
@@ -78,6 +78,8 @@ app.whenReady().then(async () => {
   const pet = createPetWindow();
   if (initial) {
     await setSettings({ activeCharacter: initial.dirId });
+    // 首启数据目录 + QBOT_LINK_JOIN：配对早于这里的激活，hello 没带上 manifestHash → 补发
+    notifyActiveCharacterChanged();
     pet.webContents.once('did-finish-load', async () => {
       pet.webContents.send('characters:activated', await getCharacter(initial.dirId));
     });

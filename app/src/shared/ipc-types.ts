@@ -122,6 +122,21 @@ export interface LinkPeerState {
 /** 联机 hello 帧（配对成功后互报） */
 export interface LinkPeerHello {
   charName: string;
+  /** 角色资产包指纹（L1 资产分发缓存键；老版本对端没有） */
+  manifestHash?: string;
+}
+
+/** 对端真身角色就位（缓存命中 / 传输完成），远端窗以此加载渲染 */
+export interface LinkPeerCharacter {
+  /** `.peer-<hash>` 缓存目录名（qbot-asset:// 的 host） */
+  dirId: string;
+  manifest: Manifest;
+}
+
+/** 角色包传输进度（远端窗占位提示用） */
+export interface LinkAssetProgress {
+  received: number;
+  total: number;
 }
 
 /** 联机链路状态（托盘菜单 + 远端窗右键菜单消费） */
@@ -202,6 +217,16 @@ export interface QBotApi {
     onPeerState(cb: (s: LinkPeerState) => void): () => void;
     /** 远端宠窗订阅：对端掉线（打瞌睡；30s 未重连主进程会关窗） */
     onPeerLeft(cb: () => void): () => void;
+    /** 远端宠窗订阅：对端真身角色就位（缓存命中 / 传输完成） */
+    onPeerCharacter(cb: (meta: LinkPeerCharacter) => void): () => void;
+    /** 远端宠窗订阅：角色包传输进度（占位提示） */
+    onAssetProgress(cb: (p: LinkAssetProgress) => void): () => void;
+    /** 远端宠窗启动自取快照（动态 import 竞态兜底：注册完监听后拉一次） */
+    getPeerCache(): Promise<{
+      hello: LinkPeerHello | null;
+      character: LinkPeerCharacter | null;
+      state: LinkPeerState | null;
+    }>;
   };
   room: {
     /** 单击桌宠：角色走进小房间（pet 窗隐藏 → room 窗弹出） */

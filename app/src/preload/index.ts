@@ -1,6 +1,6 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkPeerHello, LinkPeerState, MusicStatus, QBotApi, Settings } from '../shared/ipc-types';
+import type { AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, LinkPeerHello, LinkPeerState, MusicStatus, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
@@ -132,6 +132,17 @@ const api: QBotApi = {
       ipcRenderer.on('link:peerLeft', listener);
       return () => ipcRenderer.removeListener('link:peerLeft', listener);
     },
+    onPeerCharacter: (cb) => {
+      const listener = (_ev: unknown, meta: LinkPeerCharacter) => cb(meta);
+      ipcRenderer.on('link:peerCharacter', listener);
+      return () => ipcRenderer.removeListener('link:peerCharacter', listener);
+    },
+    onAssetProgress: (cb) => {
+      const listener = (_ev: unknown, p: LinkAssetProgress) => cb(p);
+      ipcRenderer.on('link:assetProgress', listener);
+      return () => ipcRenderer.removeListener('link:assetProgress', listener);
+    },
+    getPeerCache: () => ipcRenderer.invoke('link:getPeerCache'),
   },
 };
 

@@ -7,7 +7,7 @@ import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipelin
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
 import { createStudioWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow } from './windows';
-import { getLinkStatus, stopLink } from './link/link';
+import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import { rebuildTray } from './tray';
@@ -55,6 +55,7 @@ export function registerIpc(): void {
     if (!meta || !meta.manifest) throw new Error(`character not found: ${dirId}`);
     await setSettings({ activeCharacter: dirId });
     broadcastCharacterActivated(meta);
+    notifyActiveCharacterChanged(); // 联机中：新形象重新 hello 给对端
     await rebuildTray(); // 切换后菜单 radio 状态同步
   });
   ipcMain.handle('characters:getActive', async () => {
@@ -84,6 +85,7 @@ export function registerIpc(): void {
 
   // ── link 联机 ──────────────────────────────────────────
   ipcMain.handle('link:getStatus', () => getLinkStatus());
+  ipcMain.handle('link:getPeerCache', () => getPeerCache());
   ipcMain.on('link:stop', () => stopLink());
 
   // ── room ───────────────────────────────────────────────

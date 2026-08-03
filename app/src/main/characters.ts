@@ -43,6 +43,8 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
   const out: CharacterMeta[] = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
+    // 点开头是保留目录（联机对端角色缓存 .peer-<hash> 等），不进角色列表
+    if (entry.name.startsWith('.')) continue;
     const charDir = path.join(dir, entry.name);
     const manifestPath = path.join(charDir, 'manifest.json');
     const hasUnfinishedJob =
