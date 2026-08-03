@@ -24,6 +24,7 @@ export default defineConfig({
           room: resolve(__dirname, 'src/renderer/room/index.html'),
           studio: resolve(__dirname, 'src/renderer/studio/index.html'),
           bubble: resolve(__dirname, 'src/renderer/bubble/index.html'),
+          market: resolve(__dirname, 'src/renderer/market/index.html'),
         },
       },
     },

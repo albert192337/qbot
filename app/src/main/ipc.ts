@@ -6,7 +6,8 @@ import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { createStudioWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow } from './windows';
+import { createStudioWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, createMarketWindow } from './windows';
+import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
@@ -120,7 +121,13 @@ export function registerIpc(): void {
 
   // ── studio ──────────────────────────────────────────────
   ipcMain.on('studio:open', () => createStudioWindow());
-  // 桌宠右键「更多…」→ 鼠标处弹托盘同源原生菜单（托盘被刘海屏挤掉时的兜底）
+
+  // ── market 装扮市场 ────────────────────────────────────
+  ipcMain.on('market:open', () => createMarketWindow());
+  ipcMain.handle('market:list', () => listSkins());
+  ipcMain.handle('market:upload', (_ev, dirId: string) => uploadSkin(dirId));
+  ipcMain.handle('market:download', (_ev, hash: string) => downloadSkin(hash));
+  ipcMain.handle('market:remove', (_ev, hash: string) => removeSkin(hash));  // 桌宠右键「更多…」→ 鼠标处弹托盘同源原生菜单（托盘被刘海屏挤掉时的兜底）
   ipcMain.on('app:popupMenu', (ev) => {
     const win = BrowserWindow.fromWebContents(ev.sender);
     void popupAppMenu(win ?? undefined);

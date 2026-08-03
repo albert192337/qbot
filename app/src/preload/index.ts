@@ -65,6 +65,13 @@ const api: QBotApi = {
   appMenu: {
     popup: () => ipcRenderer.send('app:popupMenu'),
   },
+  market: {
+    open: () => ipcRenderer.send('market:open'),
+    list: () => ipcRenderer.invoke('market:list'),
+    upload: (dirId) => ipcRenderer.invoke('market:upload', dirId),
+    download: (hash) => ipcRenderer.invoke('market:download', hash),
+    remove: (hash) => ipcRenderer.invoke('market:remove', hash),
+  },
   studio: {
     open: () => ipcRenderer.send('studio:open'),
     savePersona: (dirId, persona) => ipcRenderer.invoke('studio:savePersona', dirId, persona),

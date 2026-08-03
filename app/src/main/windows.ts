@@ -36,7 +36,7 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds(); // 不依赖 resize 事件的投递时机
 }
 
-type RendererPage = 'pet' | 'hatch' | 'room' | 'studio' | 'bubble';
+type RendererPage = 'pet' | 'hatch' | 'room' | 'studio' | 'bubble' | 'market';
 
 function load(win: BrowserWindow, page: RendererPage, query?: Record<string, string>): void {
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -365,4 +365,27 @@ export function createStudioWindow(): BrowserWindow {
   studioWindow.on('closed', () => { studioWindow = null; });
   load(studioWindow, 'studio');
   return studioWindow;
+}
+
+/** 装扮市场：上传/下载皮肤的货架窗（spec 2026-08-02-skin-market-design） */
+let marketWindow: BrowserWindow | null = null;
+
+export function createMarketWindow(): BrowserWindow {
+  if (marketWindow && !marketWindow.isDestroyed()) {
+    marketWindow.focus();
+    return marketWindow;
+  }
+  marketWindow = new BrowserWindow({
+    width: 640,
+    height: 720,
+    title: 'QBot 装扮市场',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      sandbox: false,
+    },
+  });
+  marketWindow.on('closed', () => { marketWindow = null; });
+  load(marketWindow, 'market');
+  return marketWindow;
 }

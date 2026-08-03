@@ -35,6 +35,10 @@ export interface Settings {
   claudeHooksInstalled?: boolean;
   /** 联机：把正在听的曲名分享给对端（默认 false，spec §一「同步粒度」） */
   linkShareSong?: boolean;
+  /** 装扮市场：上传署名昵称（默认「匿名」） */
+  marketNickname?: string;
+  /** 装扮市场：hash → 管理码（下架自己上传的皮肤用） */
+  marketTokens?: Record<string, string>;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */
@@ -66,8 +70,25 @@ export interface AgentStatus {
   sessions: number;
 }
 
-/** 气泡类型：done = 回合完成（Stop）；attention = 需要你处理（Notification） */
-export type AgentMessageKind = 'done' | 'attention';
+/** 装扮市场货架条目（spec 2026-08-02-skin-market-design）；服务端 meta + 本地视角字段 */
+export interface MarketSkin {
+  hash: string;
+  name: string;
+  uploader: string;
+  /** 包体字节数 */
+  size: number;
+  /** 动作数（服务端从包头数出，不信客户端） */
+  actions: number;
+  at: number;
+  /** 封面 URL（<img> 直连服务器；无封面 = undefined 用占位） */
+  previewUrl?: string;
+  /** 本地存有管理码（自己上传的，可下架） */
+  mine: boolean;
+  /** 已下载入库（characters/market-<hash>/ 存在） */
+  installed: boolean;
+}
+
+/** 气泡类型：done = 回合完成（Stop）；attention = 需要你处理（Notification） */export type AgentMessageKind = 'done' | 'attention';
 
 /**
  * Stop / Notification 触发的一次性提示消息（bubble 窗消费）。
@@ -227,6 +248,18 @@ export interface QBotApi {
       character: LinkPeerCharacter | null;
       state: LinkPeerState | null;
     }>;
+  };
+  market: {
+    /** 打开装扮市场窗口 */
+    open(): void;
+    /** 货架列表（含本地视角的 mine/installed） */
+    list(): Promise<MarketSkin[]>;
+    /** 打包上传本地角色，返回上架 hash */
+    upload(dirId: string): Promise<string>;
+    /** 下载并激活（已装过则直接激活） */
+    download(hash: string): Promise<void>;
+    /** 下架自己上传的皮肤（凭本地管理码） */
+    remove(hash: string): Promise<void>;
   };
   room: {
     /** 单击桌宠：角色走进小房间（pet 窗隐藏 → room 窗弹出） */

@@ -522,6 +522,14 @@ stage.addEventListener('contextmenu', (e) => {
     window.qbot.studio.open();
   });
   menu.appendChild(studioItem);
+  const marketItem = document.createElement('div');
+  marketItem.className = 'menu-item';
+  marketItem.textContent = '装扮市场';
+  marketItem.addEventListener('click', () => {
+    hideMenu();
+    window.qbot.market.open();
+  });
+  menu.appendChild(marketItem);
   // 托盘同源原生菜单（孵化/切角色/Claude 联动/联机/设置/退出）——
   // 刘海屏 mac 托盘图标可能被系统挤掉，这里是兜底配置入口
   const moreItem = document.createElement('div');
