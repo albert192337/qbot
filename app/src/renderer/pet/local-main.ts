@@ -412,7 +412,6 @@ stage.addEventListener('pointerdown', (e) => {
   offsetX = e.clientX;
   offsetY = e.clientY;
   stage.setPointerCapture(e.pointerId);
-  hideMenu();
 });
 
 stage.addEventListener('pointermove', (e) => {
@@ -472,81 +471,18 @@ const ACTION_LABELS: Record<string, string | undefined> = {
   talk_happy: '聊天·开心',
   talk_annoyed: '聊天·嫌弃',
 };
-const menu = document.getElementById('menu')!;
-
-function hideMenu(): void {
-  menu.style.display = 'none';
-}
-
+// 右键菜单走主进程原生 Menu.popup（不受桌宠小窗边界约束，DOM 菜单会被截断）；
+// 动作列表现算现传（自定义动作/角色切换后自动跟上），说话/播动作回本端执行
 stage.addEventListener('contextmenu', (e) => {
   e.preventDefault();
-  menu.replaceChildren();
-  const speakItem = document.createElement('div');
-  speakItem.className = 'menu-item';
-  speakItem.textContent = '说句话';
-  speakItem.addEventListener('click', () => {
-    hideMenu();
-    speaker.forceSpeak();
-  });
-  menu.appendChild(speakItem);
-  for (const id of available) {
-    // 标准动作用中文标签；自定义动作直接用动作名（不再被静默跳过）
-    const label = ACTION_LABELS[id] ?? (id === 'idle' || id === 'drag' ? '' : id);
-    if (!label) continue;
-    const item = document.createElement('div');
-    item.className = 'menu-item';
-    item.textContent = label;
-    item.addEventListener('click', () => {
-      hideMenu();
-      dispatch({ type: 'PLAY_ACTION', action: id });
-    });
-    menu.appendChild(item);
-  }
-  // 分隔 + 打开房间
-  const sep = document.createElement('div');
-  sep.style.cssText = 'margin:2px 10px;border-top:1px solid rgba(0,0,0,0.1)';
-  menu.appendChild(sep);
-  const roomItem = document.createElement('div');
-  roomItem.className = 'menu-item';
-  roomItem.textContent = '打开房间';
-  roomItem.addEventListener('click', () => {
-    hideMenu();
-    window.qbot.room.open();
-  });
-  menu.appendChild(roomItem);
-  const studioItem = document.createElement('div');
-  studioItem.className = 'menu-item';
-  studioItem.textContent = '生成配置';
-  studioItem.addEventListener('click', () => {
-    hideMenu();
-    window.qbot.studio.open();
-  });
-  menu.appendChild(studioItem);
-  const marketItem = document.createElement('div');
-  marketItem.className = 'menu-item';
-  marketItem.textContent = '装扮市场';
-  marketItem.addEventListener('click', () => {
-    hideMenu();
-    window.qbot.market.open();
-  });
-  menu.appendChild(marketItem);
-  // 托盘同源原生菜单（孵化/切角色/Claude 联动/联机/设置/退出）——
-  // 刘海屏 mac 托盘图标可能被系统挤掉，这里是兜底配置入口
-  const moreItem = document.createElement('div');
-  moreItem.className = 'menu-item';
-  moreItem.textContent = '更多…';
-  moreItem.addEventListener('click', () => {
-    hideMenu();
-    window.qbot.appMenu.popup();
-  });
-  menu.appendChild(moreItem);
-  if (!menu.children.length) return;
-  menu.style.display = 'block';
-  const mw = 120;
-  menu.style.left = `${Math.min(e.clientX, window.innerWidth - mw - 4)}px`;
-  menu.style.top = `${Math.min(e.clientY, window.innerHeight - menu.children.length * 34 - 8)}px`;
+  window.qbot.pet.popupMenu(
+    available
+      .map((id) => ({ id, label: ACTION_LABELS[id] ?? (id === 'idle' || id === 'drag' ? '' : id) }))
+      .filter((a) => a.label),
+  );
 });
 
-document.addEventListener('click', (e) => {
-  if (!menu.contains(e.target as Node)) hideMenu();
+window.qbot.pet.onMenuCommand((cmd) => {
+  if (cmd.type === 'speak') speaker.forceSpeak();
+  else if (cmd.type === 'play') dispatch({ type: 'PLAY_ACTION', action: cmd.action as PlayableId });
 });

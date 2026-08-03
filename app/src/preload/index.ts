@@ -1,6 +1,6 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, LinkPeerHello, LinkPeerState, MusicStatus, QBotApi, Settings } from '../shared/ipc-types';
+import type { AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, LinkPeerHello, LinkPeerState, MusicStatus, PetMenuCommand, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
@@ -36,6 +36,12 @@ const api: QBotApi = {
     // 高频拖拽走 send（不等待回包）
     move: (x, y) => ipcRenderer.send('pet:move', x, y),
     setVisitMode: (enter) => ipcRenderer.send('pet:setVisitMode', enter),
+    popupMenu: (actions) => ipcRenderer.send('pet:popupMenu', actions),
+    onMenuCommand: (cb) => {
+      const listener = (_ev: unknown, cmd: PetMenuCommand) => cb(cmd);
+      ipcRenderer.on('pet:menuCommand', listener);
+      return () => ipcRenderer.removeListener('pet:menuCommand', listener);
+    },
   },
   room: {
     open: () => ipcRenderer.send('room:open'),
@@ -61,9 +67,6 @@ const api: QBotApi = {
       ipcRenderer.on('ui:showScreen', listener);
       return () => ipcRenderer.removeListener('ui:showScreen', listener);
     },
-  },
-  appMenu: {
-    popup: () => ipcRenderer.send('app:popupMenu'),
   },
   market: {
     open: () => ipcRenderer.send('market:open'),

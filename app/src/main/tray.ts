@@ -52,16 +52,11 @@ export async function rebuildTray(): Promise<void> {
 }
 
 /**
- * 桌宠右键「更多…」兜底入口：在鼠标处弹与托盘同源的原生菜单。
- * 刘海屏 mac 菜单栏挤满时托盘图标会被系统静默隐藏，没有这个入口就没有配置入口。
+ * 托盘与桌宠右键「更多」共用的菜单模板（单一来源，改一处两边生效）。
+ * 桌宠右键经 ipc 'pet:popupMenu' 以原生子菜单内嵌——刘海屏 mac 菜单栏
+ * 挤满时托盘图标被系统静默隐藏，右键是兜底配置入口。
  */
-export async function popupAppMenu(win?: Electron.BrowserWindow): Promise<void> {
-  const menu = Menu.buildFromTemplate(await buildMenuTemplate());
-  menu.popup(win ? { window: win } : {});
-}
-
-/** 托盘与桌宠右键「更多…」共用的菜单模板（单一来源，改一处两边生效） */
-async function buildMenuTemplate(): Promise<Electron.MenuItemConstructorOptions[]> {
+export async function buildMenuTemplate(): Promise<Electron.MenuItemConstructorOptions[]> {
   const characters = (await listCharacters()).filter((c) => c.manifest);
   const settings = await getSettings();
   return [

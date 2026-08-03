@@ -127,6 +127,15 @@ export interface MusicStatus {
   artist?: string;
 }
 
+/** 桌宠右键菜单「说话/动作」条目（渲染端报给主进程建原生菜单） */
+export interface PetMenuActionEntry {
+  id: string;
+  label: string;
+}
+
+/** 原生右键菜单点选后回渲染端执行的命令 */
+export type PetMenuCommand = { type: 'speak' } | { type: 'play'; action: string };
+
 // ── 联机 presence（spec 2026-08-02-multiplayer-presence-design）──────────
 /** 对端高层状态：agent 活动 + 听歌（隐私边界见 spec §四，只有枚举/动作名/放行曲名出本机） */
 export type LinkMode = AgentActivity | 'music';
@@ -141,8 +150,7 @@ export interface LinkPeerState {
 }
 
 /** 联机 hello 帧（配对成功后互报） */
-export interface LinkPeerHello {
-  charName: string;
+export interface LinkPeerHello {  charName: string;
   /** 角色资产包指纹（L1 资产分发缓存键；老版本对端没有） */
   manifestHash?: string;
 }
@@ -220,6 +228,12 @@ export interface QBotApi {
     move(screenX: number, screenY: number): void;
     /** 串门模式：拓宽/恢复窗口 */
     setVisitMode(enter: boolean): void;
+    /**
+     * 右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
+     * 动作列表由渲染端传入，说话/播动作的执行经 onMenuCommand 回渲染端。
+     */
+    popupMenu(actions: PetMenuActionEntry[]): void;
+    onMenuCommand(cb: (cmd: PetMenuCommand) => void): () => void;
   };
   music: {
     /** 当前音乐播放状态（pet 窗口加载时铺底） */
@@ -300,10 +314,6 @@ export interface QBotApi {
   ui: {
     /** 主进程要求切屏（托盘「设置」→ settings 屏） */
     onShowScreen(cb: (name: string) => void): () => void;
-  };
-  appMenu: {
-    /** 在鼠标处弹与托盘同源的原生菜单（托盘图标被菜单栏挤掉时的兜底入口） */
-    popup(): void;
   };
   studio: {
     /** 打开生成配置面板 */

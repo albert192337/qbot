@@ -1,9 +1,10 @@
 /** IPC 注册：preload 契约的主进程实现 */
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { BrowserWindow, Menu, dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
+import type { PetMenuActionEntry, PetMenuCommand } from '../shared/ipc-types';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
 import { createStudioWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, createMarketWindow } from './windows';
@@ -11,7 +12,7 @@ import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
-import { rebuildTray, popupAppMenu } from './tray';
+import { rebuildTray, buildMenuTemplate } from './tray';
 import { getAgentStatus } from './agent-server';
 import { getMusicStatus } from './music-monitor';
 
@@ -127,10 +128,43 @@ export function registerIpc(): void {
   ipcMain.handle('market:list', () => listSkins());
   ipcMain.handle('market:upload', (_ev, dirId: string) => uploadSkin(dirId));
   ipcMain.handle('market:download', (_ev, hash: string) => downloadSkin(hash));
-  ipcMain.handle('market:remove', (_ev, hash: string) => removeSkin(hash));  // 桌宠右键「更多…」→ 鼠标处弹托盘同源原生菜单（托盘被刘海屏挤掉时的兜底）
-  ipcMain.on('app:popupMenu', (ev) => {
+  ipcMain.handle('market:remove', (_ev, hash: string) => removeSkin(hash));
+
+  // 桌宠右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
+  // 说话/播动作回渲染端执行；房间/配置/市场直调主进程；「更多」内嵌托盘同源模板
+  // （孵化/切角色/Claude 联动/联机/设置/退出——托盘被刘海屏挤掉时的兜底配置入口）
+  ipcMain.on('pet:popupMenu', async (ev, actions: PetMenuActionEntry[]) => {
     const win = BrowserWindow.fromWebContents(ev.sender);
-    void popupAppMenu(win ?? undefined);
+    if (!win) return;
+    const send = (cmd: PetMenuCommand) => ev.sender.send('pet:menuCommand', cmd);
+    const menu = Menu.buildFromTemplate([
+      {
+        label: '说话 / 动作',
+        submenu: [
+          { label: '说句话', click: () => send({ type: 'speak' }) },
+          { type: 'separator' },
+          ...(Array.isArray(actions) ? actions : []).map((a) => ({
+            label: String(a.label),
+            click: () => send({ type: 'play', action: String(a.id) }),
+          })),
+        ],
+      },
+      { type: 'separator' },
+      {
+        label: '打开房间',
+        click: async () => {
+          const { activeCharacter } = await getSettings();
+          const meta = activeCharacter ? await getCharacter(activeCharacter) : null;
+          const name = meta?.manifest?.name;
+          openRoomWindow(name && name !== '未命名' ? `${name}的家` : '小房间');
+        },
+      },
+      { label: '生成配置', click: () => createStudioWindow() },
+      { label: '装扮市场', click: () => createMarketWindow() },
+      { type: 'separator' },
+      { label: '更多', submenu: await buildMenuTemplate() },
+    ]);
+    menu.popup({ window: win });
   });
   ipcMain.handle('studio:savePersona', async (_ev, dirId: string, persona: string) => {
     await savePersona(dirId, persona);
