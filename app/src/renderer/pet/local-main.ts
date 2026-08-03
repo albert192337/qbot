@@ -178,11 +178,18 @@ function voiceSettings(s: {
 void window.qbot.settings.get().then((s) => speaker.setSettings(voiceSettings(s)));
 window.qbot.settings.onChanged((s) => speaker.setSettings(voiceSettings(s)));
 
-// ── 举牌文字：单一来源，优先级 agent > music > 无 ─────────
+// ── 举牌文字：单一来源，优先级 手动举牌 > 一次性 > agent > music ─
 /** 一次性文字（如「工作完成！」），显示后由下一次 refresh 清掉 */
 let signboardOneShot: string | null = null;
+/** 手动举牌（右键菜单输入；联机时同步对端替身，收牌前一直举着） */
+let userSign: string | null = null;
 
 function refreshSignboard(): void {
+  if (userSign) {
+    hostSignboard.setText(userSign);
+    hostSignboard.show();
+    return;
+  }
   if (signboardOneShot) {
     hostSignboard.setText(signboardOneShot);
     hostSignboard.show();
@@ -412,6 +419,7 @@ stage.addEventListener('pointerdown', (e) => {
   offsetX = e.clientX;
   offsetY = e.clientY;
   stage.setPointerCapture(e.pointerId);
+  hideSignPrompt(); // 点宠身上：收起举牌输入框
 });
 
 stage.addEventListener('pointermove', (e) => {
@@ -485,4 +493,57 @@ stage.addEventListener('contextmenu', (e) => {
 window.qbot.pet.onMenuCommand((cmd) => {
   if (cmd.type === 'speak') speaker.forceSpeak();
   else if (cmd.type === 'play') dispatch({ type: 'PLAY_ACTION', action: cmd.action as PlayableId });
+  else if (cmd.type === 'signPrompt') showSignPrompt();
+  else if (cmd.type === 'signClear') applyUserSign(null);
 });
+
+// ── 手动举牌输入框（联机举牌：本端显示 + 同步对端替身） ─────
+let signEntry: HTMLInputElement | null = null;
+
+function applyUserSign(text: string | null): void {
+  userSign = text?.trim() ? text.trim().slice(0, 60) : null;
+  refreshSignboard();
+  window.qbot.link.setSign(userSign); // 未配对时主进程只记账，不发帧
+}
+
+function hideSignPrompt(): void {
+  if (signEntry) signEntry.style.display = 'none';
+}
+
+function showSignPrompt(): void {
+  if (!signEntry) {
+    signEntry = document.createElement('input');
+    signEntry.placeholder = '举牌内容，回车确认';
+    signEntry.maxLength = 60;
+    signEntry.style.cssText = [
+      'display:none',
+      'position:absolute',
+      'z-index:12',
+      'top:10px',
+      'left:50%',
+      'transform:translateX(-50%)',
+      'width:75%',
+      'padding:6px 10px',
+      'border-radius:8px',
+      'border:1px solid rgba(0,0,0,0.15)',
+      'background:rgba(255,255,255,0.96)',
+      'box-shadow:0 4px 18px rgba(0,0,0,0.18)',
+      'font-size:12px',
+      'outline:none',
+      "font-family:-apple-system,'PingFang SC',sans-serif",
+    ].join(';');
+    signEntry.addEventListener('keydown', (ev) => {
+      ev.stopPropagation();
+      if (ev.key === 'Enter') {
+        applyUserSign(signEntry!.value);
+        hideSignPrompt();
+      } else if (ev.key === 'Escape') {
+        hideSignPrompt();
+      }
+    });
+    document.body.appendChild(signEntry);
+  }
+  signEntry.value = userSign ?? '';
+  signEntry.style.display = 'block';
+  signEntry.focus();
+}

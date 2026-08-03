@@ -20,17 +20,24 @@ const driver = new NetworkDriver({
   play: (action, loop) => (loop ? player.playLooping(action) : player.play(action)),
 });
 
-/** 举牌单一来源：掉线 > 传输进度 > 曲名 > 报到横幅（5s 自清） */
+/** 举牌单一来源：掉线 > 对端手动举牌 > 传输进度 > 曲名 > 报到横幅（5s 自清） */
 let helloTimer: ReturnType<typeof setTimeout> | null = null;
 let peerName = '好友';
 let peerSong: string | null = null;
 let peerGone = false;
 /** 角色包接收进度文案（就位后清空） */
 let transferText: string | null = null;
+/** 对端手动举的牌（收牌前一直举着） */
+let peerSign: string | null = null;
 
 function refreshSignboard(): void {
   if (peerGone) {
     signboard.setText(`${peerName} 掉线了…`);
+    signboard.show();
+    return;
+  }
+  if (peerSign) {
+    signboard.setText(peerSign);
     signboard.show();
     return;
   }
@@ -98,11 +105,20 @@ window.qbot.link.onPeerLeft(() => {
   driver.peerLeft();
 });
 
+window.qbot.link.onPeerSign((text) => {
+  peerSign = text;
+  refreshSignboard();
+});
+
 // 兜底自取：pet/main.ts 动态 import 本模块，不阻塞页面 load → 主进程在
 // did-finish-load 的 replay 可能早于上面监听注册而丢失（缓存命中时必丢）
-void window.qbot.link.getPeerCache().then(({ hello, character, state }) => {
+void window.qbot.link.getPeerCache().then(({ hello, character, state, sign }) => {
   if (hello) peerName = hello.charName; // 只取名字，不重放报到横幅
   if (character) applyPeerCharacter(character);
+  if (sign) {
+    peerSign = sign;
+    refreshSignboard();
+  }
   if (state) applyPeerState(state);
 });
 

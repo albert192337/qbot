@@ -155,6 +155,12 @@ const api: QBotApi = {
       ipcRenderer.on('link:assetProgress', listener);
       return () => ipcRenderer.removeListener('link:assetProgress', listener);
     },
+    onPeerSign: (cb) => {
+      const listener = (_ev: unknown, text: string | null) => cb(text);
+      ipcRenderer.on('link:peerSign', listener);
+      return () => ipcRenderer.removeListener('link:peerSign', listener);
+    },
+    setSign: (text) => ipcRenderer.send('link:setSign', text),
     getPeerCache: () => ipcRenderer.invoke('link:getPeerCache'),
   },
 };

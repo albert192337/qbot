@@ -9,7 +9,7 @@ import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from '
 import { getSettings, setSettings } from './config';
 import { createStudioWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, createMarketWindow } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
-import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache } from './link/link';
+import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, getLocalSign, setLocalSign } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import { rebuildTray, buildMenuTemplate } from './tray';
@@ -88,6 +88,9 @@ export function registerIpc(): void {
   // ── link 联机 ──────────────────────────────────────────
   ipcMain.handle('link:getStatus', () => getLinkStatus());
   ipcMain.handle('link:getPeerCache', () => getPeerCache());
+  ipcMain.on('link:setSign', (_ev, text: string | null) =>
+    setLocalSign(typeof text === 'string' ? text : null),
+  );
   ipcMain.on('link:stop', () => stopLink());
 
   // ── room ───────────────────────────────────────────────
@@ -161,6 +164,20 @@ export function registerIpc(): void {
       },
       { label: '生成配置', click: () => createStudioWindow() },
       { label: '装扮市场', click: () => createMarketWindow() },
+      // 联机举牌：打字后自己和对端屏幕上的替身都举同款牌（用户显式输入才出本机）；
+      // 断线后牌还举着时也给入口，能收牌
+      ...(getLinkStatus().phase === 'paired' || getLocalSign()
+        ? [
+            { type: 'separator' as const },
+            {
+              label: getLocalSign() ? '换个牌子…' : '举牌…',
+              click: () => send({ type: 'signPrompt' as const }),
+            },
+            ...(getLocalSign()
+              ? [{ label: '收牌', click: () => send({ type: 'signClear' as const }) }]
+              : []),
+          ]
+        : []),
       { type: 'separator' },
       { label: '更多', submenu: await buildMenuTemplate() },
     ]);

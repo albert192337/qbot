@@ -134,7 +134,12 @@ export interface PetMenuActionEntry {
 }
 
 /** 原生右键菜单点选后回渲染端执行的命令 */
-export type PetMenuCommand = { type: 'speak' } | { type: 'play'; action: string };
+export type PetMenuCommand =
+  | { type: 'speak' }
+  | { type: 'play'; action: string }
+  /** 弹举牌输入框（联机举牌：本端显示 + 同步对端替身） */
+  | { type: 'signPrompt' }
+  | { type: 'signClear' };
 
 // ── 联机 presence（spec 2026-08-02-multiplayer-presence-design）──────────
 /** 对端高层状态：agent 活动 + 听歌（隐私边界见 spec §四，只有枚举/动作名/放行曲名出本机） */
@@ -256,11 +261,16 @@ export interface QBotApi {
     onPeerCharacter(cb: (meta: LinkPeerCharacter) => void): () => void;
     /** 远端宠窗订阅：角色包传输进度（占位提示） */
     onAssetProgress(cb: (p: LinkAssetProgress) => void): () => void;
+    /** 远端宠窗订阅：对端手动举牌（null=收牌） */
+    onPeerSign(cb: (text: string | null) => void): () => void;
+    /** 本端手动举牌（null=收牌）：配对期间同步给对端替身显示 */
+    setSign(text: string | null): void;
     /** 远端宠窗启动自取快照（动态 import 竞态兜底：注册完监听后拉一次） */
     getPeerCache(): Promise<{
       hello: LinkPeerHello | null;
       character: LinkPeerCharacter | null;
       state: LinkPeerState | null;
+      sign: string | null;
     }>;
   };
   market: {

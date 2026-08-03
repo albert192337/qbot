@@ -60,6 +60,13 @@ let assembler: ChunkAssembler | null = null;
 const PEER_CACHE_PREFIX = '.peer-';
 const HASH_RE = /^[0-9a-f]{16}$/;
 
+/** 手动举牌文字上限（牌子就那么宽） */
+const SIGN_MAX_LEN = 60;
+/** 本端手动举的牌（配对期间同步对端替身；显示由渲染端负责，这里只记账+传输） */
+let localSign: string | null = null;
+/** 对端举的牌（远端窗显示） */
+let peerSign: string | null = null;
+
 export function setLinkStatusListener(cb: () => void): void {
   statusListener = cb;
 }
@@ -115,6 +122,7 @@ function teardown(): void {
   peerHello = null;
   peerState = null;
   peerCharacter = null;
+  peerSign = null;
   assembler = null;
   lastSent = null;
   closeRemotePetWindow();
@@ -138,6 +146,7 @@ function handlePaired(): void {
   setStatus({ ...status, phase: 'paired' });
   void sendHello();
   void sendState(true);
+  sendSign(); // 重配对（对端掉线重连）后把还举着的牌补给对端
   if (!heartbeatTimer) {
     heartbeatTimer = setInterval(() => void sendState(true), HEARTBEAT_MS);
   }
@@ -178,12 +187,21 @@ function handleFrame(frame: LinkFrame): void {
       pushToRemote('link:peerState', peerState);
       break;
     }
+    case 'sign': {
+      // 对端手动举牌（用户显式输入的文字；空串=收牌）
+      const text = typeof frame.text === 'string' ? frame.text.trim().slice(0, SIGN_MAX_LEN) : '';
+      peerSign = text || null;
+      console.log('[link] peer sign', peerSign ? 'set' : 'cleared'); // 不打正文
+      pushToRemote('link:peerSign', peerSign);
+      break;
+    }
     case 'bye':
       // 对端主动退出：立即收走远端窗，自己留在房里等新的加入没有意义 → 回 waiting
       console.log('[link] peer bye');
       peerHello = null;
       peerState = null;
       peerCharacter = null;
+      peerSign = null;
       assembler = null;
       closeRemotePetWindow();
       setStatus({ phase: 'waiting', roomCode: status.roomCode });
@@ -221,7 +239,26 @@ function openRemoteWindow(): void {
 function replayPeerCache(): void {
   if (peerHello) pushToRemote('link:peerHello', peerHello);
   if (peerCharacter) pushToRemote('link:peerCharacter', peerCharacter);
+  if (peerSign) pushToRemote('link:peerSign', peerSign);
   if (peerState) pushToRemote('link:peerState', peerState);
+}
+
+// ── 手动举牌（用户显式输入，配对期间同步对端替身）────────────
+
+export function getLocalSign(): string | null {
+  return localSign;
+}
+
+/** 举牌 / 收牌（null）：本端牌子显示由渲染端负责，这里记账 + 发对端 */
+export function setLocalSign(text: string | null): void {
+  localSign = text ? text.replace(/\s+/g, ' ').trim().slice(0, SIGN_MAX_LEN) || null : null;
+  sendSign();
+}
+
+function sendSign(): void {
+  if (transport && status.phase === 'paired') {
+    transport.send({ t: 'sign', text: localSign ?? '' });
+  }
 }
 
 // ── L1 资产分发（spec §三.2）────────────────────────────────
@@ -339,8 +376,9 @@ export function getPeerCache(): {
   hello: LinkPeerHello | null;
   character: LinkPeerCharacter | null;
   state: LinkPeerState | null;
+  sign: string | null;
 } {
-  return { hello: peerHello, character: peerCharacter, state: peerState };
+  return { hello: peerHello, character: peerCharacter, state: peerState, sign: peerSign };
 }
 
 // ── 本地状态出帧 ────────────────────────────────────────────
