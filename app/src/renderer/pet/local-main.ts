@@ -330,7 +330,7 @@ function dispatch(event: Parameters<typeof step>[1]): void {
 }
 
 // ── 角色加载 ─────────────────────────────────────────────
-window.qbot.characters.onActivated((meta) => {
+function activateCharacter(meta: CharacterMeta): void {
   if (!meta?.manifest) return;
   currentCharacter = meta;
   available = player.load(meta.dirId, meta.manifest);
@@ -364,6 +364,13 @@ window.qbot.characters.onActivated((meta) => {
   scheduleVisit();
   if (agentActivity !== 'idle') dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
   if (musicStatus.playing && agentActivity === 'idle') dispatch({ type: 'MUSIC_STATUS', playing: true });
+}
+
+window.qbot.characters.onActivated(activateCharacter);
+// 兜底：pet/main.ts 动态 import 本模块，不阻塞页面 load → 主进程 did-finish-load
+// 推送的 characters:activated 可能早于上面监听注册而丢失，注册完主动拉一次
+void window.qbot.characters.getActive().then((meta) => {
+  if (meta && !currentCharacter) activateCharacter(meta);
 });
 
 // 窗口隐藏期间（角色进小房间）Chromium 会自动暂停 <video> 且不派发 ended，
