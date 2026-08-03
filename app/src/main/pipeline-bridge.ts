@@ -14,7 +14,14 @@ import {
   createArkClient,
   resolveFfmpegPath,
   sampleKeyColor,
+  sampleBackgroundColors,
+  selectChromaKey,
+  checkVideoDrift,
   toWebm,
+  toGif,
+  computeAlphaStats,
+  probeSize,
+  normalizeFilter,
   createGptImageGenerator,
   turnaroundPrompt,
   framePrompt,
@@ -207,12 +214,29 @@ export async function getHatchStatus(dirId: string): Promise<HatchStatus | null>
 
 /** 重试失败动作：重置 failed → pending，走 runActions + runPackage（同 CLI redo） */
 export async function redoFailed(dirId: string): Promise<void> {
-  if (active.has(dirId)) return; // 已在跑
   const outDir = path.join(charactersDir(), dirId);
   const job = await Job.load(outDir);
   const failed = ACTION_IDS.filter((id) => job.state.actions[id]?.status === 'failed');
   if (!failed.length) return;
-  for (const id of failed) {
+  await rerunActions(dirId, failed);
+}
+
+/**
+ * 按 prompt 重新生成指定动作（**花钱**：每动作 1 次生图 + 1 条视频约 ¥1）。
+ * 复用 runActions + runPackage，因此自动继承尺寸归一化与 manifest 回写。
+ */
+export async function regenerateActions(dirId: string, actionIds: ActionId[]): Promise<void> {
+  const valid = actionIds.filter((id) => (ACTION_IDS as readonly string[]).includes(id));
+  if (!valid.length) throw new Error('没有合法的动作 id');
+  await rerunActions(dirId, valid);
+}
+
+/** 重置给定动作为 pending 后跑 runActions + runPackage */
+async function rerunActions(dirId: string, actionIds: ActionId[]): Promise<void> {
+  if (active.has(dirId)) throw new Error('该角色已有生成任务在跑，请等它结束');
+  const outDir = path.join(charactersDir(), dirId);
+  const job = await Job.load(outDir);
+  for (const id of actionIds) {
     job.state.actions[id] = { status: 'pending', attempts: { frame: 0, video: 0 } };
   }
   await job.save();
@@ -229,6 +253,11 @@ export async function redoFailed(dirId: string): Promise<void> {
     await runPackage(job);
     broadcast(dirId, { jobId: job.state.jobId, stage: 'done' });
     await rebuildTray();
+    // 新资产落盘 → 让 pet 重建 Player
+    const meta = await getCharacter(dirId);
+    if (meta?.manifest && (await getSettings()).activeCharacter === dirId) {
+      broadcastCharacterActivated(meta);
+    }
   } catch (err) {
     broadcast(dirId, {
       jobId: job.state.jobId,
@@ -238,6 +267,52 @@ export async function redoFailed(dirId: string): Promise<void> {
   } finally {
     active.delete(dirId);
   }
+}
+
+/**
+ * 重新生成三视图（**花钱且连带**：三视图是所有动作的参考图，换了必须重生全部 6 个动作，
+ * 约 6 条视频）。复用 runPipeline 的「候选 → awaiting_pick → 挑图」循环，
+ * 挑图界面就是现有的孵化窗。
+ */
+export async function regenerateTurnaround(dirId: string): Promise<void> {
+  if (active.has(dirId)) throw new Error('该角色已有生成任务在跑，请等它结束');
+  const outDir = path.join(charactersDir(), dirId);
+  const job = await Job.load(outDir);
+  // 清空已挑选的三视图 + 全部动作回 pending，让 runPipeline 从 Stage 1 重跑
+  job.state.turnaround = { candidates: [], picked: null };
+  for (const id of ACTION_IDS) {
+    job.state.actions[id] = { status: 'pending', attempts: { frame: 0, video: 0 } };
+  }
+  await job.save();
+  runJob(dirId, job); // 内部已挂 pickCandidate hook + 进度广播
+}
+
+// ── studio: prompt 全文编辑 ────────────────────────────────
+
+/** 保存某动作的首帧/视频 prompt 全文覆盖（空串 = 清除覆盖，回退模板） */
+export async function saveFullPrompts(
+  dirId: string,
+  actionId: string,
+  framePromptFull: string,
+  videoPromptFull: string,
+): Promise<void> {
+  const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
+  const raw = await readFile(manifestPath, 'utf8');
+  const manifest = JSON.parse(raw) as Manifest;
+  const a = manifest.actions[actionId as ActionId];
+  if (!a) throw new Error(`动作 "${actionId}" 不存在`);
+  a.framePromptFull = framePromptFull.trim() || undefined;
+  a.videoPromptFull = videoPromptFull.trim() || undefined;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
+/** 保存三视图 prompt 全文覆盖（空串 = 清除覆盖） */
+export async function saveTurnaroundPrompt(dirId: string, prompt: string): Promise<void> {
+  const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
+  const raw = await readFile(manifestPath, 'utf8');
+  const manifest = JSON.parse(raw) as Manifest;
+  manifest.turnaroundPromptFull = prompt.trim() || undefined;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 }
 
 // ── studio: persona + custom actions ──────────────────────
@@ -352,9 +427,23 @@ async function generateCustomAction(a: {
     const videoRel = `.job/${name}.mp4`;
     await ark.downloadVideo(videoUrl!, path.join(outDir, videoRel));
 
-    // 抠像转码
-    const key = await sampleKeyColor(path.join(outDir, videoRel), ffmpegPath);
-    await toWebm(path.join(outDir, videoRel), path.join(outDir, 'actions', `${name}.webm`), [key], ffmpegPath);
+    // 抠像转码：必须和 stages.ts 的 keyActionVideo 走完全同一套，否则
+    // (a) 漏归一化 → 角色尺寸/位置是原始状态，大概率跑到画面外；
+    // (b) 用 sampleKeyColor 单点采样选 key → 实测 6/7 动作选到的 key 比
+    //     selectChromaKey 更不饱和，会连角色本体一起吃掉并留绿边。
+    const videoAbs = path.join(outDir, videoRel);
+    const drift = await checkVideoDrift(videoAbs, ffmpegPath);
+    if (drift.fail) {
+      throw new Error(`绿幕背景漂移 ${drift.maxDrift}/255 超限，视频不可用`);
+    }
+    const chromaKey = selectChromaKey(await sampleBackgroundColors(videoAbs, ffmpegPath));
+    const keys = [chromaKey ?? (await sampleKeyColor(videoAbs, ffmpegPath))];
+    const stats = await computeAlphaStats(videoAbs, keys, ffmpegPath);
+    const size = await probeSize(videoAbs, ffmpegPath);
+    const normVf = stats ? normalizeFilter(stats, size.width, size.height) : undefined;
+    await toWebm(videoAbs, path.join(outDir, 'actions', `${name}.webm`), keys, ffmpegPath, normVf);
+    // manifest 里声明了 gif，不产出就是悬空引用
+    await toGif(videoAbs, path.join(outDir, 'actions', `${name}.gif`), keys, ffmpegPath, normVf);
 
     await patchCustomActionStatus(manifestPath, name, 'done');
     broadcastCustomAction(dirId, name, 'done');
@@ -458,7 +547,12 @@ export async function getPrompts(dirId: string): Promise<PromptData> {
     // 无 manifest
   }
 
-  const tp = turnaroundPrompt(DEFAULT_CHARACTER_DESC, characterForm, characterStyle);
+  const tp = turnaroundPrompt(
+    DEFAULT_CHARACTER_DESC,
+    characterForm,
+    characterStyle,
+    manifest?.turnaroundPromptFull,
+  );
 
   const actions = Object.fromEntries(
     ACTION_IDS.map((id) => {
@@ -467,16 +561,33 @@ export async function getPrompts(dirId: string): Promise<PromptData> {
       // 优先使用 manifest 中保存的自定义 prompt，未保存的用默认 actionSpec
       const poseDesc = custom?.poseDesc || spec.poseDesc;
       const motionDesc = custom?.motionDesc || spec.motionDesc;
-      const fp = framePrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.poseDesc);
-      const vp = videoPrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.motionDesc);
+      // 传入全文覆盖 → 返回的就是实际会用于生成的 prompt（UI 直接展示可编辑）
+      const fp = framePrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.poseDesc, custom?.framePromptFull);
+      const vp = videoPrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.motionDesc, custom?.videoPromptFull);
       return [
         id,
-        { poseDesc, motionDesc, framePrompt: fp, videoPrompt: vp },
+        {
+          poseDesc,
+          motionDesc,
+          framePrompt: fp,
+          videoPrompt: vp,
+          framePromptCustomized: !!custom?.framePromptFull,
+          videoPromptCustomized: !!custom?.videoPromptFull,
+        },
       ];
     }),
   ) as PromptData['actions'];
 
-  return { characterForm, characterStyle, imageProvider, persona, agentActions: manifest?.agentActions, turnaroundPrompt: tp, actions };
+  return {
+    characterForm,
+    characterStyle,
+    imageProvider,
+    persona,
+    agentActions: manifest?.agentActions,
+    turnaroundPrompt: tp,
+    turnaroundCustomized: !!manifest?.turnaroundPromptFull,
+    actions,
+  };
 }
 
 function toDataUrl(buf: Buffer): string {

@@ -71,11 +71,15 @@ function applyVisitFacing(): void {
   document.body.classList.toggle('flip-visitor', visitorFacing === 'right');
 }
 
-/** 清理串门状态：移除 visit-mode + flip 类 + visitor stage + 恢复 host idle。
- *  注意：不隐藏 hostSignboard——牌子与串门无关，独立控制。 */
+/** 清理串门状态：移除 visit-mode + flip 类 + visitor 的 video + 恢复 host idle。
+ *  注意：不隐藏 hostSignboard——牌子与串门无关，独立控制。
+ *  只删 video/poof，不用 replaceChildren——那会把 visitorSignboard 的 DOM 一起删掉，
+ *  Signboard 对象持有失效引用，之后访客再来就永远举不出牌了。 */
 function endVisit(): void {
   document.body.classList.remove('visit-mode', 'flip-host', 'flip-visitor');
-  visitorStage.replaceChildren();
+  for (const el of Array.from(visitorStage.querySelectorAll('video,.stage-poof'))) {
+    el.remove();
+  }
   window.qbot.pet.setVisitMode(false);
   visitorCharacter = null;
   visitorSignboard.hide();
@@ -230,6 +234,72 @@ function onMusicStatus(status: MusicStatus): void {
 window.qbot.music.onStatus(onMusicStatus);
 void window.qbot.music.getStatus().then(onMusicStatus);
 
+// ── 桌面行走 ──────────────────────────────────────────────
+/** 行走动画的动作名（自定义动作，manifest.customActions 的 key） */
+const WALK_ACTION = 'walk';
+/** 单次行走的最大位移（屏幕 px） */
+const WALK_DISTANCE = 280;
+/**
+ * 行走方向固定，**不做镜像翻转**。
+ * 原来按 talk_happy 的 facing 决定翻不翻，但那是**另一个动作**的朝向，
+ * 自定义动作的 manifest 里没有 facing 字段，拿它当代理会翻错 —— 实测往左走反而
+ * 被翻成朝右，看着像倒着走。固定方向和动画本身对齐最省事也最稳。
+ * 若发现方向与动画相反，把这里改成 1 即可（唯一需要改的地方）。
+ */
+const WALK_DIR = -1;
+let walkRaf: number | null = null;
+
+function stopDesktopWalk(): void {
+  if (walkRaf !== null) {
+    cancelAnimationFrame(walkRaf);
+    walkRaf = null;
+    hostSignboard.onDragEnd(); // 停下后延时把牌子弹回来（同松手逻辑）
+  }
+}
+
+/**
+ * 播行走动画时真的把窗口挪过去（动画本身是原地踏步，位移由这里负责）。
+ * 方向固定为 WALK_DIR，夹在工作区内；贴边时只播动画不挪。
+ */
+function startDesktopWalk(): void {
+  if (walkRaf !== null) {
+    cancelAnimationFrame(walkRaf);
+    walkRaf = null;
+  }
+  const durationMs =
+    (currentCharacter?.manifest.customActions?.[WALK_ACTION]?.durationSec ?? 5) * 1000;
+  const startX = window.screenX;
+  const y = window.screenY;
+  // availLeft 是 Chromium 的非标准属性（多屏时非 0），TS 的 Screen 类型里没有
+  const availL = (window.screen as Screen & { availLeft?: number }).availLeft ?? 0;
+  const w = window.outerWidth;
+  const room =
+    WALK_DIR > 0 ? availL + window.screen.availWidth - (startX + w) : startX - availL;
+  const dist = Math.min(WALK_DISTANCE, Math.max(0, room));
+  // 走路时收牌，停下再弹（同被拎起的处理）
+  hostSignboard.onDragStart();
+  if (dist < 8) {
+    // 已贴边：只播动画不挪，但牌子仍按走路处理，播完由 stopDesktopWalk 弹回
+    walkRaf = requestAnimationFrame(() => {
+      walkRaf = null;
+      hostSignboard.onDragEnd();
+    });
+    return;
+  }
+  const t0 = performance.now();
+  const tick = (t: number): void => {
+    const k = Math.min(1, (t - t0) / durationMs);
+    window.qbot.pet.move(Math.round(startX + WALK_DIR * dist * k), y);
+    if (k < 1) {
+      walkRaf = requestAnimationFrame(tick);
+    } else {
+      walkRaf = null;
+      hostSignboard.onDragEnd();
+    }
+  };
+  walkRaf = requestAnimationFrame(tick);
+}
+
 function scheduleTimer(): void {
   clearTimer();
   timer = setTimeout(() => dispatch({ type: 'TIMER_FIRE' }), randomDelay(rng));
@@ -314,7 +384,12 @@ function dispatch(event: Parameters<typeof step>[1]): void {
     updateDebugState();
   }
 
-  if (result.play) player.play(result.play);
+  if (result.play) {
+    player.play(result.play);
+    // 行走动画要配合窗口位移才看得出在走；切到别的动作立刻停下
+    if (result.play === WALK_ACTION) startDesktopWalk();
+    else stopDesktopWalk();
+  }
   if (result.clearTimer) clearTimer();
   if (result.rescheduleTimer) scheduleTimer();
   // agent 活动进行中却落回 idle（拖拽松手/庆祝播完/用户动作播完）→ 恢复 agent 视觉。
@@ -419,6 +494,7 @@ stage.addEventListener('pointermove', (e) => {
     // 拖拽开始就结束串门
     visitOrchestrator.cancelVisit();
     endVisit();
+    stopDesktopWalk(); // 拖拽期间别再自动挪窗口
     hostSignboard.onDragStart();
     dispatch({ type: 'POINTER_DOWN' });
   }
@@ -464,6 +540,7 @@ const ACTION_LABELS: Record<string, string | undefined> = {
   tea: '喝茶',
   talk_happy: '聊天·开心',
   talk_annoyed: '聊天·嫌弃',
+  walk: '行走',
 };
 const menu = document.getElementById('menu')!;
 

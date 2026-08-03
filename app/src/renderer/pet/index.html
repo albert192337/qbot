@@ -31,6 +31,8 @@
         height: 100%;
         object-fit: contain;
         pointer-events: none;
+        /* 角色必须盖在牌子上方：否则举牌的长杆会横穿角色身体 */
+        z-index: 2;
       }
       /* ── 动作切换烟雾过渡 ── */
       .stage-poof {
@@ -100,7 +102,8 @@
         top: 0;
         bottom: 0;
         right: 12%;
-        z-index: 2;
+        /* 低于 #stage video(2)：杆子被角色挡住，不遮挡小人 */
+        z-index: 1;
         pointer-events: none;
         opacity: 0;
         display: flex;
@@ -130,6 +133,10 @@
         font-size: 13px;
         color: #5c3d2e;
         text-align: center;
+        /* 长歌名会把牌子撑出窗口被裁掉（窗口默认仅 360px）→ 限宽 + 省略号 */
+        max-width: 76vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
         box-shadow: 0 2px 8px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
         min-width: 40px;

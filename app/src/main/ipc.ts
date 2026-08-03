@@ -6,8 +6,8 @@ import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow } from './windows';
-import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions } from './pipeline-bridge';
+import { createHatchWindow, createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow } from './windows';
+import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import { rebuildTray } from './tray';
 import { getAgentStatus } from './agent-server';
@@ -127,6 +127,20 @@ export function registerIpc(): void {
   });
   ipcMain.handle('studio:saveAgentActions', async (_ev, dirId: string, config) => {
     await saveAgentActions(dirId, config);
+  });
+  ipcMain.handle('studio:saveFullPrompts', async (_ev, dirId: string, actionId: string, framePromptFull: string, videoPromptFull: string) => {
+    await saveFullPrompts(dirId, actionId, framePromptFull, videoPromptFull);
+  });
+  ipcMain.handle('studio:saveTurnaroundPrompt', async (_ev, dirId: string, prompt: string) => {
+    await saveTurnaroundPrompt(dirId, prompt);
+  });
+  // 下面两个会调 API 花钱，渲染层已做二次确认
+  ipcMain.handle('studio:regenerateActions', async (_ev, dirId: string, actionIds: string[]) => {
+    await regenerateActions(dirId, actionIds as never);
+  });
+  ipcMain.handle('studio:regenerateTurnaround', async (_ev, dirId: string) => {
+    createHatchWindow(); // 三视图要人工挑图，先把孵化窗弹出来
+    await regenerateTurnaround(dirId);
   });
 
   // ── agent 联动 ─────────────────────────────────────────

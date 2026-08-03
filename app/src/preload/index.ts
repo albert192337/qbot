@@ -79,6 +79,14 @@ const api: QBotApi = {
       ipcRenderer.on('studio:customAction', listener);
       return () => ipcRenderer.removeListener('studio:customAction', listener);
     },
+    saveFullPrompts: (dirId, actionId, framePromptFull, videoPromptFull) =>
+      ipcRenderer.invoke('studio:saveFullPrompts', dirId, actionId, framePromptFull, videoPromptFull),
+    saveTurnaroundPrompt: (dirId, prompt) =>
+      ipcRenderer.invoke('studio:saveTurnaroundPrompt', dirId, prompt),
+    regenerateActions: (dirId, actionIds) =>
+      ipcRenderer.invoke('studio:regenerateActions', dirId, actionIds),
+    regenerateTurnaround: (dirId) =>
+      ipcRenderer.invoke('studio:regenerateTurnaround', dirId),
   },
   agent: {
     getStatus: () => ipcRenderer.invoke('agent:getStatus'),

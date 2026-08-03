@@ -212,6 +212,19 @@ export interface QBotApi {
     ): Promise<void>;
     /** 订阅自定义动作的后台生成进度（addCustomAction 立即返回，生成在后台跑） */
     onCustomAction(cb: (ev: CustomActionEvent) => void): () => void;
+    /** 保存某动作的首帧/视频 prompt 全文覆盖（空串 = 清除覆盖回退模板）。只影响之后的生成 */
+    saveFullPrompts(
+      dirId: string,
+      actionId: string,
+      framePromptFull: string,
+      videoPromptFull: string,
+    ): Promise<void>;
+    /** 保存三视图 prompt 全文覆盖（空串 = 清除覆盖） */
+    saveTurnaroundPrompt(dirId: string, prompt: string): Promise<void>;
+    /** 按当前 prompt 重新生成指定动作（**花钱**，每动作约 ¥1） */
+    regenerateActions(dirId: string, actionIds: string[]): Promise<void>;
+    /** 重新生成三视图并连带重生全部动作（**花钱**，约 6 条视频）；挑图走孵化窗 */
+    regenerateTurnaround(dirId: string): Promise<void>;
   };
   agent: {
     /** 当前合成状态（pet 窗口加载时铺底） */

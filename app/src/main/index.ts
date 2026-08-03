@@ -1,8 +1,8 @@
 /** 主进程入口：协议注册（必须在 ready 前）→ 预置角色 → 窗口/托盘/IPC */
-import { app, net, protocol, screen } from 'electron';
-import { existsSync } from 'node:fs';
+import { app, protocol, screen } from 'electron';
+import { open, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+
 import { charactersDir, getCharacter, listCharacters, seedPresets } from './characters';
 import { getSettings, setSettings } from './config';
 import { registerIpc } from './ipc';
@@ -10,6 +10,17 @@ import { rebuildTray } from './tray';
 import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds } from './windows';
 import { startAgentServer } from './agent-server';
 import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
+
+/** qbot-asset 响应的 Content-Type（漏了类型 Chromium 会拒绝解码 <video>） */
+const ASSET_MIME: Record<string, string> = {
+  '.webm': 'video/webm',
+  '.mp4': 'video/mp4',
+  '.gif': 'image/gif',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.json': 'application/json',
+};
 
 // qbot-asset://<dirId>/<relPath> → userData/characters/<dirId>/<relPath>
 // stream: true 缺失时 <video> 对协议 URL 静默不播（必须 ready 前注册）
@@ -32,16 +43,67 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.whenReady().then(async () => {
-  protocol.handle('qbot-asset', (req) => {
+  protocol.handle('qbot-asset', async (req) => {
     const url = new URL(req.url);
     const base = charactersDir();
     const full = path.normalize(
       path.join(base, url.hostname, decodeURIComponent(url.pathname)),
     );
-    if (!full.startsWith(base + path.sep) || !existsSync(full)) {
+    if (!full.startsWith(base + path.sep)) {
+      return new Response('forbidden', { status: 403 });
+    }
+    let info;
+    try {
+      info = await stat(full);
+    } catch {
       return new Response('not found', { status: 404 });
     }
-    return net.fetch(pathToFileURL(full).toString());
+    if (!info.isFile()) return new Response('not found', { status: 404 });
+
+    const type = ASSET_MIME[path.extname(full).toLowerCase()] ?? 'application/octet-stream';
+    const common = {
+      'Content-Type': type,
+      'Accept-Ranges': 'bytes',
+      // 资产会被重抠/重新生成覆盖，同名同 URL —— 缓存住就会一直显示旧动画
+      'Cache-Control': 'no-store',
+    };
+
+    // Range 支持：Chromium 媒体栈对 <video> 一定会发 Range，原来 net.fetch(fileURL)
+    // 把请求头整个丢了、也不回 206/Accept-Ranges，多路并发时会 MEDIA_ERR_NETWORK
+    // → 动作永久停在一帧甚至整个角色空白。
+    const range = req.headers.get('Range');
+    const m = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null;
+    if (m && (m[1] || m[2])) {
+      const size = info.size;
+      const start = m[1] ? Number(m[1]) : 0;
+      const end = Math.min(m[2] ? Number(m[2]) : size - 1, size - 1);
+      if (!Number.isFinite(start) || start > end || start >= size) {
+        return new Response(null, {
+          status: 416,
+          headers: { ...common, 'Content-Range': `bytes */${size}` },
+        });
+      }
+      const len = end - start + 1;
+      const fh = await open(full, 'r');
+      try {
+        const buf = Buffer.allocUnsafe(len);
+        await fh.read(buf, 0, len, start);
+        return new Response(buf, {
+          status: 206,
+          headers: {
+            ...common,
+            'Content-Length': String(len),
+            'Content-Range': `bytes ${start}-${end}/${size}`,
+          },
+        });
+      } finally {
+        await fh.close();
+      }
+    }
+    return new Response(await readFile(full), {
+      status: 200,
+      headers: { ...common, 'Content-Length': String(info.size) },
+    });
   });
 
   if (process.platform === 'darwin') app.dock?.hide();

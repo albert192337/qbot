@@ -3,9 +3,10 @@
  * 纯逻辑（zone/增删移缩）在 decor.ts，本模块只做事件与渲染。
  */
 import type { DecorPlacement } from '../../shared/ipc-types';
-import { DECOR_BY_ID, DECOR_PACK } from './decor-pack';
+import { anchorOf, DECOR_BY_ID, DECOR_PACK } from './decor-pack';
 import {
   addPlacement,
+  depthZ,
   movePlacement,
   placementTransform,
   removePlacement,
@@ -96,6 +97,8 @@ export class DecorEditor {
       img.dataset.id = p.id;
       img.style.width = `${sticker.defaultW}px`;
       img.style.transform = placementTransform(p, spec);
+      // 地面家具按 y 深度分层，和角色同一刻度 → 走到前面会挡住它
+      img.style.zIndex = String(depthZ(p.y, spec, sticker.anchor));
       layer.appendChild(img);
     }
     this.updateSelBox();
@@ -134,18 +137,41 @@ export class DecorEditor {
     if (this.barBuilt) return;
     this.barBuilt = true;
     const { bar } = this.hooks;
+    // 单行横向滚动托盘 + 分组：原来 flex-wrap 换行会吃掉房间底部
+    const scroller = document.createElement('div');
+    scroller.className = 'decor-scroll';
+    const groups = new Map<string, typeof DECOR_PACK>();
     for (const sticker of DECOR_PACK) {
-      const thumb = document.createElement('div');
-      thumb.className = 'decor-thumb';
-      const img = document.createElement('img');
-      img.src = sticker.image;
-      img.draggable = false;
-      const label = document.createElement('span');
-      label.textContent = sticker.name;
-      thumb.append(img, label);
-      bar.appendChild(thumb);
-      this.bindThumbDrag(thumb, sticker.id, sticker.defaultW);
+      const g = groups.get(sticker.category) ?? [];
+      g.push(sticker);
+      groups.set(sticker.category, g);
     }
+    for (const [category, items] of groups) {
+      const group = document.createElement('div');
+      group.className = 'decor-group';
+      const head = document.createElement('span');
+      head.className = 'decor-group-label';
+      head.textContent = category;
+      group.appendChild(head);
+      const row = document.createElement('div');
+      row.className = 'decor-group-row';
+      for (const sticker of items) {
+        const thumb = document.createElement('div');
+        thumb.className = 'decor-thumb';
+        thumb.title = sticker.name;
+        const img = document.createElement('img');
+        img.src = sticker.image;
+        img.draggable = false;
+        const label = document.createElement('span');
+        label.textContent = sticker.name;
+        thumb.append(img, label);
+        row.appendChild(thumb);
+        this.bindThumbDrag(thumb, sticker.id, sticker.defaultW);
+      }
+      group.appendChild(row);
+      scroller.appendChild(group);
+    }
+    bar.appendChild(scroller);
     const done = document.createElement('button');
     done.id = 'decorDone';
     done.textContent = '完成';
@@ -189,7 +215,9 @@ export class DecorEditor {
           ghost.remove();
           const pos = this.hooks.toRoom(ev.clientX, ev.clientY);
           if (!pointInPolygon(pos, this.hooks.spec.outline)) return; // 丢在房间外 = 取消
-          this.placements = addPlacement(this.placements, stickerId, pos, this.hooks.spec);
+          this.placements = addPlacement(
+            this.placements, stickerId, pos, this.hooks.spec, undefined, anchorOf(stickerId),
+          );
           this.select(this.placements[this.placements.length - 1].id);
           this.render();
         },
@@ -212,6 +240,7 @@ export class DecorEditor {
             id,
             this.hooks.toRoom(ev.clientX, ev.clientY),
             this.hooks.spec,
+            anchorOf(this.placements.find((q) => q.id === id)?.stickerId ?? ''),
           );
           this.render();
         },

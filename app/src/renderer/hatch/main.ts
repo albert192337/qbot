@@ -367,7 +367,8 @@ async function showCertificate(): Promise<void> {
     if (action.status !== 'done') continue;
     const fig = document.createElement('figure');
     const video = document.createElement('video');
-    video.src = `qbot-asset://${currentDirId}/${action.webm}`;
+    // 带 nonce：redo 重生后同名文件会被缓存住
+    video.src = `qbot-asset://${currentDirId}/${action.webm}?v=${Date.now()}`;
     video.muted = true;
     video.autoplay = true;
     video.loop = true;

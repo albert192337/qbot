@@ -134,9 +134,10 @@
         color: white;
       }
       /* ── 装饰系统 ── */
+      /* display:contents —— 让 .decor-item 直接参与 #stage 的层叠上下文，
+         这样家具的 z-index 才能和 #char 比较（否则 #decor 会把它们整体压在角色后面） */
       #decor {
-        position: absolute;
-        inset: 0;
+        display: contents;
       }
       .decor-item {
         position: absolute;
@@ -195,9 +196,8 @@
         left: 50%;
         bottom: 10px;
         transform: translateX(-50%);
-        align-items: center;
-        justify-content: center;
-        flex-wrap: wrap; /* 10 贴纸 + 完成钮超出窗宽 → 换行，禁止溢出到窗外 */
+        align-items: flex-end;
+        /* 单行托盘：贴纸多了横向滚动，不再换行吃掉房间底部 */
         max-width: calc(100vw - 24px);
         gap: 10px;
         padding: 8px 12px;
@@ -205,6 +205,35 @@
         border-radius: 14px;
         box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
         z-index: 35;
+      }
+      /* 装饰托盘：横向滚动 + 分组 */
+      .decor-scroll {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+        padding-bottom: 2px;
+      }
+      .decor-group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 0 0 auto;
+      }
+      .decor-group + .decor-group {
+        border-left: 1px solid rgba(0, 0, 0, 0.1);
+        padding-left: 12px;
+      }
+      .decor-group-label {
+        font-size: 10px;
+        color: #999;
+        padding-left: 2px;
+      }
+      .decor-group-row {
+        display: flex;
+        gap: 8px;
       }
       body.editing #decorBar {
         display: flex;

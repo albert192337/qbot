@@ -179,7 +179,10 @@ export function turnaroundPrompt(
   desc: CharacterDesc = DEFAULT_CHARACTER_DESC,
   form: CharacterForm = 'humanoid',
   style: CharacterStyle = 'faithful',
+  /** 全文覆盖（manifest.turnaroundPromptFull）：完全取代模板拼装 */
+  fullOverride?: string,
 ): string {
+  if (fullOverride?.trim()) return fullOverride.trim();
   if (form === 'abstract') {
     return (
       `角色三视图设定表：参考图中的角色，完全保持参考图中角色的形态、线条风格、颜色、比例与画风。` +
@@ -218,7 +221,10 @@ export function framePrompt(
   persona?: string,
   /** 自定义姿势描述（覆盖默认 actionSpec.poseDesc），来自 manifest.json 中该动作的 poseDesc 字段 */
   poseOverride?: string,
+  /** 全文覆盖（manifest.actions[x].framePromptFull）：完全取代模板拼装 */
+  fullOverride?: string,
 ): string {
+  if (fullOverride?.trim()) return fullOverride.trim();
   const faithful = form !== 'abstract' && style === 'faithful';
   const keep =
     form === 'abstract'
@@ -255,8 +261,14 @@ export function videoPrompt(
   persona?: string,
   /** 自定义动作描述（覆盖默认 actionSpec.motionDesc），来自 manifest.json 中该动作的 motionDesc 字段 */
   motionOverride?: string,
+  /** 全文覆盖（manifest.actions[x].videoPromptFull）：完全取代下面的模板拼装 */
+  fullOverride?: string,
 ): string {
   const spec = actionSpec(action, form, style);
+  // 全文覆盖：Seedance 的 `--` 参数是必需的，用户删掉会导致 400 或时长不对 → 自动补回
+  if (fullOverride?.trim()) {
+    return withVideoParams(fullOverride.trim(), spec.durationSec);
+  }
   const faithful = form !== 'abstract' && style === 'faithful';
   const keep =
     form === 'abstract'
@@ -275,4 +287,17 @@ export function videoPrompt(
     `画面中始终只有这一个角色，绝对不出现其他人物、手或物体。丝滑流畅循环动画。` +
     ` --resolution 480p --duration ${spec.durationSec} --camerafixed true`
   );
+}
+
+/**
+ * 保证视频 prompt 带齐 Seedance 必需的 `--` 参数尾缀。
+ * 用户全文编辑时很容易把这段删掉 —— 缺 duration 会 400（1.5-pro 不支持默认值），
+ * 缺 camerafixed 会导致镜头漂移。已存在的参数保持用户的值不动。
+ */
+function withVideoParams(prompt: string, durationSec: number): string {
+  let out = prompt;
+  if (!/--resolution\s+\S+/.test(out)) out += ' --resolution 480p';
+  if (!/--duration\s+\d+/.test(out)) out += ` --duration ${durationSec}`;
+  if (!/--camerafixed\s+\S+/.test(out)) out += ' --camerafixed true';
+  return out;
 }
