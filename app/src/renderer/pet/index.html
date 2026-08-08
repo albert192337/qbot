@@ -31,6 +31,8 @@
         height: 100%;
         object-fit: contain;
         pointer-events: none;
+        /* 角色在举牌之上（牌子从身后露出） */
+        z-index: 1;
       }
       /* ── 动作切换烟雾过渡 ── */
       .stage-poof {
@@ -68,6 +70,7 @@
         height: 100%;
         object-fit: contain;
         pointer-events: none;
+        z-index: 1;
       }
       /* ── visit mode: side-by-side with overlap ── */
       body.visit-mode {
@@ -94,13 +97,13 @@
       body.visit-mode.flip-visitor #visitor-stage {
         transform: scaleX(-1);
       }
-      /* ── signboard ── */
+      /* ── signboard（在角色身后，视频 z-index:1 压住它）── */
       .signboard {
         position: absolute;
         top: 0;
         bottom: 0;
         right: 12%;
-        z-index: 2;
+        z-index: 0;
         pointer-events: none;
         opacity: 0;
         display: flex;
