@@ -495,6 +495,7 @@ window.qbot.pet.onMenuCommand((cmd) => {
   else if (cmd.type === 'play') dispatch({ type: 'PLAY_ACTION', action: cmd.action as PlayableId });
   else if (cmd.type === 'signPrompt') showSignPrompt();
   else if (cmd.type === 'signClear') applyUserSign(null);
+  else if (cmd.type === 'debugToggle') debug.toggle();
 });
 
 // ── 手动举牌输入框（联机举牌：本端显示 + 同步对端替身） ─────

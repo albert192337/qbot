@@ -175,7 +175,8 @@ export function registerIpc(): void {
       ...(await characterSection()),
       ...(await connectSection()),
       { type: 'separator' },
-      // ── 系统（托盘同源）─────────────────────────────────
+      // ── 系统（托盘同源）+ 调试入口（仅右键有，纯开发工具）──
+      { label: '调试面板', click: () => send({ type: 'debugToggle' }) },
       ...systemSection(),
     ]);
     menu.popup({ window: win });

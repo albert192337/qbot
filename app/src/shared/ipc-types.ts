@@ -139,7 +139,9 @@ export type PetMenuCommand =
   | { type: 'play'; action: string }
   /** 弹举牌输入框（联机举牌：本端显示 + 同步对端替身） */
   | { type: 'signPrompt' }
-  | { type: 'signClear' };
+  | { type: 'signClear' }
+  /** 展开/收起调试面板（状态/日志/串门触发等开发工具） */
+  | { type: 'debugToggle' };
 
 // ── 联机 presence（spec 2026-08-02-multiplayer-presence-design）──────────
 /** 对端高层状态：agent 活动 + 听歌（隐私边界见 spec §四，只有枚举/动作名/放行曲名出本机） */
