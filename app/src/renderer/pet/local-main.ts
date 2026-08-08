@@ -1,6 +1,6 @@
 /** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 + 串门 + 调试面板 */
 import type { ActionId, PlayableId } from '@qbot/pipeline';
-import type { AgentActivity, CharacterMeta, MusicStatus } from '../../shared/ipc-types';
+import type { AgentActivity, CharacterMeta, MeetingStatus, MusicStatus } from '../../shared/ipc-types';
 import { DebugPanel } from './debug-panel';
 import { Player } from './player';
 import { randomDelay, step, type PetState, type StepContext } from './state-machine';
@@ -21,8 +21,10 @@ let visitorCharacter: CharacterMeta | null = null;
 let agentActivity: AgentActivity = 'idle';
 /** 最新音乐播放状态（曲名用于举牌，playing 用于状态机恢复） */
 let musicStatus: MusicStatus = { playing: false };
+/** 最新飞书会议状态（举牌「正在开会」+ meeting 态恢复） */
+let meetingStatus: MeetingStatus = { inMeeting: false };
 
-/** step() 上下文：可用动作 + 可选的 agent/music 覆盖配置 */
+/** step() 上下文：可用动作 + 可选的 agent/meeting/music 覆盖配置 */
 let stepCtx: StepContext = { available: [], rng };
 
 const player = new Player(stage, () => dispatch({ type: 'VIDEO_ENDED' }));
@@ -178,7 +180,7 @@ function voiceSettings(s: {
 void window.qbot.settings.get().then((s) => speaker.setSettings(voiceSettings(s)));
 window.qbot.settings.onChanged((s) => speaker.setSettings(voiceSettings(s)));
 
-// ── 举牌文字：单一来源，优先级 手动举牌 > 一次性 > agent > music ─
+// ── 举牌文字：单一来源，优先级 手动举牌 > 一次性 > agent > meeting > music ─
 /** 一次性文字（如「工作完成！」），显示后由下一次 refresh 清掉 */
 let signboardOneShot: string | null = null;
 /** 手动举牌（右键菜单输入；联机时同步对端替身，收牌前一直举着） */
@@ -198,6 +200,9 @@ function refreshSignboard(): void {
   }
   if (agentActivity !== 'idle') {
     hostSignboard.setText('工作中…');
+    hostSignboard.show();
+  } else if (meetingStatus.inMeeting) {
+    hostSignboard.setText('正在开会');
     hostSignboard.show();
   } else if (musicStatus.playing) {
     hostSignboard.setText(
@@ -225,6 +230,17 @@ function onAgentStatus(activity: AgentActivity): void {
 
 window.qbot.agent.onStatus((s) => onAgentStatus(s.activity));
 void window.qbot.agent.getStatus().then((s) => onAgentStatus(s.activity));
+
+// ── meeting 联动 ──────────────────────────────────────────
+function onMeetingStatus(status: MeetingStatus): void {
+  meetingStatus = status;
+  if (available.length === 0) return;
+  refreshSignboard();
+  dispatch({ type: 'MEETING_STATUS', inMeeting: status.inMeeting });
+}
+
+window.qbot.meeting.onStatus(onMeetingStatus);
+void window.qbot.meeting.getStatus().then(onMeetingStatus);
 
 // ── music 联动 ────────────────────────────────────────────
 function onMusicStatus(status: MusicStatus): void {
@@ -329,8 +345,13 @@ function dispatch(event: Parameters<typeof step>[1]): void {
   if (state.kind === 'idle' && agentActivity !== 'idle' && event.type !== 'AGENT_STATUS') {
     dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
   }
-  // 音乐在播但落回 idle（agent 干完活/拖拽松手/串门结束）→ 恢复摇摆 + 举牌
-  if (state.kind === 'idle' && agentActivity === 'idle' && musicStatus.playing && event.type !== 'MUSIC_STATUS') {
+  // 开会中却落回 idle（agent 干完活/拖拽松手/串门结束）→ 恢复会中动画 + 举牌
+  if (state.kind === 'idle' && agentActivity === 'idle' && meetingStatus.inMeeting && event.type !== 'MEETING_STATUS') {
+    refreshSignboard();
+    dispatch({ type: 'MEETING_STATUS', inMeeting: true });
+  }
+  // 音乐在播但落回 idle（agent 干完活/散会/拖拽松手/串门结束）→ 恢复摇摆 + 举牌
+  if (state.kind === 'idle' && agentActivity === 'idle' && !meetingStatus.inMeeting && musicStatus.playing && event.type !== 'MUSIC_STATUS') {
     refreshSignboard();
     dispatch({ type: 'MUSIC_STATUS', playing: true });
   }
@@ -357,6 +378,7 @@ function activateCharacter(meta: CharacterMeta): void {
     doneAction: meta.manifest?.agentActions?.doneAction,
     doneLoops: meta.manifest?.agentActions?.doneLoops,
     musicAction: meta.manifest?.agentActions?.musicAction,
+    meetingAction: meta.manifest?.agentActions?.meetingAction,
   };
   state = { kind: 'idle' };
   player.play('idle');
@@ -370,7 +392,8 @@ function activateCharacter(meta: CharacterMeta): void {
   endVisit();
   scheduleVisit();
   if (agentActivity !== 'idle') dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
-  if (musicStatus.playing && agentActivity === 'idle') dispatch({ type: 'MUSIC_STATUS', playing: true });
+  if (meetingStatus.inMeeting && agentActivity === 'idle') dispatch({ type: 'MEETING_STATUS', inMeeting: true });
+  if (musicStatus.playing && agentActivity === 'idle' && !meetingStatus.inMeeting) dispatch({ type: 'MUSIC_STATUS', playing: true });
 }
 
 window.qbot.characters.onActivated(activateCharacter);
@@ -392,7 +415,8 @@ document.addEventListener('visibilitychange', () => {
   endVisit();
   scheduleVisit();
   if (agentActivity !== 'idle') dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
-  if (musicStatus.playing && agentActivity === 'idle') dispatch({ type: 'MUSIC_STATUS', playing: true });
+  if (meetingStatus.inMeeting && agentActivity === 'idle') dispatch({ type: 'MEETING_STATUS', inMeeting: true });
+  if (musicStatus.playing && agentActivity === 'idle' && !meetingStatus.inMeeting) dispatch({ type: 'MUSIC_STATUS', playing: true });
 });
 
 // ── 指针交互 ─────────────────────────────────────────────

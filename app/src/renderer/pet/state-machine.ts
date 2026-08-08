@@ -1,10 +1,11 @@
 /**
  * 桌宠状态机：纯逻辑，不碰 DOM（vitest 可单测）。
  * 状态：idle（loop 常驻）/ auto（随机动作，播 1~3 遍回 idle）/ drag（指针按住）
- *      / visit（串门）/ agent（Claude Code 等在干活，粘性循环直到活动结束）。
+ *      / visit（串门）/ agent（Claude Code 等在干活，粘性循环直到活动结束）
+ *      / meeting（飞书开会中）/ music（听歌中）。
  * 调度：idle 时随机 30s~3min 触发一次 auto。
- * 优先级：drag > agent > auto/idle（drag 中忽略 agent 事件，由入口层在
- * POINTER_UP 后重发最新 AGENT_STATUS 恢复）。
+ * 优先级：drag > agent > meeting > music > auto/idle（drag 中忽略 agent 事件，
+ * 由入口层在 POINTER_UP 后重发最新状态恢复；meeting/music 同理）。
  */
 import type { ActionId, PlayableId } from '@qbot/pipeline';
 import type { AgentActivity } from '../../shared/ipc-types';
@@ -15,6 +16,7 @@ export type PetState =
   | { kind: 'drag' }
   | { kind: 'visit'; action: PlayableId; loopsLeft: number }
   | { kind: 'agent'; activity: AgentActivity; action: PlayableId }
+  | { kind: 'meeting'; action: PlayableId }
   | { kind: 'music'; action: PlayableId };
 
 export type PetEvent =
@@ -26,6 +28,7 @@ export type PetEvent =
   | { type: 'VISIT_START'; action: PlayableId; loops: number }
   | { type: 'VISIT_END' }
   | { type: 'AGENT_STATUS'; activity: AgentActivity }
+  | { type: 'MEETING_STATUS'; inMeeting: boolean }
   | { type: 'MUSIC_STATUS'; playing: boolean };
 
 /**
@@ -51,6 +54,9 @@ export const DONE_LOOPS = 1;
 
 /** 音乐播放时的默认摇摆动作 */
 export const DEFAULT_MUSIC_ACTION: ActionId = 'talk_happy';
+
+/** 飞书开会时的默认动作（喝茶旁听既视感；Studio 可改） */
+export const DEFAULT_MEETING_ACTION: ActionId = 'tea';
 
 export interface StepResult {
   state: PetState;
@@ -94,6 +100,8 @@ export interface StepContext {
   doneLoops?: number;
   /** 音乐摇摆动作覆盖（缺省 DEFAULT_MUSIC_ACTION） */
   musicAction?: PlayableId;
+  /** 开会动作覆盖（缺省 DEFAULT_MEETING_ACTION） */
+  meetingAction?: PlayableId;
 }
 
 export function randomDelay(rng: SchedulerRng): number {
@@ -145,8 +153,9 @@ export function step(
     }
 
     case 'VIDEO_ENDED': {
-      // agent / music 态粘性循环：播完手动重播
+      // agent / meeting / music 态粘性循环：播完手动重播
       if (state.kind === 'agent') return { state, play: state.action };
+      if (state.kind === 'meeting') return { state, play: state.action };
       if (state.kind === 'music') return { state, play: state.action };
       if (state.kind === 'visit') {
         const left = state.loopsLeft - 1;
@@ -232,9 +241,35 @@ export function step(
       };
     }
 
-    case 'MUSIC_STATUS': {
-      // 优先级：drag > agent > visit > music
+    case 'MEETING_STATUS': {
+      // 优先级：drag > agent > visit(进行中的不打断) > meeting
       if (state.kind === 'drag' || state.kind === 'agent' || state.kind === 'visit') return { state };
+      const { inMeeting } = event;
+      if (!inMeeting) {
+        // 离会：只有 meeting 态回 idle（音乐恢复由入口层重发 MUSIC_STATUS）
+        if (state.kind !== 'meeting') return { state };
+        return { state: { kind: 'idle' }, play: 'idle', rescheduleTimer: true };
+      }
+      // 入会：meeting > music，正在摇摆也切过去
+      const meetingAction = ctx.meetingAction ?? DEFAULT_MEETING_ACTION;
+      const action = ctx.available.includes(meetingAction) ? meetingAction : 'idle';
+      if (state.kind === 'meeting' && state.action === action) return { state };
+      return {
+        state: { kind: 'meeting', action },
+        play: action,
+        clearTimer: true,
+      };
+    }
+
+    case 'MUSIC_STATUS': {
+      // 优先级：drag > agent > meeting > visit > music
+      if (
+        state.kind === 'drag' ||
+        state.kind === 'agent' ||
+        state.kind === 'meeting' ||
+        state.kind === 'visit'
+      )
+        return { state };
       const { playing } = event;
       if (!playing) {
         // 音乐停止：只有 music 态回 idle

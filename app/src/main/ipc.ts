@@ -15,6 +15,7 @@ import { getDecor, setDecor } from './decor';
 import { rebuildTray, characterSection, connectSection, systemSection } from './tray';
 import { getAgentStatus } from './agent-server';
 import { getMusicStatus } from './music-monitor';
+import { getMeetingStatus } from './meeting-monitor';
 
 export function registerIpc(): void {
   // ── hatch ──────────────────────────────────────────────
@@ -205,6 +206,9 @@ export function registerIpc(): void {
 
   // ── music 联动 ─────────────────────────────────────────
   ipcMain.handle('music:getStatus', () => getMusicStatus());
+
+  // ── meeting 联动 ───────────────────────────────────────
+  ipcMain.handle('meeting:getStatus', () => getMeetingStatus());
 
   // ── bubble ─────────────────────────────────────────────
   ipcMain.on('bubble:empty', () => hideBubbleWindow());

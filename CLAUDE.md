@@ -48,12 +48,21 @@
 - 自定义动作生成进度通过 `studio:customAction` 事件广播，Studio 页自动刷新
 - 数据存储：`manifest.json` 新增 `persona`/`customActions`/`agentActions` 字段
 
+## 飞书会议联动
+
+- 监控本地飞书客户端会议模块（byteview）的明文日志检测本机入会/离会：`<LarkShell>/sdk_storage/log/native-pc-sdk/byteview-PCSDK-FALCON_<日期>.log`，标记 `onJoinChannelSuccess` / `join-work-flow:leaveRoom`（RTC 引擎入口函数名，跨版本稳定；1v1 通话也算会中）
+- **为什么不走 OpenAPI**：飞书没有「查询/订阅某用户当前是否在会中」的能力（join/leave 事件只对 OpenAPI 预约的会议触发），详见 `docs/feishu-meeting-monitor-design.md`
+- 会中桌宠举牌「正在开会」+ 切 meeting 态动作（默认 `tea`，Studio「飞书开会时」可配）；优先级 `drag > agent > meeting > music > visit > auto/idle`
+- 失效保护三连（防钉死在会中态）：飞书进程消失（30s pgrep）、会中日志停滞 5min、IO 连续失败 10 次降级禁用；启动读日志尾 256KB 播种（会中重启 QBot 也能识别）
+- 零权限、零网络、零 npm 依赖；日志目录不存在（未装飞书/非 mac|win）静默禁用；Windows 日志路径按同构推断**未实测**
+- 核心文件：`app/src/main/meeting-monitor.ts`（轮询/失效保护）+ `meeting-log-parser.ts`（纯逻辑，可单测）
+
 ## 网易云音乐联动（Windows 专属）
 
 - 通过 **SMTC (SystemMediaTransportControls)** API 监控云音乐播放状态
 - 检测到播放时桌宠**举牌显示「曲名 - 歌手」**并切换到摇摆动作（默认 `talk_happy`，可在 Studio 配置）
 - 常驻一个 PowerShell 进程内部每 3 秒轮询，进程意外退出会退避重启
-- 状态机新增 **music 态**，优先级 `drag > agent > music > visit > auto/idle`（Claude 干活时音乐不打断 agent 动画）
+- 状态机新增 **music 态**，优先级 `drag > agent > meeting > music > visit > auto/idle`（Claude 干活/开会时音乐不打断）
 - 非 Windows 平台静默禁用，零新增 npm 依赖
 - 核心文件：`app/src/main/music-monitor.ts` (175 行)
 

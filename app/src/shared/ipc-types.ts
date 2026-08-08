@@ -127,6 +127,13 @@ export interface MusicStatus {
   artist?: string;
 }
 
+/** 飞书会议状态（来自本地 byteview 日志监控；1v1 通话也算会中） */
+export interface MeetingStatus {
+  inMeeting: boolean;
+  /** 检测到入会的时刻（主进程时钟） */
+  since?: number;
+}
+
 /** 桌宠右键菜单「说话/动作」条目（渲染端报给主进程建原生菜单） */
 export interface PetMenuActionEntry {
   id: string;
@@ -247,6 +254,12 @@ export interface QBotApi {
     getStatus(): Promise<MusicStatus>;
     /** pet 窗口订阅：音乐播放状态变化 */
     onStatus(cb: (status: MusicStatus) => void): () => void;
+  };
+  meeting: {
+    /** 当前飞书会议状态（pet 窗口加载时铺底） */
+    getStatus(): Promise<MeetingStatus>;
+    /** pet 窗口订阅：会议状态变化 */
+    onStatus(cb: (status: MeetingStatus) => void): () => void;
   };
   link: {
     /** 当前联机链路状态 */

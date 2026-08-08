@@ -10,6 +10,7 @@ import { rebuildTray } from './tray';
 import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds } from './windows';
 import { startAgentServer } from './agent-server';
 import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
+import { startMeetingMonitor, stopMeetingMonitor } from './meeting-monitor';
 import { setLinkStatusListener, stopLink, createLinkRoom, joinLinkRoom, notifyActiveCharacterChanged } from './link/link';
 
 // qbot-asset://<dirId>/<relPath> → userData/characters/<dirId>/<relPath>
@@ -68,6 +69,7 @@ app.whenReady().then(async () => {
   await rebuildTray();
   void startAgentServer(); // agent 联动状态服务（失败不阻塞桌宠本体）
   startMusicMonitor(); // 网易云音乐播放监控（Windows only，失败不阻塞）
+  startMeetingMonitor(); // 飞书会议监控（本地日志轮询，失败不阻塞）
 
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
@@ -94,6 +96,7 @@ app.on('window-all-closed', () => {
 // 退出前收掉常驻的 powershell 监控进程，避免留孤儿；联机侧发 bye 让对端立即收窗
 app.on('before-quit', () => {
   stopMusicMonitor();
+  stopMeetingMonitor();
   stopLink();
 });
 
