@@ -12,7 +12,7 @@ import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, getLocalSign, setLocalSign } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
-import { rebuildTray, buildMenuTemplate } from './tray';
+import { rebuildTray, characterSection, connectSection, systemSection } from './tray';
 import { getAgentStatus } from './agent-server';
 import { getMusicStatus } from './music-monitor';
 
@@ -134,27 +134,33 @@ export function registerIpc(): void {
   ipcMain.handle('market:remove', (_ev, hash: string) => removeSkin(hash));
 
   // 桌宠右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
-  // 说话/播动作回渲染端执行；房间/配置/市场直调主进程；「更多」内嵌托盘同源模板
-  // （孵化/切角色/Claude 联动/联机/设置/退出——托盘被刘海屏挤掉时的兜底配置入口）
+  // 按「玩宠 → 窗口 → 角色/联机 → 系统」四段组织，托盘同源 section 直接平铺
+  // （刘海屏 mac 菜单栏挤满时托盘图标被系统静默隐藏，右键是兜底配置入口）。
+  // 说话/播动作/举牌回渲染端执行；开窗口直调主进程
   ipcMain.on('pet:popupMenu', async (ev, actions: PetMenuActionEntry[]) => {
     const win = BrowserWindow.fromWebContents(ev.sender);
     if (!win) return;
     const send = (cmd: PetMenuCommand) => ev.sender.send('pet:menuCommand', cmd);
     const menu = Menu.buildFromTemplate([
+      // ── 玩宠（最高频，一级直达）─────────────────────────
+      { label: '说句话', click: () => send({ type: 'speak' }) },
       {
-        label: '说话 / 动作',
-        submenu: [
-          { label: '说句话', click: () => send({ type: 'speak' }) },
-          { type: 'separator' },
-          ...(Array.isArray(actions) ? actions : []).map((a) => ({
-            label: String(a.label),
-            click: () => send({ type: 'play', action: String(a.id) }),
-          })),
-        ],
+        label: '播放动作',
+        submenu: (Array.isArray(actions) ? actions : []).map((a) => ({
+          label: String(a.label),
+          click: () => send({ type: 'play', action: String(a.id) }),
+        })),
       },
-      { type: 'separator' },
+      // 举牌不依赖联机（signboard 本地渲染，配对时才同步对端）；入口常驻，位置稳定
       {
-        label: '打开房间',
+        label: getLocalSign() ? '换个牌子…' : '举牌…',
+        click: () => send({ type: 'signPrompt' }),
+      },
+      ...(getLocalSign() ? [{ label: '收牌', click: () => send({ type: 'signClear' as const }) }] : []),
+      { type: 'separator' },
+      // ── 窗口入口 ────────────────────────────────────────
+      {
+        label: '小房间',
         click: async () => {
           const { activeCharacter } = await getSettings();
           const meta = activeCharacter ? await getCharacter(activeCharacter) : null;
@@ -162,24 +168,15 @@ export function registerIpc(): void {
           openRoomWindow(name && name !== '未命名' ? `${name}的家` : '小房间');
         },
       },
-      { label: '生成配置', click: () => createStudioWindow() },
       { label: '装扮市场', click: () => createMarketWindow() },
-      // 联机举牌：打字后自己和对端屏幕上的替身都举同款牌（用户显式输入才出本机）；
-      // 断线后牌还举着时也给入口，能收牌
-      ...(getLinkStatus().phase === 'paired' || getLocalSign()
-        ? [
-            { type: 'separator' as const },
-            {
-              label: getLocalSign() ? '换个牌子…' : '举牌…',
-              click: () => send({ type: 'signPrompt' as const }),
-            },
-            ...(getLocalSign()
-              ? [{ label: '收牌', click: () => send({ type: 'signClear' as const }) }]
-              : []),
-          ]
-        : []),
+      { label: '角色工作室', click: () => createStudioWindow() },
       { type: 'separator' },
-      { label: '更多', submenu: await buildMenuTemplate() },
+      // ── 角色 / 联机（托盘同源）──────────────────────────
+      ...(await characterSection()),
+      ...(await connectSection()),
+      { type: 'separator' },
+      // ── 系统（托盘同源）─────────────────────────────────
+      ...systemSection(),
     ]);
     menu.popup({ window: win });
   });

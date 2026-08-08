@@ -355,7 +355,7 @@ export function createStudioWindow(): BrowserWindow {
   studioWindow = new BrowserWindow({
     width: 480,
     height: 680,
-    title: 'QBot 生成配置',
+    title: 'QBot 角色工作室',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

@@ -39,7 +39,7 @@
 
 ## Studio 配置面板（工作室）
 
-- **托盘菜单「生成配置」**打开独立配置窗口（第 5 个 renderer：`studio`）
+- **桌宠右键菜单「角色工作室」**打开独立配置窗口（第 5 个 renderer：`studio`）
 - **人设编辑**：角色 persona 可视化编辑，后续所有动作生成会注入人设到 prompt
 - **Claude Code 联动配置**：为每个 agent 活动（thinking/working/waiting/error/done）+ 听歌（music）指定播放的动作，支持自定义动作
 - **动作 Prompt 查看/编辑**：查看每个动作的 poseDesc/motionDesc，可修改后影响后续 redo

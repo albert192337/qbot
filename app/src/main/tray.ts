@@ -52,40 +52,49 @@ export async function rebuildTray(): Promise<void> {
 }
 
 /**
- * 托盘与桌宠右键「更多」共用的菜单模板（单一来源，改一处两边生效）。
- * 桌宠右键经 ipc 'pet:popupMenu' 以原生子菜单内嵌——刘海屏 mac 菜单栏
- * 挤满时托盘图标被系统静默隐藏，右键是兜底配置入口。
+ * 菜单按 section 拆分（单一来源，改一处两边生效）：托盘 = character + connect
+ * + system；桌宠右键（ipc 'pet:popupMenu'）在前面追加玩宠/窗口两段后拼同样的
+ * section——刘海屏 mac 菜单栏挤满时托盘图标被系统静默隐藏，右键是兜底配置入口。
  */
-export async function buildMenuTemplate(): Promise<Electron.MenuItemConstructorOptions[]> {
+
+/** 角色管理：「切换角色」radio 列表 + 孵化新角色（换角色/造新角色是同一件事的两个动作） */
+export async function characterSection(): Promise<Electron.MenuItemConstructorOptions[]> {
   const characters = (await listCharacters()).filter((c) => c.manifest);
   const settings = await getSettings();
   return [
     {
-      label: '孵化新角色…',
-      click: () => createHatchWindow(),
-    },
-    {
       label: '切换角色',
-      submenu: characters.length
-        ? characters.map((c) => ({
-            // 「未命名」会撞名 → 补 dirId 前缀区分
-            label:
-              !c.manifest.name || c.manifest.name === '未命名'
-                ? `未命名（${c.dirId.slice(0, 8)}）`
-                : c.manifest.name,
-            type: 'radio' as const,
-            checked: settings.activeCharacter === c.dirId,
-            click: async () => {
-              await setSettings({ activeCharacter: c.dirId });
-              const meta = await getCharacter(c.dirId);
-              if (meta) broadcastCharacterActivated(meta);
-              notifyActiveCharacterChanged(); // 联机中：新形象重新 hello 给对端
-              void rebuildTray();
-            },
-          }))
-        : [{ label: '（暂无角色）', enabled: false }],
+      submenu: [
+        ...(characters.length
+          ? characters.map((c) => ({
+              // 「未命名」会撞名 → 补 dirId 前缀区分
+              label:
+                !c.manifest.name || c.manifest.name === '未命名'
+                  ? `未命名（${c.dirId.slice(0, 8)}）`
+                  : c.manifest.name,
+              type: 'radio' as const,
+              checked: settings.activeCharacter === c.dirId,
+              click: async () => {
+                await setSettings({ activeCharacter: c.dirId });
+                const meta = await getCharacter(c.dirId);
+                if (meta) broadcastCharacterActivated(meta);
+                notifyActiveCharacterChanged(); // 联机中：新形象重新 hello 给对端
+                void rebuildTray();
+              },
+            }))
+          : [{ label: '（暂无角色）', enabled: false }]),
+        { type: 'separator' as const },
+        { label: '孵化新角色…', click: () => createHatchWindow() },
+      ],
     },
-    { type: 'separator' },
+  ];
+}
+
+/** 对外连接：联机 + Claude Code 联动 */
+export async function connectSection(): Promise<Electron.MenuItemConstructorOptions[]> {
+  const settings = await getSettings();
+  return [
+    linkMenuItem(),
     {
       // 显式同意入口：点击弹确认框，绝不静默改 ~/.claude/settings.json
       label: settings.claudeHooksInstalled ? '✓ Claude Code 联动' : '接入 Claude Code 联动…',
@@ -95,13 +104,27 @@ export async function buildMenuTemplate(): Promise<Electron.MenuItemConstructorO
         void rebuildTray();
       },
     },
-    linkMenuItem(),
+  ];
+}
+
+/** 系统：设置 + 退出 */
+export function systemSection(): Electron.MenuItemConstructorOptions[] {
+  return [
     {
       label: '设置…',
       click: () => createHatchWindow('settings'),
     },
-    { type: 'separator' },
     { label: '退出 QBot', click: () => app.quit() },
+  ];
+}
+
+export async function buildMenuTemplate(): Promise<Electron.MenuItemConstructorOptions[]> {
+  return [
+    ...(await characterSection()),
+    { type: 'separator' },
+    ...(await connectSection()),
+    { type: 'separator' },
+    ...systemSection(),
   ];
 }
 
@@ -124,7 +147,7 @@ function linkMenuItem(): Electron.MenuItemConstructorOptions {
       label,
       submenu: [
         {
-          label: '创建房间（房间码进剪贴板）',
+          label: '邀请好友（房间码进剪贴板）',
           click: async () => {
             try {
               const code = await createLinkRoom();
@@ -132,7 +155,7 @@ function linkMenuItem(): Electron.MenuItemConstructorOptions {
               void dialog.showMessageBox({
                 type: 'info',
                 message: `房间码：${code}`,
-                detail: '已复制到剪贴板。发给好友，对方在托盘选「从剪贴板加入房间」。',
+                detail: '已复制到剪贴板。发给好友，对方复制后在「联机」菜单选「用剪贴板房间码加入」。',
               });
             } catch (err) {
               void dialog.showMessageBox({
@@ -144,7 +167,7 @@ function linkMenuItem(): Electron.MenuItemConstructorOptions {
           },
         },
         {
-          label: '从剪贴板加入房间',
+          label: '用剪贴板房间码加入',
           click: async () => {
             const code = clipboard.readText().trim().toUpperCase();
             if (!ROOM_CODE_RE.test(code)) {
