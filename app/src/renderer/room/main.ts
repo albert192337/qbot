@@ -2,8 +2,9 @@
 import type { ActionId } from '@qbot/pipeline';
 import { Player } from '../pet/player';
 import { DEFAULT_VOICE_SETTINGS, Speaker, type VoiceSettings } from '../pet/voice/speak';
-import { sanitizePlacements } from './decor';
+import { depthZ, footprintsOf, sanitizePlacements, type Footprint } from './decor';
 import { DecorEditor } from './decor-editor';
+import { InventoryPanel } from './inventory-panel';
 import { DECOR_BY_ID } from './decor-pack';
 import { pointInPolygon, polygonCentroid } from './geometry';
 import { scaleForY, step, type Point, type RoamState } from './roam';
@@ -63,6 +64,16 @@ let available: ActionId[] = [];
 const STD_ACTION_IDS: readonly string[] = ['idle', 'drag', 'sleep', 'tea', 'talk_happy', 'talk_annoyed'];
 let timer: ReturnType<typeof setTimeout> | null = null;
 let editing = false; // 编辑态：漫游/发言/互动/窗口拖动全部暂停
+/** 当前角色（取美术固有朝向用） */
+let currentCharacter: Awaited<ReturnType<typeof window.qbot.characters.getActive>> = null;
+/** 水平翻转系数：1 = 原朝向，-1 = 镜像（朝行进方向） */
+let charScaleFlip = 1;
+/** 是否有可用的自定义 walk 动画。
+ *  漫游动作池只收标准动作（走路不该被当成「随机做个动作」抽中），
+ *  所以 walk 单独记一个开关，只在 walking 状态用。 */
+let hasWalkAction = false;
+/** 行走动画的动作名（manifest.customActions 里的 key） */
+const WALK_ACTION = 'walk';
 
 const player = new Player(charStage, () => dispatch({ type: 'VIDEO_ENDED' }));
 
@@ -73,13 +84,46 @@ const speaker = new Speaker({
   hasAction: (action) => available.includes(action),
 });
 
-/** 脚底锚点定位 + 远近缩放；durationMs>0 = 走动的缓动平移 */
+/**
+ * 行走素材本身的朝向。
+ * 不能用 manifest.actions.talk_happy.facing 当代理——那是**另一个动作**的朝向，
+ * 自定义动作的 manifest 里没有 facing 字段，实测按它判断会翻反。
+ * walk 生成时 prompt 明确要求「正侧面朝左」，所以钉死为 left。
+ */
+const WALK_ART_FACING: 'left' | 'right' = 'left';
+
+/**
+ * 走动朝向：让角色面朝行进方向。房间里角色四面八方走，所以必须按 dx 判断
+ * （桌面上是固定方向所以不翻）。素材朝左 → 往右走才需要镜像。
+ *
+ * 换向必须是**瞬间**的：镜像若跟着走动的 transition 补间，会经过 scaleX(0)
+ * 把角色压扁成一条线。所以镜像单独放在 #charStage（无过渡），并在换向那一刻
+ * 触发烟雾特效遮掩这一帧的跳变。
+ */
+function faceTowards(dx: number): void {
+  if (Math.abs(dx) < 1) return; // 几乎垂直移动：保持当前朝向，别抖
+  const goingRight = dx > 0;
+  const next = goingRight === (WALK_ART_FACING === 'left') ? -1 : 1;
+  if (next === charScaleFlip) return; // 朝向没变，别白放特效
+  charScaleFlip = next;
+  player.triggerPoof();
+}
+
+/** 脚底锚点定位 + 远近缩放；durationMs>0 = 走动的匀速平移 */
 function render(pos: Point, durationMs: number): void {
-  const ease = durationMs > 0 ? `transform ${durationMs}ms ease-in-out` : 'none';
+  // 走动用 linear：ease-in-out 的起步/收尾加减速配上平移会更像「飘」而不是走
+  const ease = durationMs > 0 ? `transform ${durationMs}ms linear` : 'none';
   char.style.transition = ease;
-  charScale.style.transition = ease;
+  // 缩放不跟走动同缓动（远近变化应平滑连续，不需要 linear）
+  charScale.style.transition = durationMs > 0 ? `transform ${durationMs}ms linear` : 'none';
   char.style.transform = `translate(${pos.x - spec.petHeight / 2}px, ${pos.y - spec.petHeight}px)`;
+  // #charScale 只做远近缩放；镜像放在 #charStage —— 否则会把同级的 #bubble 一起镜像
+  // （实测气泡文字反过来了），而且跟着补间会被压扁。
   charScale.style.transform = `scale(${scaleForY(pos.y, spec)})`;
+  charStage.style.transition = 'none';
+  charStage.style.transform = `scaleX(${charScaleFlip})`;
+  // 与地面家具共用同一深度刻度：角色走到家具前面就盖住它，走到后面就被挡
+  char.style.zIndex = String(depthZ(pos.y, spec));
 }
 
 /** 当前实际位置（走动中 = CSS 过渡的插值位置），脚底锚点坐标 */
@@ -95,17 +139,30 @@ function clearTimer(): void {
   }
 }
 
+/**
+ * 当前地面家具足迹。每次现取而不缓存：placements 只由 DecorEditor 持有，
+ * 且它的每个修改器都**重新赋值新数组** —— 缓存一份引用会立刻失效。
+ */
+function currentBlocked(): Footprint[] {
+  return footprintsOf(editor.placementsSnapshot(), (id) => DECOR_BY_ID.get(id));
+}
+
 function dispatch(event: Parameters<typeof step>[1]): void {
   if (editing) return; // 编辑态冻结漫游
-  const result = step(state, event, { available, rng, geom: spec });
+  const result = step(state, event, { available, rng, geom: spec, blocked: currentBlocked() });
   if (result.state === state && !result.play && !result.restMs) return; // 事件被忽略
   state = result.state;
   clearTimer();
-  if (result.play) player.play(result.play);
   if (state.kind === 'walking') {
+    // 有 walk 动画就循环播它（roam.ts 给的是 idle 兜底：没有行走动画时只能原地站着滑）
+    faceTowards(state.to.x - state.from.x);
+    if (hasWalkAction) player.playLooping(WALK_ACTION);
+    else if (result.play) player.play(result.play);
     render(state.to, state.durationMs);
     timer = setTimeout(() => dispatch({ type: 'WALK_ARRIVED' }), state.durationMs);
   } else {
+    if (result.play) player.play(result.play);
+    // 拎着时跟手：不能有过渡，否则会拖出橡皮筋般的延迟
     render(state.pos, 0);
   }
   if (result.restMs) timer = setTimeout(() => dispatch({ type: 'REST_OVER' }), result.restMs);
@@ -114,10 +171,11 @@ function dispatch(event: Parameters<typeof step>[1]): void {
 // ── 角色加载（启动主动拉取 + 切角色广播） ─────────────────
 function loadCharacter(meta: Awaited<ReturnType<typeof window.qbot.characters.getActive>>): void {
   if (!meta?.manifest) return; // 无激活角色：空房间照常展示
+  currentCharacter = meta;
   // 小房间漫游只用标准动作，自定义动作（听歌摇摆等）不参与
-  available = player
-    .load(meta.dirId, meta.manifest)
-    .filter((id): id is ActionId => STD_ACTION_IDS.includes(id));
+  const loaded = player.load(meta.dirId, meta.manifest);
+  hasWalkAction = loaded.includes(WALK_ACTION);
+  available = loaded.filter((id): id is ActionId => STD_ACTION_IDS.includes(id));
   clearTimer();
   state = { kind: 'resting', pos: polygonCentroid(spec.floor) };
   player.play('idle');
@@ -144,11 +202,46 @@ function voiceSettings(s: {
 void window.qbot.settings.get().then((s) => speaker.setSettings(voiceSettings(s)));
 window.qbot.settings.onChanged((s) => speaker.setSettings(voiceSettings(s)));
 
-// ── 点角色互动：打断漫游，talk_happy + 说一句 ─────────────
-char.addEventListener('click', () => {
-  if (editing || available.length === 0) return;
-  dispatch({ type: 'CHAR_CLICK', pos: currentPos() });
-  speaker.forceSpeak();
+// ── 点角色 / 拎起角色 ─────────────────────────────────────
+// 点一下 = 就近走一小会；按住拖 = 拎起来（播 drag 动画，跟手移动，松手落回地板）
+// 不用 setPointerCapture：同 DecorEditor 的注释，CDP 合成事件下它会抛异常，
+// 而 releasePointerCapture 一抛就会把后面的 DRAG_END 吃掉 → 角色永远卡在 drag。
+// 改成 window 级监听，天然免疫。
+const CHAR_DRAG_THRESHOLD = 4; // px（房间坐标），超过才算拖拽而非点击
+
+char.addEventListener('pointerdown', (e) => {
+  if (editing || available.length === 0 || e.button !== 0) return;
+  e.stopPropagation(); // 别触发窗口拖动
+  const downAt = toRoom(e.clientX, e.clientY);
+  let dragging = false;
+
+  const onMove = (ev: PointerEvent): void => {
+    const p = toRoom(ev.clientX, ev.clientY);
+    if (!dragging) {
+      if (Math.hypot(p.x - downAt.x, p.y - downAt.y) < CHAR_DRAG_THRESHOLD) return;
+      dragging = true;
+      speaker.stop(); // 拎起来就别说话了
+      dispatch({ type: 'DRAG_START', pos: p });
+    }
+    dispatch({ type: 'DRAG_MOVE', pos: p });
+  };
+
+  const onUp = (ev: PointerEvent): void => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+    if (dragging) {
+      dispatch({ type: 'DRAG_END', pos: toRoom(ev.clientX, ev.clientY) });
+      return;
+    }
+    // 没超过阈值 = 点击：就近走一小会 + 说一句
+    dispatch({ type: 'CHAR_CLICK', pos: currentPos() });
+    speaker.forceSpeak();
+  };
+
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
 });
 
 // ── 装饰系统 ─────────────────────────────────────────────
@@ -182,13 +275,27 @@ void window.qbot.decor
   .get(spec.name)
   .then((raw) => editor.setPlacements(sanitizePlacements(raw, new Set(DECOR_BY_ID.keys()))));
 
+// 装饰托盘按库存开锁：开箱/合成后主进程会广播，托盘余量实时跟上
+const inventory = new InventoryPanel();
+void window.qbot.progress.get().then((p) => {
+  editor.setInventory(p.inventory);
+  inventory.setProgress(p);
+});
+window.qbot.progress.onChanged((p) => {
+  editor.setInventory(p.inventory);
+  inventory.setProgress(p);
+});
+
 // ── 贴纸窗交互 ───────────────────────────────────────────
 // 外沿透明区穿透：鼠标出入房间实体轮廓时切换 setIgnoreMouseEvents（forward 保证
 // 穿透期间 mousemove 仍进来，能判定回归）；同一状态只发一次 IPC。
 // 编辑态整窗保持可交互：装饰栏 fixed 在轮廓外的透明区，穿透会让它点不到。
 let inRoom = false;
 document.addEventListener('mousemove', (e) => {
-  const inside = editing || pointInPolygon(toRoom(e.clientX, e.clientY), spec.outline);
+  // 编辑态 / 背包开着时整窗保持可交互：这两个面板都浮在房间轮廓外的透明区，
+  // 一穿透就点不到（装饰栏当年踩过同一个坑）
+  const inside =
+    editing || inventory.isOpen() || pointInPolygon(toRoom(e.clientX, e.clientY), spec.outline);
   if (inside === inRoom) return;
   inRoom = inside;
   window.qbot.room.setIgnoreMouse(!inside);
@@ -237,7 +344,8 @@ stage.addEventListener('pointerup', (e) => {
 closeBtn.addEventListener('click', () => window.close());
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (editor.active) editor.exit(); // 编辑态 ESC 先退编辑，再按才关窗
+  if (inventory.isOpen()) inventory.hide(); // 背包开着先关背包
+  else if (editor.active) editor.exit(); // 编辑态 ESC 先退编辑，再按才关窗
   else window.close();
 });
 
@@ -257,6 +365,14 @@ document.addEventListener('contextmenu', (e) => {
     editor.enter(editor.placementsSnapshot());
   });
   menu.appendChild(decorate);
+  const bag = document.createElement('div');
+  bag.className = 'menu-item';
+  bag.textContent = '我的家具';
+  bag.addEventListener('click', () => {
+    hideMenu();
+    inventory.show();
+  });
+  menu.appendChild(bag);
   const close = document.createElement('div');
   close.className = 'menu-item';
   close.textContent = '关闭房间';
@@ -268,7 +384,7 @@ document.addEventListener('contextmenu', (e) => {
   menu.style.display = 'block';
   const mw = 120;
   menu.style.left = `${Math.min(e.clientX, window.innerWidth - mw - 4)}px`;
-  menu.style.top = `${Math.min(e.clientY, window.innerHeight - 78)}px`;
+  menu.style.top = `${Math.min(e.clientY, window.innerHeight - 108)}px`;
 });
 document.addEventListener('click', (e) => {
   if (!menu.contains(e.target as Node)) hideMenu();

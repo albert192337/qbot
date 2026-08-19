@@ -133,6 +133,10 @@
         font-size: 13px;
         color: #5c3d2e;
         text-align: center;
+        /* 长歌名会把牌子撑出窗口被裁掉（窗口默认仅 360px）→ 限宽 + 省略号 */
+        max-width: 76vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
         box-shadow: 0 2px 8px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
         min-width: 40px;

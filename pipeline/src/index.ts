@@ -14,6 +14,11 @@ export {
   toWebm,
   toGif,
   computeAlphaBBox,
+  computeAlphaStats,
+  ALPHA_ERODE_PX,
+  NORM_TARGET_COVERAGE,
+  NORM_SCALE_MIN,
+  NORM_SCALE_MAX,
   normalizeFilter,
   probeSize,
 } from './chroma.js';

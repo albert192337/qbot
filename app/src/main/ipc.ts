@@ -7,11 +7,20 @@ import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipelin
 import type { PetMenuActionEntry, PetMenuCommand } from '../shared/ipc-types';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { createStudioWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, createMarketWindow } from './windows';
+import { createHatchWindow, createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, createMarketWindow } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, getLocalSign, setLocalSign } from './link/link';
-import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions } from './pipeline-bridge';
+import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
+import {
+  craft,
+  debugAddIdleMs,
+  debugGrantBoxes,
+  debugGrantFurniture,
+  debugGrantPoints,
+  getProgress,
+  openBox,
+} from './progress';
 import { rebuildTray, characterSection, connectSection, systemSection } from './tray';
 import { getAgentStatus } from './agent-server';
 import { getMusicStatus } from './music-monitor';
@@ -80,10 +89,7 @@ export function registerIpc(): void {
   });
 
   // ── pet ────────────────────────────────────────────────
-  // 按发送方窗口分派：本地宠和联机远端宠共用同一套拖拽代码
-  ipcMain.on('pet:move', (ev, x: number, y: number) => {
-    BrowserWindow.fromWebContents(ev.sender)?.setPosition(Math.round(x), Math.round(y), false);
-  });
+  ipcMain.on('pet:move', (_ev, x: number, y: number) => movePetWindow(x, y));
   ipcMain.on('pet:setVisitMode', (_ev, enter: boolean) => setPetVisitMode(enter));
 
   // ── link 联机 ──────────────────────────────────────────
@@ -113,6 +119,19 @@ export function registerIpc(): void {
       console.error('decor:set failed', err); // 写失败不阻塞 UI
     }
   });
+
+  // ── progress 游戏化积累 ────────────────────────────────
+  // 一次性结果（开箱/合成得到什么）走 invoke 返回值，幂等状态走 progress:changed
+  // 广播 —— 两者混用会被节流的广播吞掉一次性事件（见本文件 AgentStatus 处的同类注释）
+  ipcMain.handle('progress:get', () => getProgress());
+  ipcMain.handle('progress:openBox', () => openBox());
+  ipcMain.handle('progress:craft', (_ev, tier) => craft(tier));
+  ipcMain.handle('progress:debugAddIdleMs', (_ev, ms: number) => debugAddIdleMs(ms));
+  ipcMain.handle('progress:debugGrantBoxes', (_ev, n: number) => debugGrantBoxes(n));
+  ipcMain.handle('progress:debugGrantPoints', (_ev, n: number) => debugGrantPoints(n));
+  ipcMain.handle('progress:debugGrantFurniture', (_ev, stickerId?: string) =>
+    debugGrantFurniture(stickerId),
+  );
 
   // ── settings ───────────────────────────────────────────
   ipcMain.handle('settings:get', () => getSettings());
@@ -200,6 +219,20 @@ export function registerIpc(): void {
   ipcMain.handle('studio:saveAgentActions', async (_ev, dirId: string, config) => {
     await saveAgentActions(dirId, config);
   });
+  ipcMain.handle('studio:saveFullPrompts', async (_ev, dirId: string, actionId: string, framePromptFull: string, videoPromptFull: string) => {
+    await saveFullPrompts(dirId, actionId, framePromptFull, videoPromptFull);
+  });
+  ipcMain.handle('studio:saveTurnaroundPrompt', async (_ev, dirId: string, prompt: string) => {
+    await saveTurnaroundPrompt(dirId, prompt);
+  });
+  // 下面两个会调 API 花钱，渲染层已做二次确认
+  ipcMain.handle('studio:regenerateActions', async (_ev, dirId: string, actionIds: string[]) => {
+    await regenerateActions(dirId, actionIds as never);
+  });
+  ipcMain.handle('studio:regenerateTurnaround', async (_ev, dirId: string) => {
+    createHatchWindow(); // 三视图要人工挑图，先把孵化窗弹出来
+    await regenerateTurnaround(dirId);
+  });
 
   // ── agent 联动 ─────────────────────────────────────────
   ipcMain.handle('agent:getStatus', () => getAgentStatus());
@@ -209,7 +242,6 @@ export function registerIpc(): void {
 
   // ── meeting 联动 ───────────────────────────────────────
   ipcMain.handle('meeting:getStatus', () => getMeetingStatus());
-
   // ── bubble ─────────────────────────────────────────────
   ipcMain.on('bubble:empty', () => hideBubbleWindow());
 }

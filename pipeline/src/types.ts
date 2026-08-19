@@ -91,6 +91,16 @@ export interface ManifestAction {
   poseDesc?: string;
   /** 自定义动作描述（覆盖默认 actionSpec.motionDesc） */
   motionDesc?: string;
+  /**
+   * 首帧 prompt 全文覆盖：非空时**完全取代**模板拼装结果（含"保持发型/绿幕背景"等外层措辞）。
+   * 只影响之后的生成；已产出的 webm/gif 不受影响，需重新生成才生效。
+   */
+  framePromptFull?: string;
+  /**
+   * 视频 prompt 全文覆盖。注意尾缀的 `--resolution/--duration/--camerafixed`
+   * 是 Seedance 必需参数，缺失时由 videoPrompt() 自动补回。
+   */
+  videoPromptFull?: string;
 }
 
 /** 角色声线（voice spec §5）：首次加载时按 id 哈希分配后写回，永久稳定 */
@@ -121,6 +131,11 @@ export interface Manifest {
   customActions?: Record<string, ManifestAction>;
   /** Claude Code 联动时 agent 活动→动作的映射。缺省时各活动使用 state-machine 内置默认值。 */
   agentActions?: AgentActionConfig;
+  /**
+   * 三视图 prompt 全文覆盖：非空时完全取代 turnaroundPrompt() 的拼装结果。
+   * 只在重新生成三视图时生效（三视图是所有动作的参考图，换了需连带重生全部动作）。
+   */
+  turnaroundPromptFull?: string;
 }
 
 /** Claude Code 联动：agent 活动→桌宠动作的可配置映射（可指向自定义动作） */
@@ -236,6 +251,8 @@ export interface PromptData {
   /** Claude Code 联动动作配置（来自 manifest.agentActions） */
   agentActions?: AgentActionConfig;
   turnaroundPrompt: string;
+  /** 三视图 prompt 是否已被用户全文覆盖 */
+  turnaroundCustomized?: boolean;
   actions: Record<
     ActionId,
     {
@@ -243,6 +260,10 @@ export interface PromptData {
       motionDesc: string;
       framePrompt: string;
       videoPrompt: string;
+      /** 首帧 prompt 是否已被全文覆盖（UI 显示「已自定义」+ 恢复默认） */
+      framePromptCustomized?: boolean;
+      /** 视频 prompt 是否已被全文覆盖 */
+      videoPromptCustomized?: boolean;
     }
   >;
 }

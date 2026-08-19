@@ -206,3 +206,48 @@ describe('prompts', () => {
     }
   });
 });
+
+describe('prompt 全文覆盖', () => {
+  it('framePrompt 全文覆盖完全取代模板', () => {
+    const p = framePrompt('tea', undefined, 'humanoid', 'chibi', 'shy', undefined, '我自己写的首帧描述');
+    expect(p).toBe('我自己写的首帧描述');
+    expect(p).not.toContain('绿幕');
+    expect(p).not.toContain('角色人设');
+  });
+
+  it('turnaroundPrompt 全文覆盖完全取代模板', () => {
+    const p = turnaroundPrompt(undefined, 'humanoid', 'chibi', '我自己写的三视图描述');
+    expect(p).toBe('我自己写的三视图描述');
+  });
+
+  it('空白覆盖视为未设置，回退模板', () => {
+    const tpl = framePrompt('tea', undefined, 'humanoid', 'chibi');
+    expect(framePrompt('tea', undefined, 'humanoid', 'chibi', undefined, undefined, '   ')).toBe(tpl);
+    expect(framePrompt('tea', undefined, 'humanoid', 'chibi', undefined, undefined, undefined)).toBe(tpl);
+  });
+
+  it('videoPrompt 全文覆盖时自动补回缺失的 Seedance 参数', () => {
+    const v = videoPrompt('tea', undefined, 'humanoid', 'chibi', undefined, undefined, '角色摇摆');
+    expect(v).toContain('角色摇摆');
+    expect(v).toMatch(/--resolution \S+/);
+    expect(v).toMatch(/--duration \d+/);
+    expect(v).toContain('--camerafixed true');
+  });
+
+  it('videoPrompt 全文覆盖已带参数时不重复追加、保留用户的值', () => {
+    const v = videoPrompt('tea', undefined, 'humanoid', 'chibi', undefined, undefined,
+      '角色摇摆 --resolution 720p --duration 5 --camerafixed false');
+    expect(v.match(/--resolution/g)).toHaveLength(1);
+    expect(v.match(/--duration/g)).toHaveLength(1);
+    expect(v).toContain('--resolution 720p');
+    expect(v).toContain('--camerafixed false');
+  });
+
+  it('回归：视频 duration 不得小于 5（1.5-pro 会 400）', () => {
+    const v = videoPrompt('idle', undefined, 'humanoid', 'chibi', undefined, undefined, '随便写');
+    const m = v.match(/--duration (\d+)/);
+    expect(m).not.toBeNull();
+    expect(Number(m![1])).toBeGreaterThanOrEqual(5);
+  });
+});
+

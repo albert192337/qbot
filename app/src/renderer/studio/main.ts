@@ -12,6 +12,15 @@ interface ActionInfo {
   isCustom: boolean;
 }
 
+/** 标准动作的中文标签（自定义动作直接用动作名） */
+const STD_LABELS: Partial<Record<ActionId, string>> = {
+  idle: '待机', drag: '拖拽', sleep: '睡觉', tea: '喝茶',
+  talk_happy: '聊天·开心', talk_annoyed: '聊天·嫌弃',
+};
+
+/** 页面级缓存击穿标记（每次打开 studio 取一次新值） */
+const ASSET_NONCE = Date.now();
+
 async function main(): Promise<void> {
   const meta = await window.qbot.characters.getActive();
   if (!meta?.manifest) {
@@ -33,6 +42,7 @@ async function main(): Promise<void> {
   // 渲染"生成 Prompt" tab
   if (prompts) {
     document.getElementById('tab-prompts')!.innerHTML = renderPrompts(prompts);
+    bindPromptEvents(meta.dirId); // 必须在 innerHTML 之后，否则拿不到元素
   } else {
     document.getElementById('tab-prompts')!.innerHTML =
       '<p style="color:#999">无法加载生成提示（.job/state.json 可能缺失）。</p>';
@@ -52,10 +62,6 @@ async function main(): Promise<void> {
 
 function render(m: Manifest, dirId: string, prompts?: PromptData): void {
   const actions: ActionInfo[] = [];
-  const STD_LABELS: Partial<Record<ActionId, string>> = {
-    idle: '待机', drag: '拖拽', sleep: '睡觉', tea: '喝茶',
-    talk_happy: '聊天·开心', talk_annoyed: '聊天·嫌弃',
-  };
   for (const [id, a] of Object.entries(m.actions) as [ActionId, ManifestAction][]) {
     const pa = prompts?.actions[id];
     actions.push({
@@ -159,7 +165,8 @@ function render(m: Manifest, dirId: string, prompts?: PromptData): void {
   html += `<h3>动作列表</h3>`;
   for (const a of actions) {
     const frameUrl = a.status === 'done'
-      ? `qbot-asset://${dirId}/actions/${a.id}.webm`
+      // 带 nonce：重生动作后文件变了但 URL 不变，Chromium 会吃缓存显示旧动画
+      ? `qbot-asset://${dirId}/actions/${a.id}.webm?v=${ASSET_NONCE}`
       : (a.frameUrl ?? '');
     html += `<div class="action-card" data-action="${esc(a.id)}" data-custom="${a.isCustom ? '1' : '0'}">`;
     html += `<div class="meta">`;
@@ -209,7 +216,7 @@ function render(m: Manifest, dirId: string, prompts?: PromptData): void {
   bindEvents(dirId, m);
 }
 
-/** 渲染"生成 Prompt" tab：三视图 + 每个动作的首帧/视频 prompt */
+/** 渲染"生成 Prompt" tab：三视图 + 每个动作的首帧/视频 prompt（全部可编辑） */
 function renderPrompts(prompts: PromptData): string {
   let html = '<h3>生成参数</h3>';
   html += `<div class="config-params">`;
@@ -219,27 +226,45 @@ function renderPrompts(prompts: PromptData): string {
   html += `<p><b>角色人设:</b> ${prompts.persona ? esc(prompts.persona) : '(未设置)'}</p>`;
   html += `</div>`;
 
-  // 三视图 prompt
-  html += `<h3>三视图 Prompt</h3>`;
-  html += `<div class="prompt-block"><pre>${esc(prompts.turnaroundPrompt)}</pre></div>`;
+  html += `<div class="warn-box">`;
+  html += `改 prompt <b>不会</b>改变已生成的动画 —— 保存只影响之后的生成。`;
+  html += `要让改动落到画面上必须重新生成，而重新生成会调用 API <b>产生费用</b>（每个动作约 ¥1）。`;
+  html += `</div>`;
 
-  // 每个动作的 prompt
+  // ── 三视图 prompt ──
+  html += `<h3>三视图 Prompt ${prompts.turnaroundCustomized ? '<span class="badge-custom">已自定义</span>' : ''}</h3>`;
+  html += `<div class="prompt-block">`;
+  html += `<textarea id="turnaround-prompt" rows="6">${esc(prompts.turnaroundPrompt)}</textarea>`;
+  html += `<div class="btn-row">`;
+  html += `<button id="save-turnaround" class="primary">保存</button>`;
+  html += `<button id="reset-turnaround">恢复默认</button>`;
+  html += `<button id="regen-turnaround" class="danger">保存并重生三视图（约 ¥6）</button>`;
+  html += `</div>`;
+  html += `<p class="hint">三视图是所有动作的参考图 —— 换了它必须连带重新生成全部 6 个动作，`;
+  html += `否则新旧风格对不上。挑图界面会弹出孵化窗。</p>`;
+  html += `</div>`;
+
+  // ── 每个动作的 prompt ──
   html += `<h3>动作 Prompt</h3>`;
-  const STD_LABELS: Partial<Record<ActionId, string>> = {
-    idle: '待机', drag: '拖拽', sleep: '睡觉', tea: '喝茶',
-    talk_happy: '聊天·开心', talk_annoyed: '聊天·嫌弃',
-  };
   for (const [id, p] of Object.entries(prompts.actions)) {
-    html += `<div class="prompt-block">`;
-    html += `<b>${STD_LABELS[id as ActionId] ?? id}</b> (${id})`;
-    html += `<details><summary>首帧 Prompt</summary><pre>${esc(p.framePrompt)}</pre></details>`;
-    html += `<details><summary>视频 Prompt</summary><pre>${esc(p.videoPrompt)}</pre></details>`;
+    const label = STD_LABELS[id as ActionId] ?? id;
+    const custom = p.framePromptCustomized || p.videoPromptCustomized;
+    html += `<div class="prompt-block" data-action="${esc(id)}">`;
+    html += `<b>${esc(label)}</b> (${esc(id)})`;
+    html += custom ? ` <span class="badge-custom">已自定义</span>` : '';
+    html += `<label>首帧 Prompt</label>`;
+    html += `<textarea class="frame-prompt" rows="5">${esc(p.framePrompt)}</textarea>`;
+    html += `<label>视频 Prompt</label>`;
+    html += `<textarea class="video-prompt" rows="5">${esc(p.videoPrompt)}</textarea>`;
+    html += `<p class="hint">尾部 <code>--resolution / --duration / --camerafixed</code> 是必需参数，`;
+    html += `删掉会导致生成失败 —— 缺失时会自动补回。</p>`;
+    html += `<div class="btn-row">`;
+    html += `<button class="save-full primary" data-id="${esc(id)}">保存</button>`;
+    html += `<button class="reset-full" data-id="${esc(id)}">恢复默认</button>`;
+    html += `<button class="regen-action danger" data-id="${esc(id)}">保存并重新生成（约 ¥1）</button>`;
+    html += `</div>`;
     html += `</div>`;
   }
-
-  html += `<p style="margin-top:12px;font-size:11px;color:#999">`;
-  html += `提示：以上 Prompt 是根据 .job/state.json 中的参数重建的，`;
-  html += `反映了该角色的实际生成配置。</p>`;
   return html;
 }
 
@@ -333,6 +358,106 @@ function bindEvents(dirId: string, m: Manifest): void {
       alert(`动作「${ev.name}」生成失败：${ev.error ?? '未知错误'}`);
       location.reload();
     }
+  });
+
+}
+
+/** 生成 Prompt tab 的保存 / 恢复默认 / 重新生成 */
+function bindPromptEvents(dirId: string): void {
+  const guard = async (btn: HTMLButtonElement, label: string, fn: () => Promise<void>) => {
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = label;
+    try {
+      await fn();
+    } catch (err) {
+      alert(`失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+    }
+  };
+
+  // ── 三视图 ──
+  const turnaroundTa = () => document.getElementById('turnaround-prompt') as HTMLTextAreaElement;
+
+  document.getElementById('save-turnaround')?.addEventListener('click', (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    void guard(btn, '保存中…', async () => {
+      await window.qbot.studio.saveTurnaroundPrompt(dirId, turnaroundTa().value);
+      alert('三视图 prompt 已保存。它只在重新生成三视图时生效。');
+    });
+  });
+
+  document.getElementById('reset-turnaround')?.addEventListener('click', (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    if (!confirm('恢复默认模板？你当前编辑的内容会丢失。')) return;
+    void guard(btn, '处理中…', async () => {
+      await window.qbot.studio.saveTurnaroundPrompt(dirId, '');
+      location.reload();
+    });
+  });
+
+  document.getElementById('regen-turnaround')?.addEventListener('click', (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    if (!confirm(
+      '这会重新生成三视图，并且连带重新生成全部 6 个动作。\n\n' +
+      '预计费用：3 张三视图候选 + 6 张首帧 + 6 条视频（约 ¥6 以上）。\n' +
+      '过程中会弹出孵化窗让你挑三视图。\n\n确定继续？',
+    )) return;
+    void guard(btn, '已启动…', async () => {
+      await window.qbot.studio.saveTurnaroundPrompt(dirId, turnaroundTa().value);
+      await window.qbot.studio.regenerateTurnaround(dirId);
+      alert('已开始重新生成。请在孵化窗里挑选三视图，之后 6 个动作会自动重跑。');
+    });
+  });
+
+  // ── 各动作 ──
+  const readBlock = (id: string) => {
+    const block = document.querySelector(`.prompt-block[data-action="${CSS.escape(id)}"]`)!;
+    return {
+      frame: (block.querySelector('.frame-prompt') as HTMLTextAreaElement).value,
+      video: (block.querySelector('.video-prompt') as HTMLTextAreaElement).value,
+    };
+  };
+
+  document.querySelectorAll<HTMLButtonElement>('.save-full').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id!;
+      const { frame, video } = readBlock(id);
+      void guard(btn, '保存中…', async () => {
+        await window.qbot.studio.saveFullPrompts(dirId, id, frame, video);
+        alert(`${id} 的 prompt 已保存。已生成的动画不变，需重新生成才生效。`);
+      });
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('.reset-full').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id!;
+      if (!confirm(`把 ${id} 的 prompt 恢复成默认模板？`)) return;
+      void guard(btn, '处理中…', async () => {
+        await window.qbot.studio.saveFullPrompts(dirId, id, '', '');
+        location.reload();
+      });
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('.regen-action').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id!;
+      if (!confirm(
+        `按当前 prompt 重新生成「${id}」。\n\n` +
+        `会调用 API 产生费用（1 张首帧 + 1 条视频，约 ¥1），耗时几分钟。\n\n确定继续？`,
+      )) return;
+      const { frame, video } = readBlock(id);
+      void guard(btn, '生成中…', async () => {
+        await window.qbot.studio.saveFullPrompts(dirId, id, frame, video);
+        await window.qbot.studio.regenerateActions(dirId, [id]);
+        alert(`「${id}」重新生成完成，桌宠已重新加载。`);
+        location.reload();
+      });
+    });
   });
 }
 

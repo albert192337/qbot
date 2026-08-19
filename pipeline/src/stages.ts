@@ -8,7 +8,7 @@ import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createArkClient, toDataUrl, type ArkClient } from './ark.js';
 import {
-  computeAlphaBBox,
+  computeAlphaStats,
   normalizeFilter,
   probeSize,
   resolveFfmpegPath,
@@ -56,7 +56,20 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 export async function runTurnaround(job: Job, ark: ArkClient): Promise<string[]> {
   await job.setStage('turnaround');
   const refPng = await readFile(path.join(job.outDir, job.state.refImage));
-  const prompt = turnaroundPrompt(undefined, job.state.characterForm, job.state.characterStyle);
+  // 重新生成三视图时 manifest 已存在，可能带全文覆盖；初次孵化时读不到，走模板
+  let turnaroundFull: string | undefined;
+  try {
+    const raw = await readFile(path.join(job.outDir, 'manifest.json'), 'utf8');
+    turnaroundFull = (JSON.parse(raw) as Manifest).turnaroundPromptFull;
+  } catch {
+    // 初次孵化：manifest 尚未写出
+  }
+  const prompt = turnaroundPrompt(
+    undefined,
+    job.state.characterForm,
+    job.state.characterStyle,
+    turnaroundFull,
+  );
   const buffers = await Promise.all(
     Array.from({ length: TURNAROUND_CANDIDATES }, () =>
       ark.generateImage({
@@ -109,10 +122,10 @@ export async function keyActionVideo(
   const keys = [chromaKey ?? (await sampleKeyColor(videoAbs, ffmpegPath))];
   a.keyColors = keys;
   await job.save();
-  // 尺寸归一化：各动作角色 bbox 高度统一、底边对齐（空 bbox 跳过）
-  const bbox = await computeAlphaBBox(videoAbs, keys, ffmpegPath);
+  // 尺寸归一化：按 alpha 覆盖面积统一视觉大小、底边对齐（空内容跳过）
+  const stats = await computeAlphaStats(videoAbs, keys, ffmpegPath);
   const size = await probeSize(videoAbs, ffmpegPath);
-  const normVf = bbox ? normalizeFilter(bbox, size.width, size.height) : undefined;
+  const normVf = stats ? normalizeFilter(stats, size.width, size.height) : undefined;
   const webmAbs = path.join(job.outDir, 'actions', `${action}.webm`);
   const gifAbs = path.join(job.outDir, 'actions', `${action}.gif`);
   await toWebm(videoAbs, webmAbs, keys, ffmpegPath, normVf);
@@ -130,10 +143,13 @@ async function runAction(
   const a = job.state.actions[action];
   const turnaroundPng = await readFile(path.join(job.outDir, 'turnaround.png'));
 
-  // 读取自定义 prompt（poseDesc/motionDesc）与人设（初次生成时 manifest 尚未写出，redo 时已有）
+  // 读取自定义 prompt（poseDesc/motionDesc + 全文覆盖）与人设
+  // （初次生成时 manifest 尚未写出，redo/重新生成时已有）
   let persona: string | undefined;
   let customPoseDesc: string | undefined;
   let customMotionDesc: string | undefined;
+  let framePromptFull: string | undefined;
+  let videoPromptFull: string | undefined;
   try {
     const manifestRaw = await readFile(path.join(job.outDir, 'manifest.json'), 'utf8');
     const manifest = JSON.parse(manifestRaw) as Manifest;
@@ -141,6 +157,8 @@ async function runAction(
     const custom = manifest.actions[action];
     customPoseDesc = custom?.poseDesc;
     customMotionDesc = custom?.motionDesc;
+    framePromptFull = custom?.framePromptFull;
+    videoPromptFull = custom?.videoPromptFull;
   } catch {
     // manifest 不存在 → 初次生成，无自定义 prompt
   }
@@ -154,7 +172,7 @@ async function runAction(
           attempts: { ...a.attempts, frame: a.attempts.frame + 1 },
         });
         const frameBuf = await ark.generateImage({
-          prompt: framePrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customPoseDesc),
+          prompt: framePrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customPoseDesc, framePromptFull),
           refImageDataUrl: toDataUrl(turnaroundPng),
           size: IMAGE_SIZES.frame,
         });
@@ -180,7 +198,7 @@ async function runAction(
         });
         const frameBuf = await readFile(job.jobPath(a.framePath!));
         const taskId = await ark.submitVideoTask({
-          prompt: videoPrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customMotionDesc),
+          prompt: videoPrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customMotionDesc, videoPromptFull),
           frameDataUrl: toDataUrl(frameBuf),
         });
         await job.transition(action, 'generating_video', { videoTaskId: taskId });

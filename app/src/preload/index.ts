@@ -1,6 +1,6 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, LinkPeerHello, LinkPeerState, MeetingStatus, MusicStatus, PetMenuCommand, QBotApi, Settings } from '../shared/ipc-types';
+import type { AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, LinkPeerHello, LinkPeerState, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
@@ -52,6 +52,21 @@ const api: QBotApi = {
     get: (roomName) => ipcRenderer.invoke('decor:get', roomName),
     set: (roomName, placements) => ipcRenderer.invoke('decor:set', roomName, placements),
   },
+  progress: {
+    get: () => ipcRenderer.invoke('progress:get'),
+    openBox: () => ipcRenderer.invoke('progress:openBox'),
+    craft: (tier) => ipcRenderer.invoke('progress:craft', tier),
+    onChanged: (cb) => {
+      const listener = (_ev: unknown, progress: Progress) => cb(progress);
+      ipcRenderer.on('progress:changed', listener);
+      return () => ipcRenderer.removeListener('progress:changed', listener);
+    },
+    debugAddIdleMs: (ms) => ipcRenderer.invoke('progress:debugAddIdleMs', ms),
+    debugGrantBoxes: (n) => ipcRenderer.invoke('progress:debugGrantBoxes', n),
+    debugGrantPoints: (n) => ipcRenderer.invoke('progress:debugGrantPoints', n),
+    debugGrantFurniture: (stickerId) =>
+      ipcRenderer.invoke('progress:debugGrantFurniture', stickerId),
+  },
   settings: {
     get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
     set: (patch) => ipcRenderer.invoke('settings:set', patch),
@@ -92,6 +107,14 @@ const api: QBotApi = {
       ipcRenderer.on('studio:customAction', listener);
       return () => ipcRenderer.removeListener('studio:customAction', listener);
     },
+    saveFullPrompts: (dirId, actionId, framePromptFull, videoPromptFull) =>
+      ipcRenderer.invoke('studio:saveFullPrompts', dirId, actionId, framePromptFull, videoPromptFull),
+    saveTurnaroundPrompt: (dirId, prompt) =>
+      ipcRenderer.invoke('studio:saveTurnaroundPrompt', dirId, prompt),
+    regenerateActions: (dirId, actionIds) =>
+      ipcRenderer.invoke('studio:regenerateActions', dirId, actionIds),
+    regenerateTurnaround: (dirId) =>
+      ipcRenderer.invoke('studio:regenerateTurnaround', dirId),
   },
   agent: {
     getStatus: () => ipcRenderer.invoke('agent:getStatus'),

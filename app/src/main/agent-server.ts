@@ -30,6 +30,7 @@ import { readLastAssistantEntry } from './transcript';
 import { pushAgentMessage } from './bubble';
 import { getPetWindow } from './windows';
 import { pushLocalAgentActivity } from './link/link';
+import { addAgentRun } from './progress';
 
 const PORTS = [24242, 24243, 24244, 24245, 24246];
 const BODY_LIMIT = 64 * 1024;
@@ -151,6 +152,10 @@ function handleStatePost(agentId: string, body: unknown): number {
   if (!activity) return 200; // 未知事件静默忽略（hook 端 fire-and-forget）
   sessions.set(key, { activity, updatedAt: Date.now() });
   broadcastIfChanged();
+
+  // 「Claude Code 跑完一次 +10 点」。计在原始 Stop 事件上而不是合成状态的
+  // done 跃迁上：合成态会被更高优先级会话遮住、还有 TTL 衰减，按状态数会漏。
+  if (event === 'Stop') void addAgentRun();
 
   const kind = MESSAGE_KIND[event];
   if (kind) {

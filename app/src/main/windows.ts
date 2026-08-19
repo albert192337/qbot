@@ -4,7 +4,14 @@ import path from 'node:path';
 import type { CharacterMeta } from '../shared/ipc-types';
 
 const PET_SIZE = 360;
-const ROOM_SIZE = 560;
+/**
+ * 小房间窗边长。素材是 1024x1024，560 时 fit~0.55 -- 房间只占屏幕一小块，
+ * 家具缩到 ~120px，观感「又小又挤」。放大到 960 让素材接近 1:1。
+ * 实际值由 roomSize() 按工作区夹取，避免小屏被裁。
+ */
+const ROOM_SIZE_PREFERRED = 960;
+/** 房间素材设计尺寸；超过它就是放大插值，别再往上加 */
+const ROOM_ART_SIZE = 1024;
 /** 气泡窗：固定尺寸，创建后只 setPosition 永不改大小（绕开透明窗 resize 渲染 bug） */
 const BUBBLE_W = 340;
 const BUBBLE_H = 500;
@@ -182,7 +189,6 @@ export function closeRemotePetWindow(): void {
   if (remotePetWindow && !remotePetWindow.isDestroyed()) remotePetWindow.close();
   remotePetWindow = null;
 }
-
 /** 懒创建：桌宠 99% 时间没有 agent 消息，不预先吃一个 renderer 进程 */
 function createBubbleWindow(): BrowserWindow {
   if (bubbleWindow && !bubbleWindow.isDestroyed()) return bubbleWindow;
@@ -312,6 +318,16 @@ export function setRoomIgnoreMouse(ignore: boolean): void {
  * 开小房间：角色「走进房间」——pet 窗隐藏，room 窗关闭（含渲染进程崩溃、Cmd+W）
  * 统一走 closed 事件恢复 pet 窗。
  */
+/**
+ * 房间窗边长：取偏好值，但留出工作区边距并不超过素材原尺寸。
+ * 小屏（笔记本 768p）会被夹到装得下的最大方形，避免窗口比屏幕还高。
+ */
+function roomSize(): number {
+  const { workArea } = screen.getPrimaryDisplay();
+  const fits = Math.floor(Math.min(workArea.width, workArea.height) * 0.9);
+  return Math.max(480, Math.min(ROOM_SIZE_PREFERRED, ROOM_ART_SIZE, fits));
+}
+
 export function openRoomWindow(title: string): BrowserWindow {
   if (roomWindow && !roomWindow.isDestroyed()) {
     roomWindow.focus();
@@ -320,9 +336,14 @@ export function openRoomWindow(title: string): BrowserWindow {
   petWindow?.hide();
   hideBubbleWindow(); // 角色进小房间：气泡跟着走
   if (process.platform === 'darwin') void app.dock?.show();
+  const size = roomSize();
+  const { workArea } = screen.getPrimaryDisplay();
   roomWindow = new BrowserWindow({
-    width: ROOM_SIZE,
-    height: ROOM_SIZE,
+    width: size,
+    height: size,
+    // 原来完全没定位，Electron 默认摆放常常偏上角；房间是主要观赏面，居中
+    x: Math.round(workArea.x + (workArea.width - size) / 2),
+    y: Math.round(workArea.y + (workArea.height - size) / 2),
     useContentSize: true,
     title,
     // 贴纸小屋：只显示房间实体，外沿透明；关闭/拖动由 renderer 自绘
