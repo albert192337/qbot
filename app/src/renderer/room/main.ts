@@ -4,6 +4,7 @@ import { Player } from '../pet/player';
 import { DEFAULT_VOICE_SETTINGS, Speaker, type VoiceSettings } from '../pet/voice/speak';
 import { depthZ, footprintsOf, sanitizePlacements, type Footprint } from './decor';
 import { DecorEditor } from './decor-editor';
+import { InventoryPanel } from './inventory-panel';
 import { DECOR_BY_ID } from './decor-pack';
 import { pointInPolygon, polygonCentroid } from './geometry';
 import { scaleForY, step, type Point, type RoamState } from './roam';
@@ -274,13 +275,27 @@ void window.qbot.decor
   .get(spec.name)
   .then((raw) => editor.setPlacements(sanitizePlacements(raw, new Set(DECOR_BY_ID.keys()))));
 
+// 装饰托盘按库存开锁：开箱/合成后主进程会广播，托盘余量实时跟上
+const inventory = new InventoryPanel();
+void window.qbot.progress.get().then((p) => {
+  editor.setInventory(p.inventory);
+  inventory.setProgress(p);
+});
+window.qbot.progress.onChanged((p) => {
+  editor.setInventory(p.inventory);
+  inventory.setProgress(p);
+});
+
 // ── 贴纸窗交互 ───────────────────────────────────────────
 // 外沿透明区穿透：鼠标出入房间实体轮廓时切换 setIgnoreMouseEvents（forward 保证
 // 穿透期间 mousemove 仍进来，能判定回归）；同一状态只发一次 IPC。
 // 编辑态整窗保持可交互：装饰栏 fixed 在轮廓外的透明区，穿透会让它点不到。
 let inRoom = false;
 document.addEventListener('mousemove', (e) => {
-  const inside = editing || pointInPolygon(toRoom(e.clientX, e.clientY), spec.outline);
+  // 编辑态 / 背包开着时整窗保持可交互：这两个面板都浮在房间轮廓外的透明区，
+  // 一穿透就点不到（装饰栏当年踩过同一个坑）
+  const inside =
+    editing || inventory.isOpen() || pointInPolygon(toRoom(e.clientX, e.clientY), spec.outline);
   if (inside === inRoom) return;
   inRoom = inside;
   window.qbot.room.setIgnoreMouse(!inside);
@@ -329,7 +344,8 @@ stage.addEventListener('pointerup', (e) => {
 closeBtn.addEventListener('click', () => window.close());
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (editor.active) editor.exit(); // 编辑态 ESC 先退编辑，再按才关窗
+  if (inventory.isOpen()) inventory.hide(); // 背包开着先关背包
+  else if (editor.active) editor.exit(); // 编辑态 ESC 先退编辑，再按才关窗
   else window.close();
 });
 
@@ -349,6 +365,14 @@ document.addEventListener('contextmenu', (e) => {
     editor.enter(editor.placementsSnapshot());
   });
   menu.appendChild(decorate);
+  const bag = document.createElement('div');
+  bag.className = 'menu-item';
+  bag.textContent = '我的家具';
+  bag.addEventListener('click', () => {
+    hideMenu();
+    inventory.show();
+  });
+  menu.appendChild(bag);
   const close = document.createElement('div');
   close.className = 'menu-item';
   close.textContent = '关闭房间';
@@ -360,7 +384,7 @@ document.addEventListener('contextmenu', (e) => {
   menu.style.display = 'block';
   const mw = 120;
   menu.style.left = `${Math.min(e.clientX, window.innerWidth - mw - 4)}px`;
-  menu.style.top = `${Math.min(e.clientY, window.innerHeight - 78)}px`;
+  menu.style.top = `${Math.min(e.clientY, window.innerHeight - 108)}px`;
 });
 document.addEventListener('click', (e) => {
   if (!menu.contains(e.target as Node)) hideMenu();

@@ -153,6 +153,30 @@ debug.onHideSignboard = () => {
   debug.log('收牌');
 };
 
+// ── 游戏化积累：调试注水 + 状态订阅 ─────────────────────
+debug.onAddIdleTime = async () => {
+  const p = await window.qbot.progress.debugAddIdleMs(15 * 60 * 1000);
+  debug.setProgress(p);
+  debug.log(`挂机 +15 分钟 → 箱子 ${p.boxes}`);
+};
+debug.onGrantBox = async () => {
+  const p = await window.qbot.progress.debugGrantBoxes(1);
+  debug.setProgress(p);
+  debug.log(`箱子 +1 → ${p.boxes}`);
+};
+debug.onGrantPoints = async () => {
+  const p = await window.qbot.progress.debugGrantPoints(500);
+  debug.setProgress(p);
+  debug.log(`点数 +500 → ${p.points}`);
+};
+debug.onGrantFurniture = async () => {
+  const { stickerId, progress } = await window.qbot.progress.debugGrantFurniture();
+  debug.setProgress(progress);
+  debug.log(`家具 +1: ${stickerId}`);
+};
+window.qbot.progress.onChanged((p) => debug.setProgress(p));
+void window.qbot.progress.get().then((p) => debug.setProgress(p));
+
 async function refreshCharacterList(): Promise<void> {
   const all = await window.qbot.characters.list();
   const active = await window.qbot.characters.getActive();

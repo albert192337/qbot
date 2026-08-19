@@ -3,6 +3,7 @@
  * 入口在桌宠右键菜单「调试面板」（toggle），不占屏幕常驻元素。
  * 纯 DOM，不碰主逻辑。
  */
+import type { Progress } from '../../shared/ipc-types';
 
 export interface DebugState {
   petState: string;
@@ -31,6 +32,7 @@ const MAX_LOG = 50;
 export class DebugPanel {
   private container: HTMLElement;
   private stateEl: HTMLElement;
+  private progressEl!: HTMLElement;
   private charListEl: HTMLElement;
   private logEl: HTMLElement;
   private visible = false;
@@ -43,6 +45,10 @@ export class DebugPanel {
   onActivateCharacter?: (dirId: string) => void;
   onShowSignboard?: (text: string) => void;
   onHideSignboard?: () => void;
+  onAddIdleTime?: () => void;
+  onGrantBox?: () => void;
+  onGrantPoints?: () => void;
+  onGrantFurniture?: () => void;
 
   /** 最近一次发言内容（供外部 setState 读取） */
   lastUtterance = '';
@@ -121,6 +127,29 @@ export class DebugPanel {
 
     this.container.appendChild(signRow);
 
+    // 游戏化积累注水行（点数/箱子/家具正常靠挂机和敲键盘攒，调试期等不起）
+    const progRow = document.createElement('div');
+    progRow.className = 'debug-btns';
+    for (const [label, fn] of [
+      ['+15分钟', () => this.onAddIdleTime?.()],
+      ['+1箱子', () => this.onGrantBox?.()],
+      ['+500点', () => this.onGrantPoints?.()],
+      ['+1家具', () => this.onGrantFurniture?.()],
+    ] as const) {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fn();
+      });
+      progRow.appendChild(b);
+    }
+    this.container.appendChild(progRow);
+
+    this.progressEl = document.createElement('div');
+    this.progressEl.className = 'debug-state';
+    this.container.appendChild(this.progressEl);
+
     // 角色管理区
     this.charListEl = document.createElement('div');
     this.charListEl.className = 'debug-chars';
@@ -157,6 +186,18 @@ export class DebugPanel {
       lines.push(`上次发言: "${s.lastUtterance}" (${s.lastMood ?? '—'})`);
     }
     this.stateEl.innerHTML = lines.join('<br>');
+  }
+
+  /** 积累状态行（主进程 progress:changed 是节流后的，最快每秒一条） */
+  setProgress(p: Progress): void {
+    const owned = Object.values(p.inventory).reduce((a, b) => a + b, 0);
+    const kinds = Object.keys(p.inventory).length;
+    const mins = Math.floor(p.idleMs / 60_000);
+    const secs = Math.floor((p.idleMs % 60_000) / 1000);
+    this.progressEl.innerHTML =
+      `点数: <b>${p.points}</b>　箱子: <b>${p.boxes}</b>　挂机: ${mins}分${pad(secs)}秒/15分<br>` +
+      `家具: ${owned} 件 / ${kinds} 种　开箱 ${p.boxesOpened} 次　合成 ${p.crafted} 次<br>` +
+      `键盘 ${p.keysCounted} 下　CC 跑完 ${p.runsCounted} 轮`;
   }
 
   log(msg: string): void {

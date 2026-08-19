@@ -10,6 +10,7 @@ import type {
   ProgressEvent,
   Stage,
 } from '@qbot/pipeline';
+import type { FurnitureTier } from './furniture';
 
 export interface CharacterMeta {
   /** 目录名（qbot-asset:// 的 host） */
@@ -205,6 +206,42 @@ export interface DecorPlacement {
   zone: 'wallL' | 'wallR' | 'free';
 }
 
+/**
+ * 游戏化积累（progress.json）。全局，不按角色分——换角色不该清空收集品。
+ * 权威在主进程 `main/progress.ts`，renderer 只读 + 通过 IPC 请求变更。
+ */
+export interface Progress {
+  /** 点数：敲键盘 +1 / Claude Code 跑完一轮 +10。开箱消耗 */
+  points: number;
+  /** 未开的箱子数：挂机 15 分钟攒一个 */
+  boxes: number;
+  /** 距下一个箱子的挂机余量（ms），满一箱就扣掉 */
+  idleMs: number;
+  /** 家具库存 stickerId → 件数（可重复，重复件是合成的燃料） */
+  inventory: Record<string, number>;
+  /** 以下纯统计，玩法不读 */
+  keysCounted: number;
+  runsCounted: number;
+  boxesOpened: number;
+  crafted: number;
+}
+
+/** 开箱结果。失败走 ok:false 而不抛异常——「点数不够」是正常分支不是错误 */
+export type OpenBoxResult =
+  | { ok: true; stickerId: string; tier: FurnitureTier; progress: Progress }
+  | { ok: false; error: string };
+
+/** 合成结果。consumed = 实际烧掉的 stickerId → 件数，UI 要报给用户 */
+export type CraftResult =
+  | {
+      ok: true;
+      stickerId: string;
+      tier: FurnitureTier;
+      consumed: Record<string, number>;
+      progress: Progress;
+    }
+  | { ok: false; error: string };
+
 export interface QBotApi {
   hatch: {
     /** 丢图开始孵化，返回角色目录 ID；imageProvider 缺省 = seedream，characterForm 缺省 = humanoid，characterStyle 缺省 = faithful（UI 默认传 chibi） */
@@ -386,6 +423,26 @@ export interface QBotApi {
     regenerateActions(dirId: string, actionIds: string[]): Promise<void>;
     /** 重新生成三视图并连带重生全部动作（**花钱**，约 6 条视频）；挑图走孵化窗 */
     regenerateTurnaround(dirId: string): Promise<void>;
+  };
+
+  /**
+   * 游戏化积累：点数/箱子/家具库存。全局非按角色。
+   * room 窗消费（背包/合成 + 装饰托盘的已拥有过滤），pet 窗消费（调试面板）。
+   */
+  progress: {
+    get(): Promise<Progress>;
+    /** 开箱：扣 1 箱 + 500 点换随机家具。点数/箱子不够返回 ok:false，不抛 */
+    openBox(): Promise<OpenBoxResult>;
+    /** 合成：同档任意 10 件 → 上一档随机 1 件。烧哪几件由主进程挑（优先烧大堆保品种） */
+    craft(tier: FurnitureTier): Promise<CraftResult>;
+    /** 订阅积累变化（键盘加分是节流后每秒最多一次，不会刷爆） */
+    onChanged(cb: (progress: Progress) => void): () => void;
+    /** 以下仅调试面板用，正式玩法不该调 */
+    debugAddIdleMs(ms: number): Promise<Progress>;
+    debugGrantBoxes(n: number): Promise<Progress>;
+    debugGrantPoints(n: number): Promise<Progress>;
+    /** stickerId 省略 = 按开箱权重随机一件（不扣箱不扣点） */
+    debugGrantFurniture(stickerId?: string): Promise<{ stickerId: string; progress: Progress }>;
   };
 }
 

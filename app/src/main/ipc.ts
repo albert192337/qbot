@@ -12,6 +12,15 @@ import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, getLocalSign, setLocalSign } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
+import {
+  craft,
+  debugAddIdleMs,
+  debugGrantBoxes,
+  debugGrantFurniture,
+  debugGrantPoints,
+  getProgress,
+  openBox,
+} from './progress';
 import { rebuildTray, characterSection, connectSection, systemSection } from './tray';
 import { getAgentStatus } from './agent-server';
 import { getMusicStatus } from './music-monitor';
@@ -110,6 +119,19 @@ export function registerIpc(): void {
       console.error('decor:set failed', err); // 写失败不阻塞 UI
     }
   });
+
+  // ── progress 游戏化积累 ────────────────────────────────
+  // 一次性结果（开箱/合成得到什么）走 invoke 返回值，幂等状态走 progress:changed
+  // 广播 —— 两者混用会被节流的广播吞掉一次性事件（见本文件 AgentStatus 处的同类注释）
+  ipcMain.handle('progress:get', () => getProgress());
+  ipcMain.handle('progress:openBox', () => openBox());
+  ipcMain.handle('progress:craft', (_ev, tier) => craft(tier));
+  ipcMain.handle('progress:debugAddIdleMs', (_ev, ms: number) => debugAddIdleMs(ms));
+  ipcMain.handle('progress:debugGrantBoxes', (_ev, n: number) => debugGrantBoxes(n));
+  ipcMain.handle('progress:debugGrantPoints', (_ev, n: number) => debugGrantPoints(n));
+  ipcMain.handle('progress:debugGrantFurniture', (_ev, stickerId?: string) =>
+    debugGrantFurniture(stickerId),
+  );
 
   // ── settings ───────────────────────────────────────────
   ipcMain.handle('settings:get', () => getSettings());

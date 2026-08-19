@@ -12,6 +12,8 @@ import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds } from './
 import { startAgentServer } from './agent-server';
 import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
 import { startMeetingMonitor, stopMeetingMonitor } from './meeting-monitor';
+import { startInputMonitor, stopInputMonitor } from './input-monitor';
+import { flushProgress, startProgressTicker, stopProgressTicker } from './progress';
 import { setLinkStatusListener, stopLink, createLinkRoom, joinLinkRoom, notifyActiveCharacterChanged } from './link/link';
 
 /** qbot-asset 响应的 Content-Type（漏了类型 Chromium 会拒绝解码 <video>） */
@@ -133,6 +135,8 @@ app.whenReady().then(async () => {
   void startAgentServer(); // agent 联动状态服务（失败不阻塞桌宠本体）
   startMusicMonitor(); // 网易云音乐播放监控（Windows only，失败不阻塞）
   startMeetingMonitor(); // 飞书会议监控（本地日志轮询，失败不阻塞）
+  startInputMonitor(); // 键盘敲击计数（Windows only，只数次数不记键位）
+  startProgressTicker(); // 挂机计时：满 15 分钟发一个箱子
 
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
@@ -157,10 +161,21 @@ app.on('window-all-closed', () => {
 });
 
 // 退出前收掉常驻的 powershell 监控进程，避免留孤儿；联机侧发 bye 让对端立即收窗
-app.on('before-quit', () => {
+let quitFlushed = false;
+app.on('before-quit', (ev) => {
+  if (quitFlushed) return; // 下面 app.quit() 会二次进来
   stopMusicMonitor();
   stopMeetingMonitor();
+  stopInputMonitor();
+  stopProgressTicker();
   stopLink();
+  // progress 是玩法数据（点数/箱子/库存），不能丢防抖窗口里最后那笔 →
+  // 拦一次退出等落盘完再真退。写失败 flushProgress 内部已吞，不会卡住退出
+  ev.preventDefault();
+  void flushProgress().finally(() => {
+    quitFlushed = true;
+    app.quit();
+  });
 });
 
 app.on('activate', () => {
