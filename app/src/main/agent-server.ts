@@ -29,6 +29,7 @@ import {
 import { readLastAssistantEntry } from './transcript';
 import { pushAgentMessage } from './bubble';
 import { getPetWindow } from './windows';
+import { pushLocalAgentActivity } from './link/link';
 
 const PORTS = [24242, 24243, 24244, 24245, 24246];
 const BODY_LIMIT = 64 * 1024;
@@ -73,6 +74,7 @@ function broadcastIfChanged(): void {
   }
   lastBroadcast = next;
   getPetWindow()?.webContents.send('agent:status', next);
+  pushLocalAgentActivity(next.activity); // 联机钩子：只出状态枚举（spec §四）
 }
 
 interface PendingMessage {

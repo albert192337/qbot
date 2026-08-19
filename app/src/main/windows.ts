@@ -5,7 +5,7 @@ import type { CharacterMeta } from '../shared/ipc-types';
 
 const PET_SIZE = 360;
 /**
- * 小房间窗边长。素材是 1024×1024，560 时 fit≈0.55 —— 房间只占屏幕一小块，
+ * 小房间窗边长。素材是 1024x1024，560 时 fit~0.55 -- 房间只占屏幕一小块，
  * 家具缩到 ~120px，观感「又小又挤」。放大到 960 让素材接近 1:1。
  * 实际值由 roomSize() 按工作区夹取，避免小屏被裁。
  */
@@ -19,6 +19,9 @@ const BUBBLE_H = 500;
 const BUBBLE_OVERLAP = 24;
 
 let petWindow: BrowserWindow | null = null;
+/** 联机远端宠窗（?remote=1 复用 pet renderer；独立单例，绝不复用 petWindow——
+ *  否则 broadcastCharacterActivated 会把本地角色切换广播进远端窗） */
+let remotePetWindow: BrowserWindow | null = null;
 let hatchWindow: BrowserWindow | null = null;
 let roomWindow: BrowserWindow | null = null;
 let studioWindow: BrowserWindow | null = null;
@@ -40,19 +43,19 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds(); // 不依赖 resize 事件的投递时机
 }
 
-type RendererPage = 'pet' | 'hatch' | 'room' | 'studio' | 'bubble';
+type RendererPage = 'pet' | 'hatch' | 'room' | 'studio' | 'bubble' | 'market';
 
-function rendererUrl(page: RendererPage): { url?: string; file?: string } {
+function load(win: BrowserWindow, page: RendererPage, query?: Record<string, string>): void {
   if (process.env.ELECTRON_RENDERER_URL) {
-    return { url: `${process.env.ELECTRON_RENDERER_URL}/${page}/index.html` };
+    const qs = query ? `?${new URLSearchParams(query)}` : '';
+    void win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/${page}/index.html${qs}`);
+    return;
   }
-  return { file: path.join(__dirname, `../renderer/${page}/index.html`) };
-}
-
-function load(win: BrowserWindow, page: RendererPage): void {
-  const target = rendererUrl(page);
-  if (target.url) void win.loadURL(target.url);
-  else void win.loadFile(target.file!);
+  // 打包模式：loadFile 原生支持 query，location.search 两种模式行为一致
+  void win.loadFile(
+    path.join(__dirname, `../renderer/${page}/index.html`),
+    query ? { query } : undefined,
+  );
 }
 
 export function getPetWindow(): BrowserWindow | null {
@@ -143,6 +146,49 @@ export function createPetWindow(): BrowserWindow {
   return petWindow;
 }
 
+// ── 联机远端宠窗（spec 2026-08-02 §二.3）─────────────────────
+
+export function getRemotePetWindow(): BrowserWindow | null {
+  return remotePetWindow;
+}
+
+export function createRemotePetWindow(): BrowserWindow {
+  if (remotePetWindow && !remotePetWindow.isDestroyed()) return remotePetWindow;
+  const { workArea } = screen.getPrimaryDisplay();
+  const size = Math.round(PET_SIZE * petScale);
+  // 默认落在本地宠左侧；本地宠不在（角色进房间等）就贴屏幕左下
+  const anchor = petWindow && !petWindow.isDestroyed() ? petWindow.getBounds() : null;
+  remotePetWindow = new BrowserWindow({
+    width: size,
+    height: size,
+    x: anchor ? Math.max(workArea.x, anchor.x - size - 24) : workArea.x + 40,
+    y: anchor ? anchor.y : workArea.y + workArea.height - size - 20,
+    transparent: true,
+    frame: false,
+    hasShadow: false, // 同 pet 窗：不显式关会有残影阴影框
+    resizable: false, // 透明窗 resize 有渲染 bug
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      sandbox: false,
+    },
+  });
+  remotePetWindow.setAlwaysOnTop(true, 'floating');
+  remotePetWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  remotePetWindow.once('ready-to-show', () => remotePetWindow?.show());
+  remotePetWindow.on('closed', () => {
+    remotePetWindow = null;
+  });
+  load(remotePetWindow, 'pet', { remote: '1' });
+  return remotePetWindow;
+}
+
+export function closeRemotePetWindow(): void {
+  if (remotePetWindow && !remotePetWindow.isDestroyed()) remotePetWindow.close();
+  remotePetWindow = null;
+}
 /** 懒创建：桌宠 99% 时间没有 agent 消息，不预先吃一个 renderer 进程 */
 function createBubbleWindow(): BrowserWindow {
   if (bubbleWindow && !bubbleWindow.isDestroyed()) return bubbleWindow;
@@ -330,7 +376,7 @@ export function createStudioWindow(): BrowserWindow {
   studioWindow = new BrowserWindow({
     width: 480,
     height: 680,
-    title: 'QBot 生成配置',
+    title: 'QBot 角色工作室',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -340,4 +386,27 @@ export function createStudioWindow(): BrowserWindow {
   studioWindow.on('closed', () => { studioWindow = null; });
   load(studioWindow, 'studio');
   return studioWindow;
+}
+
+/** 装扮市场：上传/下载皮肤的货架窗（spec 2026-08-02-skin-market-design） */
+let marketWindow: BrowserWindow | null = null;
+
+export function createMarketWindow(): BrowserWindow {
+  if (marketWindow && !marketWindow.isDestroyed()) {
+    marketWindow.focus();
+    return marketWindow;
+  }
+  marketWindow = new BrowserWindow({
+    width: 640,
+    height: 720,
+    title: 'QBot 装扮市场',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      sandbox: false,
+    },
+  });
+  marketWindow.on('closed', () => { marketWindow = null; });
+  load(marketWindow, 'market');
+  return marketWindow;
 }

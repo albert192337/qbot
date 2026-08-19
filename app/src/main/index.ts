@@ -1,5 +1,6 @@
 /** 主进程入口：协议注册（必须在 ready 前）→ 预置角色 → 窗口/托盘/IPC */
-import { app, protocol, screen } from 'electron';
+import { app, net, protocol, screen } from 'electron';
+import { existsSync } from 'node:fs';
 import { open, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -10,6 +11,8 @@ import { rebuildTray } from './tray';
 import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds } from './windows';
 import { startAgentServer } from './agent-server';
 import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
+import { startMeetingMonitor, stopMeetingMonitor } from './meeting-monitor';
+import { setLinkStatusListener, stopLink, createLinkRoom, joinLinkRoom, notifyActiveCharacterChanged } from './link/link';
 
 /** qbot-asset 响应的 Content-Type（漏了类型 Chromium 会拒绝解码 <video>） */
 const ASSET_MIME: Record<string, string> = {
@@ -114,9 +117,22 @@ app.whenReady().then(async () => {
 
   registerIpc();
   await seedPresets();
+  // 联机状态变化 → 托盘标签刷新（在这接线避免 link ↔ tray 循环 import）
+  setLinkStatusListener(() => void rebuildTray());
+  // dev 自动联机（QBOT_USER_DATA 双实例验证用；正常入口是托盘菜单）
+  if (process.env.QBOT_LINK_CREATE) {
+    void createLinkRoom()
+      .then((code) => console.log('[link] room code:', code))
+      .catch((err) => console.error('[link] create failed:', err));
+  } else if (process.env.QBOT_LINK_JOIN) {
+    void joinLinkRoom(process.env.QBOT_LINK_JOIN)
+      .then(() => console.log('[link] joined'))
+      .catch((err) => console.error('[link] join failed:', err));
+  }
   await rebuildTray();
   void startAgentServer(); // agent 联动状态服务（失败不阻塞桌宠本体）
   startMusicMonitor(); // 网易云音乐播放监控（Windows only，失败不阻塞）
+  startMeetingMonitor(); // 飞书会议监控（本地日志轮询，失败不阻塞）
 
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
@@ -127,6 +143,8 @@ app.whenReady().then(async () => {
   const pet = createPetWindow();
   if (initial) {
     await setSettings({ activeCharacter: initial.dirId });
+    // 首启数据目录 + QBOT_LINK_JOIN：配对早于这里的激活，hello 没带上 manifestHash → 补发
+    notifyActiveCharacterChanged();
     pet.webContents.once('did-finish-load', async () => {
       pet.webContents.send('characters:activated', await getCharacter(initial.dirId));
     });
@@ -138,9 +156,11 @@ app.on('window-all-closed', () => {
   /* keep alive */
 });
 
-// 退出前收掉常驻的 powershell 监控进程，避免留孤儿
+// 退出前收掉常驻的 powershell 监控进程，避免留孤儿；联机侧发 bye 让对端立即收窗
 app.on('before-quit', () => {
   stopMusicMonitor();
+  stopMeetingMonitor();
+  stopLink();
 });
 
 app.on('activate', () => {

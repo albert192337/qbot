@@ -34,6 +34,12 @@ export interface Settings {
   talkFrequency?: 'quiet' | 'normal' | 'chatty';
   /** Claude Code 联动 hooks 已安装（托盘开关的记忆位） */
   claudeHooksInstalled?: boolean;
+  /** 联机：把正在听的曲名分享给对端（默认 false，spec §一「同步粒度」） */
+  linkShareSong?: boolean;
+  /** 装扮市场：上传署名昵称（默认「匿名」） */
+  marketNickname?: string;
+  /** 装扮市场：hash → 管理码（下架自己上传的皮肤用） */
+  marketTokens?: Record<string, string>;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */
@@ -55,7 +61,7 @@ export interface HatchStatus {
   actions: Record<ActionId, { status: ActionStatus; frameUrl?: string; error?: string }>;
 }
 
-/** Agent 会话合成后的活动状态（优先级 error > working > thinking > waiting > done > idle） */
+/** Agent 会话合成后的活动状态（优先级 error > waiting > working > thinking > done > idle） */
 export type AgentActivity = 'idle' | 'thinking' | 'working' | 'waiting' | 'done' | 'error';
 
 /** 主进程 agent-server 广播给 pet 窗口的合成状态 */
@@ -63,6 +69,24 @@ export interface AgentStatus {
   activity: AgentActivity;
   /** 当前活跃会话数（0 = 无 agent 在干活） */
   sessions: number;
+}
+
+/** 装扮市场货架条目（spec 2026-08-02-skin-market-design）；服务端 meta + 本地视角字段 */
+export interface MarketSkin {
+  hash: string;
+  name: string;
+  uploader: string;
+  /** 包体字节数 */
+  size: number;
+  /** 动作数（服务端从包头数出，不信客户端） */
+  actions: number;
+  at: number;
+  /** 封面 URL（<img> 直连服务器；无封面 = undefined 用占位） */
+  previewUrl?: string;
+  /** 本地存有管理码（自己上传的，可下架） */
+  mine: boolean;
+  /** 已下载入库（characters/market-<hash>/ 存在） */
+  installed: boolean;
 }
 
 /** 气泡类型：done = 回合完成（Stop）；attention = 需要你处理（Notification） */
@@ -103,6 +127,70 @@ export interface MusicStatus {
   title?: string;
   /** 当前播放曲目艺术家 */
   artist?: string;
+}
+
+/** 飞书会议状态（来自本地 byteview 日志监控；1v1 通话也算会中） */
+export interface MeetingStatus {
+  inMeeting: boolean;
+  /** 检测到入会的时刻（主进程时钟） */
+  since?: number;
+}
+
+/** 桌宠右键菜单「说话/动作」条目（渲染端报给主进程建原生菜单） */
+export interface PetMenuActionEntry {
+  id: string;
+  label: string;
+}
+
+/** 原生右键菜单点选后回渲染端执行的命令 */
+export type PetMenuCommand =
+  | { type: 'speak' }
+  | { type: 'play'; action: string }
+  /** 弹举牌输入框（联机举牌：本端显示 + 同步对端替身） */
+  | { type: 'signPrompt' }
+  | { type: 'signClear' }
+  /** 展开/收起调试面板（状态/日志/串门触发等开发工具） */
+  | { type: 'debugToggle' };
+
+// ── 联机 presence（spec 2026-08-02-multiplayer-presence-design）──────────
+/** 对端高层状态：agent 活动 + 听歌（隐私边界见 spec §四，只有枚举/动作名/放行曲名出本机） */
+export type LinkMode = AgentActivity | 'music';
+
+/** 联机 state 帧（peer ↔ peer，经 relay 盲转） */
+export interface LinkPeerState {
+  mode: LinkMode;
+  /** 动作提示（对端 Studio 配了自定义动作时带上；缺省由接收端按替身角色自己的映射解析） */
+  action?: string;
+  /** 对端开了「分享曲名」才有 */
+  song?: string;
+}
+
+/** 联机 hello 帧（配对成功后互报） */
+export interface LinkPeerHello {  charName: string;
+  /** 角色资产包指纹（L1 资产分发缓存键；老版本对端没有） */
+  manifestHash?: string;
+}
+
+/** 对端真身角色就位（缓存命中 / 传输完成），远端窗以此加载渲染 */
+export interface LinkPeerCharacter {
+  /** `.peer-<hash>` 缓存目录名（qbot-asset:// 的 host） */
+  dirId: string;
+  manifest: Manifest;
+}
+
+/** 角色包传输进度（远端窗占位提示用） */
+export interface LinkAssetProgress {
+  received: number;
+  total: number;
+}
+
+/** 联机链路状态（托盘菜单 + 远端窗右键菜单消费） */
+export interface LinkStatus {
+  phase: 'off' | 'connecting' | 'waiting' | 'paired';
+  /** waiting/paired 时：本房房间码（自己建的房才有） */
+  roomCode?: string;
+  /** paired 且收到 hello 后：对端角色名 */
+  peerName?: string;
 }
 
 /** 小房间装饰摆放（room-decor.json，按房间名键控） */
@@ -156,6 +244,63 @@ export interface QBotApi {
     move(screenX: number, screenY: number): void;
     /** 串门模式：拓宽/恢复窗口 */
     setVisitMode(enter: boolean): void;
+    /**
+     * 右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
+     * 动作列表由渲染端传入，说话/播动作的执行经 onMenuCommand 回渲染端。
+     */
+    popupMenu(actions: PetMenuActionEntry[]): void;
+    onMenuCommand(cb: (cmd: PetMenuCommand) => void): () => void;
+  };
+  music: {
+    /** 当前音乐播放状态（pet 窗口加载时铺底） */
+    getStatus(): Promise<MusicStatus>;
+    /** pet 窗口订阅：音乐播放状态变化 */
+    onStatus(cb: (status: MusicStatus) => void): () => void;
+  };
+  meeting: {
+    /** 当前飞书会议状态（pet 窗口加载时铺底） */
+    getStatus(): Promise<MeetingStatus>;
+    /** pet 窗口订阅：会议状态变化 */
+    onStatus(cb: (status: MeetingStatus) => void): () => void;
+  };
+  link: {
+    /** 当前联机链路状态 */
+    getStatus(): Promise<LinkStatus>;
+    /** 断开联机（远端窗右键菜单；托盘走主进程直调） */
+    stop(): void;
+    /** 远端宠窗订阅：对端角色名（hello 帧） */
+    onPeerHello(cb: (info: LinkPeerHello) => void): () => void;
+    /** 远端宠窗订阅：对端状态帧（驱动 NetworkDriver） */
+    onPeerState(cb: (s: LinkPeerState) => void): () => void;
+    /** 远端宠窗订阅：对端掉线（打瞌睡；30s 未重连主进程会关窗） */
+    onPeerLeft(cb: () => void): () => void;
+    /** 远端宠窗订阅：对端真身角色就位（缓存命中 / 传输完成） */
+    onPeerCharacter(cb: (meta: LinkPeerCharacter) => void): () => void;
+    /** 远端宠窗订阅：角色包传输进度（占位提示） */
+    onAssetProgress(cb: (p: LinkAssetProgress) => void): () => void;
+    /** 远端宠窗订阅：对端手动举牌（null=收牌） */
+    onPeerSign(cb: (text: string | null) => void): () => void;
+    /** 本端手动举牌（null=收牌）：配对期间同步给对端替身显示 */
+    setSign(text: string | null): void;
+    /** 远端宠窗启动自取快照（动态 import 竞态兜底：注册完监听后拉一次） */
+    getPeerCache(): Promise<{
+      hello: LinkPeerHello | null;
+      character: LinkPeerCharacter | null;
+      state: LinkPeerState | null;
+      sign: string | null;
+    }>;
+  };
+  market: {
+    /** 打开装扮市场窗口 */
+    open(): void;
+    /** 货架列表（含本地视角的 mine/installed） */
+    list(): Promise<MarketSkin[]>;
+    /** 打包上传本地角色，返回上架 hash */
+    upload(dirId: string): Promise<string>;
+    /** 下载并激活（已装过则直接激活） */
+    download(hash: string): Promise<void>;
+    /** 下架自己上传的皮肤（凭本地管理码） */
+    remove(hash: string): Promise<void>;
   };
   room: {
     /** 单击桌宠：角色走进小房间（pet 窗隐藏 → room 窗弹出） */
@@ -176,6 +321,22 @@ export interface QBotApi {
     set(patch: Partial<Settings>): Promise<void>;
     /** pet 窗口订阅：设置变更实时生效（语音开关/音量/频率等） */
     onChanged(cb: (settings: Settings) => void): () => void;
+  };
+  agent: {
+    /** 当前合成状态（pet 窗口加载时铺底） */
+    getStatus(): Promise<AgentStatus>;
+    /** 订阅合成状态变化（agent-server 有变化才广播） */
+    onStatus(cb: (status: AgentStatus) => void): () => void;
+    /** bubble 窗订阅：agent 一次性提示消息 */
+    onMessage(cb: (msg: AgentMessage) => void): () => void;
+  };
+  bubble: {
+    /** 气泡全部消散 → 主进程隐藏气泡窗 */
+    reportEmpty(): void;
+    /** 主进程要求清空（角色进小房间等） */
+    onClear(cb: () => void): () => void;
+    /** 气泡栈贴桌宠上方还是下方（桌宠贴屏幕顶部时翻转） */
+    onAnchor(cb: (side: 'above' | 'below') => void): () => void;
   };
   ui: {
     /** 主进程要求切屏（托盘「设置」→ settings 屏） */
@@ -225,28 +386,6 @@ export interface QBotApi {
     regenerateActions(dirId: string, actionIds: string[]): Promise<void>;
     /** 重新生成三视图并连带重生全部动作（**花钱**，约 6 条视频）；挑图走孵化窗 */
     regenerateTurnaround(dirId: string): Promise<void>;
-  };
-  agent: {
-    /** 当前合成状态（pet 窗口加载时铺底） */
-    getStatus(): Promise<AgentStatus>;
-    /** 订阅合成状态变化（agent-server 有变化才广播） */
-    onStatus(cb: (status: AgentStatus) => void): () => void;
-    /** bubble 窗订阅：agent 一次性提示消息 */
-    onMessage(cb: (msg: AgentMessage) => void): () => void;
-  };
-  bubble: {
-    /** 气泡全部消散 → 主进程隐藏气泡窗 */
-    reportEmpty(): void;
-    /** 主进程要求清空（角色进小房间等） */
-    onClear(cb: () => void): () => void;
-    /** 气泡栈贴桌宠上方还是下方（桌宠贴屏幕顶部时翻转） */
-    onAnchor(cb: (side: 'above' | 'below') => void): () => void;
-  };
-  music: {
-    /** 当前音乐播放状态（pet 窗口加载时铺底） */
-    getStatus(): Promise<MusicStatus>;
-    /** 订阅音乐播放状态变化 */
-    onStatus(cb: (status: MusicStatus) => void): () => void;
   };
 }
 

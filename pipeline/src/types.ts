@@ -148,6 +148,8 @@ export interface AgentActionConfig {
   doneLoops?: number;
   /** 网易云音乐播放时摇摆动作（缺省 = talk_happy） */
   musicAction?: PlayableId;
+  /** 飞书开会时动作（缺省 = tea） */
+  meetingAction?: PlayableId;
 }
 
 /** job 进度事件，pipeline 内部 emit，app 经 IPC 转发给孵化 UI */

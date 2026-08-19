@@ -1,6 +1,6 @@
 /**
  * 调试面板：状态显示 + 事件日志 + 快捷按钮。
- * 鼠标移到窗口左上角触发齿轮图标，点击展开/收起面板。
+ * 入口在桌宠右键菜单「调试面板」（toggle），不占屏幕常驻元素。
  * 纯 DOM，不碰主逻辑。
  */
 
@@ -30,7 +30,6 @@ const MAX_LOG = 50;
 
 export class DebugPanel {
   private container: HTMLElement;
-  private trigger: HTMLElement;
   private stateEl: HTMLElement;
   private charListEl: HTMLElement;
   private logEl: HTMLElement;
@@ -50,19 +49,6 @@ export class DebugPanel {
   lastMood = '';
 
   constructor() {
-    // ── 触发区：左上角 36×36 ──
-    this.trigger = document.createElement('div');
-    this.trigger.id = 'debug-trigger';
-    this.trigger.title = '调试面板';
-    this.trigger.textContent = '⚙';
-    this.trigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggle();
-    });
-    // 防止拖拽穿透
-    this.trigger.addEventListener('pointerdown', (e) => e.stopPropagation());
-    document.body.appendChild(this.trigger);
-
     // ── 面板主体 ──
     this.container = document.createElement('div');
     this.container.id = 'debug-panel';
@@ -222,7 +208,7 @@ export class DebugPanel {
     this.renderLog();
   }
 
-  private toggle(): void {
+  toggle(): void {
     if (this.visible) {
       this.hide();
     } else {
@@ -233,14 +219,12 @@ export class DebugPanel {
   private show(): void {
     this.visible = true;
     this.container.style.display = 'block';
-    this.trigger.textContent = '✕';
     document.body.classList.add('has-debug-panel');
   }
 
   private hide(): void {
     this.visible = false;
     this.container.style.display = 'none';
-    this.trigger.textContent = '⚙';
     document.body.classList.remove('has-debug-panel');
   }
 

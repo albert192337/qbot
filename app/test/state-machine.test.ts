@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_ACTION,
+  DEFAULT_MEETING_ACTION,
   DEFAULT_MUSIC_ACTION,
   pickAutoAction,
   randomDelay,
@@ -264,6 +265,117 @@ describe('可配置动作映射', () => {
       { available: ALL, rng: rng(0), agentActionMap: { working: '未生成的动作' } },
     );
     expect(r.state).toEqual({ kind: 'agent', activity: 'working', action: 'idle' });
+  });
+});
+
+describe('meeting 联动', () => {
+  it('入会进入 meeting 态，默认 tea', () => {
+    const r = step({ kind: 'idle' }, { type: 'MEETING_STATUS', inMeeting: true }, { available: ALL, rng: rng(0) });
+    expect(r.state).toEqual({ kind: 'meeting', action: DEFAULT_MEETING_ACTION });
+    expect(r.play).toBe(DEFAULT_MEETING_ACTION);
+    expect(r.clearTimer).toBe(true);
+  });
+
+  it('meetingAction 可配置为自定义动作', () => {
+    const r = step(
+      { kind: 'idle' },
+      { type: 'MEETING_STATUS', inMeeting: true },
+      { available: [...ALL, '摸鱼'], rng: rng(0), meetingAction: '摸鱼' },
+    );
+    expect(r.state).toEqual({ kind: 'meeting', action: '摸鱼' });
+    expect(r.play).toBe('摸鱼');
+  });
+
+  it('配置的动作不可用时退化为 idle 动画但保持 meeting 态', () => {
+    const r = step(
+      { kind: 'idle' },
+      { type: 'MEETING_STATUS', inMeeting: true },
+      { available: ['idle', 'drag'], rng: rng(0), meetingAction: '未生成的动作' },
+    );
+    expect(r.state).toEqual({ kind: 'meeting', action: 'idle' });
+  });
+
+  it('meeting 态 VIDEO_ENDED 粘性重播', () => {
+    const s: PetState = { kind: 'meeting', action: 'tea' };
+    const r = step(s, { type: 'VIDEO_ENDED' }, { available: ALL, rng: rng(0) });
+    expect(r.state).toBe(s);
+    expect(r.play).toBe('tea');
+  });
+
+  it('离会从 meeting 回 idle 并重排定时器；非 meeting 态忽略', () => {
+    const r = step(
+      { kind: 'meeting', action: 'tea' },
+      { type: 'MEETING_STATUS', inMeeting: false },
+      { available: ALL, rng: rng(0) },
+    );
+    expect(r.state.kind).toBe('idle');
+    expect(r.play).toBe('idle');
+    expect(r.rescheduleTimer).toBe(true);
+
+    const r2 = step({ kind: 'idle' }, { type: 'MEETING_STATUS', inMeeting: false }, { available: ALL, rng: rng(0) });
+    expect(r2.state.kind).toBe('idle');
+    expect(r2.play).toBeUndefined();
+  });
+
+  it('agent 干活时入会不打断（agent > meeting）', () => {
+    const s: PetState = { kind: 'agent', activity: 'working', action: 'tea' };
+    const r = step(s, { type: 'MEETING_STATUS', inMeeting: true }, { available: ALL, rng: rng(0) });
+    expect(r.state).toBe(s);
+    expect(r.play).toBeUndefined();
+  });
+
+  it('听歌中入会切到 meeting（meeting > music）', () => {
+    const r = step(
+      { kind: 'music', action: 'talk_happy' },
+      { type: 'MEETING_STATUS', inMeeting: true },
+      { available: ALL, rng: rng(0) },
+    );
+    expect(r.state).toEqual({ kind: 'meeting', action: DEFAULT_MEETING_ACTION });
+    expect(r.play).toBe(DEFAULT_MEETING_ACTION);
+  });
+
+  it('开会中音乐事件被忽略（meeting > music）', () => {
+    const s: PetState = { kind: 'meeting', action: 'tea' };
+    for (const playing of [true, false]) {
+      const r = step(s, { type: 'MUSIC_STATUS', playing }, { available: ALL, rng: rng(0) });
+      expect(r.state).toBe(s);
+      expect(r.play).toBeUndefined();
+    }
+  });
+
+  it('drag / visit 中会议事件被忽略', () => {
+    for (const s of [
+      { kind: 'drag' },
+      { kind: 'visit', action: 'talk_happy', loopsLeft: 2 },
+    ] as PetState[]) {
+      const r = step(s, { type: 'MEETING_STATUS', inMeeting: true }, { available: ALL, rng: rng(0) });
+      expect(r.state).toBe(s);
+      expect(r.play).toBeUndefined();
+    }
+  });
+
+  it('POINTER_DOWN 可打断 meeting 进 drag', () => {
+    const r = step(
+      { kind: 'meeting', action: 'tea' },
+      { type: 'POINTER_DOWN' },
+      { available: ALL, rng: rng(0) },
+    );
+    expect(r.state.kind).toBe('drag');
+    expect(r.play).toBe('drag');
+  });
+
+  it('TIMER_FIRE 在 meeting 态忽略（不插播随机动作）', () => {
+    const s: PetState = { kind: 'meeting', action: 'tea' };
+    const r = step(s, { type: 'TIMER_FIRE' }, { available: ALL, rng: rng(0) });
+    expect(r.state).toBe(s);
+    expect(r.play).toBeUndefined();
+  });
+
+  it('同状态重复上报不重播（避免每次轮询都 restart）', () => {
+    const s: PetState = { kind: 'meeting', action: DEFAULT_MEETING_ACTION };
+    const r = step(s, { type: 'MEETING_STATUS', inMeeting: true }, { available: ALL, rng: rng(0) });
+    expect(r.state).toBe(s);
+    expect(r.play).toBeUndefined();
   });
 });
 

@@ -1,17 +1,21 @@
 /** IPC 注册：preload 契约的主进程实现 */
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { BrowserWindow, Menu, dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
+import type { PetMenuActionEntry, PetMenuCommand } from '../shared/ipc-types';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { createHatchWindow, createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow } from './windows';
+import { createHatchWindow, createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, createMarketWindow } from './windows';
+import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
+import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, getLocalSign, setLocalSign } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
-import { rebuildTray } from './tray';
+import { rebuildTray, characterSection, connectSection, systemSection } from './tray';
 import { getAgentStatus } from './agent-server';
 import { getMusicStatus } from './music-monitor';
+import { getMeetingStatus } from './meeting-monitor';
 
 export function registerIpc(): void {
   // ── hatch ──────────────────────────────────────────────
@@ -54,6 +58,7 @@ export function registerIpc(): void {
     if (!meta || !meta.manifest) throw new Error(`character not found: ${dirId}`);
     await setSettings({ activeCharacter: dirId });
     broadcastCharacterActivated(meta);
+    notifyActiveCharacterChanged(); // 联机中：新形象重新 hello 给对端
     await rebuildTray(); // 切换后菜单 radio 状态同步
   });
   ipcMain.handle('characters:getActive', async () => {
@@ -77,6 +82,14 @@ export function registerIpc(): void {
   // ── pet ────────────────────────────────────────────────
   ipcMain.on('pet:move', (_ev, x: number, y: number) => movePetWindow(x, y));
   ipcMain.on('pet:setVisitMode', (_ev, enter: boolean) => setPetVisitMode(enter));
+
+  // ── link 联机 ──────────────────────────────────────────
+  ipcMain.handle('link:getStatus', () => getLinkStatus());
+  ipcMain.handle('link:getPeerCache', () => getPeerCache());
+  ipcMain.on('link:setSign', (_ev, text: string | null) =>
+    setLocalSign(typeof text === 'string' ? text : null),
+  );
+  ipcMain.on('link:stop', () => stopLink());
 
   // ── room ───────────────────────────────────────────────
   ipcMain.on('room:open', async () => {
@@ -110,6 +123,62 @@ export function registerIpc(): void {
 
   // ── studio ──────────────────────────────────────────────
   ipcMain.on('studio:open', () => createStudioWindow());
+
+  // ── market 装扮市场 ────────────────────────────────────
+  ipcMain.on('market:open', () => createMarketWindow());
+  ipcMain.handle('market:list', () => listSkins());
+  ipcMain.handle('market:upload', (_ev, dirId: string) => uploadSkin(dirId));
+  ipcMain.handle('market:download', (_ev, hash: string) => downloadSkin(hash));
+  ipcMain.handle('market:remove', (_ev, hash: string) => removeSkin(hash));
+
+  // 桌宠右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
+  // 按「玩宠 → 窗口 → 角色/联机 → 系统」四段组织，托盘同源 section 直接平铺
+  // （刘海屏 mac 菜单栏挤满时托盘图标被系统静默隐藏，右键是兜底配置入口）。
+  // 说话/播动作/举牌回渲染端执行；开窗口直调主进程
+  ipcMain.on('pet:popupMenu', async (ev, actions: PetMenuActionEntry[]) => {
+    const win = BrowserWindow.fromWebContents(ev.sender);
+    if (!win) return;
+    const send = (cmd: PetMenuCommand) => ev.sender.send('pet:menuCommand', cmd);
+    const menu = Menu.buildFromTemplate([
+      // ── 玩宠（最高频，一级直达）─────────────────────────
+      { label: '说句话', click: () => send({ type: 'speak' }) },
+      {
+        label: '播放动作',
+        submenu: (Array.isArray(actions) ? actions : []).map((a) => ({
+          label: String(a.label),
+          click: () => send({ type: 'play', action: String(a.id) }),
+        })),
+      },
+      // 举牌不依赖联机（signboard 本地渲染，配对时才同步对端）；入口常驻，位置稳定
+      {
+        label: getLocalSign() ? '换个牌子…' : '举牌…',
+        click: () => send({ type: 'signPrompt' }),
+      },
+      ...(getLocalSign() ? [{ label: '收牌', click: () => send({ type: 'signClear' as const }) }] : []),
+      { type: 'separator' },
+      // ── 窗口入口 ────────────────────────────────────────
+      {
+        label: '小房间',
+        click: async () => {
+          const { activeCharacter } = await getSettings();
+          const meta = activeCharacter ? await getCharacter(activeCharacter) : null;
+          const name = meta?.manifest?.name;
+          openRoomWindow(name && name !== '未命名' ? `${name}的家` : '小房间');
+        },
+      },
+      { label: '装扮市场', click: () => createMarketWindow() },
+      { label: '角色工作室', click: () => createStudioWindow() },
+      { type: 'separator' },
+      // ── 角色 / 联机（托盘同源）──────────────────────────
+      ...(await characterSection()),
+      ...(await connectSection()),
+      { type: 'separator' },
+      // ── 系统（托盘同源）+ 调试入口（仅右键有，纯开发工具）──
+      { label: '调试面板', click: () => send({ type: 'debugToggle' }) },
+      ...systemSection(),
+    ]);
+    menu.popup({ window: win });
+  });
   ipcMain.handle('studio:savePersona', async (_ev, dirId: string, persona: string) => {
     await savePersona(dirId, persona);
   });
@@ -149,6 +218,8 @@ export function registerIpc(): void {
   // ── music 联动 ─────────────────────────────────────────
   ipcMain.handle('music:getStatus', () => getMusicStatus());
 
+  // ── meeting 联动 ───────────────────────────────────────
+  ipcMain.handle('meeting:getStatus', () => getMeetingStatus());
   // ── bubble ─────────────────────────────────────────────
   ipcMain.on('bubble:empty', () => hideBubbleWindow());
 }

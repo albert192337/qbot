@@ -1,0 +1,12 @@
+{
+  "name": "@qbot/market",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "QBot 装扮市场：角色包货架（上传/下载/下架），零依赖单文件",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "smoke": "node smoke.mjs"
+  }
+}
