@@ -115,6 +115,13 @@ pkill -f "electron-vite"; pkill -f "QBot/node_modules/electron"   # 关闭（必
 npm test -w pipeline         # 管线单测（全 mock，不花钱）
 npm run build -w pipeline    # tsc 编译 dist/（app 引用的是 dist，改 pipeline 后必须 build）
 npx tsc --noEmit -p app      # app 类型检查
+
+# 存量角色重抠像（不重新生成视频 = 零 API 花费，绿幕 mp4 一直留在 .job/）
+npx tsx pipeline/src/cli.ts rekey --job ~/Library/Application\ Support/@qbot/app/characters/<id>
+                             # --despill <mix> 调去绿边强度（0 = 关闭回退旧的 alpha 收边）
+                             # --erode <px>    仅 --despill 0 时生效（两者互斥，见血泪坑 22）
+                             # --action <id>   只重抠单个动作
+
 npm run dist -w app          # 打包当前平台（mac→dmg / win→nsis+zip；mac 从未验证成功过）
                              # Windows 包必须在 Windows 上构建（ffmpeg-static 装机时按平台下载）
                              # → 完整流程/镜像/验证清单见 docs/windows-build-and-release.md
@@ -143,7 +150,7 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 ## 血泪坑（改代码前必读）
 
 1. **WebM alpha 双参数**：`-auto-alt-ref 0` + `-metadata:s:v:0 alpha_mode=1` 缺一即黑底；解码验证需 `-vcodec libvpx-vp9`
-2. **GIF 三铁律**：不做 despill；`dither=none`；循环靠生成层（首尾帧相同），不靠 ffmpeg
+2. **GIF 铁律**：`dither=none`；循环靠生成层（首尾帧相同），不靠 ffmpeg；不做**全帧** despill（见坑 22）
 3. **抠像默认 colorkey 0.15:0.04**（`chroma.ts`）——DESIGN.md 里的 0.24 会把偏绿的角色身体抠出镂空
 4. **尺寸归一化**：抠像后按 alpha bbox 缩放到统一高度、底边对齐（`computeAlphaBBox`/`normalizeFilter`）；原始绿幕 mp4 永久留在 `.job/`，改抠像参数零成本重抠（参考 `pipeline/test/tmp/rekey-normalize.mts`）
 5. **`qbot-asset://` 协议**：`registerSchemesAsPrivileged` 必须在 app.ready 前且带 `stream: true`，否则 `<video>` 静默不播
@@ -163,6 +170,13 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 19. **Claude Code 的 hook 在 Windows 上跑在 bash 里，不是 cmd**（实测 `$0` = `/usr/bin/bash`，Git for Windows 提供）。所以 hook 命令串**必须保持 POSIX**：写成 `.cmd`/`%VAR%`/反斜杠路径反而会 `command not found`（bash 把 `D:\dev\...` 的反斜杠当转义符吃掉，报 `D:devqbot...`）。查这类问题用 `claude -p ... --debug hooks`，hook 失败信息只在那里出现，正常输出里完全静默
 20. **`GetAsyncKeyState` 首次轮询必然脏**：它的返回值里带「自上次调用以来是否被按过」位，进程启动后第一次扫 256 个 vk，会把 QBot 启动**之前**用户敲的键一次性算进来（实测能白送几十点）。所以 `input-monitor.ts` 有个 `seeded` 标志：第一轮只用来建立基线、一律返回 0。同理任何「按下沿」计数都必须先播种再计数，不能一上来就 diff
 21. **等距房间的可走区必须比地板小一圈**：`RoomSpec.floor` 是脚底锚点的多边形，但角色有高度（`petHeight` 185px），脚底贴到地板真实边界时上半身早就压进墙里，表现为「走到墙边还在走」（碰墙不停）。靠墙的边要沿法向内收 ≈45px；2:1 等距下「沿边内收 d」换算成顶点位移不是简单加减 d，得把两条相邻边各自偏移后求交点。开口方向（前面两条边）不要收，收了白丢可走面积。改这个数据前先确认：`scaleForY` 取的是 floor 的 y 极值（跟着变、自洽），`depthZ` 取 `spec.height`（不受影响），`sanitizePlacements` 不做多边形包含判定（已存盘的家具摆放不会被判无效）
+22. **去绿边只能用 rim-only despill，且和 alpha 腐蚀互斥**（`chroma.ts:rimDespillFilter`，2026-08-21 实测）：
+    - **绿边像素 alpha=255（不透明）**，所以「只修半透明 rim」的直觉方案抓不到它；环带必须用 `dilate(alpha) − erode(alpha)` 向外扩才能覆盖
+    - **alpha 腐蚀从不改颜色**，只把绿边挪成半透明（实测 `bdffb5` G+70 在 erode1 后颜色原样、alpha ff→7a）；erode2 才抠掉但同时啃角色本体 → 旧方案「没绿边」和「抠得完整」不可兼得
+    - **全帧 despill 的真正危险不是白色而是绿色系角色**：实测纯白 G+0 不变（旧注释说的「白发染粉紫」未复现），但薄荷绿身体 G+86→G-1、橄榄绿衣服 G+73→G-1（= 坑 3 的小青）。所以必须空间门控
+    - **三处像素格式必须显式钉死**：`alphaextract` 前要 `format=yuva444p`（否则整图协商失败报 `could not choose their formats`）；mask 要 `format=gbrp,format=rgba` 复制到 RGB 三通道（gray mask 会被转 yuv、chroma 补 128，`maskedmerge` 退化成 50% 混合，despill 只生效一半）；base/overlay 同走 rgba
+    - **despill 开着就不许再 erode**：两段独立 split/alphaextract 子图叠加会触发格式重协商，实测把角色内部也改坏（薄荷绿 G+86→G+42）。`keyActionVideo` 已强制互斥
+    - 效果：同素材绿偏像素 6048(1.13%)→**0**、不透明像素 +2 万（角色更完整）。对照组测试在 `pipeline/test/despill.test.ts`，**别把这两条「优化」回去**
 
 ## 已知未解决
 
@@ -175,5 +189,5 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 
 - pipeline 模块禁止 import Electron API
 - prompt 模板文字实测有效，不要随意改写措辞（`prompts.ts`）
-- 改动作/管线参数后跑 `npm test -w pipeline`（26+ 测试，全 mock 不花钱）
+- 改动作/管线参数后跑 `npm test -w pipeline`（80 测试，全 mock 不花钱）；抠像参数另有 `test/despill.test.ts` 的对照组守着（血泪坑 22）
 - 真实 API 烟测要花钱（生图分/张、视频约 ¥1/条），先问用户

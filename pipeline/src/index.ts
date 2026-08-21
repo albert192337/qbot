@@ -16,11 +16,15 @@ export {
   computeAlphaBBox,
   computeAlphaStats,
   ALPHA_ERODE_PX,
+  RIM_DESPILL_MIX,
+  RIM_DESPILL_BAND,
+  rimDespillFilter,
+  erodeFilter,
   NORM_TARGET_COVERAGE,
   NORM_SCALE_MIN,
   NORM_SCALE_MAX,
   normalizeFilter,
   probeSize,
 } from './chroma.js';
-export { checkGreenFrame, checkVideoDrift, classifyDrift, selectChromaKey } from './qc.js';
+export { checkGreenFrame, checkVideoDrift, classifyDrift, selectChromaKey, selectDualKeys } from './qc.js';
 export { turnaroundPrompt, framePrompt, videoPrompt, actionSpec, ACTIONS, ABSTRACT_ACTIONS, FAITHFUL_ACTIONS, DEFAULT_CHARACTER_DESC } from './prompts.js';

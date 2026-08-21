@@ -3,7 +3,9 @@
  * ffmpeg 参数逐字取自 DESIGN.md §3.4 实测生产参数。
  *
  * ── 三条踩坑铁律（实测血泪，禁止"优化"）──────────────────────────
- * 1. 不要用 despill：白色含大量绿通道，despill 会把白发/白衣染成粉紫
+ * 1. 不要用**全帧** despill：会把绿色系角色本体压成灰（薄荷绿身体 G+86→G-1，
+ *    即血泪坑 3 的小青案例）。去绿边必须用 rim-only despill 做空间门控，
+ *    只改轮廓环带、不碰内部（见 rimDespillFilter）
  * 2. GIF 必须 dither=none：bayer 抖动会把 alpha 一起抖出半透明散点
  * 3. 循环靠生成层保证（first=last frame），不做后期交叉淡化接缝
  * ────────────────────────────────────────────────────────────────
@@ -32,21 +34,44 @@ export interface AlphaStats {
  *   把黑皮衣抠成半透明洞
  * - colorkey 0.11 + 多 key → 写实渲染的暗部胶片颗粒单像素散布大，RGB 距离覆盖不住，
  *   「暗部颗粒要大半径、深色衣服要小半径」在 RGB 空间无解
- * - 现方案 chromakey + 单个「最饱和亮绿」key：UV 色度空间对亮度不敏感，
- *   同一色度的亮暗渐变和颗粒一个 key 全覆盖；必须选最饱和的绿做 key——
+ * - 现方案 chromakey + 双 key（色度极值两端）：UV 色度空间对亮度不敏感，
+ *   同一色度的亮暗渐变和颗粒一个 key 全覆盖；必须选最饱和的绿做主 key——
  *   暗绿的 UV 弱（贴近中性灰），会连深色衣服一起吃掉
  * - 残留绿边不靠调大 similarity 解决（上面两条已证明会吃角色本体），
- *   而是靠 ALPHA_ERODE_PX 收边：只动 alpha 通道，不碰 key 半径
+ *   而是靠 rim-only despill 在轮廓环带上压绿（见 RIM_DESPILL_MIX）
  */
 export const CHROMAKEY_SIMILARITY = 0.1;
 export const CHROMAKEY_BLEND = 0.07;
 
 /**
- * alpha 收边像素数（仅 webm；GIF 走 paletteuse=alpha_threshold=128 天然硬切）。
- * chromakey 半径故意留小以免抠穿角色，代价是轮廓上留一圈半透明的混色绿像素。
- * 对 alpha 做 N 次 3×3 腐蚀把这圈啃掉，比调大 similarity 安全得多。
+ * rim-only despill：只在角色轮廓环带上压减绿通道，消除抗锯齿/色度子采样产生的绿边。
+ *
+ * ── 为什么不是全帧 despill（血泪坑 1 的正确版本）────────────────────
+ * 实测（/tmp 探针，白/薄荷绿/橄榄绿/深色 8 色块）：
+ *   全帧 despill mix=0.5 → 纯白 G+0 不变（坑 1 说的「白发染粉紫」在本管线未复现），
+ *   但**绿色角色本体**被毁：薄荷绿身体 G+86→G-1、橄榄绿衣服 G+73→G-1（= 血泪坑 3 的小青案例）。
+ *   所以危险的不是白色，是绿色系角色 —— 必须做空间门控，只动轮廓，不动内部。
+ *
+ * ── 为什么替换掉 ALPHA_ERODE_PX 而不是叠加 ──────────────────────
+ * 1. 腐蚀根本没去掉绿边：实测绿边像素 bdffb5 (G+70) 在 erode1 后**颜色原样还在**，
+ *    只是 alpha 从 ff 降到 7a（半透明地绿着）；erode2 才推到 a00，但同时啃掉角色本体一圈。
+ *    「没绿边」和「抠得完整」在腐蚀方案里无法兼得。
+ * 2. rim despill 直接把那颗像素改成中性 bdb9b5 (G+0)，alpha 不动 → 边缘细节全保留。
+ * 3. 两者**不能叠加**：串两段独立的 split/alphaextract 子图会让 ffmpeg 重新协商像素格式，
+ *    实测薄荷绿内部 G+86→G+42（内部被误改）。所以 rim despill 生效时 erode 必须为 0。
+ *
+ * mix=0.5 为实测最优：绿边 G+70→G+0，白色本体与薄荷绿内部均零改动。
  */
-export const ALPHA_ERODE_PX = 1;
+export const RIM_DESPILL_MIX = 0.5;
+/** 环带宽度（dilate/erode 次数）：1 = 覆盖轮廓外一圈混色像素，实测足够 */
+export const RIM_DESPILL_BAND = 1;
+
+/**
+ * alpha 收边像素数（旧方案，默认关闭 —— 现由 rim-only despill 取代）。
+ * 保留参数是为了 rekey CLI 能对存量角色回退对照，以及 despill 关闭时的兜底。
+ * 注意：与 rim despill 同时开启会破坏画面（见上），keyActionVideo 已互斥处理。
+ */
+export const ALPHA_ERODE_PX = 0;
 
 /** 归一化目标：角色 alpha 覆盖面积占画布比例 / 底边基线位置（所有动作一致 → 视觉等大）。
  *  0.18 = 按现有 6 个动作在旧 bbox 口径下的归一化后覆盖率中位数实测标定，
@@ -344,6 +369,10 @@ export function normalizeFilter(
  * 两个不显眼但致命的参数：
  * - `-auto-alt-ref 0`：VP9 alpha 与 alt-ref 不兼容，不关会报错或丢 alpha
  * - `-metadata:s:v:0 alpha_mode=1`：Chromium 靠容器标记才把 alpha 当 alpha 渲染，漏掉则 <video> 黑底
+ *
+ * 滤镜链：chromakey → rim despill（去绿边）→ normalize → 可选收边
+ * despill 与 erode 互斥（叠加会让 ffmpeg 重协商格式而改坏内部像素，见 RIM_DESPILL_MIX 注释），
+ * 由调用方（keyActionVideo）保证只传其中一个。
  */
 export async function toWebm(
   inPath: string,
@@ -352,9 +381,12 @@ export async function toWebm(
   ffmpegPath: string,
   normVf?: string,
   erodePx: number = ALPHA_ERODE_PX,
+  despillMix: number = RIM_DESPILL_MIX,
 ): Promise<void> {
   const vf =
-    `${keyFilters(keys)},format=yuva420p${erodeFilter(erodePx)}` +
+    `${keyFilters(keys)},format=yuva420p` +
+    rimDespillFilter(despillMix) +
+    erodeFilter(erodePx) +
     `${normVf ? `,${normVf}` : ''}`;
   await runFfmpeg(ffmpegPath, [
     '-y',
@@ -374,24 +406,70 @@ export async function toWebm(
 /**
  * alpha 收边滤镜段：抽出 alpha 通道做 N 次 3×3 腐蚀后再合回去。
  * 只削 alpha，色彩平面不动 —— 所以不会重演「调大 key 半径把绿衣服抠空」。
- * 标签用 __ 前缀，避免和 toGif 里的 [a]/[b] 撞名。
+ * 标签用 prefix 区分多处调用（同一条滤镜链里标签不能重名）。
  */
-function erodeFilter(px: number): string {
+export function erodeFilter(px: number, prefix = '__p'): string {
   if (!Number.isFinite(px) || px <= 0) return '';
   const erosions = Array.from({ length: Math.floor(px) }, () => 'erosion').join(',');
-  return `,split[__m][__a];[__a]alphaextract,${erosions}[__e];[__m][__e]alphamerge`;
+  return (
+    `,format=yuva444p,split[${prefix}m][${prefix}a];` +
+    `[${prefix}a]alphaextract,${erosions}[${prefix}e];` +
+    `[${prefix}m][${prefix}e]alphamerge`
+  );
 }
 
-/** 绿幕 mp4 → 320px 透明 GIF（导出分享用，DESIGN.md §3.4 生产参数逐字） */
+/**
+ * rim-only despill 滤镜段：只在角色轮廓环带上压绿，内部像素零改动。
+ *
+ * 环带 = dilate^n(alpha) − erode^n(alpha)，二值化后作 maskedmerge 的 mask。
+ * 用 dilate 向外扩是关键：实测绿边像素的 alpha 常常已经是 255（不透明），
+ * 只用「alpha − erode(alpha)」的环带抓不到最外那圈绿。
+ *
+ * 三个必须显式钉死的像素格式（少一个就翻车，全部实测）：
+ * - `alphaextract` 前必须 `format=yuva444p`：否则整图协商失败
+ *   （"The following filters could not choose their formats"）
+ * - mask 必须 `format=gbrp,format=rgba` 复制到 RGB 三通道：gray mask 会被自动转 yuv、
+ *   chroma 补 128，maskedmerge 变成 50% 混合 → despill 只生效一半（实测 G+70 只降到 G+35）
+ * - base/overlay 都走 rgba：与 mask 同格式，merge 才是真·二值取舍
+ */
+export function rimDespillFilter(
+  mix: number = RIM_DESPILL_MIX,
+  band: number = RIM_DESPILL_BAND,
+): string {
+  if (!Number.isFinite(mix) || mix <= 0 || band <= 0) return '';
+  const ero = Array.from({ length: Math.floor(band) }, () => 'erosion').join(',');
+  const dil = Array.from({ length: Math.floor(band) }, () => 'dilation').join(',');
+  return (
+    `,format=rgba,split=3[rb][rd][rm];` +
+    `[rd]despill=type=green:mix=${mix},format=rgba[rdd];` +
+    `[rm]format=yuva444p,alphaextract,split=2[ra1][ra2];` +
+    `[ra1]${dil}[rad];[ra2]${ero}[rae];` +
+    `[rad][rae]blend=all_mode=subtract,` +
+    `lutyuv=y='if(gt(val\\,8)\\,255\\,0)',format=gbrp,format=rgba[rrim];` +
+    `[rb][rdd][rrim]maskedmerge`
+  );
+}
+
+/**
+ * 绿幕 mp4 → 320px 透明 GIF（导出分享用，DESIGN.md §3.4 生产参数逐字）。
+ *
+ * `dither=none` 与「循环靠生成层」两条铁律不变。第三条「GIF 不做 despill」
+ * 按实测收窄为「不做**全帧** despill」：GIF 走 alpha_threshold=128 硬切，
+ * alpha=255 的绿边像素会原样留下（比 webm 更显眼），rim-only despill 正是修这个，
+ * 且已验证不动角色内部（含白色与绿色系角色）。传 0 可关闭回到旧行为。
+ */
 export async function toGif(
   inPath: string,
   outPath: string,
   keys: string[],
   ffmpegPath: string,
   normVf?: string,
+  despillMix: number = RIM_DESPILL_MIX,
 ): Promise<void> {
   const vf =
-    `${keyFilters(keys)},format=yuva420p${normVf ? `,${normVf}` : ''},` +
+    `${keyFilters(keys)},format=yuva420p` +
+    rimDespillFilter(despillMix) +
+    `${normVf ? `,${normVf}` : ''},` +
     `fps=20,scale=320:-1:flags=lanczos,` +
     `split[a][b];[a]palettegen=reserve_transparent=1:stats_mode=full[p];` +
     `[b][p]paletteuse=alpha_threshold=128:dither=none`;
