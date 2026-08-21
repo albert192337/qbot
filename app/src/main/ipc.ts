@@ -9,7 +9,7 @@ import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from '
 import { getSettings, setSettings } from './config';
 import { createHatchWindow, createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, createMarketWindow, createLoungeWindow } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
-import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms } from './rooms/rooms';
+import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, isSecureTransport, reportChat, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms } from './rooms/rooms';
 import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, getLocalSign, setLocalSign } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
@@ -162,8 +162,10 @@ export function registerIpc(): void {
   ipcMain.handle('rooms:leave', () => leaveRoom());
   ipcMain.handle('rooms:getStatus', () => getRoomsStatus());
   ipcMain.handle('rooms:getCache', () => getRoomsCache());
+  ipcMain.handle('rooms:isSecure', () => isSecureTransport());
   ipcMain.on('rooms:chat', (_ev, text: string) => sendChat(text));
   ipcMain.on('rooms:deleteChat', (_ev, id: string) => deleteChat(id));
+  ipcMain.on('rooms:report', (_ev, id: string) => reportChat(id));
   ipcMain.on('rooms:wave', (_ev, memberId: string) => waveAt(memberId));
   ipcMain.handle('rooms:update', (_ev, patch) => updateRoom(patch));
   ipcMain.handle('rooms:kick', (_ev, memberId: string) => kickMember(memberId));

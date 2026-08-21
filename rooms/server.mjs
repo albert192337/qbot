@@ -163,6 +163,9 @@ function sanitizeRoom(r) {
     ownerId: typeof r.ownerId === 'string' ? r.ownerId : '',
     members,
     banned: Array.isArray(r.banned) ? r.banned.filter((x) => typeof x === 'string') : [],
+    reports: Array.isArray(r.reports)
+      ? r.reports.filter((x) => x && typeof x.msgId === 'string' && typeof x.by === 'string').slice(-200)
+      : [],
     chat: chat.slice(-CHAT_KEEP),
     createdAt: num(r.createdAt, now),
     lastActiveAt: num(r.lastActiveAt, now),
@@ -350,6 +353,7 @@ const handlers = {
       ownerId: ws.memberId,
       members: [],
       banned: [],
+      reports: [],
       chat: [],
       createdAt: now,
       lastActiveAt: now,
@@ -437,6 +441,35 @@ const handlers = {
     room.chat.splice(i, 1);
     dirty = true;
     broadcast(ws.roomId, { t: 'chat:deleted', roomId: ws.roomId, id });
+  },
+
+  /**
+   * 举报一条发言：**只记计数 + 快照，不做任何自动判定**。
+   * 自部署服务没有 7×24 审核能力（spec §5.3），所以这里只负责留证据给房主/运维看，
+   * 绝不自动删帖或封人——误伤的代价比漏判高。
+   */
+  report(ws, f) {
+    const room = ws.roomId ? rooms.get(ws.roomId) : null;
+    if (!room) return;
+    const id = String(f.id || '');
+    const msg = room.chat.find((c) => c.id === id);
+    if (!msg) return;
+    if (msg.memberId === ws.memberId) return; // 举报自己没意义
+    room.reports = Array.isArray(room.reports) ? room.reports : [];
+    // 同一人对同一条只算一次
+    if (room.reports.some((r) => r.msgId === id && r.by === ws.memberId)) return;
+    room.reports.push({
+      msgId: id,
+      by: ws.memberId,
+      at: Date.now(),
+      // 快照：原消息可能被作者撤回，留个证据才有意义
+      snapshot: { memberId: msg.memberId, nickname: msg.nickname, text: msg.text, at: msg.at },
+    });
+    // 只留最近 200 条举报，别让它无限涨
+    if (room.reports.length > 200) room.reports = room.reports.slice(-200);
+    dirty = true;
+    console.log(`[rooms] report filed (room reports=${room.reports.length})`); // 不打正文
+    send(ws, { t: 'reported', id });
   },
 
   wave(ws, f) {

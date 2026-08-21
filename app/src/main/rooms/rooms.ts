@@ -29,6 +29,11 @@ import {
   NICK_MAX,
 } from './rooms-rules';
 
+/**
+ * 房间服务地址。**上线后应指向 wss://**（spec §8.5：公共房间传的是用户手打的
+ * 聊天正文，暴露面比 1v1 的状态枚举大一个量级，wss 是上线必要项而非后置项）。
+ * wss 就绪前保持 ws://，此时入房明示会额外写明「当前传输未加密」。
+ */
 const DEFAULT_ROOMS_URL = 'ws://14.103.59.73:24252';
 const CONNECT_TIMEOUT_MS = 8_000;
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -85,6 +90,14 @@ export function setLoungePush(fn: (channel: string, payload: unknown) => void): 
 
 export function getRoomsStatus(): RoomsStatus {
   return status;
+}
+
+/**
+ * 当前链路是否加密（wss）。渲染端据此决定入房明示要不要加「传输未加密」那句——
+ * 与其含糊带过，不如把实情写在用户点「知道了」之前（spec §8.5）。
+ */
+export function isSecureTransport(): boolean {
+  return url().startsWith('wss://');
 }
 
 function setStatus(next: RoomsStatus): void {
@@ -408,6 +421,15 @@ export function sendChat(text: string): void {
 export function deleteChat(id: string): void {
   if (!currentRoomId) return;
   send({ t: 'chat:delete', id });
+}
+
+/**
+ * 举报一条发言。服务端只记计数 + 快照，**不做自动判定**——
+ * 自部署服务没有审核能力，误伤的代价比漏判高（spec §5.3）。
+ */
+export function reportChat(id: string): void {
+  if (!currentRoomId) return;
+  send({ t: 'report', id });
 }
 
 export function waveAt(targetMemberId: string): void {

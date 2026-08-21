@@ -447,9 +447,13 @@ export interface QBotApi {
       room: RoomSnapshot | null;
       chat: RoomChatMsg[];
     }>;
+    /** 链路是否加密（wss）：入房明示据此决定要不要提示传输未加密 */
+    isSecure(): Promise<boolean>;
     /** 发言（用户手打文字的唯一出口） */
     chat(text: string): void;
     deleteChat(id: string): void;
+    /** 举报一条发言（服务端只记计数，不自动处置） */
+    report(id: string): void;
     wave(memberId: string): void;
     update(patch: { name?: string; kind?: RoomKind; listed?: boolean }): Promise<void>;
     kick(memberId: string): Promise<void>;

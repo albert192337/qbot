@@ -219,6 +219,26 @@ async function main() {
   const deleted = await bob.wait('chat:deleted');
   check(deleted.id === mine.id, '能删自己的发言');
 
+  // ── 7b. 举报 ───────────────────────────────────────────
+  console.log('\n7b. 举报');
+  await sleep(3100);
+  carol.clear();
+  bob.send({ t: 'chat', text: '这条会被举报' });
+  const target = await carol.wait('chat');
+  carol.clear();
+  carol.send({ t: 'report', id: target.msg.id });
+  const reported = await carol.wait('reported');
+  check(reported.id === target.msg.id, '举报被受理');
+
+  // 举报不该自动删帖（没有审核能力就别自动处置）
+  carol.clear();
+  carol.send({ t: 'join', roomId });
+  const stillThere = await carol.wait('joined');
+  check(
+    stillThere.chat.some((c) => c.id === target.msg.id),
+    '举报后消息仍在（不自动删，只留证据）',
+  );
+
   // ── 8. 打招呼 ──────────────────────────────────────────
   console.log('\n8. 打招呼');
   bob.clear();

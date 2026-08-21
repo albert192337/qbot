@@ -260,6 +260,15 @@ function renderMsg(msg: RoomChatMsg): HTMLElement {
   bubble.textContent = msg.text; // textContent：不解析 markdown/HTML，别人的发言不该有渲染能力
 
   wrap.append(who, bubble);
+  if (!mine) {
+    // 别人的发言：右键举报（只记计数交房主/运维看，不会自动删）
+    wrap.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (!confirm(`举报 ${msg.nickname} 的这条发言？\n举报只会记录下来，不会自动删除或封禁。`)) return;
+      window.qbot.rooms.report(msg.id);
+      setStatus('已记录你的举报');
+    });
+  }
   if (mine) {
     const del = document.createElement('div');
     del.className = 'msg-del';
@@ -285,7 +294,7 @@ async function doJoin(roomId: string): Promise<void> {
   // 首次入房明示（spec §5.3）：发言会离开本机，必须让用户知情后再进
   const settings = await window.qbot.settings.get();
   if (!settings.roomsChatConsent) {
-    const agreed = await askConsent();
+    const agreed = await askConsent(await window.qbot.rooms.isSecure());
     if (!agreed) return;
     await window.qbot.settings.set({ roomsChatConsent: true });
   }
@@ -299,7 +308,7 @@ async function doJoin(roomId: string): Promise<void> {
   }
 }
 
-function askConsent(): Promise<boolean> {
+function askConsent(secure: boolean): Promise<boolean> {
   return new Promise((resolve) => {
     sheet.replaceChildren();
     const h = document.createElement('h2');
@@ -310,7 +319,9 @@ function askConsent(): Promise<boolean> {
       '公共房间里，你的发言会发送到房间服务器，房内所有人都能看到，' +
       '并且会保留最近 50 条供后来的人查看。\n\n' +
       '桌宠状态（在思考/在敲代码等）也会同步给房友，但只是状态本身——' +
-      '具体项目、文件名、AI 对话内容都不会离开你的电脑。';
+      '具体项目、文件名、AI 对话内容都不会离开你的电脑。' +
+      // wss 未就绪时必须说实话（spec §8.5），别让用户以为聊天是加密的
+      (secure ? '' : '\n\n⚠ 当前与房间服务器的连接未加密，同网络下他人可能看到你的发言。');
     p.style.whiteSpace = 'pre-line';
     const row = document.createElement('div');
     row.className = 'row';

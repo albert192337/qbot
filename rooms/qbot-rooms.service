@@ -1,0 +1,33 @@
+[Unit]
+Description=QBot 公共房间服务（房间列表 / 成员 / 在场 / 聊天）
+Documentation=https://github.com/your-org/qbot/blob/main/docs/rooms-deploy.md
+After=network.target
+
+[Service]
+Type=simple
+# DynamicUser：systemd 临时分配非特权用户，不用手工建账号（同 qbot-relay/qbot-market）
+DynamicUser=yes
+# StateDirectory 会自动创建 /var/lib/qbot-rooms 并把属主给 DynamicUser
+StateDirectory=qbot-rooms
+Environment=PORT=24252
+Environment=DATA_DIR=/var/lib/qbot-rooms
+WorkingDirectory=/opt/qbot-rooms
+ExecStart=/usr/bin/node /opt/qbot-rooms/server.mjs
+Restart=always
+RestartSec=3
+
+# 收紧权限：这个服务只需要读自己的代码 + 写 StateDirectory
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+
+# 日志只有数量统计（服务端已保证不打正文），走 journald 即可
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

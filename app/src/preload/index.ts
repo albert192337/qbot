@@ -99,8 +99,10 @@ const api: QBotApi = {
     getStatus: () => ipcRenderer.invoke('rooms:getStatus'),
     getCache: () => ipcRenderer.invoke('rooms:getCache'),
     // 高频/无返回值的走 send（同 pet.move 的取舍）
+    isSecure: () => ipcRenderer.invoke('rooms:isSecure'),
     chat: (text) => ipcRenderer.send('rooms:chat', text),
     deleteChat: (id) => ipcRenderer.send('rooms:deleteChat', id),
+    report: (id) => ipcRenderer.send('rooms:report', id),
     wave: (memberId) => ipcRenderer.send('rooms:wave', memberId),
     update: (patch) => ipcRenderer.invoke('rooms:update', patch),
     kick: (memberId) => ipcRenderer.invoke('rooms:kick', memberId),
