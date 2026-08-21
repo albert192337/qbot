@@ -27,12 +27,38 @@ export interface VideoTaskStatus {
   error?: string;
 }
 
+/** 视觉理解的单个内容块：文本或图片，按数组顺序交错 */
+export type VisionPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; dataUrl: string };
+
+/**
+ * 视觉理解请求（表情包打标用）：交错的文本/图片块，返回纯文本。
+ * 交错是必需的——批量打标要在每组帧前插「贴纸 #N」标记，
+ * 否则模型无法把扁平图片列表对回到具体贴纸（错位就整批标错）。
+ */
+export interface VisionChatOpts {
+  /** 系统提示词（类别定义、输出格式约束） */
+  system: string;
+  /** 用户内容：文本与图片按顺序交错 */
+  parts: VisionPart[];
+  /**
+   * 图片精度档：low 省 tokens（打标够用）；high 用于密集文本/复杂图表。
+   * 默认 low。
+   */
+  detail?: 'low' | 'high' | 'auto';
+  /** 采样温度，默认 0（打标要稳定可复现） */
+  temperature?: number;
+}
+
 export interface ArkClient {
   generateImage(opts: GenerateImageOpts): Promise<Buffer>;
   /** 返回 taskId。frame 同时作 first_frame 和 last_frame（循环靠生成层保证） */
   submitVideoTask(opts: { prompt: string; frameDataUrl: string }): Promise<string>;
   getVideoTask(taskId: string): Promise<VideoTaskStatus>;
   downloadVideo(url: string, destPath: string): Promise<void>;
+  /** 视觉理解（chat/completions）：返回助手回复的纯文本 */
+  visionChat(opts: VisionChatOpts): Promise<string>;
 }
 
 const RETRY_DELAYS_MS = [1000, 4000, 16000];
@@ -148,6 +174,38 @@ export function createArkClient(
       const res = await request(url, { method: 'GET' });
       const buf = Buffer.from(await res.arrayBuffer());
       await writeFile(destPath, buf);
+    },
+
+    async visionChat(opts) {
+      const detail = opts.detail ?? 'low';
+      const body = {
+        model: cfg.visionModel ?? DEFAULTS.visionModel,
+        messages: [
+          { role: 'system', content: opts.system },
+          {
+            role: 'user',
+            content: opts.parts.map((p) =>
+              p.type === 'text'
+                ? { type: 'text', text: p.text }
+                : { type: 'image_url', image_url: { url: p.dataUrl, detail } },
+            ),
+          },
+        ],
+        temperature: opts.temperature ?? 0,
+      };
+      const res = await request(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const text = json.choices?.[0]?.message?.content;
+      if (typeof text !== 'string' || !text.trim()) {
+        throw new ArkApiError('vision response missing message content', 200, false);
+      }
+      return text;
     },
   };
 }

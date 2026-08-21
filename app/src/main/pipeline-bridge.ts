@@ -78,7 +78,8 @@ function broadcast(dirId: string, ev: ProgressEvent, candidates?: string[]): voi
   }
 }
 
-async function buildConfig(): Promise<PipelineConfig> {
+/** API key + ffmpeg 路径解析（打包后 asar 修正）。sticker-importer 也用它，故导出。 */
+export async function buildConfig(): Promise<PipelineConfig> {
   const settings = await getSettings();
   if (!settings.arkApiKey) throw new Error('未配置 API key（托盘 → 设置）');
   const ffmpegPath = await resolveFfmpegPath();

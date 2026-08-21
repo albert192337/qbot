@@ -8,12 +8,13 @@
 |---|---|
 | `pipeline/` | 生成管线，**纯 Node 零 Electron 依赖**，可独立 CLI 使用（`npx tsx pipeline/src/cli.ts`） |
 | `app/` | Electron 客户端（electron-vite；main / preload / 五 renderer：pet + hatch + room 小房间 + bubble 气泡 + studio 配置面板） |
-| `app/src/main/pipeline-bridge.ts` | **唯一** import `@qbot/pipeline` 的地方 |
+| `app/src/main/pipeline-bridge.ts` | import `@qbot/pipeline` 的主入口（另一处是 sticker-importer，共用其 `buildConfig`） |
 | `app/src/main/agent-server.ts` | agent 联动：127.0.0.1 HTTP 收 hook 事件 → 会话合成 → 广播 pet 窗 |
 | `app/src/main/agent-message.ts` | agent 消息纯逻辑：markdown 展平、截断、来源标签、transcript 解析（可单测） |
 | `app/src/main/hooks/claude.ts` | Claude Code hooks 安装器（托盘显式同意，写 ~/.claude/settings.json） |
 | `app/src/main/music-monitor.ts` | 网易云音乐监控（Windows SMTC，常驻 PowerShell 进程） |
-| `app/src/renderer/studio/` | Studio 配置面板：人设编辑、自定义动作、Claude Code 联动配置 |
+| `app/src/main/sticker-importer.ts` | 表情包导入：打标→复核→转码落盘→热重载（纯逻辑在 `sticker-rules.ts`） |
+| `app/src/renderer/studio/` | Studio 配置面板：人设编辑、自定义动作、Claude Code 联动配置、表情包导入 |
 | `assets/mascot/` | 官方预置角色源（同步于 `app/resources/presets/mascot/`） |
 | `docs/superpowers/specs/` | 已批准的设计 spec（权威）；`DESIGN.md` 是最初的产品/技术调研 |
 | `config.local.json` | **gitignored**，存 API keys（arkApiKey / gptImageApiKey） |
@@ -80,6 +81,21 @@
 - 调试面板有三个注水按钮（加挂机时间 / 给箱子 / 给家具）
 - 纯逻辑单测 `app/test/progress-rules.test.ts`（33 例）
 
+## 表情包导入（GIF → 动作槽位）
+
+- 丢一套 GIF 表情包 → 模型粗标语义 → 映射到动作槽位，**绕开三视图/逐动作生成管线**（秒级、几乎免费，对比生成一个动作 5-8min + API 费）
+- **模型输出语义类别不是动作 ID**（idle/sleep/tea/happy/annoyed/celebrate/focus/wave/other 共 9 类），再经 `CATEGORY_TO_SLOT` 映射到槽位。理由：贴纸是任意素材，用户关心「它表达什么」；类别比动作 ID 稳定，动作体系重构后只改映射表
+- celebrate/focus/wave 已能被模型标出但 v1 不落槽（进备选库），等 S+ 场景动作落地补映射即自动启用
+- 打标走 `doubao-seed-2-0-mini`（Ark `chat/completions`，输入 ¥0.2/M、`detail: 'low'`、`temperature: 0`），一批 50 张约 ¥0.009
+- **请求体是交错的文本/图片块**（`VisionPart[]`）：每组帧前插「贴纸 #N」标记，否则模型无法把扁平图片列表对回具体贴纸，错位就整批标错；分块 12 张/次（150 张图挤一次请求对位准确率会掉）
+- **两阶段**：`analyze` 只打标不落盘（取消复核 = 什么都没发生）；`apply` 才转码写盘 + 热重载。打标结果由渲染层持有，主进程无状态（复核可能几分钟，存一份就要处理窗口关闭/角色删除/多窗并发）
+- 转码 `gifToWebm`：**不抠像**（GIF 自带 alpha，chromakey 会吃掉角色里的绿色）、**不归一化**（贴纸是成品），640×640 方形画布等比缩放居中 + 透明 padding——桌宠窗宽=高且 `video{width:100%}`，横版贴纸直接播会变形
+- `manifest.importedActions`（key = 槽位）与 `actions` 分开存：删字段一步回退，原 webm 从未被覆盖；`spareStickers` 是备选库；原始 GIF 永久留在 `imported/_raw/`（同血泪坑 4 思路）
+- 播放层合并顺序：标准动作 → 导入贴纸 → 自定义动作（后者覆盖同名）；**状态机零改动**（只认 PlayableId）
+- 容错三层：单块请求失败 → 该块降级 other；坏 GIF → 标红不阻断整批；类别非法/条目缺失 → other + confidence 0 强制人工指定
+- 核心文件：`pipeline/src/sticker-import.ts`（打标纯逻辑）+ `chroma.ts:gifToWebm` + `app/src/main/sticker-importer.ts`（IO/IPC）+ `sticker-rules.ts`（纯逻辑可单测）+ Studio「表情包导入」tab
+- spec：`docs/superpowers/specs/2026-08-21-sticker-pack-import-design.md`
+
 ## 举牌功能
 
 - **长柄木牌**：牌子在上、杆在下，跟随角色显示在右侧
@@ -142,6 +158,7 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 
 - **端点**：`https://ark.cn-beijing.volces.com/api/plan/v3`（火山方舟 plan 端点，key 在 config.local.json）
 - **生图**：`doubao-seedream-5.0-lite`（尺寸白名单：三视图 3072x1536、首帧 2048x2048；1440x1440 会 400）
+- **打标**：`doubao-seed-2-0-mini`（视觉理解，走 `chat/completions`；表情包导入用，输入 ¥0.2/M）
 - **视频**：`doubao-seedance-1.5-pro`——**duration 最短 5**（3 会 400）；参数走 prompt 尾缀 `--resolution 480p --duration 5 --camerafixed true`；首帧同时作 first_frame+last_frame（循环的关键）；输出 640×640 24fps h264
 - **可选生图后端 gpt-image-2**（aiartmirror，OpenAI images 兼容，`pipeline/src/gpt-image.ts`）：单张 5-10 分钟；服务端同账号疑似串行 → 客户端限并发 2、超时 900s；有参考图走 multipart `/images/edits`；4xx 与 503 `model_not_found` 永不重试
 - 返回的图片/视频 URL **24 小时过期**，管线一律立即下载落盘

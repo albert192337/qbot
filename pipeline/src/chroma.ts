@@ -234,6 +234,29 @@ function keyFilters(keys: string[]): string {
 }
 
 /** 视频像素尺寸（解析 ffmpeg stderr，ffmpeg-static 不带 ffprobe） */
+/**
+ * 视频时长秒（解析 ffmpeg stderr 的 Duration 行；ffmpeg-static 不带 ffprobe）。
+ * 拿不到时返回 undefined，由调用方决定兜底值。
+ */
+export async function probeDurationSec(
+  videoPath: string,
+  ffmpegPath: string,
+): Promise<number | undefined> {
+  const res = await execFileP(ffmpegPath, ['-i', videoPath], {
+    encoding: 'utf8',
+  }).catch((e: { stderr?: string }) => ({ stdout: '', stderr: e.stderr ?? '' }));
+  const stderr = (res as { stderr: string }).stderr ?? '';
+  const m = stderr.match(/Duration:\s*(\d+):(\d{2}):(\d{2})\.(\d{1,3})/);
+  if (!m) return undefined;
+  const [, h, min, s, frac] = m;
+  const sec =
+    Number(h) * 3600 +
+    Number(min) * 60 +
+    Number(s) +
+    Number(frac.padEnd(3, '0')) / 1000;
+  return Number.isFinite(sec) && sec > 0 ? sec : undefined;
+}
+
 export async function probeSize(
   videoPath: string,
   ffmpegPath: string,
@@ -374,6 +397,44 @@ export function normalizeFilter(
  * despill 与 erode 互斥（叠加会让 ffmpeg 重协商格式而改坏内部像素，见 RIM_DESPILL_MIX 注释），
  * 由调用方（keyActionVideo）保证只传其中一个。
  */
+/** 贴纸导入的方形画布边长（桌宠窗是方形，非方形贴纸居中留透明边） */
+export const STICKER_CANVAS = 640;
+
+/**
+ * GIF 贴纸 → WebM(VP9+alpha)。与 toWebm 的区别：
+ * - **不抠像**：GIF 自带 alpha，chromakey 反而会吃掉角色里的绿色
+ * - **不归一化**：贴纸是成品，按原样等比缩放居中即可
+ * - 方形画布 + 透明 padding：桌宠窗宽=高且 `video{width:100%}`，
+ *   非方形贴纸直接播会变形（spec §4.4 方案 B）
+ *
+ * alpha 双参数（血泪坑 1）照旧：`-auto-alt-ref 0` + `alpha_mode=1`，缺一即黑底。
+ */
+export async function gifToWebm(
+  inPath: string,
+  outPath: string,
+  ffmpegPath: string,
+  canvas: number = STICKER_CANVAS,
+): Promise<void> {
+  // decrease=等比缩放不裁切；pad 居中；force_original_aspect_ratio 防拉伸
+  const vf =
+    `scale=${canvas}:${canvas}:force_original_aspect_ratio=decrease:flags=lanczos,` +
+    `pad=${canvas}:${canvas}:(ow-iw)/2:(oh-ih)/2:color=#00000000,` +
+    `format=yuva420p`;
+  await runFfmpeg(ffmpegPath, [
+    '-y',
+    '-i', inPath,
+    '-vf', vf,
+    '-c:v', 'libvpx-vp9',
+    '-pix_fmt', 'yuva420p',
+    '-auto-alt-ref', '0',
+    '-metadata:s:v:0', 'alpha_mode=1',
+    '-b:v', '0',
+    '-crf', '30',
+    '-an',
+    outPath,
+  ]);
+}
+
 export async function toWebm(
   inPath: string,
   outPath: string,

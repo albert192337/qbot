@@ -13,6 +13,12 @@ import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, ge
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import {
+  analyzeStickers,
+  applyStickers,
+  clearImportedStickers,
+  type StickerAssignment,
+} from './sticker-importer';
+import {
   craft,
   debugAddIdleMs,
   debugGrantBoxes,
@@ -232,6 +238,29 @@ export function registerIpc(): void {
   ipcMain.handle('studio:regenerateTurnaround', async (_ev, dirId: string) => {
     createHatchWindow(); // 三视图要人工挑图，先把孵化窗弹出来
     await regenerateTurnaround(dirId);
+  });
+
+  // ── 表情包导入 ─────────────────────────────────────────
+  // analyze 调打标 API（很便宜，一批不到 1 分钱），只返回建议不落盘；
+  // apply 才转码写盘。取消复核 = 什么都没发生。
+  ipcMain.handle(
+    'studio:analyzeStickers',
+    async (_ev, input: { dir?: string; files?: string[] }) => analyzeStickers(input),
+  );
+  ipcMain.handle(
+    'studio:applyStickers',
+    async (_ev, dirId: string, assignments: StickerAssignment[]) =>
+      applyStickers(dirId, assignments),
+  );
+  ipcMain.handle('studio:clearImportedStickers', async (_ev, dirId: string) => {
+    await clearImportedStickers(dirId);
+  });
+  ipcMain.handle('studio:pickStickerDir', async () => {
+    const res = await dialog.showOpenDialog({
+      title: '选择表情包文件夹',
+      properties: ['openDirectory'],
+    });
+    return res.canceled ? null : res.filePaths[0];
   });
 
   // ── agent 联动 ─────────────────────────────────────────
