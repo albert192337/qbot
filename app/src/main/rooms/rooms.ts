@@ -30,11 +30,13 @@ import {
 } from './rooms-rules';
 
 /**
- * 房间服务地址。**上线后应指向 wss://**（spec §8.5：公共房间传的是用户手打的
- * 聊天正文，暴露面比 1v1 的状态枚举大一个量级，wss 是上线必要项而非后置项）。
- * wss 就绪前保持 ws://，此时入房明示会额外写明「当前传输未加密」。
+ * 房间服务地址：**wss**（2026-08-22 上线，借道 albertbeta.cn 的 nginx 反代到本机 24252）。
+ *
+ * 必须是 wss 而非 ws：公共房间传的是用户手打的聊天正文，暴露面比 1v1 的状态枚举
+ * 大一个量级（spec §8.5）。24252 端口本身不对公网开放，只走反代。
+ * 若哪天退回 ws://，`isSecureTransport()` 会自动让入房弹窗补上「传输未加密」的提示。
  */
-const DEFAULT_ROOMS_URL = 'ws://14.103.59.73:24252';
+const DEFAULT_ROOMS_URL = 'wss://albertbeta.cn/rooms';
 const CONNECT_TIMEOUT_MS = 8_000;
 const REQUEST_TIMEOUT_MS = 8_000;
 /** 在场心跳：on-change 之外的兜底重发（同 link 的 15s 心跳思路，房间人多所以放宽到 30s） */

@@ -13,6 +13,12 @@ import path from 'node:path';
 import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT || 24252);
+/**
+ * 监听地址。生产走 nginx 反代（wss），所以只听回环——
+ * 「24252 不对公网开放」由此成为结构事实，而不是只靠防火墙规则不出错。
+ * 本机开发/smoke 不受影响（也是连 127.0.0.1）。
+ */
+const HOST = process.env.HOST || '127.0.0.1';
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'rooms.json');
 
@@ -522,7 +528,7 @@ const handlers = {
 
 load();
 
-const wss = new WebSocketServer({ port: PORT, maxPayload: MAX_PAYLOAD });
+const wss = new WebSocketServer({ host: HOST, port: PORT, maxPayload: MAX_PAYLOAD });
 
 wss.on('connection', (ws) => {
   ws.isAlive = true;
@@ -584,4 +590,4 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-console.log(`[rooms] listening on :${PORT}  data=${DATA_FILE}`);
+console.log(`[rooms] listening on ${HOST}:${PORT}  data=${DATA_FILE}`);
