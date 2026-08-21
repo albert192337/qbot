@@ -30,6 +30,7 @@ import { readLastAssistantEntry } from './transcript';
 import { pushAgentMessage } from './bubble';
 import { getPetWindow } from './windows';
 import { pushLocalAgentActivity } from './link/link';
+import { pushLocalAgentActivity as pushRoomsActivity } from './rooms/rooms';
 import { addAgentRun } from './progress';
 
 const PORTS = [24242, 24243, 24244, 24245, 24246];
@@ -75,7 +76,8 @@ function broadcastIfChanged(): void {
   }
   lastBroadcast = next;
   getPetWindow()?.webContents.send('agent:status', next);
-  pushLocalAgentActivity(next.activity); // 联机钩子：只出状态枚举（spec §四）
+  pushLocalAgentActivity(next.activity); // 1v1 联机钩子：只出状态枚举（spec §四）
+  pushRoomsActivity(next.activity); // 公共房间钩子：同样只出枚举（2026-08-21 spec §5.3）
 }
 
 interface PendingMessage {

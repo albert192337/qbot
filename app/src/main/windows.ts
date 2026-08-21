@@ -25,6 +25,7 @@ let remotePetWindow: BrowserWindow | null = null;
 let hatchWindow: BrowserWindow | null = null;
 let roomWindow: BrowserWindow | null = null;
 let studioWindow: BrowserWindow | null = null;
+let loungeWindow: BrowserWindow | null = null;
 let bubbleWindow: BrowserWindow | null = null;
 let bubbleSide: 'above' | 'below' = 'above';
 let petScale = 1;
@@ -43,7 +44,7 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds(); // 不依赖 resize 事件的投递时机
 }
 
-type RendererPage = 'pet' | 'hatch' | 'room' | 'studio' | 'bubble' | 'market';
+type RendererPage = 'pet' | 'hatch' | 'room' | 'studio' | 'bubble' | 'market' | 'lounge';
 
 function load(win: BrowserWindow, page: RendererPage, query?: Record<string, string>): void {
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -390,6 +391,39 @@ export function createStudioWindow(): BrowserWindow {
 
 /** 装扮市场：上传/下载皮肤的货架窗（spec 2026-08-02-skin-market-design） */
 let marketWindow: BrowserWindow | null = null;
+
+/**
+ * 公共房间窗（spec 2026-08-21 §6.3）：普通窗口，**不是**透明穿透窗——
+ * 要输入文字、要滚动、要长时间停留，透明窗那套约束（血泪坑 5/18）全是负担。
+ */
+export function createLoungeWindow(): BrowserWindow {
+  if (loungeWindow && !loungeWindow.isDestroyed()) {
+    loungeWindow.focus();
+    return loungeWindow;
+  }
+  loungeWindow = new BrowserWindow({
+    width: 460,
+    height: 620,
+    minWidth: 380,
+    minHeight: 480,
+    title: 'QBot 公共房间',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      sandbox: false,
+    },
+  });
+  loungeWindow.on('closed', () => { loungeWindow = null; });
+  load(loungeWindow, 'lounge');
+  return loungeWindow;
+}
+
+/** 房间事件推送口（rooms.ts 通过 setLoungePush 注入这个） */
+export function pushToLounge(channel: string, payload: unknown): void {
+  if (loungeWindow && !loungeWindow.isDestroyed()) {
+    loungeWindow.webContents.send(channel, payload);
+  }
+}
 
 export function createMarketWindow(): BrowserWindow {
   if (marketWindow && !marketWindow.isDestroyed()) {

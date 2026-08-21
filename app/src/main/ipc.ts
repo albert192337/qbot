@@ -4,11 +4,12 @@ import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
-import type { PetMenuActionEntry, PetMenuCommand } from '../shared/ipc-types';
+import type { PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind } from '../shared/ipc-types';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { createHatchWindow, createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, createMarketWindow } from './windows';
+import { createHatchWindow, createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, createMarketWindow, createLoungeWindow } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
+import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms } from './rooms/rooms';
 import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, getLocalSign, setLocalSign } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
@@ -153,6 +154,22 @@ export function registerIpc(): void {
   ipcMain.handle('market:download', (_ev, hash: string) => downloadSkin(hash));
   ipcMain.handle('market:remove', (_ev, hash: string) => removeSkin(hash));
 
+  // ── 公共房间（spec 2026-08-21）────────────────────────────
+  ipcMain.on('rooms:open', () => createLoungeWindow());
+  ipcMain.handle('rooms:list', (_ev, kind?: RoomKind, q?: string) => listRooms(kind, q));
+  ipcMain.handle('rooms:create', (_ev, input: CreateRoomInput) => createRoom(input));
+  ipcMain.handle('rooms:join', (_ev, roomId: string) => joinRoom(roomId));
+  ipcMain.handle('rooms:leave', () => leaveRoom());
+  ipcMain.handle('rooms:getStatus', () => getRoomsStatus());
+  ipcMain.handle('rooms:getCache', () => getRoomsCache());
+  ipcMain.on('rooms:chat', (_ev, text: string) => sendChat(text));
+  ipcMain.on('rooms:deleteChat', (_ev, id: string) => deleteChat(id));
+  ipcMain.on('rooms:wave', (_ev, memberId: string) => waveAt(memberId));
+  ipcMain.handle('rooms:update', (_ev, patch) => updateRoom(patch));
+  ipcMain.handle('rooms:kick', (_ev, memberId: string) => kickMember(memberId));
+  ipcMain.handle('rooms:toggleFavorite', (_ev, roomId: string) => toggleFavorite(roomId));
+  ipcMain.handle('rooms:disconnect', () => disconnectRooms());
+
   // 桌宠右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
   // 按「玩宠 → 窗口 → 角色/联机 → 系统」四段组织，托盘同源 section 直接平铺
   // （刘海屏 mac 菜单栏挤满时托盘图标被系统静默隐藏，右键是兜底配置入口）。
@@ -188,6 +205,7 @@ export function registerIpc(): void {
           openRoomWindow(name && name !== '未命名' ? `${name}的家` : '小房间');
         },
       },
+      { label: '公共房间', click: () => createLoungeWindow() },
       { label: '装扮市场', click: () => createMarketWindow() },
       { label: '角色工作室', click: () => createStudioWindow() },
       { type: 'separator' },

@@ -1,6 +1,6 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, LinkPeerHello, LinkPeerState, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
+import type { RoomChatMsg, RoomMember, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, LinkPeerHello, LinkPeerState, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
@@ -89,6 +89,73 @@ const api: QBotApi = {
     upload: (dirId) => ipcRenderer.invoke('market:upload', dirId),
     download: (hash) => ipcRenderer.invoke('market:download', hash),
     remove: (hash) => ipcRenderer.invoke('market:remove', hash),
+  },
+  rooms: {
+    open: () => ipcRenderer.send('rooms:open'),
+    list: (kind, q) => ipcRenderer.invoke('rooms:list', kind, q),
+    create: (input) => ipcRenderer.invoke('rooms:create', input),
+    join: (roomId) => ipcRenderer.invoke('rooms:join', roomId),
+    leave: () => ipcRenderer.invoke('rooms:leave'),
+    getStatus: () => ipcRenderer.invoke('rooms:getStatus'),
+    getCache: () => ipcRenderer.invoke('rooms:getCache'),
+    // 高频/无返回值的走 send（同 pet.move 的取舍）
+    chat: (text) => ipcRenderer.send('rooms:chat', text),
+    deleteChat: (id) => ipcRenderer.send('rooms:deleteChat', id),
+    wave: (memberId) => ipcRenderer.send('rooms:wave', memberId),
+    update: (patch) => ipcRenderer.invoke('rooms:update', patch),
+    kick: (memberId) => ipcRenderer.invoke('rooms:kick', memberId),
+    toggleFavorite: (roomId) => ipcRenderer.invoke('rooms:toggleFavorite', roomId),
+    disconnect: () => ipcRenderer.invoke('rooms:disconnect'),
+    onStatus: (cb) => {
+      const listener = (_ev: unknown, s: RoomsStatus) => cb(s);
+      ipcRenderer.on('rooms:status', listener);
+      return () => ipcRenderer.removeListener('rooms:status', listener);
+    },
+    onHistory: (cb) => {
+      const listener = (_ev: unknown, chat: RoomChatMsg[]) => cb(chat);
+      ipcRenderer.on('rooms:history', listener);
+      return () => ipcRenderer.removeListener('rooms:history', listener);
+    },
+    onChat: (cb) => {
+      const listener = (_ev: unknown, msg: RoomChatMsg) => cb(msg);
+      ipcRenderer.on('rooms:chat', listener);
+      return () => ipcRenderer.removeListener('rooms:chat', listener);
+    },
+    onChatDeleted: (cb) => {
+      const listener = (_ev: unknown, id: string) => cb(id);
+      ipcRenderer.on('rooms:chatDeleted', listener);
+      return () => ipcRenderer.removeListener('rooms:chatDeleted', listener);
+    },
+    onMemberIn: (cb) => {
+      const listener = (_ev: unknown, m: RoomMember) => cb(m);
+      ipcRenderer.on('rooms:memberIn', listener);
+      return () => ipcRenderer.removeListener('rooms:memberIn', listener);
+    },
+    onMemberOut: (cb) => {
+      const listener = (_ev: unknown, id: string) => cb(id);
+      ipcRenderer.on('rooms:memberOut', listener);
+      return () => ipcRenderer.removeListener('rooms:memberOut', listener);
+    },
+    onPresence: (cb) => {
+      const listener = (_ev: unknown, p: { memberId: string; mode?: LinkMode; action?: string }) => cb(p);
+      ipcRenderer.on('rooms:presence', listener);
+      return () => ipcRenderer.removeListener('rooms:presence', listener);
+    },
+    onWave: (cb) => {
+      const listener = (_ev: unknown, w: RoomWave) => cb(w);
+      ipcRenderer.on('rooms:wave', listener);
+      return () => ipcRenderer.removeListener('rooms:wave', listener);
+    },
+    onKicked: (cb) => {
+      const listener = () => cb();
+      ipcRenderer.on('rooms:kicked', listener);
+      return () => ipcRenderer.removeListener('rooms:kicked', listener);
+    },
+    onError: (cb) => {
+      const listener = (_ev: unknown, msg: string) => cb(msg);
+      ipcRenderer.on('rooms:error', listener);
+      return () => ipcRenderer.removeListener('rooms:error', listener);
+    },
   },
   studio: {
     open: () => ipcRenderer.send('studio:open'),

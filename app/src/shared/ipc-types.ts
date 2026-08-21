@@ -41,6 +41,22 @@ export interface Settings {
   marketNickname?: string;
   /** 装扮市场：hash → 管理码（下架自己上传的皮肤用） */
   marketTokens?: Record<string, string>;
+
+  /**
+   * 统一昵称（市场署名 + 房间身份，spec 2026-08-21 §6.4）。
+   * 迁移期读取顺序 `nickname ?? marketNickname`——同一个人在市场和房间该是同一个名字。
+   */
+  nickname?: string;
+
+  // ── 公共房间（spec 2026-08-21-public-rooms-design）──
+  /** 房间服务分配的成员 ID（零账号体系：本地存着复用，同市场 token 思路） */
+  roomsMemberId?: string;
+  /** roomId → 房主管理码（自己开的房才有，改设置/踢人用） */
+  roomsOwnerTokens?: Record<string, string>;
+  /** 收藏的房间（列表置顶） */
+  roomsFavorites?: string[];
+  /** 已同意公共房间的发言须知（首次入房明示，spec §5.3） */
+  roomsChatConsent?: boolean;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */
@@ -194,6 +210,84 @@ export interface LinkStatus {
   peerName?: string;
 }
 
+// ── 公共房间（spec 2026-08-21-public-rooms-design）───────────────────────
+// 与上面的 1v1 联机是**两条独立链路**：那条是好友替身窗（relay 盲转），
+// 这条是多人房间（rooms 服务，解析+落盘）。别把两边的类型混用。
+
+/** 房间类型（列表筛选骨架） */
+export type RoomKind = 'idle' | 'study' | 'night' | 'coop';
+
+/** 房间列表条目（不含聊天/成员详情/token） */
+export interface RoomBrief {
+  roomId: string;
+  name: string;
+  kind: RoomKind;
+  capacity: number;
+  /** 常客数（进过就算，不是在线数） */
+  members: number;
+  online: number;
+  lastActiveAt: number;
+}
+
+/** 房内成员（含当前在场状态） */
+export interface RoomMember {
+  memberId: string;
+  nickname: string;
+  avatarHash?: string;
+  joinedAt: number;
+  online: boolean;
+  /** 在线时才有：复用联机的状态枚举 */
+  mode?: LinkMode;
+  action?: string;
+}
+
+/** 房内快照（进房时拿到） */
+export interface RoomSnapshot {
+  roomId: string;
+  name: string;
+  kind: RoomKind;
+  capacity: number;
+  listed: boolean;
+  ownerId: string;
+  members: RoomMember[];
+}
+
+/** 一条发言（nickname 是快照：改昵称不追溯改历史） */
+export interface RoomChatMsg {
+  id: string;
+  memberId: string;
+  nickname: string;
+  text: string;
+  /** 服务端时间戳（不信客户端时钟） */
+  at: number;
+}
+
+/** 房间链路状态（lounge 窗 + 托盘消费） */
+export interface RoomsStatus {
+  phase: 'off' | 'connecting' | 'online' | 'in-room';
+  /** 自己的成员 ID（hello:ack 后有） */
+  memberId?: string;
+  /** in-room 时：当前房快照 */
+  room?: RoomSnapshot;
+  /** 连接失败原因（off 且非主动断开时） */
+  error?: string;
+}
+
+/** 开房参数 */
+export interface CreateRoomInput {
+  name: string;
+  kind: RoomKind;
+  capacity: number;
+  /** false = 私密房（不上公共列表，凭 roomId 进） */
+  listed: boolean;
+}
+
+/** 有人跟你打招呼 */
+export interface RoomWave {
+  fromMemberId: string;
+  fromNickname: string;
+}
+
 /** 小房间装饰摆放（room-decor.json，按房间名键控） */
 export interface DecorPlacement {
   id: string;
@@ -338,6 +432,40 @@ export interface QBotApi {
     download(hash: string): Promise<void>;
     /** 下架自己上传的皮肤（凭本地管理码） */
     remove(hash: string): Promise<void>;
+  };
+  /** 公共房间（spec 2026-08-21）：与上面的 link 是两条独立链路 */
+  rooms: {
+    open(): void;
+    list(kind?: RoomKind, q?: string): Promise<RoomBrief[]>;
+    create(input: CreateRoomInput): Promise<string>;
+    join(roomId: string): Promise<RoomSnapshot>;
+    leave(): Promise<void>;
+    getStatus(): Promise<RoomsStatus>;
+    /** 窗口启动自取快照（did-finish-load 早于监听注册的竞态） */
+    getCache(): Promise<{
+      status: RoomsStatus;
+      room: RoomSnapshot | null;
+      chat: RoomChatMsg[];
+    }>;
+    /** 发言（用户手打文字的唯一出口） */
+    chat(text: string): void;
+    deleteChat(id: string): void;
+    wave(memberId: string): void;
+    update(patch: { name?: string; kind?: RoomKind; listed?: boolean }): Promise<void>;
+    kick(memberId: string): Promise<void>;
+    toggleFavorite(roomId: string): Promise<string[]>;
+    disconnect(): Promise<void>;
+    onStatus(cb: (s: RoomsStatus) => void): () => void;
+    /** 进房历史（换房/重进时整批替换，不是增量） */
+    onHistory(cb: (chat: RoomChatMsg[]) => void): () => void;
+    onChat(cb: (msg: RoomChatMsg) => void): () => void;
+    onChatDeleted(cb: (id: string) => void): () => void;
+    onMemberIn(cb: (m: RoomMember) => void): () => void;
+    onMemberOut(cb: (memberId: string) => void): () => void;
+    onPresence(cb: (p: { memberId: string; mode?: LinkMode; action?: string }) => void): () => void;
+    onWave(cb: (w: RoomWave) => void): () => void;
+    onKicked(cb: () => void): () => void;
+    onError(cb: (msg: string) => void): () => void;
   };
   room: {
     /** 单击桌宠：角色走进小房间（pet 窗隐藏 → room 窗弹出） */
