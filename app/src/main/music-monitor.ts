@@ -18,6 +18,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { sendToWindows } from './windows';
 import { pushLocalMusic as pushRoomsMusic } from './rooms/rooms';
+import { emitEvent } from './perception';
 import type { MusicStatus } from '../shared/ipc-types';
 
 /** 轮询间隔（PowerShell 进程内部循环） */
@@ -112,6 +113,13 @@ function updateStatus(next: MusicStatus): void {
   currentStatus = next;
   sendToWindows('music:status', next);
   pushRoomsMusic(next); // 公共房间钩子：只出状态枚举（mode=music），曲名绝不进房间
+  void emitEvent({
+    type: 'music',
+    at: Date.now(),
+    playing: next.playing,
+    title: next.title,
+    artist: next.artist,
+  }); // 感知层
 }
 
 function scheduleRespawn(): void {

@@ -19,6 +19,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { sendToWindows } from './windows';
 import { MeetingLogScanner, seedFromTail, type MeetingLogEvent } from './meeting-log-parser';
+import { emitEvent } from './perception';
 import type { MeetingStatus } from '../shared/ipc-types';
 
 const POLL_MS = 2_000;
@@ -76,6 +77,7 @@ function updateStatus(next: MeetingStatus): void {
   if (next.inMeeting === currentStatus.inMeeting) return;
   currentStatus = next;
   sendToWindows('meeting:status', next);
+  void emitEvent({ type: 'meeting', at: Date.now(), inMeeting: next.inMeeting }); // 感知层
 }
 
 function applyEvents(events: MeetingLogEvent[]): void {

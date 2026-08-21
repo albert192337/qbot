@@ -281,6 +281,39 @@ const api: QBotApi = {
   sign: {
     set: (text: string | null) => ipcRenderer.send('sign:set', text),
   },
+  perception: {
+    get: () => ipcRenderer.invoke('perception:get'),
+    onChanged: (cb) => {
+      const listener = () => cb();
+      ipcRenderer.on('perception:changed', listener);
+      return () => ipcRenderer.removeListener('perception:changed', listener);
+    },
+    report: (kind) => ipcRenderer.send('perception:report', kind),
+    injectTest: (appName) => ipcRenderer.invoke('perception:injectTest', appName),
+  },
+  /** 行为引擎 → pet 窗：播指定动作（state-machine 的 PLAY_ACTION 入口） */
+  behaviorAction: {
+    onPlay: (cb) => {
+      const listener = (_ev: unknown, payload: { action: string; loops: number }) => cb(payload);
+      ipcRenderer.on('behavior:action', listener);
+      return () => ipcRenderer.removeListener('behavior:action', listener);
+    },
+  },
+  /** 行为引擎 → bubble 窗：说话气泡 */
+  behaviorSay: {
+    onSay: (cb) => {
+      const listener = (_ev: unknown, payload: { text: string; durationMs: number }) => cb(payload);
+      ipcRenderer.on('behavior:say', listener);
+      return () => ipcRenderer.removeListener('behavior:say', listener);
+    },
+  },
+  behavior: {
+    getRules: () => ipcRenderer.invoke('behavior:getRules'),
+    debugTrigger: (ruleId) => ipcRenderer.invoke('behavior:debugTrigger', ruleId),
+    getExecutorState: () => ipcRenderer.invoke('behavior:getExecutorState'),
+    stopAll: () => ipcRenderer.invoke('behavior:stopAll'),
+    trigger: (trigger) => ipcRenderer.invoke('behavior:trigger', trigger),
+  },
 };
 
 contextBridge.exposeInMainWorld('qbot', api);

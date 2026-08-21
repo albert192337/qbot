@@ -177,6 +177,26 @@ function onMusicStatus(status: MusicStatus): void {
 window.qbot.music.onStatus(onMusicStatus);
 void window.qbot.music.getStatus().then(onMusicStatus);
 
+// ── 行为引擎 → 播指定动作（规则命中的行为脚本走这里；同 PLAY_ACTION 语义：播 N 遍回原状态）──
+window.qbot.behaviorAction.onPlay(({ action, loops }) => {
+  // 动作不可用（角色没这个动作）时静默忽略——执行器的语义解析已尽量给可用的，
+  // 这里是最后一道闸
+  if (available.length === 0 || !available.includes(action as PlayableId)) return;
+  dispatch({ type: 'PLAY_ACTION', action: action as PlayableId });
+  // loops > 1：state-machine 的 PLAY_ACTION 固定播 1 遍，多遍靠重发（等一动画时长）
+  if (loops > 1) {
+    const dur =
+      (currentCharacter?.manifest.customActions?.[action]?.durationSec ?? 3) * 1000;
+    for (let i = 1; i < loops; i++) {
+      setTimeout(() => {
+        if (available.includes(action as PlayableId)) {
+          dispatch({ type: 'PLAY_ACTION', action: action as PlayableId });
+        }
+      }, dur * i);
+    }
+  }
+});
+
 // ── 桌面行走 ──────────────────────────────────────────────
 /** 行走动画的动作名（自定义动作，manifest.customActions 的 key） */
 const WALK_ACTION = 'walk';
@@ -375,7 +395,6 @@ stage.addEventListener('pointerdown', (e) => {
   stage.setPointerCapture(e.pointerId);
   hideSignPrompt(); // 点宠身上：收起举牌输入框
 });
-
 stage.addEventListener('pointermove', (e) => {
   if (!pointerDown) return;
   if (!dragStarted) {
@@ -390,6 +409,7 @@ stage.addEventListener('pointermove', (e) => {
     hostSignboard.onDragStart();
     stopDesktopWalk();
     dispatch({ type: 'POINTER_DOWN' });
+    window.qbot.perception.report('drag_start');
   }
   lastScreenX = e.screenX;
   lastScreenY = e.screenY;
@@ -412,9 +432,11 @@ stage.addEventListener('pointerup', (e) => {
     dragStarted = false;
     dispatch({ type: 'POINTER_UP' });
     hostSignboard.onDragEnd();
+    window.qbot.perception.report('drag_end');
     return;
   }
   // 双击 = 立即说一句；单击不做任何事（房间入口在右键菜单）
+  window.qbot.perception.report('click');
   if (clickTimer) {
     clearTimeout(clickTimer);
     clickTimer = null;

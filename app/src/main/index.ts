@@ -10,13 +10,16 @@ import { getSettings, setSettings } from './config';
 import { registerIpc } from './ipc';
 import { wireRoomPetDisplay } from './rooms/room-pet-display';
 import { rebuildTray } from './tray';
-import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds, pushToLounge } from './windows';
+import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds, pushToLounge, broadcastCharacterActivated, getActivePlayables } from './windows';
 import { startAgentServer } from './agent-server';
 import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
 import { startMeetingMonitor, stopMeetingMonitor } from './meeting-monitor';
 import { startInputMonitor, stopInputMonitor } from './input-monitor';
 import { flushProgress, startProgressTicker, stopProgressTicker } from './progress';
 import { createRoom, joinRoom, notifyRoomCharacterChanged, setLoungePush } from './rooms/rooms';
+import { emitEvent, flush as flushPerception, onAppFocus, startFrontAppPolling, stopFrontAppPolling } from './perception';
+import { loadBuiltinRules, setAvailableActionsGetter, wireBehaviorTriggers, stopBehaviorScheduler } from './behavior-rules';
+import { startBehaviorExecutor } from './behavior-executor';
 
 /** qbot-asset 响应的 Content-Type（漏了类型 Chromium 会拒绝解码 <video>） */
 const ASSET_MIME: Record<string, string> = {
@@ -146,6 +149,23 @@ app.whenReady().then(async () => {
   startInputMonitor(); // 键盘敲击计数（Windows only，只数次数不记键位）
   startProgressTicker(); // 挂机计时：满 15 分钟发一个箱子
 
+  // ── 感知层 + 行为规则引擎（桌面行为 spec：事件流 → 规则 → 行为脚本）──
+  startBehaviorExecutor(); // DSL 执行器（内部把 execute 注册给规则调度器）
+  setAvailableActionsGetter(getActivePlayables); // 激活角色的可播放动作（windows.ts 维护）
+  await loadBuiltinRules(); // 内置规则包
+  wireBehaviorTriggers(); // 订阅感知事件流 → 规则 trigger 边沿
+  // macOS 隐藏 dock（accessory 模式）下 browser-window-focus 不可靠 → 轮询 osascript；
+  // 非 mac 平台（Windows 聚焦事件可靠）仍走窗口聚焦
+  if (process.platform !== 'darwin') {
+    app.on('browser-window-focus', (_ev, win) => {
+      if (win === getPetWindow()) return; // 桌宠自己的窗不产生「用户在用什么应用」
+      void onAppFocus(win.getTitle() || '(无标题窗口)');
+    });
+  } else {
+    startFrontAppPolling();
+  }
+  void emitEvent({ type: 'startup', at: Date.now() }); // 启动事件（会触发 startup 规则）
+
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
   if (settings.petScale) setPetScale(settings.petScale);
@@ -158,8 +178,10 @@ app.whenReady().then(async () => {
     // 首启数据目录 + QBOT_ROOMS_AUTOJOIN：进房早于这里的激活，
     // announce 没等到 activeCharacter 落盘 → 补发一次
     notifyRoomCharacterChanged();
+    // 走 broadcastCharacterActivated：pet + room 都收到，且主进程同步可用动作缓存
     pet.webContents.once('did-finish-load', async () => {
-      pet.webContents.send('characters:activated', await getCharacter(initial.dirId));
+      const meta = await getCharacter(initial.dirId);
+      if (meta) broadcastCharacterActivated(meta);
     });
   }
 });
@@ -176,11 +198,13 @@ app.on('before-quit', (ev) => {
   stopMusicMonitor();
   stopMeetingMonitor();
   stopInputMonitor();
+  stopFrontAppPolling();
+  stopBehaviorScheduler();
   stopProgressTicker();
   // progress 是玩法数据（点数/箱子/库存），不能丢防抖窗口里最后那笔 →
   // 拦一次退出等落盘完再真退。写失败 flushProgress 内部已吞，不会卡住退出
   ev.preventDefault();
-  void flushProgress().finally(() => {
+  void Promise.all([flushProgress(), flushPerception()]).finally(() => {
     quitFlushed = true;
     app.quit();
   });

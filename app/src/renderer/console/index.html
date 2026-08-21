@@ -545,6 +545,26 @@
       }
       .dev-stats { font-size: 14px; line-height: 2; color: var(--secondary); }
       .dev-stats b { color: var(--tertiary); font-weight: 700; }
+      /* ── 行为规则引擎调试区 ── */
+      .dev-trigger-select {
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        background: var(--bg);
+        color: var(--secondary);
+      }
+      .dev-exec { font-size: 13px; color: var(--secondary); margin-bottom: 6px; }
+      .dev-rule {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        line-height: 1.8;
+        color: var(--secondary);
+      }
+      .dev-rule .dev-try { padding: 2px 10px; font-size: 12px; }
+      .dev-perc-skip { color: var(--secondary); font-style: italic; opacity: 0.7; }
       /* ══ 孵化 pane（id 前缀 hatch- 防撞）══ */
       .hatch-body { padding: 24px 32px 40px; max-width: 1200px; }
       .hatch-screen { display: none; }

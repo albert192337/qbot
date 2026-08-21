@@ -197,6 +197,9 @@ export interface PetMenuActionEntry {
   label: string;
 }
 
+/** pet 窗口报告的交互类型（感知层 interact 事件） */
+export type PerceptionInteractKind = 'click' | 'drag_start' | 'drag_end' | 'sign_show' | 'sign_hide';
+
 /** 原生右键菜单点选后回渲染端执行的命令 */
 export type PetMenuCommand =
   | { type: 'speak' }
@@ -599,8 +602,7 @@ export interface QBotApi {
    * 游戏化积累：点数/箱子/家具库存。全局非按角色。
    * room 窗消费（背包/合成 + 装饰托盘的已拥有过滤），pet 窗消费（调试面板）。
    */
-  progress: {
-    get(): Promise<Progress>;
+  progress: {    get(): Promise<Progress>;
     /** 开箱：扣 1 箱 + 500 点换随机家具。点数/箱子不够返回 ok:false，不抛 */
     openBox(): Promise<OpenBoxResult>;
     /** 合成：同档任意 10 件 → 上一档随机 1 件。烧哪几件由主进程挑（优先烧大堆保品种） */
@@ -613,6 +615,50 @@ export interface QBotApi {
     debugGrantPoints(n: number): Promise<Progress>;
     /** stickerId 省略 = 按开箱权重随机一件（不扣箱不扣点） */
     debugGrantFurniture(stickerId?: string): Promise<{ stickerId: string; progress: Progress }>;
+  };
+  /**
+   * 感知层（行为体系 spec §3）：事件流/账本/行为史/决策日志，调试面板消费。
+   * 普通用户不感知；「它知道我什么」的只读视图以后单独做，不合并到这里。
+   */
+  perception: {
+    /** 一次性拉全量快照（面板展开时铺底） */
+    get(): Promise<import('./perception').PerceptionSnapshot>;
+    /** 订阅感知数据变化（主进程事件进来后广播） */
+    onChanged(cb: () => void): () => void;
+    /** pet 窗口报告交互（点/拖/举牌），进感知事件流 */
+    report(kind: PerceptionInteractKind): void;
+    /** 调试注入：假 app_focus 事件 + 一条演示决策，验证全链路 */
+    injectTest(appName?: string): Promise<void>;
+  };
+
+  /**
+   * 行为规则调试（仅开发者工具 pane 用）。
+   * 正式用户不需要——规则自动触发。
+   */
+  behavior: {
+    /** 获取所有规则列表 */
+    getRules(): Promise<Array<{ id: string; name: string; weight: number; enabled: boolean }>>;
+    /** 手动触发某条规则（绕过条件检查，调试用） */
+    debugTrigger(ruleId: string): Promise<void>;
+    /** 获取执行器状态（当前执行 + 队列） */
+    getExecutorState(): Promise<{
+      current: { id: string; step: number; priority: number } | null;
+      queue: Array<{ id: string; priority: number }>;
+    }>;
+    /** 停止所有行为 */
+    stopAll(): Promise<void>;
+    /** 触发规则引擎评估（手动指定 trigger） */
+    trigger(trigger: string): Promise<void>;
+  };
+
+  /** 行为引擎 → pet 窗：播指定动作（state-machine 的 PLAY_ACTION 入口） */
+  behaviorAction: {
+    onPlay(cb: (payload: { action: string; loops: number }) => void): () => void;
+  };
+
+  /** 行为引擎 → bubble 窗：说话气泡 */
+  behaviorSay: {
+    onSay(cb: (payload: { text: string; durationMs: number }) => void): () => void;
   };
 }
 
