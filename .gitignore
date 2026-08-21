@@ -14,3 +14,6 @@ assets/*/.job/
 .superpowers/
 assets/rooms/
 app/release/
+
+# rooms 服务运行时数据（房间注册表 + 聊天记录）
+rooms/data/

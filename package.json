@@ -6,7 +6,8 @@
     "pipeline",
     "app",
     "relay",
-    "market"
+    "market",
+    "rooms"
   ],
   "scripts": {
     "test": "npm run test -w pipeline",

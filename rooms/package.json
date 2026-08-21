@@ -1,0 +1,15 @@
+{
+  "name": "@qbot/rooms",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "QBot 公共房间：常驻房间列表 / 成员 / 在场 / 聊天，单文件 + ws",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "smoke": "node smoke.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

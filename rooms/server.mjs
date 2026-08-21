@@ -1,0 +1,554 @@
+/**
+ * QBot 公共房间服务（spec: docs/superpowers/specs/2026-08-21-public-rooms-design.md）
+ *
+ * 与 relay 的根本区别：**这个服务解析帧内容并落盘**（房间注册表 + 最近 50 条聊天）。
+ * 所以它必须是独立进程——把这些塞进 relay 会废掉 relay「不解析不落盘」的隐私声明。
+ *
+ * 单文件 + 唯一依赖 ws（同 relay/market 的部署哲学：整目录 scp 就能跑）；
+ * 禁止 import 仓库其他模块。日志只记数量，**聊天正文绝不进日志**。
+ */
+import { randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { WebSocketServer } from 'ws';
+
+const PORT = Number(process.env.PORT || 24252);
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+const DATA_FILE = path.join(DATA_DIR, 'rooms.json');
+
+/** 协议版本：不一致直接拒，不做兼容层（沿用 1v1 联机策略） */
+const PROTO_VER = 1;
+
+/** 房间帧全是小文本；缩略图走独立上限（§8.3） */
+const MAX_PAYLOAD = 32 * 1024;
+
+// ── 容量（spec §8.2） ──────────────────────────────────────
+const MAX_ROOMS = 200;
+const MAX_ROOMS_PER_CONN = 3;
+const CAPACITY_MIN = 4;
+const CAPACITY_MAX = 12;
+const CAPACITY_DEFAULT = 8;
+/** 空房回收：7 天无人进就删（常驻的前提是别无限累积） */
+const ROOM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const PING_INTERVAL_MS = 30 * 1000;
+/** 脏写落盘间隔 */
+const FLUSH_MS = 30 * 1000;
+
+// ── 文本上限 ───────────────────────────────────────────────
+const NAME_MAX = 24;
+const NICK_MAX = 16;
+const CHAT_MAX = 200;
+/** 每房保留的最近聊天条数（spec §5.1） */
+const CHAT_KEEP = 50;
+
+// ── 聊天限流（spec §5.2） ─────────────────────────────────
+const CHAT_COOLDOWN_MS = 3000;
+const CHAT_PER_MIN = 10;
+const CHAT_DUP_LIMIT = 3;
+
+const ROOM_KINDS = new Set(['idle', 'study', 'night', 'coop']);
+/** 去易混字符集（同 relay） */
+const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+const ROOM_ID_LEN = 8;
+
+/** @type {Map<string, Room>} 房间注册表（落盘） */
+const rooms = new Map();
+/** @type {Map<string, Set<import('ws').WebSocket>>} roomId → 在线连接（不落盘） */
+const online = new Map();
+let dirty = false;
+
+// ── 工具 ───────────────────────────────────────────────────
+
+function genId(len = ROOM_ID_LEN) {
+  let s = '';
+  for (let i = 0; i < len; i++) {
+    s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  }
+  return s;
+}
+
+function genRoomId() {
+  for (let i = 0; i < 100; i++) {
+    const id = genId();
+    if (!rooms.has(id)) return id;
+  }
+  return null;
+}
+
+function clampText(v, max) {
+  return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '';
+}
+
+function send(ws, obj) {
+  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
+}
+
+function fail(ws, code) {
+  send(ws, { t: 'error', code });
+}
+
+/** 房内广播（可排除发起者） */
+function broadcast(roomId, obj, except = null) {
+  const peers = online.get(roomId);
+  if (!peers) return;
+  for (const p of peers) if (p !== except) send(p, obj);
+}
+
+function onlineCount(roomId) {
+  return online.get(roomId)?.size ?? 0;
+}
+
+// ── 落盘（spec §8.1）────────────────────────────────────────
+// 全量内存 + 30s 脏写 + 退出前 flush。房间 200 × (12 成员 + 50 聊天) ≈ 3.3MB，
+// 这个量级不值得上数据库。
+
+function load() {
+  mkdirSync(DATA_DIR, { recursive: true });
+  if (!existsSync(DATA_FILE)) {
+    console.log('[rooms] no data file, starting empty');
+    return;
+  }
+  try {
+    const raw = JSON.parse(readFileSync(DATA_FILE, 'utf8'));
+    for (const r of Array.isArray(raw?.rooms) ? raw.rooms : []) {
+      const room = sanitizeRoom(r);
+      if (room) rooms.set(room.roomId, room);
+    }
+    console.log(`[rooms] loaded ${rooms.size} rooms`);
+  } catch (err) {
+    // 坏档不能让服务起不来：改名留档，空表启动
+    console.error('[rooms] data file corrupt, archiving:', err.message);
+    try {
+      writeFileSync(`${DATA_FILE}.corrupt`, readFileSync(DATA_FILE));
+    } catch { /* 留档失败也继续 */ }
+  }
+}
+
+/** 读盘容错：坏字段退默认，整条不合格才丢（同 app 侧 sanitizeProgress 的思路） */
+function sanitizeRoom(r) {
+  if (typeof r !== 'object' || r === null) return null;
+  const roomId = typeof r.roomId === 'string' ? r.roomId : '';
+  if (!/^[0-9A-Z]{4,12}$/.test(roomId)) return null;
+  const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : d);
+  const now = Date.now();
+  const members = [];
+  for (const m of Array.isArray(r.members) ? r.members : []) {
+    if (typeof m?.memberId !== 'string' || !m.memberId) continue;
+    members.push({
+      memberId: m.memberId,
+      nickname: clampText(m.nickname, NICK_MAX) || '匿名',
+      avatarHash: typeof m.avatarHash === 'string' ? m.avatarHash.slice(0, 32) : undefined,
+      joinedAt: num(m.joinedAt, now),
+      lastSeenAt: num(m.lastSeenAt, now),
+    });
+  }
+  const chat = [];
+  for (const c of Array.isArray(r.chat) ? r.chat : []) {
+    if (typeof c?.text !== 'string' || typeof c?.memberId !== 'string') continue;
+    chat.push({
+      id: typeof c.id === 'string' ? c.id : genId(12),
+      memberId: c.memberId,
+      nickname: clampText(c.nickname, NICK_MAX) || '匿名',
+      text: c.text.slice(0, CHAT_MAX),
+      at: num(c.at, now),
+    });
+  }
+  return {
+    roomId,
+    name: clampText(r.name, NAME_MAX) || '未命名',
+    kind: ROOM_KINDS.has(r.kind) ? r.kind : 'idle',
+    capacity: Math.min(CAPACITY_MAX, Math.max(CAPACITY_MIN, num(r.capacity, CAPACITY_DEFAULT))),
+    listed: r.listed !== false,
+    ownerToken: typeof r.ownerToken === 'string' ? r.ownerToken : randomBytes(16).toString('hex'),
+    ownerId: typeof r.ownerId === 'string' ? r.ownerId : '',
+    members,
+    banned: Array.isArray(r.banned) ? r.banned.filter((x) => typeof x === 'string') : [],
+    chat: chat.slice(-CHAT_KEEP),
+    createdAt: num(r.createdAt, now),
+    lastActiveAt: num(r.lastActiveAt, now),
+  };
+}
+
+function flush() {
+  if (!dirty) return;
+  dirty = false;
+  try {
+    const tmp = `${DATA_FILE}.tmp`;
+    writeFileSync(tmp, JSON.stringify({ rooms: [...rooms.values()] }));
+    renameSync(tmp, DATA_FILE); // 原子替换：崩在写一半也不会留下坏档
+  } catch (err) {
+    console.error('[rooms] flush failed:', err.message);
+    dirty = true; // 下轮重试
+  }
+}
+
+/** 空房回收：7 天没人进就删 */
+function sweep() {
+  const cutoff = Date.now() - ROOM_TTL_MS;
+  let removed = 0;
+  for (const [id, room] of rooms) {
+    if (room.lastActiveAt < cutoff && onlineCount(id) === 0) {
+      rooms.delete(id);
+      online.delete(id);
+      removed++;
+    }
+  }
+  if (removed) {
+    dirty = true;
+    console.log(`[rooms] swept ${removed} stale rooms`);
+  }
+}
+
+// ── 房间视图 ───────────────────────────────────────────────
+
+/** 列表条目：不含聊天/token/成员详情（列表页不需要，也少一份泄漏面） */
+function roomBrief(room) {
+  return {
+    roomId: room.roomId,
+    name: room.name,
+    kind: room.kind,
+    capacity: room.capacity,
+    members: room.members.length,
+    online: onlineCount(room.roomId),
+    lastActiveAt: room.lastActiveAt,
+  };
+}
+
+/** 房内快照：成员表 + 每人当前在场状态（token 永不出现） */
+function roomSnapshot(room) {
+  const peers = online.get(room.roomId);
+  const presence = {};
+  if (peers) {
+    for (const p of peers) {
+      if (p.memberId) presence[p.memberId] = { mode: p.mode || 'idle', action: p.action };
+    }
+  }
+  return {
+    roomId: room.roomId,
+    name: room.name,
+    kind: room.kind,
+    capacity: room.capacity,
+    listed: room.listed,
+    ownerId: room.ownerId,
+    members: room.members.map((m) => ({
+      memberId: m.memberId,
+      nickname: m.nickname,
+      avatarHash: m.avatarHash,
+      joinedAt: m.joinedAt,
+      online: !!presence[m.memberId],
+      mode: presence[m.memberId]?.mode,
+      action: presence[m.memberId]?.action,
+    })),
+  };
+}
+
+/** 常驻成员登记：进过就算（社交资产是「常客名单」，不是「在线名单」） */
+function upsertMember(room, ws) {
+  const now = Date.now();
+  let m = room.members.find((x) => x.memberId === ws.memberId);
+  if (!m) {
+    m = { memberId: ws.memberId, nickname: ws.nickname, joinedAt: now, lastSeenAt: now };
+    room.members.push(m);
+  }
+  m.nickname = ws.nickname;
+  if (ws.avatarHash) m.avatarHash = ws.avatarHash;
+  m.lastSeenAt = now;
+  room.lastActiveAt = now;
+  dirty = true;
+  return m;
+}
+
+/** 离房：清在线表 + 广播；不动 members（常驻） */
+function leaveRoom(ws, notify = true) {
+  const roomId = ws.roomId;
+  if (!roomId) return;
+  ws.roomId = null;
+  const peers = online.get(roomId);
+  if (peers) {
+    peers.delete(ws);
+    if (peers.size === 0) online.delete(roomId);
+  }
+  const room = rooms.get(roomId);
+  if (room) {
+    const m = room.members.find((x) => x.memberId === ws.memberId);
+    if (m) { m.lastSeenAt = Date.now(); dirty = true; }
+  }
+  if (notify) broadcast(roomId, { t: 'member:out', roomId, memberId: ws.memberId });
+}
+
+// ── 聊天限流（spec §5.2）──────────────────────────────────
+// 服务端权威。客户端 chat-rules.ts 有一份同规则的本地预挡（即时反馈），
+// 但**以这里为准**——不信客户端。
+
+/** @returns {string|null} 拒绝原因 code，null = 放行 */
+function checkChatLimit(ws, text) {
+  const now = Date.now();
+  if (now - (ws.lastChatAt || 0) < CHAT_COOLDOWN_MS) return 'rate_limited';
+  ws.chatTimes = (ws.chatTimes || []).filter((t) => now - t < 60_000);
+  if (ws.chatTimes.length >= CHAT_PER_MIN) return 'rate_limited';
+  // 连发同内容：防复制粘贴刷屏
+  if (text === ws.lastChatText) {
+    if ((ws.dupCount || 0) + 1 >= CHAT_DUP_LIMIT) return 'rate_limited';
+  }
+  return null;
+}
+
+function noteChatSent(ws, text) {
+  const now = Date.now();
+  ws.lastChatAt = now;
+  ws.chatTimes = [...(ws.chatTimes || []), now];
+  ws.dupCount = text === ws.lastChatText ? (ws.dupCount || 0) + 1 : 0;
+  ws.lastChatText = text;
+}
+
+// ── 帧处理 ─────────────────────────────────────────────────
+
+const handlers = {
+  hello(ws, f) {
+    if (f.protoVer !== PROTO_VER) { fail(ws, 'proto_mismatch'); ws.close(); return; }
+    // memberId 由服务端分配后由客户端存本地复用（零账号体系，同市场的 token 思路）
+    ws.memberId = typeof f.memberId === 'string' && /^[0-9A-Z]{12}$/.test(f.memberId)
+      ? f.memberId
+      : genId(12);
+    ws.nickname = clampText(f.nickname, NICK_MAX) || '匿名';
+    ws.avatarHash = typeof f.avatarHash === 'string' ? f.avatarHash.slice(0, 32) : undefined;
+    ws.hello = true;
+    send(ws, { t: 'hello:ack', memberId: ws.memberId, serverTime: Date.now() });
+  },
+
+  list(ws, f) {
+    const kind = ROOM_KINDS.has(f.kind) ? f.kind : null;
+    const q = clampText(f.q, 32).toLowerCase();
+    const out = [];
+    for (const room of rooms.values()) {
+      if (!room.listed) continue; // 私密房不上架，凭 roomId 进
+      if (kind && room.kind !== kind) continue;
+      if (q && !room.name.toLowerCase().includes(q)) continue;
+      out.push(roomBrief(room));
+    }
+    // 在线人多的排前面，其次按最近活跃
+    out.sort((a, b) => b.online - a.online || b.lastActiveAt - a.lastActiveAt);
+    send(ws, { t: 'rooms', rooms: out.slice(0, 100) });
+  },
+
+  create(ws, f) {
+    if (rooms.size >= MAX_ROOMS) { fail(ws, 'server_full'); return; }
+    if ((ws.created || 0) >= MAX_ROOMS_PER_CONN) { fail(ws, 'too_many_rooms'); return; }
+    const name = clampText(f.name, NAME_MAX);
+    if (!name) { fail(ws, 'bad_frame'); return; }
+    const roomId = genRoomId();
+    if (!roomId) { fail(ws, 'server_full'); return; }
+    const now = Date.now();
+    const room = {
+      roomId,
+      name,
+      kind: ROOM_KINDS.has(f.kind) ? f.kind : 'idle',
+      capacity: Math.min(CAPACITY_MAX, Math.max(CAPACITY_MIN,
+        Number.isFinite(f.capacity) ? Math.floor(f.capacity) : CAPACITY_DEFAULT)),
+      listed: f.listed !== false,
+      ownerToken: randomBytes(16).toString('hex'),
+      ownerId: ws.memberId,
+      members: [],
+      banned: [],
+      chat: [],
+      createdAt: now,
+      lastActiveAt: now,
+    };
+    rooms.set(roomId, room);
+    ws.created = (ws.created || 0) + 1;
+    dirty = true;
+    send(ws, { t: 'room', roomId, ownerToken: room.ownerToken });
+    console.log(`[rooms] created (total=${rooms.size})`); // 不记房名
+  },
+
+  join(ws, f) {
+    const room = rooms.get(String(f.roomId || '').toUpperCase());
+    if (!room) { fail(ws, 'room_not_found'); return; }
+    if (room.banned.includes(ws.memberId)) { fail(ws, 'banned'); return; }
+    // 已在别的房：先退（一条连接同时只在一个房里）
+    if (ws.roomId && ws.roomId !== room.roomId) leaveRoom(ws);
+    if (ws.roomId !== room.roomId && onlineCount(room.roomId) >= room.capacity) {
+      fail(ws, 'room_full');
+      return;
+    }
+    ws.roomId = room.roomId;
+    ws.mode = ws.mode || 'idle';
+    if (!online.has(room.roomId)) online.set(room.roomId, new Set());
+    online.get(room.roomId).add(ws);
+    const member = upsertMember(room, ws);
+    // 进房带回最近 50 条聊天（spec §5.1「能看到最近的」）
+    send(ws, { t: 'joined', room: roomSnapshot(room), chat: room.chat });
+    broadcast(room.roomId, {
+      t: 'member:in',
+      roomId: room.roomId,
+      member: { ...member, online: true, mode: ws.mode },
+    }, ws);
+  },
+
+  leave(ws) {
+    leaveRoom(ws);
+  },
+
+  presence(ws, f) {
+    if (!ws.roomId) return;
+    ws.mode = typeof f.mode === 'string' ? f.mode.slice(0, 16) : 'idle';
+    ws.action = typeof f.action === 'string' ? f.action.slice(0, 32) : undefined;
+    // 只转发状态枚举 + 动作名——曲名等内容在客户端就没进帧（spec §5.3）
+    broadcast(ws.roomId, {
+      t: 'presence',
+      roomId: ws.roomId,
+      memberId: ws.memberId,
+      mode: ws.mode,
+      action: ws.action,
+    }, ws);
+  },
+
+  chat(ws, f) {
+    if (!ws.roomId) { fail(ws, 'not_in_room'); return; }
+    const room = rooms.get(ws.roomId);
+    if (!room) { fail(ws, 'room_not_found'); return; }
+    const text = clampText(f.text, CHAT_MAX);
+    if (!text) return;
+    const reject = checkChatLimit(ws, text);
+    if (reject) { fail(ws, reject); return; }
+    noteChatSent(ws, text);
+    const msg = {
+      id: genId(12),
+      memberId: ws.memberId,
+      nickname: ws.nickname,
+      text,
+      at: Date.now(), // 服务端时间：不信客户端时钟
+    };
+    room.chat.push(msg);
+    if (room.chat.length > CHAT_KEEP) room.chat = room.chat.slice(-CHAT_KEEP);
+    room.lastActiveAt = msg.at;
+    dirty = true;
+    broadcast(ws.roomId, { t: 'chat', roomId: ws.roomId, msg }); // 含发送者：以服务端 id/时间为准
+  },
+
+  'chat:delete'(ws, f) {
+    const room = ws.roomId ? rooms.get(ws.roomId) : null;
+    if (!room) return;
+    const id = String(f.id || '');
+    const i = room.chat.findIndex((c) => c.id === id);
+    if (i < 0) return;
+    // 只能删自己的（房主也不能删别人的话——踢人是另一回事）
+    if (room.chat[i].memberId !== ws.memberId) { fail(ws, 'not_yours'); return; }
+    room.chat.splice(i, 1);
+    dirty = true;
+    broadcast(ws.roomId, { t: 'chat:deleted', roomId: ws.roomId, id });
+  },
+
+  wave(ws, f) {
+    if (!ws.roomId) return;
+    const target = String(f.targetMemberId || '');
+    const peers = online.get(ws.roomId);
+    if (!peers) return;
+    for (const p of peers) {
+      if (p.memberId === target) {
+        send(p, { t: 'wave', roomId: ws.roomId, fromMemberId: ws.memberId, fromNickname: ws.nickname });
+        break;
+      }
+    }
+  },
+
+  'room:update'(ws, f) {
+    const room = ws.roomId ? rooms.get(ws.roomId) : null;
+    if (!room) return;
+    if (f.token !== room.ownerToken) { fail(ws, 'not_owner'); return; }
+    if (typeof f.name === 'string') room.name = clampText(f.name, NAME_MAX) || room.name;
+    if (ROOM_KINDS.has(f.kind)) room.kind = f.kind;
+    if (typeof f.listed === 'boolean') room.listed = f.listed;
+    dirty = true;
+    broadcast(room.roomId, { t: 'room:updated', room: roomSnapshot(room) });
+  },
+
+  'room:kick'(ws, f) {
+    const room = ws.roomId ? rooms.get(ws.roomId) : null;
+    if (!room) return;
+    if (f.token !== room.ownerToken) { fail(ws, 'not_owner'); return; }
+    const target = String(f.memberId || '');
+    if (!target || target === room.ownerId) return;
+    room.members = room.members.filter((m) => m.memberId !== target);
+    if (!room.banned.includes(target)) room.banned.push(target);
+    dirty = true;
+    const peers = online.get(room.roomId);
+    if (peers) {
+      for (const p of [...peers]) {
+        if (p.memberId === target) {
+          send(p, { t: 'kicked', roomId: room.roomId });
+          leaveRoom(p);
+        }
+      }
+    }
+    broadcast(room.roomId, { t: 'member:out', roomId: room.roomId, memberId: target });
+  },
+};
+
+// ── WS 服务器 ──────────────────────────────────────────────
+
+load();
+
+const wss = new WebSocketServer({ port: PORT, maxPayload: MAX_PAYLOAD });
+
+wss.on('connection', (ws) => {
+  ws.isAlive = true;
+  ws.roomId = null;
+  ws.on('pong', () => { ws.isAlive = true; });
+
+  ws.on('message', (data) => {
+    let frame;
+    try {
+      frame = JSON.parse(data.toString());
+    } catch {
+      fail(ws, 'bad_frame');
+      return;
+    }
+    const handler = handlers[frame?.t];
+    if (!handler) { fail(ws, 'bad_frame'); return; }
+    // hello 之前只允许 hello：memberId/nickname 是后续一切帧的前提
+    if (!ws.hello && frame.t !== 'hello') { fail(ws, 'need_hello'); return; }
+    try {
+      handler(ws, frame);
+    } catch (err) {
+      console.error(`[rooms] handler ${frame.t} failed:`, err.message); // 不打帧内容
+      fail(ws, 'server_error');
+    }
+  });
+
+  ws.on('close', () => leaveRoom(ws));
+  ws.on('error', () => ws.close());
+});
+
+// 心跳踢死连接（NAT 半开、断电对端）
+const pinger = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!ws.isAlive) { ws.terminate(); continue; }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, PING_INTERVAL_MS);
+
+const flusher = setInterval(flush, FLUSH_MS);
+const sweeper = setInterval(sweep, 60 * 60 * 1000);
+sweeper.unref();
+
+// 运营日志只记数字（聊天正文绝不进日志，spec §8.4）
+const logger = setInterval(() => {
+  let chatCount = 0;
+  for (const r of rooms.values()) chatCount += r.chat.length;
+  console.log(`[rooms] rooms=${rooms.size} conns=${wss.clients.size} msgs=${chatCount}`);
+}, 60 * 1000);
+logger.unref();
+
+function shutdown() {
+  clearInterval(pinger);
+  clearInterval(flusher);
+  flush(); // 退出前落盘，别丢最后 30s 的聊天
+  wss.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 2000).unref();
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+console.log(`[rooms] listening on :${PORT}  data=${DATA_FILE}`);
