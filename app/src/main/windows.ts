@@ -332,6 +332,7 @@ export type ConsolePane =
   | 'hatch'
   | 'persona'
   | 'scene-actions'
+  | 'stickers'
   | 'prompts'
   | 'market'
   | 'claude'

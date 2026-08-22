@@ -54,7 +54,11 @@ export interface FrameQcResult {
   reason?: string;
 }
 
-/** 绿幕首帧质检：四角 8×8 全绿才 pass（角色出画/背景非绿都会挂在这里） */
+/**
+ * 绿幕首帧质检：四角 8×8 全绿 + 背景均匀度检查。
+ * - 角色出画/背景非绿 → 四角不全绿 → fail
+ * - 背景渐变/纹理 → 色差超标 → fail（同一帧内色差 > DRIFT_DOUBLE_KEY_MAX = 判背景不均匀）
+ */
 export async function checkGreenFrame(
   pngPath: string,
   ffmpegPath: string,
@@ -66,6 +70,23 @@ export async function checkGreenFrame(
       pass: false,
       corners,
       reason: `${bad.length}/4 corners not green: ${bad.join(', ')}`,
+    };
+  }
+  // 背景均匀度：四角两两色差，任意 RGB 分量差 > DRIFT_DOUBLE_KEY_MAX 判不均匀
+  const rgbs = corners.map(hexToRgb);
+  let maxDrift = 0;
+  for (let i = 0; i < rgbs.length; i++) {
+    for (let j = i + 1; j < rgbs.length; j++) {
+      for (let k = 0; k < 3; k++) {
+        maxDrift = Math.max(maxDrift, Math.abs(rgbs[i][k] - rgbs[j][k]));
+      }
+    }
+  }
+  if (maxDrift > DRIFT_DOUBLE_KEY_MAX) {
+    return {
+      pass: false,
+      corners,
+      reason: `background not uniform (max drift ${maxDrift}/255 > ${DRIFT_DOUBLE_KEY_MAX})`,
     };
   }
   return { pass: true, corners };
@@ -118,6 +139,27 @@ export function selectChromaKey(samples: string[]): string | null {
     }
   }
   return best;
+}
+
+/**
+ * 双 key 选择：取样本中最亮绿 + 最暗绿（色度极值）覆盖全部背景绿范围。
+ * - 写实绿幕自带渐变、帧间颗粒，单 key 常漏；双 key 常态化（漂移小也双 key，几乎零成本）。
+ * - 统一背景或样本单一时两 key 相同（fixture 平涂绿），不影响 chromakey 正确性。
+ * 返回 [亮绿, 暗绿]；无可用绿样本时返回空数组。
+ */
+export function selectDualKeys(samples: string[]): string[] {
+  const greens = samples.filter(isGreen);
+  if (greens.length === 0) return [];
+  // 按 s×v 排序，取首尾（最饱和亮绿 + 最不饱和暗绿 = 色度极值两端）
+  const scored = greens.map((c) => {
+    const [, s, v] = rgbToHsv(...hexToRgb(c));
+    return { c, score: s * v };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  const bright = scored[0].c;
+  const dark = scored[scored.length - 1].c;
+  // 去重（统一背景时相同）
+  return bright === dark ? [bright] : [bright, dark];
 }
 
 export interface DriftQcResult {

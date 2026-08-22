@@ -260,6 +260,59 @@
         font-weight: 600;
         vertical-align: middle;
       }
+      /* ── 表情包导入 ── */
+      .sticker-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+        margin: 10px 0;
+      }
+      .sticker-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 8px;
+        background: var(--card);
+        font-size: 11px;
+      }
+      /* 三色置信度：绿=自动采纳 黄=建议确认 红=必须人工指定 */
+      .sticker-card.tier-high { border-left: 4px solid #4caf50; }
+      .sticker-card.tier-medium { border-left: 4px solid #ffb300; }
+      .sticker-card.tier-low { border-left: 4px solid #e53935; }
+      .sticker-card img,
+      .sticker-card video {
+        width: 100%;
+        height: 110px;
+        object-fit: contain;
+        background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 50% / 12px 12px;
+        border-radius: 6px;
+      }
+      .sticker-card .name {
+        font-weight: 600;
+        color: #444;
+        margin: 4px 0 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .sticker-card .reason { color: var(--sub); font-size: 10px; line-height: 1.4; min-height: 26px; }
+      .sticker-card select { width: 100%; font-size: 11px; margin-top: 4px; }
+      .conf-badge {
+        display: inline-block;
+        padding: 0 5px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .conf-high { background: #d4edda; color: #155724; }
+      .conf-medium { background: #fff3cd; color: #856404; }
+      .conf-low { background: #f8d7da; color: #721c24; }
+      .sticker-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 12px 0;
+        flex-wrap: wrap;
+      }
       /* 非阻塞提示条（替代 alert） */
       .studio-toast {
         position: sticky;

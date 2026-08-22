@@ -115,6 +115,12 @@ const api: QBotApi = {
       ipcRenderer.invoke('studio:regenerateActions', dirId, actionIds),
     regenerateTurnaround: (dirId) =>
       ipcRenderer.invoke('studio:regenerateTurnaround', dirId),
+    pickStickerDir: () => ipcRenderer.invoke('studio:pickStickerDir'),
+    analyzeStickers: (input) => ipcRenderer.invoke('studio:analyzeStickers', input),
+    applyStickers: (dirId, assignments) =>
+      ipcRenderer.invoke('studio:applyStickers', dirId, assignments),
+    clearImportedStickers: (dirId) =>
+      ipcRenderer.invoke('studio:clearImportedStickers', dirId),
   },
   claude: {
     getStatus: () => ipcRenderer.invoke('claude:getStatus'),

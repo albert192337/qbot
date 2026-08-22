@@ -1,7 +1,7 @@
 /**
  * WebM 播放器：每个已生成动作一个 <video> 预创建堆叠，切 visibility 硬切（不换 src，零闪黑）。
  * idle/drag 循环播放；auto 动作不 loop，靠 ended 事件计数。
- * 标准 6 动作 + 用户自定义动作（manifest.customActions）都会加载。
+ * 标准 6 动作 + 导入贴纸（manifest.importedActions）+ 用户自定义动作（customActions）都会加载。
  */
 import type { Manifest, ManifestAction, PlayableId } from '@qbot/pipeline';
 
@@ -41,13 +41,20 @@ export class Player {
      * 每次 load 带一个新 nonce 强制重取。本地协议读盘开销可忽略。
      */
     const nonce = Date.now();
-    // 标准动作 + 自定义动作一起加载（自定义动作让听歌/agent 联动可选自制动画）
-    const all: [string, ManifestAction][] = [
+    /**
+     * 合并顺序（sticker-import spec §4.3）：标准动作 → 导入贴纸 → 自定义动作。
+     * 后写的覆盖同名 key，所以导入贴纸能盖掉同名标准动作，
+     * 而用户显式建的自定义动作优先级最高。
+     * 贴纸只有 webm 没有 gif，且没有 status 字段（落盘即可用）。
+     */
+    const all: [string, { webm: string; status?: string }][] = [
       ...(Object.entries(manifest.actions) as [string, ManifestAction][]),
+      ...Object.entries(manifest.importedActions ?? {}),
       ...(Object.entries(manifest.customActions ?? {}) as [string, ManifestAction][]),
     ];
     for (const [id, action] of all) {
-      if (action.status !== 'done') continue;
+      // 生成动作有 status（未生成完的不建）；导入贴纸没有 status，落盘即可用
+      if (action.status !== undefined && action.status !== 'done') continue;
       const video = document.createElement('video');
       video.src = `qbot-asset://${dirId}/${action.webm}?v=${nonce}`;
       video.muted = true; // 必须：否则 autoplay 策略拦截

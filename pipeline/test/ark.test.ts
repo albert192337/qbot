@@ -77,4 +77,48 @@ describe('ark client', () => {
     expect(t.status).toBe('succeeded');
     expect(t.videoUrl).toBe('https://v.test/a.mp4');
   });
+
+  it('visionChat 交错文本/图片，默认 detail=low + temperature=0', async () => {
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(url)).toBe('https://ark.test/api/v3/chat/completions');
+      const body = JSON.parse(init?.body as string);
+      // 打标要稳定可复现 → 温度必须 0
+      expect(body.temperature).toBe(0);
+      expect(body.messages[0].role).toBe('system');
+      const content = body.messages[1].content;
+      // 顺序必须保持：文本标记在对应图片之前，否则模型会把帧对错贴纸
+      expect(content.map((c: { type: string }) => c.type)).toEqual([
+        'text', 'image_url', 'text', 'image_url',
+      ]);
+      // low 档省 tokens（打标够用）
+      expect(content[1].image_url.detail).toBe('low');
+      return jsonResponse({ choices: [{ message: { content: '[{"index":1}]' } }] });
+    });
+    const ark = createArkClient(CFG, fetchMock as unknown as typeof fetch);
+    const text = await ark.visionChat({
+      system: 'sys',
+      parts: [
+        { type: 'text', text: '贴纸 #1' },
+        { type: 'image', dataUrl: 'data:image/png;base64,a' },
+        { type: 'text', text: '贴纸 #2' },
+        { type: 'image', dataUrl: 'data:image/png;base64,b' },
+      ],
+    });
+    expect(text).toBe('[{"index":1}]');
+  });
+
+  it('visionChat 用 visionModel 配置；空回复视为不可重试错误', async () => {
+    const fetchMock = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      expect(JSON.parse(init?.body as string).model).toBe('my-vision-model');
+      return jsonResponse({ choices: [{ message: { content: '   ' } }] });
+    });
+    const ark = createArkClient(
+      { ...CFG, visionModel: 'my-vision-model' },
+      fetchMock as unknown as typeof fetch,
+    );
+    await expect(
+      ark.visionChat({ system: 's', parts: [{ type: 'text', text: 't' }] }),
+    ).rejects.toSatisfy((e: unknown) => e instanceof ArkApiError && !e.retryable);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // 不重试
+  });
 });

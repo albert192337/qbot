@@ -15,7 +15,7 @@ import {
   resolveFfmpegPath,
   sampleKeyColor,
   sampleBackgroundColors,
-  selectChromaKey,
+  selectDualKeys,
   checkVideoDrift,
   toWebm,
   toGif,
@@ -78,7 +78,8 @@ function broadcast(dirId: string, ev: ProgressEvent, candidates?: string[]): voi
   }
 }
 
-async function buildConfig(): Promise<PipelineConfig> {
+/** API key + ffmpeg 路径解析（打包后 asar 修正）。sticker-importer 也用它，故导出。 */
+export async function buildConfig(): Promise<PipelineConfig> {
   const settings = await getSettings();
   if (!settings.arkApiKey) throw new Error('未配置 API key（托盘 → 设置）');
   const ffmpegPath = await resolveFfmpegPath();
@@ -432,14 +433,16 @@ async function generateCustomAction(a: {
     // 抠像转码：必须和 stages.ts 的 keyActionVideo 走完全同一套，否则
     // (a) 漏归一化 → 角色尺寸/位置是原始状态，大概率跑到画面外；
     // (b) 用 sampleKeyColor 单点采样选 key → 实测 6/7 动作选到的 key 比
-    //     selectChromaKey 更不饱和，会连角色本体一起吃掉并留绿边。
+    //     色度极值双 key 更不饱和，会连角色本体一起吃掉并留绿边。
     const videoAbs = path.join(outDir, videoRel);
     const drift = await checkVideoDrift(videoAbs, ffmpegPath);
     if (drift.fail) {
       throw new Error(`绿幕背景漂移 ${drift.maxDrift}/255 超限，视频不可用`);
     }
-    const chromaKey = selectChromaKey(await sampleBackgroundColors(videoAbs, ffmpegPath));
-    const keys = [chromaKey ?? (await sampleKeyColor(videoAbs, ffmpegPath))];
+    let keys = selectDualKeys(await sampleBackgroundColors(videoAbs, ffmpegPath));
+    if (keys.length === 0) {
+      keys = [await sampleKeyColor(videoAbs, ffmpegPath)];
+    }
     const stats = await computeAlphaStats(videoAbs, keys, ffmpegPath);
     const size = await probeSize(videoAbs, ffmpegPath);
     const normVf = stats ? normalizeFilter(stats, size.width, size.height) : undefined;

@@ -8,11 +8,12 @@
 |---|---|
 | `pipeline/` | 生成管线，**纯 Node 零 Electron 依赖**，可独立 CLI 使用（`npx tsx pipeline/src/cli.ts`） |
 | `app/` | Electron 客户端（electron-vite；main / preload / 四 renderer：pet + room 小房间 + bubble 气泡 + console 控制台） |
-| `app/src/main/pipeline-bridge.ts` | **唯一** import `@qbot/pipeline` 的地方 |
+| `app/src/main/pipeline-bridge.ts` | import `@qbot/pipeline` 的主入口（另一处是 sticker-importer，共用其 `buildConfig`） |
 | `app/src/main/agent-server.ts` | agent 联动：127.0.0.1 HTTP 收 hook 事件 → 会话合成 → 广播 pet 窗 |
 | `app/src/main/agent-message.ts` | agent 消息纯逻辑：markdown 展平、截断、来源标签、transcript 解析（可单测） |
 | `app/src/main/hooks/claude.ts` | Claude Code hooks 安装器（托盘显式同意，写 ~/.claude/settings.json） |
 | `app/src/main/music-monitor.ts` | 网易云音乐监控（Windows SMTC，常驻 PowerShell 进程） |
+| `app/src/main/sticker-importer.ts` | 表情包导入：打标→复核→转码落盘→热重载（纯逻辑在 `sticker-rules.ts`） |
 | `app/src/renderer/console/` | **统一控制台**：左侧栏二级目录（角色/配置/社区/连接/系统），`panes/*.ts` 一 pane 一文件，懒挂载 |
 | `assets/mascot/` | 官方预置角色源（同步于 `app/resources/presets/mascot/`） |
 | `docs/superpowers/specs/` | 已批准的设计 spec（权威）；`DESIGN.md` 是最初的产品/技术调研 |
@@ -39,9 +40,9 @@
 
 ## 统一控制台（原 Studio / 市场 / 孵化 / 设置 / 调试面板五合一）
 
-- **桌宠右键「控制台…」或托盘**打开单窗（880×640，renderer `console`），左侧栏五组十项：
+- **桌宠右键「控制台…」或托盘**打开单窗（880×640，renderer `console`），左侧栏五组十一项：
   - 角色：我的角色（切换/改名/删除）、孵化新角色（drop→brewing→pick→progress→certificate 五屏）
-  - 配置：人设与动作、场景动作（Claude/听歌/开会 三类映射）、生成 Prompt
+  - 配置：人设与动作、场景动作（Claude/听歌/开会 三类映射）、表情包导入、生成 Prompt
   - 社区：装扮市场　连接：Claude Code、联机　系统：设置、开发者工具
 - **pane 懒挂载常驻**：首次激活才 `mount()`，切走只隐藏 → 未保存输入不丢；再次可见调 `onVisible()`
   （孵化据此主动 `seedFromStatus`，兜底懒挂载错过的 `awaiting_pick` 事件）
@@ -88,6 +89,21 @@
 - 调试面板有三个注水按钮（加挂机时间 / 给箱子 / 给家具）
 - 纯逻辑单测 `app/test/progress-rules.test.ts`（33 例）
 
+## 表情包导入（GIF → 动作槽位）
+
+- 丢一套 GIF 表情包 → 模型粗标语义 → 映射到动作槽位，**绕开三视图/逐动作生成管线**（秒级、几乎免费，对比生成一个动作 5-8min + API 费）
+- **模型输出语义类别不是动作 ID**（idle/sleep/tea/happy/annoyed/celebrate/focus/wave/other 共 9 类），再经 `CATEGORY_TO_SLOT` 映射到槽位。理由：贴纸是任意素材，用户关心「它表达什么」；类别比动作 ID 稳定，动作体系重构后只改映射表
+- celebrate/focus/wave 已能被模型标出但 v1 不落槽（进备选库），等 S+ 场景动作落地补映射即自动启用
+- 打标走 `doubao-seed-2-0-mini`（Ark `chat/completions`，输入 ¥0.2/M、`detail: 'low'`、`temperature: 0`），一批 50 张约 ¥0.009
+- **请求体是交错的文本/图片块**（`VisionPart[]`）：每组帧前插「贴纸 #N」标记，否则模型无法把扁平图片列表对回具体贴纸，错位就整批标错；分块 12 张/次（150 张图挤一次请求对位准确率会掉）
+- **两阶段**：`analyze` 只打标不落盘（取消复核 = 什么都没发生）；`apply` 才转码写盘 + 热重载。打标结果由渲染层持有，主进程无状态（复核可能几分钟，存一份就要处理窗口关闭/角色删除/多窗并发）
+- 转码 `gifToWebm`：**不抠像**（GIF 自带 alpha，chromakey 会吃掉角色里的绿色）、**不归一化**（贴纸是成品），640×640 方形画布等比缩放居中 + 透明 padding——桌宠窗宽=高且 `video{width:100%}`，横版贴纸直接播会变形
+- `manifest.importedActions`（key = 槽位）与 `actions` 分开存：删字段一步回退，原 webm 从未被覆盖；`spareStickers` 是备选库；原始 GIF 永久留在 `imported/_raw/`（同血泪坑 4 思路）
+- 播放层合并顺序：标准动作 → 导入贴纸 → 自定义动作（后者覆盖同名）；**状态机零改动**（只认 PlayableId）
+- 容错三层：单块请求失败 → 该块降级 other；坏 GIF → 标红不阻断整批；类别非法/条目缺失 → other + confidence 0 强制人工指定
+- 核心文件：`pipeline/src/sticker-import.ts`（打标纯逻辑）+ `chroma.ts:gifToWebm` + `app/src/main/sticker-importer.ts`（IO/IPC）+ `sticker-rules.ts`（纯逻辑可单测）+ Studio「表情包导入」tab
+- spec：`docs/superpowers/specs/2026-08-21-sticker-pack-import-design.md`
+
 ## 举牌功能
 
 - **长柄木牌**：牌子在上、杆在下，跟随角色显示在右侧
@@ -127,6 +143,13 @@ pkill -f "electron-vite"; pkill -f "QBot/node_modules/electron"   # 关闭（必
 npm test -w pipeline         # 管线单测（全 mock，不花钱）
 npm run build -w pipeline    # tsc 编译 dist/（app 引用的是 dist，改 pipeline 后必须 build）
 npx tsc --noEmit -p app      # app 类型检查
+
+# 存量角色重抠像（不重新生成视频 = 零 API 花费，绿幕 mp4 一直留在 .job/）
+npx tsx pipeline/src/cli.ts rekey --job ~/Library/Application\ Support/@qbot/app/characters/<id>
+                             # --despill <mix> 调去绿边强度（0 = 关闭回退旧的 alpha 收边）
+                             # --erode <px>    仅 --despill 0 时生效（两者互斥，见血泪坑 22）
+                             # --action <id>   只重抠单个动作
+
 npm run dist -w app          # 打包当前平台（mac→dmg / win→nsis+zip；mac 从未验证成功过）
                              # Windows 包必须在 Windows 上构建（ffmpeg-static 装机时按平台下载）
                              # → 完整流程/镜像/验证清单见 docs/windows-build-and-release.md
@@ -147,6 +170,7 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 
 - **端点**：`https://ark.cn-beijing.volces.com/api/plan/v3`（火山方舟 plan 端点，key 在 config.local.json）
 - **生图**：`doubao-seedream-5.0-lite`（尺寸白名单：三视图 3072x1536、首帧 2048x2048；1440x1440 会 400）
+- **打标**：`doubao-seed-2-0-mini`（视觉理解，走 `chat/completions`；表情包导入用，输入 ¥0.2/M）
 - **视频**：`doubao-seedance-1.5-pro`——**duration 最短 5**（3 会 400）；参数走 prompt 尾缀 `--resolution 480p --duration 5 --camerafixed true`；首帧同时作 first_frame+last_frame（循环的关键）；输出 640×640 24fps h264
 - **可选生图后端 gpt-image-2**（aiartmirror，OpenAI images 兼容，`pipeline/src/gpt-image.ts`）：单张 5-10 分钟；服务端同账号疑似串行 → 客户端限并发 2、超时 900s；有参考图走 multipart `/images/edits`；4xx 与 503 `model_not_found` 永不重试
 - 返回的图片/视频 URL **24 小时过期**，管线一律立即下载落盘
@@ -155,7 +179,7 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 ## 血泪坑（改代码前必读）
 
 1. **WebM alpha 双参数**：`-auto-alt-ref 0` + `-metadata:s:v:0 alpha_mode=1` 缺一即黑底；解码验证需 `-vcodec libvpx-vp9`
-2. **GIF 三铁律**：不做 despill；`dither=none`；循环靠生成层（首尾帧相同），不靠 ffmpeg
+2. **GIF 铁律**：`dither=none`；循环靠生成层（首尾帧相同），不靠 ffmpeg；不做**全帧** despill（见坑 22）
 3. **抠像默认 colorkey 0.15:0.04**（`chroma.ts`）——DESIGN.md 里的 0.24 会把偏绿的角色身体抠出镂空
 4. **尺寸归一化**：抠像后按 alpha bbox 缩放到统一高度、底边对齐（`computeAlphaBBox`/`normalizeFilter`）；原始绿幕 mp4 永久留在 `.job/`，改抠像参数零成本重抠（参考 `pipeline/test/tmp/rekey-normalize.mts`）
 5. **`qbot-asset://` 协议**：`registerSchemesAsPrivileged` 必须在 app.ready 前且带 `stream: true`，否则 `<video>` 静默不播
@@ -175,6 +199,13 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 19. **Claude Code 的 hook 在 Windows 上跑在 bash 里，不是 cmd**（实测 `$0` = `/usr/bin/bash`，Git for Windows 提供）。所以 hook 命令串**必须保持 POSIX**：写成 `.cmd`/`%VAR%`/反斜杠路径反而会 `command not found`（bash 把 `D:\dev\...` 的反斜杠当转义符吃掉，报 `D:devqbot...`）。查这类问题用 `claude -p ... --debug hooks`，hook 失败信息只在那里出现，正常输出里完全静默
 20. **`GetAsyncKeyState` 首次轮询必然脏**：它的返回值里带「自上次调用以来是否被按过」位，进程启动后第一次扫 256 个 vk，会把 QBot 启动**之前**用户敲的键一次性算进来（实测能白送几十点）。所以 `input-monitor.ts` 有个 `seeded` 标志：第一轮只用来建立基线、一律返回 0。同理任何「按下沿」计数都必须先播种再计数，不能一上来就 diff
 21. **等距房间的可走区必须比地板小一圈**：`RoomSpec.floor` 是脚底锚点的多边形，但角色有高度（`petHeight` 185px），脚底贴到地板真实边界时上半身早就压进墙里，表现为「走到墙边还在走」（碰墙不停）。靠墙的边要沿法向内收 ≈45px；2:1 等距下「沿边内收 d」换算成顶点位移不是简单加减 d，得把两条相邻边各自偏移后求交点。开口方向（前面两条边）不要收，收了白丢可走面积。改这个数据前先确认：`scaleForY` 取的是 floor 的 y 极值（跟着变、自洽），`depthZ` 取 `spec.height`（不受影响），`sanitizePlacements` 不做多边形包含判定（已存盘的家具摆放不会被判无效）
+22. **去绿边只能用 rim-only despill，且和 alpha 腐蚀互斥**（`chroma.ts:rimDespillFilter`，2026-08-21 实测）：
+    - **绿边像素 alpha=255（不透明）**，所以「只修半透明 rim」的直觉方案抓不到它；环带必须用 `dilate(alpha) − erode(alpha)` 向外扩才能覆盖
+    - **alpha 腐蚀从不改颜色**，只把绿边挪成半透明（实测 `bdffb5` G+70 在 erode1 后颜色原样、alpha ff→7a）；erode2 才抠掉但同时啃角色本体 → 旧方案「没绿边」和「抠得完整」不可兼得
+    - **全帧 despill 的真正危险不是白色而是绿色系角色**：实测纯白 G+0 不变（旧注释说的「白发染粉紫」未复现），但薄荷绿身体 G+86→G-1、橄榄绿衣服 G+73→G-1（= 坑 3 的小青）。所以必须空间门控
+    - **三处像素格式必须显式钉死**：`alphaextract` 前要 `format=yuva444p`（否则整图协商失败报 `could not choose their formats`）；mask 要 `format=gbrp,format=rgba` 复制到 RGB 三通道（gray mask 会被转 yuv、chroma 补 128，`maskedmerge` 退化成 50% 混合，despill 只生效一半）；base/overlay 同走 rgba
+    - **despill 开着就不许再 erode**：两段独立 split/alphaextract 子图叠加会触发格式重协商，实测把角色内部也改坏（薄荷绿 G+86→G+42）。`keyActionVideo` 已强制互斥
+    - 效果：同素材绿偏像素 6048(1.13%)→**0**、不透明像素 +2 万（角色更完整）。对照组测试在 `pipeline/test/despill.test.ts`，**别把这两条「优化」回去**
 
 22. **多页合一个窗时，三样东西必炸**：(a) 裸标签选择器 —— 原 hatch/studio/market 各自定义
     裸 `button`，`button.danger` 一个红底白字一个白底红字，合并后按加载顺序互相覆盖，
@@ -204,5 +235,5 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 
 - pipeline 模块禁止 import Electron API
 - prompt 模板文字实测有效，不要随意改写措辞（`prompts.ts`）
-- 改动作/管线参数后跑 `npm test -w pipeline`（26+ 测试，全 mock 不花钱）
+- 改动作/管线参数后跑 `npm test -w pipeline`（80 测试，全 mock 不花钱）；抠像参数另有 `test/despill.test.ts` 的对照组守着（血泪坑 22）
 - 真实 API 烟测要花钱（生图分/张、视频约 ¥1/条），先问用户

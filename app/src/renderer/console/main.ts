@@ -11,6 +11,7 @@ export type PaneId =
   | 'hatch'
   | 'persona'
   | 'scene-actions'
+  | 'stickers'
   | 'prompts'
   | 'market'
   | 'claude'
@@ -47,6 +48,7 @@ const GROUPS: { label: string; defs: Omit<PaneDef, 'group'>[] }[] = [
     defs: [
       { id: 'persona', label: '人设与动作', icon: '🎨', load: () => import('./panes/persona') },
       { id: 'scene-actions', label: '场景动作', icon: '🎬', load: () => import('./panes/scene-actions') },
+      { id: 'stickers', label: '表情包导入', icon: '🧩', load: () => import('./panes/stickers') },
       { id: 'prompts', label: '生成 Prompt', icon: '📝', load: () => import('./panes/prompts') },
     ],
   },
