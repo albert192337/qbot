@@ -3,7 +3,7 @@ import { Menu, Tray, app, clipboard, dialog, nativeImage } from 'electron';
 import path from 'node:path';
 import { listCharacters } from './characters';
 import { getSettings, setSettings } from './config';
-import { createHatchWindow, broadcastCharacterActivated } from './windows';
+import { createConsoleWindow, broadcastCharacterActivated } from './windows';
 import { toggleClaudeHooks } from './hooks/claude';
 import { getCharacter } from './characters';
 import { createLinkRoom, getLinkStatus, joinLinkRoom, stopLink, notifyActiveCharacterChanged } from './link/link';
@@ -84,7 +84,7 @@ export async function characterSection(): Promise<Electron.MenuItemConstructorOp
             }))
           : [{ label: '（暂无角色）', enabled: false }]),
         { type: 'separator' as const },
-        { label: '孵化新角色…', click: () => createHatchWindow() },
+        { label: '孵化新角色…', click: () => createConsoleWindow('hatch') },
       ],
     },
   ];
@@ -111,8 +111,12 @@ export async function connectSection(): Promise<Electron.MenuItemConstructorOpti
 export function systemSection(): Electron.MenuItemConstructorOptions[] {
   return [
     {
+      label: '控制台…',
+      click: () => createConsoleWindow(),
+    },
+    {
       label: '设置…',
-      click: () => createHatchWindow('settings'),
+      click: () => createConsoleWindow('settings'),
     },
     { label: '退出 QBot', click: () => app.quit() },
   ];

@@ -22,9 +22,8 @@ let petWindow: BrowserWindow | null = null;
 /** 联机远端宠窗（?remote=1 复用 pet renderer；独立单例，绝不复用 petWindow——
  *  否则 broadcastCharacterActivated 会把本地角色切换广播进远端窗） */
 let remotePetWindow: BrowserWindow | null = null;
-let hatchWindow: BrowserWindow | null = null;
 let roomWindow: BrowserWindow | null = null;
-let studioWindow: BrowserWindow | null = null;
+let consoleWindow: BrowserWindow | null = null;
 let loungeWindow: BrowserWindow | null = null;
 let bubbleWindow: BrowserWindow | null = null;
 let bubbleSide: 'above' | 'below' = 'above';
@@ -44,7 +43,7 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds(); // 不依赖 resize 事件的投递时机
 }
 
-type RendererPage = 'pet' | 'hatch' | 'room' | 'studio' | 'bubble' | 'market' | 'lounge';
+type RendererPage = 'pet' | 'room' | 'bubble' | 'console' | 'lounge';
 
 function load(win: BrowserWindow, page: RendererPage, query?: Record<string, string>): void {
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -61,10 +60,6 @@ function load(win: BrowserWindow, page: RendererPage, query?: Record<string, str
 
 export function getPetWindow(): BrowserWindow | null {
   return petWindow;
-}
-
-export function getHatchWindow(): BrowserWindow | null {
-  return hatchWindow;
 }
 
 export function getRoomWindow(): BrowserWindow | null {
@@ -250,42 +245,6 @@ function closeBubbleWindow(): void {
   bubbleWindow = null;
 }
 
-export function createHatchWindow(screenName?: 'settings'): BrowserWindow {
-  if (hatchWindow && !hatchWindow.isDestroyed()) {
-    hatchWindow.focus();
-    if (screenName) hatchWindow.webContents.send('ui:showScreen', screenName);
-    return hatchWindow;
-  }
-  // dock 隐藏时常规窗口聚焦行为异常 → 开孵化窗时临时显示 dock
-  if (process.platform === 'darwin') void app.dock?.show();
-  hatchWindow = new BrowserWindow({
-    width: 720,
-    height: 560,
-    title: 'QBot 孵化室',
-    webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      sandbox: false,
-    },
-  });
-  hatchWindow.on('closed', () => {
-    hatchWindow = null;
-    // room 窗还开着就不收 dock（常规窗聚焦需要 dock 在场）
-    if (process.platform === 'darwin' && !roomWindow) app.dock?.hide();
-  });
-  hatchWindow.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
-    return { action: 'deny' };
-  });
-  if (screenName) {
-    hatchWindow.webContents.once('did-finish-load', () => {
-      hatchWindow?.webContents.send('ui:showScreen', screenName);
-    });
-  }
-  load(hatchWindow, 'hatch');
-  return hatchWindow;
-}
-
 /** 拖拽移动（高频调用，不做动画） */
 export function movePetWindow(x: number, y: number): void {
   petWindow?.setPosition(Math.round(x), Math.round(y), false);
@@ -362,35 +321,81 @@ export function openRoomWindow(title: string): BrowserWindow {
   roomWindow.on('closed', () => {
     roomWindow = null;
     petWindow?.show(); // 角色回桌面
-    if (process.platform === 'darwin' && !hatchWindow) app.dock?.hide();
+    if (process.platform === 'darwin' && !consoleWindow) app.dock?.hide();
   });
   load(roomWindow, 'room');
   return roomWindow;
 }
 
-/** 生成配置面板：编辑人设 + 查看/新增/删除动作 */
-export function createStudioWindow(): BrowserWindow {
-  if (studioWindow && !studioWindow.isDestroyed()) {
-    studioWindow.focus();
-    return studioWindow;
+/** 控制台侧栏 pane 标识（与 renderer/console/main.ts 的 PaneId 对应） */
+export type ConsolePane =
+  | 'characters'
+  | 'hatch'
+  | 'persona'
+  | 'scene-actions'
+  | 'stickers'
+  | 'prompts'
+  | 'market'
+  | 'claude'
+  | 'link'
+  | 'settings'
+  | 'devtools';
+
+export function getConsoleWindow(): BrowserWindow | null {
+  return consoleWindow;
+}
+
+/**
+ * 统一广播：桌面宠窗 + 房间窗 + 控制台窗（存在才发）。
+ * 各监控器（agent/music/meeting/progress/settings）的状态推送都走这里，
+ * 新窗接入只改这一处。
+ */
+export function sendToWindows(channel: string, payload: unknown): void {
+  getPetWindow()?.webContents.send(channel, payload);
+  const room = getRoomWindow();
+  if (room && !room.isDestroyed()) room.webContents.send(channel, payload);
+  const consoleWin = getConsoleWindow();
+  if (consoleWin && !consoleWin.isDestroyed()) consoleWin.webContents.send(channel, payload);
+}
+
+/**
+ * 统一控制台窗：右侧栏二级目录收拢全部配置/管理功能。
+ * 深链：已开窗→直接发 ui:showScreen；新窗→did-finish-load once 后发（避免渲染进程还没订阅）。
+ * dock 协调：mac 上 dock 隐藏时常规窗聚焦行为异常，所以开窗前 show、关窗后按需 hide。
+ */
+export function createConsoleWindow(pane?: ConsolePane): BrowserWindow {
+  if (consoleWindow && !consoleWindow.isDestroyed()) {
+    consoleWindow.focus();
+    if (pane) consoleWindow.webContents.send('ui:showScreen', pane);
+    return consoleWindow;
   }
-  studioWindow = new BrowserWindow({
-    width: 480,
-    height: 680,
-    title: 'QBot 角色工作室',
+  if (process.platform === 'darwin') void app.dock?.show();
+  consoleWindow = new BrowserWindow({
+    width: 880,
+    height: 640,
+    title: 'QBot 控制台',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       sandbox: false,
     },
   });
-  studioWindow.on('closed', () => { studioWindow = null; });
-  load(studioWindow, 'studio');
-  return studioWindow;
+  consoleWindow.on('closed', () => {
+    consoleWindow = null;
+    if (process.platform === 'darwin' && !roomWindow) app.dock?.hide();
+  });
+  consoleWindow.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  if (pane) {
+    consoleWindow.webContents.once('did-finish-load', () => {
+      consoleWindow?.webContents.send('ui:showScreen', pane);
+    });
+  }
+  load(consoleWindow, 'console', pane ? { pane } : undefined);
+  return consoleWindow;
 }
-
-/** 装扮市场：上传/下载皮肤的货架窗（spec 2026-08-02-skin-market-design） */
-let marketWindow: BrowserWindow | null = null;
 
 /**
  * 公共房间窗（spec 2026-08-21 §6.3）：普通窗口，**不是**透明穿透窗——
@@ -423,24 +428,4 @@ export function pushToLounge(channel: string, payload: unknown): void {
   if (loungeWindow && !loungeWindow.isDestroyed()) {
     loungeWindow.webContents.send(channel, payload);
   }
-}
-
-export function createMarketWindow(): BrowserWindow {
-  if (marketWindow && !marketWindow.isDestroyed()) {
-    marketWindow.focus();
-    return marketWindow;
-  }
-  marketWindow = new BrowserWindow({
-    width: 640,
-    height: 720,
-    title: 'QBot 装扮市场',
-    webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      sandbox: false,
-    },
-  });
-  marketWindow.on('closed', () => { marketWindow = null; });
-  load(marketWindow, 'market');
-  return marketWindow;
 }

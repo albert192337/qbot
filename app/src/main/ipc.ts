@@ -7,10 +7,10 @@ import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipelin
 import type { PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind } from '../shared/ipc-types';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { createHatchWindow, createStudioWindow, movePetWindow, setPetScale, getPetWindow, getRoomWindow, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, createMarketWindow, createLoungeWindow } from './windows';
+import { createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, type ConsolePane } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, isSecureTransport, reportChat, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms } from './rooms/rooms';
-import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, getLocalSign, setLocalSign } from './link/link';
+import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, getLocalSign, setLocalSign, createLinkRoom, joinLinkRoom } from './link/link';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import {
@@ -28,12 +28,20 @@ import {
   getProgress,
   openBox,
 } from './progress';
-import { rebuildTray, characterSection, connectSection, systemSection } from './tray';
+import { rebuildTray } from './tray';
 import { getAgentStatus } from './agent-server';
 import { getMusicStatus } from './music-monitor';
 import { getMeetingStatus } from './meeting-monitor';
+import { claudeHooksPresent, toggleClaudeHooks } from './hooks/claude';
 
 export function registerIpc(): void {
+  // 开小房间：房间窗标题用激活角色名（右键菜单与 room:open 共用）
+  async function openRoomWindowSafe(): Promise<void> {
+    const { activeCharacter } = await getSettings();
+    const meta = activeCharacter ? await getCharacter(activeCharacter) : null;
+    const name = meta?.manifest?.name;
+    openRoomWindow(name && name !== '未命名' ? `${name}的家` : '小房间');
+  }
   // ── hatch ──────────────────────────────────────────────
   ipcMain.handle(
     'hatch:start',
@@ -108,12 +116,7 @@ export function registerIpc(): void {
   ipcMain.on('link:stop', () => stopLink());
 
   // ── room ───────────────────────────────────────────────
-  ipcMain.on('room:open', async () => {
-    const { activeCharacter } = await getSettings();
-    const meta = activeCharacter ? await getCharacter(activeCharacter) : null;
-    const name = meta?.manifest?.name;
-    openRoomWindow(name && name !== '未命名' ? `${name}的家` : '小房间');
-  });
+  ipcMain.on('room:open', () => void openRoomWindowSafe());
   ipcMain.on('room:move', (_ev, x: number, y: number) => moveRoomWindow(x, y));
   ipcMain.on('room:setIgnoreMouse', (_ev, ignore: boolean) => setRoomIgnoreMouse(ignore));
 
@@ -146,15 +149,13 @@ export function registerIpc(): void {
     const next = await setSettings(patch);
     if (typeof patch?.petScale === 'number') setPetScale(patch.petScale); // 实时生效
     // 语音设置实时生效（pet + room）
-    getPetWindow()?.webContents.send('settings:changed', next);
-    getRoomWindow()?.webContents.send('settings:changed', next);
+    sendToWindows('settings:changed', next);
   });
 
   // ── studio ──────────────────────────────────────────────
-  ipcMain.on('studio:open', () => createStudioWindow());
-
-  // ── market 装扮市场 ────────────────────────────────────
-  ipcMain.on('market:open', () => createMarketWindow());
+  // 统一控制台：右键/托盘/各处配置入口都走这里开窗并直达 pane
+  // （原 studio:open / market:open 两条 IPC 是死代码，合并改造）
+  ipcMain.on('ui:openConsole', (_ev, pane?: ConsolePane) => createConsoleWindow(pane));
   ipcMain.handle('market:list', () => listSkins());
   ipcMain.handle('market:upload', (_ev, dirId: string) => uploadSkin(dirId));
   ipcMain.handle('market:download', (_ev, hash: string) => downloadSkin(hash));
@@ -179,9 +180,8 @@ export function registerIpc(): void {
   ipcMain.handle('rooms:disconnect', () => disconnectRooms());
 
   // 桌宠右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
-  // 按「玩宠 → 窗口 → 角色/联机 → 系统」四段组织，托盘同源 section 直接平铺
-  // （刘海屏 mac 菜单栏挤满时托盘图标被系统静默隐藏，右键是兜底配置入口）。
-  // 说话/播动作/举牌回渲染端执行；开窗口直调主进程
+  // 只留「玩宠动作 + 去处」两段——所有配置/管理都收进控制台（一个窗、左侧栏二级目录），
+  // 不再把托盘的 section 平铺进来。说话/播动作/举牌回渲染端执行；开窗口直调主进程
   ipcMain.on('pet:popupMenu', async (ev, actions: PetMenuActionEntry[]) => {
     const win = BrowserWindow.fromWebContents(ev.sender);
     if (!win) return;
@@ -203,27 +203,10 @@ export function registerIpc(): void {
       },
       ...(getLocalSign() ? [{ label: '收牌', click: () => send({ type: 'signClear' as const }) }] : []),
       { type: 'separator' },
-      // ── 窗口入口 ────────────────────────────────────────
-      {
-        label: '小房间',
-        click: async () => {
-          const { activeCharacter } = await getSettings();
-          const meta = activeCharacter ? await getCharacter(activeCharacter) : null;
-          const name = meta?.manifest?.name;
-          openRoomWindow(name && name !== '未命名' ? `${name}的家` : '小房间');
-        },
-      },
+      // ── 去处（角色能去的地方 + 控制台）──────────────────
+      { label: '小房间', click: () => void openRoomWindowSafe() },
       { label: '公共房间', click: () => createLoungeWindow() },
-      { label: '装扮市场', click: () => createMarketWindow() },
-      { label: '角色工作室', click: () => createStudioWindow() },
-      { type: 'separator' },
-      // ── 角色 / 联机（托盘同源）──────────────────────────
-      ...(await characterSection()),
-      ...(await connectSection()),
-      { type: 'separator' },
-      // ── 系统（托盘同源）+ 调试入口（仅右键有，纯开发工具）──
-      { label: '调试面板', click: () => send({ type: 'debugToggle' }) },
-      ...systemSection(),
+      { label: '控制台…', click: () => createConsoleWindow() },
     ]);
     menu.popup({ window: win });
   });
@@ -256,7 +239,9 @@ export function registerIpc(): void {
     await regenerateActions(dirId, actionIds as never);
   });
   ipcMain.handle('studio:regenerateTurnaround', async (_ev, dirId: string) => {
-    createHatchWindow(); // 三视图要人工挑图，先把孵化窗弹出来
+    // 三视图要人工挑图：先把控制台切到孵化 pane 并置前，否则候选图出现在看不见的
+    // 地方，管线会永久挂在 pickResolver 上等不到人挑（原实现开的是独立孵化窗）
+    createConsoleWindow('hatch');
     await regenerateTurnaround(dirId);
   });
 
@@ -285,6 +270,22 @@ export function registerIpc(): void {
 
   // ── agent 联动 ─────────────────────────────────────────
   ipcMain.handle('agent:getStatus', () => getAgentStatus());
+
+  // ── Claude Code hooks（控制台「连接」组）────────────────
+  // 读磁盘真值而非 settings 里的记忆位：用户手改 ~/.claude/settings.json 后
+  // 那个 bool 会漂移（claudeHooksPresent 早就实现，此前无人调用）
+  ipcMain.handle('claude:getStatus', () => claudeHooksPresent());
+  ipcMain.handle('claude:toggle', async () => {
+    const present = await claudeHooksPresent();
+    const installed = await toggleClaudeHooks(present);
+    await setSettings({ claudeHooksInstalled: installed });
+    await rebuildTray();
+    return installed;
+  });
+
+  // ── link 联机（控制台「连接」组新增建房/加入）───────────
+  ipcMain.handle('link:create', () => createLinkRoom());
+  ipcMain.handle('link:join', (_ev, code: string) => joinLinkRoom(code));
 
   // ── music 联动 ─────────────────────────────────────────
   ipcMain.handle('music:getStatus', () => getMusicStatus());

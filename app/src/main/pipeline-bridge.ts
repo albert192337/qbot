@@ -44,7 +44,7 @@ import {
 import type { HatchStatus } from '../shared/ipc-types';
 import { charactersDir, getCharacter } from './characters';
 import { getSettings } from './config';
-import { broadcastCharacterActivated } from './windows';
+import { broadcastCharacterActivated, getConsoleWindow } from './windows';
 import { rebuildTray } from './tray';
 
 interface ActiveHatch {
@@ -337,8 +337,10 @@ function broadcastCustomAction(
   status: 'pending' | 'done' | 'failed',
   error?: string,
 ): void {
-  for (const wc of webContents.getAllWebContents()) {
-    wc.send('studio:customAction', { dirId, name, status, error });
+  // 只发控制台窗（人设/动作 pane 据此刷新；旧 studio 独立窗阶段 4 后下线）
+  const win = getConsoleWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('studio:customAction', { dirId, name, status, error });
   }
 }
 

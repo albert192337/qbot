@@ -20,12 +20,10 @@ export default defineConfig({
       rollupOptions: {
         input: {
           pet: resolve(__dirname, 'src/renderer/pet/index.html'),
-          hatch: resolve(__dirname, 'src/renderer/hatch/index.html'),
           room: resolve(__dirname, 'src/renderer/room/index.html'),
-          studio: resolve(__dirname, 'src/renderer/studio/index.html'),
           bubble: resolve(__dirname, 'src/renderer/bubble/index.html'),
+          console: resolve(__dirname, 'src/renderer/console/index.html'),
           lounge: resolve(__dirname, 'src/renderer/lounge/index.html'),
-          market: resolve(__dirname, 'src/renderer/market/index.html'),
         },
       },
     },

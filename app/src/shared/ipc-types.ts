@@ -203,9 +203,7 @@ export type PetMenuCommand =
   | { type: 'play'; action: string }
   /** 弹举牌输入框（联机举牌：本端显示 + 同步对端替身） */
   | { type: 'signPrompt' }
-  | { type: 'signClear' }
-  /** 展开/收起调试面板（状态/日志/串门触发等开发工具） */
-  | { type: 'debugToggle' };
+  | { type: 'signClear' };
 
 // ── 联机 presence（spec 2026-08-02-multiplayer-presence-design）──────────
 /** 对端高层状态：agent 活动 + 听歌（隐私边界见 spec §四，只有枚举/动作名/放行曲名出本机） */
@@ -435,6 +433,12 @@ export interface QBotApi {
   link: {
     /** 当前联机链路状态 */
     getStatus(): Promise<LinkStatus>;
+    /** 建房，返回 6 位房间码（控制台「联机」pane） */
+    create(): Promise<string>;
+    /** 用房间码加入（控制台「联机」pane 的输入框） */
+    join(code: string): Promise<void>;
+    /** 订阅链路状态变化（主进程 setLinkStatusListener 搭车推送） */
+    onChanged(cb: (status: LinkStatus) => void): () => void;
     /** 断开联机（远端窗右键菜单；托盘走主进程直调） */
     stop(): void;
     /** 远端宠窗订阅：对端角色名（hello 帧） */
@@ -460,8 +464,6 @@ export interface QBotApi {
     }>;
   };
   market: {
-    /** 打开装扮市场窗口 */
-    open(): void;
     /** 货架列表（含本地视角的 mine/installed） */
     list(): Promise<MarketSkin[]>;
     /** 打包上传本地角色，返回上架 hash */
@@ -529,6 +531,12 @@ export interface QBotApi {
     /** pet 窗口订阅：设置变更实时生效（语音开关/音量/频率等） */
     onChanged(cb: (settings: Settings) => void): () => void;
   };
+  claude: {
+    /** Claude Code hooks 是否已装（读 ~/.claude/settings.json 真值，非 settings 记忆位） */
+    getStatus(): Promise<boolean>;
+    /** 切换安装/卸载，返回切换后的状态（内部弹原生确认框） */
+    toggle(): Promise<boolean>;
+  };
   agent: {
     /** 当前合成状态（pet 窗口加载时铺底） */
     getStatus(): Promise<AgentStatus>;
@@ -546,12 +554,12 @@ export interface QBotApi {
     onAnchor(cb: (side: 'above' | 'below') => void): () => void;
   };
   ui: {
-    /** 主进程要求切屏（托盘「设置」→ settings 屏） */
+    /** 主进程要求切屏（托盘「设置」→ settings 屏；控制台切 pane 同用） */
     onShowScreen(cb: (name: string) => void): () => void;
+    /** 打开统一控制台窗并直达 pane（pane 名见 renderer/console/main.ts 的 PaneId） */
+    openConsole(pane?: string): void;
   };
   studio: {
-    /** 打开生成配置面板 */
-    open(): void;
     /** 保存角色人设到 manifest.json */
     savePersona(dirId: string, persona: string): Promise<void>;
     /** 新增自定义动作并开始生成 */

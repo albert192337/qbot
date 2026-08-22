@@ -17,7 +17,7 @@ import { execFile } from 'node:child_process';
 import { open, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { getPetWindow } from './windows';
+import { sendToWindows } from './windows';
 import { MeetingLogScanner, seedFromTail, type MeetingLogEvent } from './meeting-log-parser';
 import type { MeetingStatus } from '../shared/ipc-types';
 
@@ -75,7 +75,7 @@ async function readRange(path: string, start: number, end: number): Promise<stri
 function updateStatus(next: MeetingStatus): void {
   if (next.inMeeting === currentStatus.inMeeting) return;
   currentStatus = next;
-  getPetWindow()?.webContents.send('meeting:status', next);
+  sendToWindows('meeting:status', next);
 }
 
 function applyEvents(events: MeetingLogEvent[]): void {

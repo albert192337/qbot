@@ -1,6 +1,6 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { RoomChatMsg, RoomMember, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, LinkPeerHello, LinkPeerState, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
+import type { RoomChatMsg, RoomMember, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, LinkStatus, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, LinkPeerHello, LinkPeerState, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
@@ -82,9 +82,10 @@ const api: QBotApi = {
       ipcRenderer.on('ui:showScreen', listener);
       return () => ipcRenderer.removeListener('ui:showScreen', listener);
     },
+    /** 打开统一控制台窗并直达 pane（未开窗则新开；已开则切 pane） */
+    openConsole: (pane?: string) => ipcRenderer.send('ui:openConsole', pane),
   },
   market: {
-    open: () => ipcRenderer.send('market:open'),
     list: () => ipcRenderer.invoke('market:list'),
     upload: (dirId) => ipcRenderer.invoke('market:upload', dirId),
     download: (hash) => ipcRenderer.invoke('market:download', hash),
@@ -160,7 +161,6 @@ const api: QBotApi = {
     },
   },
   studio: {
-    open: () => ipcRenderer.send('studio:open'),
     savePersona: (dirId, persona) => ipcRenderer.invoke('studio:savePersona', dirId, persona),
     addCustomAction: (dirId, name, poseDesc, motionDesc, durationSec) =>
       ipcRenderer.invoke('studio:addCustomAction', dirId, name, poseDesc, motionDesc, durationSec),
@@ -190,6 +190,10 @@ const api: QBotApi = {
       ipcRenderer.invoke('studio:applyStickers', dirId, assignments),
     clearImportedStickers: (dirId) =>
       ipcRenderer.invoke('studio:clearImportedStickers', dirId),
+  },
+  claude: {
+    getStatus: () => ipcRenderer.invoke('claude:getStatus'),
+    toggle: () => ipcRenderer.invoke('claude:toggle'),
   },
   agent: {
     getStatus: () => ipcRenderer.invoke('agent:getStatus'),
@@ -235,6 +239,13 @@ const api: QBotApi = {
   },
   link: {
     getStatus: () => ipcRenderer.invoke('link:getStatus'),
+    create: () => ipcRenderer.invoke('link:create'),
+    join: (code) => ipcRenderer.invoke('link:join', code),
+    onChanged: (cb) => {
+      const listener = (_ev: unknown, status: LinkStatus) => cb(status);
+      ipcRenderer.on('link:changed', listener);
+      return () => ipcRenderer.removeListener('link:changed', listener);
+    },
     stop: () => ipcRenderer.send('link:stop'),
     onPeerHello: (cb) => {
       const listener = (_ev: unknown, info: LinkPeerHello) => cb(info);
