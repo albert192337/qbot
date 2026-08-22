@@ -14,7 +14,7 @@ import path from 'node:path';
 import { Job } from './job.js';
 import { runPipeline, runActions, runPackage, keyActionVideo } from './stages.js';
 import { resolveFfmpegPath, sampleBackgroundColors, sampleKeyColor, toGif, toWebm } from './chroma.js';
-import { checkVideoDrift, selectChromaKey } from './qc.js';
+import { checkVideoDrift, selectDualKeys } from './qc.js';
 import { ACTION_IDS, type ActionId, type PipelineConfig, type ProgressEvent } from './types.js';
 
 function getApiKey(optKey?: string): string {
@@ -160,10 +160,14 @@ program
   .description('对已下载的绿幕视频重新抠像转码（不重新生成视频，抠像调参后修复存量角色用）')
   .requiredOption('--job <dir>', '资产包目录')
   .option('--action <id>', `只重抠指定动作（${ACTION_IDS.join('/')}）`)
+  .option('--despill <mix>', 'rim despill 强度 0~1（0 = 关闭，回退旧的 alpha 收边）', '0.5')
+  .option('--erode <px>', 'alpha 收边像素数（仅 --despill 0 时生效）', '0')
   .action(async (opts) => {
     const job = await Job.load(path.resolve(opts.job));
     const ffmpegPath = await resolveFfmpegPath();
     const ids = opts.action ? [opts.action as ActionId] : ACTION_IDS;
+    const despillMix = Number(opts.despill);
+    const erodePx = parseInt(opts.erode, 10);
     for (const id of ids) {
       const a = job.state.actions[id];
       if (!a?.videoPath) {
@@ -171,7 +175,7 @@ program
         continue;
       }
       try {
-        await keyActionVideo(job, id, ffmpegPath);
+        await keyActionVideo(job, id, ffmpegPath, { despillMix, erodePx });
         console.log(`✅ ${id} 重抠完成 (keys: ${a.keyColors?.map((k) => `#${k}`).join(', ')})`);
       } catch (err) {
         console.log(`❌ ${id}: ${err instanceof Error ? err.message : err}`);
@@ -194,8 +198,11 @@ program
       }`,
     );
     if (drift.fail) process.exit(1);
-    const chromaKey = selectChromaKey(await sampleBackgroundColors(inPath, ffmpegPath));
-    const keys = [chromaKey ?? (await sampleKeyColor(inPath, ffmpegPath))];
+    const bgSamples = await sampleBackgroundColors(inPath, ffmpegPath);
+    let keys = selectDualKeys(bgSamples);
+    if (keys.length === 0) {
+      keys = [await sampleKeyColor(inPath, ffmpegPath)];
+    }
     console.log(`key 色: ${keys.map((k) => `#${k}`).join(', ')}`);
     const outPath = path.resolve(opts.out);
     if (outPath.endsWith('.gif')) {

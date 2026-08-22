@@ -5,6 +5,7 @@ import {
   isGreen,
   rgbToHsv,
   selectChromaKey,
+  selectDualKeys,
   DRIFT_SINGLE_KEY_MAX,
   DRIFT_DOUBLE_KEY_MAX,
 } from '../src/qc.js';
@@ -63,5 +64,53 @@ describe('qc 纯逻辑', () => {
   it('selectChromaKey：过滤非绿样本（采样点落在角色上不会当 key），全非绿返回 null', () => {
     expect(selectChromaKey(['1a1a1a', 'f5e6d0', '3bfa2c'])).toBe('3bfa2c');
     expect(selectChromaKey(['1a1a1a', 'ffffff'])).toBeNull();
+  });
+
+  it('selectDualKeys：取色度极值两端（亮绿 + 暗绿），覆盖渐变全范围', () => {
+    // 写实影棚绿幕实测样本：应同时拿到最亮和最暗的绿
+    const keys = selectDualKeys(['034b25', '075f36', '05744a', '0e815c', '085e32', '17845f']);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe('0e815c'); // 最饱和亮绿（与 selectChromaKey 一致）
+    expect(keys[1]).toBe('034b25'); // 最暗绿
+  });
+
+  it('selectDualKeys：统一背景（样本同色）时去重成单 key', () => {
+    expect(selectDualKeys(['3bfa2c'])).toEqual(['3bfa2c']);
+  });
+
+  it('selectDualKeys：过滤非绿样本，全非绿返回空数组（调用方回退单点采样）', () => {
+    expect(selectDualKeys(['1a1a1a', 'f5e6d0', '3bfa2c'])).toEqual(['3bfa2c']);
+    expect(selectDualKeys(['1a1a1a', 'ffffff'])).toEqual([]);
+  });
+
+  it('selectDualKeys：亮 key 恒等于 selectChromaKey（不回退旧行为的质量）', () => {
+    const samples = ['034b25', '075f36', '05744a', '0e815c', '085e32'];
+    expect(selectDualKeys(samples)[0]).toBe(selectChromaKey(samples));
+  });
+});
+
+describe('checkGreenFrame 背景均匀度（纯逻辑部分）', () => {
+  // checkGreenFrame 要跑 ffmpeg，这里用与其一致的判定式覆盖阈值语义：
+  // 四角全绿但色差 > DRIFT_DOUBLE_KEY_MAX 应判不均匀
+  const maxDrift = (colors: string[]) => {
+    const rgbs = colors.map(hexToRgb);
+    let m = 0;
+    for (let i = 0; i < rgbs.length; i++)
+      for (let j = i + 1; j < rgbs.length; j++)
+        for (let k = 0; k < 3; k++) m = Math.max(m, Math.abs(rgbs[i][k] - rgbs[j][k]));
+    return m;
+  };
+
+  it('均匀绿背景（平涂贴纸风）色差在门槛内', () => {
+    const corners = ['3bfa2c', '3cfa2d', '3bf92c', '3bfa2b'];
+    expect(corners.every(isGreen)).toBe(true);
+    expect(maxDrift(corners)).toBeLessThanOrEqual(DRIFT_DOUBLE_KEY_MAX);
+  });
+
+  it('带光照渐变的绿背景（四角暗中心亮）超门槛 → 该重试', () => {
+    // 写实影棚绿幕实测：暗角 034b25 与亮部 17845f 同帧并存
+    const corners = ['034b25', '17845f', '075f36', '0e815c'];
+    expect(corners.every(isGreen)).toBe(true);
+    expect(maxDrift(corners)).toBeGreaterThan(DRIFT_DOUBLE_KEY_MAX);
   });
 });

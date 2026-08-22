@@ -57,6 +57,8 @@ export interface PipelineConfig {
   imageModel?: string;
   /** 默认 doubao-seedance-1.5-pro */
   videoModel?: string;
+  /** 视觉理解模型（表情包打标用），默认 doubao-seed-2-0-mini */
+  visionModel?: string;
   /** 动作并发数，默认 6 */
   concurrency?: number;
 }
@@ -103,6 +105,30 @@ export interface ManifestAction {
   videoPromptFull?: string;
 }
 
+/**
+ * 表情包导入的动作条目（sticker-pack-import spec §4.2）。
+ * 与 ManifestAction 分开是为了可回退：删掉 importedActions 即恢复生成动作，
+ * 原始 webm/gif 从未被覆盖。
+ */
+export interface ManifestImportedAction {
+  /** 转码产物（相对角色包根，如 imported/idle.webm） */
+  webm: string;
+  /** 原始贴纸（相对角色包根，如 imported/_raw/xxx.gif）；改映射时重转码的输入 */
+  raw: string;
+  /** 时长秒（转码后探测，播放层的安全超时用） */
+  durationSec: number;
+  /** 贴纸原始文件名（复核界面/调试显示） */
+  sourceName: string;
+  /** 导入时模型给的语义类别 */
+  category?: string;
+  /** 导入时模型建议的槽位（追溯用；与实际 key 不同即说明用户改过） */
+  suggestedSlot?: string;
+  /** 导入时的置信度 [0,1] */
+  confidence?: number;
+  /** 用户是否人工改过槽位 */
+  manualOverride?: boolean;
+}
+
 /** 角色声线（voice spec §5）：首次加载时按 id 哈希分配后写回，永久稳定 */
 export interface ManifestVoice {
   /** 语音包 id（soft/bouncy/baby，未来可扩）；未知值由客户端按哈希回退 */
@@ -129,6 +155,13 @@ export interface Manifest {
   persona?: string;
   /** 自定义动作（用户新增的额外动作，key 为 action name） */
   customActions?: Record<string, ManifestAction>;
+  /**
+   * 表情包导入动作：key = 动作槽位（覆盖同名标准动作）。
+   * 缺省 = 未导入。删除本字段即一步回退到生成动作。
+   */
+  importedActions?: Record<string, ManifestImportedAction>;
+  /** 导入但未落槽的备选贴纸（备选库，可随时换到槽位上） */
+  spareStickers?: ManifestImportedAction[];
   /** Claude Code 联动时 agent 活动→动作的映射。缺省时各活动使用 state-machine 内置默认值。 */
   agentActions?: AgentActionConfig;
   /**
@@ -230,6 +263,8 @@ export const DEFAULTS = {
   imageModel: 'doubao-seedream-5.0-lite',
   // 注意：1.5-pro 不支持 duration 3，动作时长至少 5s
   videoModel: 'doubao-seedance-1.5-pro',
+  // 表情包打标：Seed 2.0 系列最便宜的一档（输入 ¥0.2/M、输出 ¥2/M），低延迟高并发
+  visionModel: 'doubao-seed-2-0-mini-260428',
   gptImageBaseUrl: 'https://www.aiartmirror.com/v1',
   gptImageModel: 'gpt-image-2',
   concurrency: 6,

@@ -16,9 +16,11 @@ import {
   sampleKeyColor,
   toGif,
   toWebm,
+  ALPHA_ERODE_PX,
+  RIM_DESPILL_MIX,
 } from './chroma.js';
 import { framePrompt, turnaroundPrompt, videoPrompt, ACTIONS } from './prompts.js';
-import { checkGreenFrame, checkVideoDrift, selectChromaKey } from './qc.js';
+import { checkGreenFrame, checkVideoDrift, selectDualKeys } from './qc.js';
 import { Job } from './job.js';
 import {
   ACTION_IDS,
@@ -103,14 +105,16 @@ export async function pickTurnaround(job: Job, index: number): Promise<void> {
 
 /**
  * Stage 4 抠像转码（runAction 与 CLI rekey 共用）：绿幕 mp4 → 透明 webm/gif 资产。
- * key 色 = 首/尾帧 8 点背景采样中最饱和的亮绿（chromakey 对亮度不敏感，
- * 一个高色度 key 覆盖写实绿幕的全部光照渐变与颗粒），无绿样本时回退左上角单点。
+ * key 色 = 双 key 常态化（从首/尾帧 8 点背景采样中取色度极值，覆盖渐变+颗粒），
+ * 无绿样本时回退左上角单点。
+ * 绿边由 rim-only despill 处理（见 chroma.ts RIM_DESPILL_MIX）。
  * 不改动作状态，只更新 keyColors。
  */
 export async function keyActionVideo(
   job: Job,
   action: ActionId,
   ffmpegPath: string,
+  opts: { despillMix?: number; erodePx?: number } = {},
 ): Promise<void> {
   const a = job.state.actions[action];
   const videoAbs = job.jobPath(a.videoPath!);
@@ -118,18 +122,26 @@ export async function keyActionVideo(
   if (drift.fail) {
     throw new Error(`background drift ${drift.maxDrift}/255 exceeds limit, video unusable`);
   }
-  const chromaKey = selectChromaKey(await sampleBackgroundColors(videoAbs, ffmpegPath));
-  const keys = [chromaKey ?? (await sampleKeyColor(videoAbs, ffmpegPath))];
+  const bgSamples = await sampleBackgroundColors(videoAbs, ffmpegPath);
+  let keys = selectDualKeys(bgSamples);
+  if (keys.length === 0) {
+    // 无可用绿样本（所有采样点都落在角色上 / 背景非绿），回退左上角单点
+    keys = [await sampleKeyColor(videoAbs, ffmpegPath)];
+  }
   a.keyColors = keys;
   await job.save();
+  const despillMix = opts.despillMix ?? RIM_DESPILL_MIX;
+  // 互斥：两段独立的 split/alphaextract 子图叠加会让 ffmpeg 重协商像素格式，
+  // 实测把角色内部也改坏（薄荷绿 G+86→G+42）。despill 开着就不再收边。
+  const erodePx = despillMix > 0 ? 0 : (opts.erodePx ?? ALPHA_ERODE_PX);
   // 尺寸归一化：按 alpha 覆盖面积统一视觉大小、底边对齐（空内容跳过）
   const stats = await computeAlphaStats(videoAbs, keys, ffmpegPath);
   const size = await probeSize(videoAbs, ffmpegPath);
   const normVf = stats ? normalizeFilter(stats, size.width, size.height) : undefined;
   const webmAbs = path.join(job.outDir, 'actions', `${action}.webm`);
   const gifAbs = path.join(job.outDir, 'actions', `${action}.gif`);
-  await toWebm(videoAbs, webmAbs, keys, ffmpegPath, normVf);
-  await toGif(videoAbs, gifAbs, keys, ffmpegPath, normVf);
+  await toWebm(videoAbs, webmAbs, keys, ffmpegPath, normVf, erodePx, despillMix);
+  await toGif(videoAbs, gifAbs, keys, ffmpegPath, normVf, despillMix);
 }
 
 /** 单动作完整链：frame → qc → video 提交 → 轮询 → 下载 → keying → 资产落盘 */

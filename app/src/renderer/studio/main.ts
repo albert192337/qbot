@@ -1,5 +1,6 @@
-/** 生成配置页面：人设编辑 + 动作 prompt 查看 + 自定义动作 + 生成 Prompt 展示 */
+/** 生成配置页面：人设编辑 + 动作 prompt 查看 + 自定义动作 + 表情包导入 + 生成 Prompt 展示 */
 import type { ActionId, AgentActionConfig, Manifest, ManifestAction, PlayableId, PromptData } from '@qbot/pipeline';
+import type { AnalyzedSticker } from '../../shared/ipc-types';
 
 interface ActionInfo {
   id: string;
@@ -38,6 +39,9 @@ async function main(): Promise<void> {
   }
 
   render(m, meta.dirId, prompts);
+
+  // 渲染"表情包导入" tab
+  renderStickerTab(m, meta.dirId);
 
   // 渲染"生成 Prompt" tab
   if (prompts) {
@@ -463,6 +467,265 @@ function bindPromptEvents(dirId: string): void {
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ════════════════════════════════════════════════════════════
+// 表情包导入（sticker-import spec §2 复核界面）
+// ════════════════════════════════════════════════════════════
+
+/**
+ * 可落槽的动作槽位。血泪坑 12：renderer 不能 value import pipeline
+ * （会把整个 index 拖进浏览器包），所以这里本地重声明。
+ * 与 pipeline/src/sticker-import.ts 的 CATEGORY_TO_SLOT 值域保持一致。
+ */
+const STICKER_SLOTS: Array<{ id: string; label: string }> = [
+  { id: 'idle', label: '待机' },
+  { id: 'sleep', label: '睡觉' },
+  { id: 'tea', label: '喝茶' },
+  { id: 'talk_happy', label: '聊天·开心' },
+  { id: 'talk_annoyed', label: '聊天·嫌弃' },
+];
+
+/** 与 pipeline 的 CONFIDENCE_HIGH / CONFIDENCE_LOW 保持一致 */
+const CONF_HIGH = 0.6;
+const CONF_LOW = 0.35;
+
+function confTier(c: number): 'high' | 'medium' | 'low' {
+  return c >= CONF_HIGH ? 'high' : c >= CONF_LOW ? 'medium' : 'low';
+}
+
+/** 复核中的贴纸（analyze 结果 + 用户改过的槽位） */
+interface ReviewItem extends AnalyzedSticker {
+  /** 用户当前选择的槽位（'' = 进备选库） */
+  chosenSlot: string;
+}
+
+let reviewItems: ReviewItem[] = [];
+
+function renderStickerTab(m: Manifest, dirId: string): void {
+  const el = document.getElementById('tab-stickers')!;
+  const imported = Object.entries(m.importedActions ?? {});
+  const spares = m.spareStickers ?? [];
+
+  let html = '<h3>表情包导入</h3>';
+  html += `<p class="hint">导入一套 GIF 表情包，模型会自动分析每张贴纸的语义并映射到桌宠动作。`
+    + `一次最多 50 张，v1 只支持 .gif。</p>`;
+
+  // ── 当前已导入状态 ──
+  if (imported.length > 0) {
+    html += `<div class="warn-box" style="background:#e8f5e9;border-color:#a5d6a7;color:#2e7d32">`;
+    html += `当前有 <b>${imported.length}</b> 个动作来自导入的表情包`;
+    if (spares.length > 0) html += `，备选库 <b>${spares.length}</b> 张`;
+    html += `。这些贴纸<b>覆盖</b>了同名的生成动作，清空后自动恢复。`;
+    html += `</div>`;
+    html += `<div class="sticker-grid">`;
+    for (const [slot, a] of imported) {
+      const label = STICKER_SLOTS.find(s => s.id === slot)?.label ?? slot;
+      html += `<div class="sticker-card">`;
+      html += `<video src="qbot-asset://${dirId}/${a.webm}?v=${ASSET_NONCE}" muted autoplay loop playsinline style="width:100%;height:110px;object-fit:contain"></video>`;
+      html += `<div class="name">${esc(label)} (${esc(slot)})</div>`;
+      html += `<div class="reason">来源：${esc(a.sourceName)}`;
+      if (a.manualOverride) html += ` <span class="badge-custom">人工指定</span>`;
+      html += `</div>`;
+      html += `</div>`;
+    }
+    html += `</div>`;
+    html += `<div class="btn-row"><button id="clear-stickers" class="danger">清空导入，恢复生成动作</button></div>`;
+  }
+
+  // ── 导入入口 ──
+  html += `<div class="sticker-bar">`;
+  html += `<button id="pick-sticker-dir" class="primary">选择表情包文件夹…</button>`;
+  html += `<span id="sticker-status">或把 GIF 文件拖到这个页面</span>`;
+  html += `</div>`;
+
+  // ── 复核区（analyze 后填充）──
+  html += `<div id="sticker-review"></div>`;
+
+  el.innerHTML = html;
+  bindStickerEvents(dirId, m);
+}
+
+/** 渲染复核网格（analyze 返回后调用） */
+function renderReview(): void {
+  const box = document.getElementById('sticker-review')!;
+  if (reviewItems.length === 0) {
+    box.innerHTML = '';
+    return;
+  }
+
+  const lowCount = reviewItems.filter(i => confTier(i.confidence) === 'low').length;
+  let html = `<h3>复核映射（${reviewItems.length} 张）</h3>`;
+  html += `<p class="hint">`
+    + `<span class="conf-badge conf-high">绿</span> 高置信可直接采纳　`
+    + `<span class="conf-badge conf-medium">黄</span> 建议确认　`
+    + `<span class="conf-badge conf-low">红</span> 请人工指定。`
+    + `同一槽位只能有一张贴纸，多选会互相顶掉；选「不使用」则进备选库。</p>`;
+  if (lowCount > 0) {
+    html += `<div class="warn-box">有 <b>${lowCount}</b> 张贴纸模型判断不准，已默认「不使用」，请手动指定槽位。</div>`;
+  }
+
+  html += `<div class="sticker-grid">`;
+  reviewItems.forEach((it, i) => {
+    const tier = confTier(it.confidence);
+    html += `<div class="sticker-card tier-${tier}" data-idx="${i}">`;
+    if (it.previewDataUrl) {
+      html += `<img src="${it.previewDataUrl}" alt="${esc(it.sourceName)}" />`;
+    }
+    html += `<div class="name" title="${esc(it.sourceName)}">${esc(it.sourceName)}</div>`;
+    html += `<div><span class="conf-badge conf-${tier}">${Math.round(it.confidence * 100)}%</span> `;
+    html += `<span style="color:#888">${esc(it.category)}</span></div>`;
+    html += `<div class="reason">${esc(it.reason)}</div>`;
+    html += `<select class="slot-select" data-idx="${i}">`;
+    html += `<option value=""${it.chosenSlot === '' ? ' selected' : ''}>— 不使用（备选库）—</option>`;
+    for (const s of STICKER_SLOTS) {
+      const sel = it.chosenSlot === s.id ? ' selected' : '';
+      html += `<option value="${esc(s.id)}"${sel}>${esc(s.label)}</option>`;
+    }
+    html += `</select>`;
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  const used = reviewItems.filter(i => i.chosenSlot !== '').length;
+  html += `<div class="sticker-bar">`;
+  html += `<span id="sticker-summary">将替换 <b>${used}</b> 个动作，`
+    + `<b>${reviewItems.length - used}</b> 张进备选库</span>`;
+  html += `<span class="spacer"></span>`;
+  html += `<button id="cancel-review">取消</button>`;
+  html += `<button id="apply-stickers" class="primary"${used === 0 ? ' disabled' : ''}>确认导入</button>`;
+  html += `</div>`;
+
+  box.innerHTML = html;
+  bindReviewEvents();
+}
+
+function bindReviewEvents(): void {
+  // 槽位下拉：同槽位互斥（选了别人已占的槽，把对方顶成备选库）
+  document.querySelectorAll<HTMLSelectElement>('.slot-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const idx = Number(sel.dataset.idx);
+      const val = sel.value;
+      if (val !== '') {
+        reviewItems.forEach((other, i) => {
+          if (i !== idx && other.chosenSlot === val) other.chosenSlot = '';
+        });
+      }
+      reviewItems[idx].chosenSlot = val;
+      renderReview(); // 整体重渲染：被顶掉的那张下拉也要跟着变
+    });
+  });
+
+  document.getElementById('cancel-review')?.addEventListener('click', () => {
+    // 复核阶段没落任何盘，取消 = 直接丢弃（spec §2.2）
+    reviewItems = [];
+    renderReview();
+    setStickerStatus('已取消，未做任何改动');
+  });
+}
+
+function setStickerStatus(text: string): void {
+  const el = document.getElementById('sticker-status');
+  if (el) el.textContent = text;
+}
+
+function bindStickerEvents(dirId: string, m: Manifest): void {
+  const pickBtn = document.getElementById('pick-sticker-dir') as HTMLButtonElement | null;
+
+  /** analyze → 填复核区。打标要调 API（很便宜），期间禁用按钮防重入 */
+  async function analyze(input: { dir?: string; files?: string[] }): Promise<void> {
+    if (pickBtn) pickBtn.disabled = true;
+    setStickerStatus('正在分析贴纸…（模型打标，通常几秒）');
+    try {
+      const analyzed = await window.qbot.studio.analyzeStickers(input);
+      // 低置信度默认不落槽：强制用户看一眼再决定（spec §2.2）
+      reviewItems = analyzed.map(a => ({
+        ...a,
+        chosenSlot: confTier(a.confidence) === 'low' ? '' : (a.slot ?? ''),
+      }));
+      // 同槽位竞争：主进程已按置信度排好序，这里只需保证界面上不重复占位
+      const taken = new Set<string>();
+      for (const it of reviewItems) {
+        if (it.chosenSlot === '') continue;
+        if (taken.has(it.chosenSlot)) it.chosenSlot = '';
+        else taken.add(it.chosenSlot);
+      }
+      renderReview();
+      setStickerStatus(`分析完成，共 ${analyzed.length} 张`);
+    } catch (err) {
+      setStickerStatus('');
+      alert(`分析失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      if (pickBtn) pickBtn.disabled = false;
+    }
+  }
+
+  pickBtn?.addEventListener('click', async () => {
+    const dir = await window.qbot.studio.pickStickerDir();
+    if (dir) await analyze({ dir });
+  });
+
+  // 拖入 GIF：Electron ≥32 没有 File.path，必须走 preload 的 webUtils（血泪坑 6）
+  const tab = document.getElementById('tab-stickers')!;
+  tab.addEventListener('dragover', ev => {
+    ev.preventDefault();
+  });
+  tab.addEventListener('drop', async ev => {
+    ev.preventDefault();
+    const files = Array.from(ev.dataTransfer?.files ?? [])
+      .map(f => window.qbot.hatch.getPathForFile(f))
+      .filter(p => p.toLowerCase().endsWith('.gif'));
+    if (files.length === 0) {
+      setStickerStatus('没有识别到 GIF 文件');
+      return;
+    }
+    await analyze({ files });
+  });
+
+  // 确认导入：转码落盘 + 热重载
+  document.getElementById('sticker-review')?.addEventListener('click', async ev => {
+    const btn = (ev.target as HTMLElement).closest('#apply-stickers') as HTMLButtonElement | null;
+    if (!btn) return;
+    btn.disabled = true;
+    setStickerStatus('正在转码落盘…');
+    try {
+      const result = await window.qbot.studio.applyStickers(
+        dirId,
+        reviewItems.map(it => ({
+          absPath: it.absPath,
+          sourceName: it.sourceName,
+          slot: it.chosenSlot === '' ? null : it.chosenSlot,
+          category: it.category,
+          suggestedSlot: it.slot,
+          confidence: it.confidence,
+        })),
+      );
+      reviewItems = [];
+      let msg = `已导入 ${result.slots.length} 个动作`;
+      if (result.spareCount > 0) msg += `，${result.spareCount} 张进备选库`;
+      if (result.failed.length > 0) {
+        msg += `\n\n${result.failed.length} 张失败：\n`
+          + result.failed.map(f => `· ${f.sourceName}: ${f.error}`).join('\n');
+      }
+      alert(msg);
+      // manifest 变了，整页重取重渲染（桌宠侧已由主进程热重载）
+      const meta = await window.qbot.characters.getActive();
+      if (meta?.manifest) renderStickerTab(meta.manifest, dirId);
+    } catch (err) {
+      alert(`导入失败：${err instanceof Error ? err.message : String(err)}`);
+      btn.disabled = false;
+    }
+  });
+
+  // 清空导入
+  document.getElementById('clear-stickers')?.addEventListener('click', async () => {
+    if (!confirm('清空所有导入的表情包动作，恢复原本生成的动作？\n（贴纸文件保留，可以再导一次）')) return;
+    await window.qbot.studio.clearImportedStickers(dirId);
+    const meta = await window.qbot.characters.getActive();
+    if (meta?.manifest) renderStickerTab(meta.manifest, dirId);
+  });
+
+  void m; // 当前 manifest 由调用方传入渲染，事件里用不到
 }
 
 main();

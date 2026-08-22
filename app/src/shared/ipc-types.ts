@@ -137,6 +137,44 @@ export interface CustomActionEvent {
   error?: string;
 }
 
+/** 表情包导入：单张贴纸的打标结果（复核界面渲染用） */
+export interface AnalyzedSticker {
+  sourceName: string;
+  /** 贴纸绝对路径；apply 时原样回传 */
+  absPath: string;
+  /** 复核界面预览（内联 GIF data URL，会动） */
+  previewDataUrl: string;
+  /** 模型给的语义类别 */
+  category: string;
+  confidence: number;
+  /** 模型的一句话理由 */
+  reason: string;
+  /** 建议落到的动作槽位；undefined = 建议进备选库 */
+  slot?: string;
+}
+
+/** 表情包导入：用户复核后提交的最终分配 */
+export interface StickerAssignment {
+  absPath: string;
+  sourceName: string;
+  /** 用户确认的槽位；null = 进备选库 */
+  slot: string | null;
+  category?: string;
+  /** 模型原建议（追溯 manualOverride 用） */
+  suggestedSlot?: string;
+  confidence?: number;
+}
+
+/** 表情包导入结果 */
+export interface StickerImportResult {
+  /** 成功落槽的动作 id */
+  slots: string[];
+  /** 进备选库的数量 */
+  spareCount: number;
+  /** 转码失败的贴纸 */
+  failed: Array<{ sourceName: string; error: string }>;
+}
+
 /** 音乐播放状态（来自 Windows SMTC API） */
 export interface MusicStatus {
   playing: boolean;
@@ -555,6 +593,19 @@ export interface QBotApi {
     regenerateActions(dirId: string, actionIds: string[]): Promise<void>;
     /** 重新生成三视图并连带重生全部动作（**花钱**，约 6 条视频）；挑图走孵化窗 */
     regenerateTurnaround(dirId: string): Promise<void>;
+
+    // ── 表情包导入（sticker-import spec）────────────────
+    /** 弹目录选择框，返回选中路径（取消返回 null） */
+    pickStickerDir(): Promise<string | null>;
+    /**
+     * 扫描 + 模型打标，**不落盘**（取消复核 = 什么都没发生）。
+     * 调打标 API（很便宜：一批 50 张不到 1 分钱）。
+     */
+    analyzeStickers(input: { dir?: string; files?: string[] }): Promise<AnalyzedSticker[]>;
+    /** 用户复核确认后：转码落盘 + 写 manifest + 桌宠热重载 */
+    applyStickers(dirId: string, assignments: StickerAssignment[]): Promise<StickerImportResult>;
+    /** 一步回退：清空导入动作，恢复生成动作（imported/ 文件保留） */
+    clearImportedStickers(dirId: string): Promise<void>;
   };
 
   /**

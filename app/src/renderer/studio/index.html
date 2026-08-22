@@ -95,15 +95,55 @@
         font-size: 11px; line-height: 1.5; min-height: 60px;
       }
       button:disabled { opacity: 0.5; cursor: default; }
+
+      /* ── 表情包导入 ───────────────────────────────── */
+      .sticker-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px; margin: 10px 0;
+      }
+      .sticker-card {
+        border: 1px solid #ddd; border-radius: 6px; padding: 8px;
+        background: #fff; font-size: 11px;
+      }
+      /* 三色置信度：绿=自动采纳 黄=建议确认 红=必须人工指定 */
+      .sticker-card.tier-high { border-left: 4px solid #4caf50; }
+      .sticker-card.tier-medium { border-left: 4px solid #ffb300; }
+      .sticker-card.tier-low { border-left: 4px solid #e53935; }
+      .sticker-card img {
+        width: 100%; height: 110px; object-fit: contain;
+        background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 50%/12px 12px;
+        border-radius: 4px;
+      }
+      .sticker-card .name {
+        font-weight: 600; color: #444; margin: 4px 0 2px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .sticker-card .reason { color: #999; font-size: 10px; line-height: 1.4; min-height: 26px; }
+      .sticker-card select { width: 100%; font-size: 11px; margin-top: 4px; }
+      .conf-badge {
+        display: inline-block; padding: 0 5px; border-radius: 3px;
+        font-size: 10px; font-weight: 600;
+      }
+      .conf-high { background: #d4edda; color: #155724; }
+      .conf-medium { background: #fff3cd; color: #856404; }
+      .conf-low { background: #f8d7da; color: #721c24; }
+      .sticker-bar {
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        margin: 10px 0; padding: 8px; background: #f0f4f8; border-radius: 6px;
+      }
+      .sticker-bar .spacer { flex: 1; }
+      #sticker-status { font-size: 11px; color: #666; }
     </style>
   </head>
   <body>
     <h2>🎨 角色工作室</h2>
     <div class="tabs">
       <button class="tab-btn active" data-tab="actions">动作配置</button>
+      <button class="tab-btn" data-tab="stickers">表情包导入</button>
       <button class="tab-btn" data-tab="prompts">生成 Prompt</button>
     </div>
     <div id="tab-actions" class="tab-content active"></div>
+    <div id="tab-stickers" class="tab-content"></div>
     <div id="tab-prompts" class="tab-content"></div>
     <script type="module" src="./main.ts"></script>
   </body>

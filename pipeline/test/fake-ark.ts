@@ -5,7 +5,12 @@
  * - downloadVideo 复制本地 fixture
  */
 import { copyFile, readFile } from 'node:fs/promises';
-import type { ArkClient, GenerateImageOpts, VideoTaskStatus } from '../src/ark.js';
+import type {
+  ArkClient,
+  GenerateImageOpts,
+  VideoTaskStatus,
+  VisionChatOpts,
+} from '../src/ark.js';
 
 export interface FakeArkOptions {
   /** 绿幕首帧 fixture PNG 路径（四角必须纯绿，过 QC 用） */
@@ -16,18 +21,23 @@ export interface FakeArkOptions {
   greenVideoMp4: string;
   /** 让指定次数的 getVideoTask 返回 running（测轮询） */
   pollsBeforeSuccess?: number;
+  /** visionChat 的回复（表情包打标测试注入）；函数形式可按请求内容分支 */
+  visionReply?: string | ((opts: VisionChatOpts) => string);
 }
 
 export function createFakeArkClient(opts: FakeArkOptions): ArkClient & {
-  calls: { images: number; tasks: number; polls: number };
+  calls: { images: number; tasks: number; polls: number; visions: number };
+  visionRequests: VisionChatOpts[];
 } {
-  const calls = { images: 0, tasks: 0, polls: 0 };
+  const calls = { images: 0, tasks: 0, polls: 0, visions: 0 };
+  const visionRequests: VisionChatOpts[] = [];
   let taskCounter = 0;
   const pollsNeeded = opts.pollsBeforeSuccess ?? 0;
   const pollCount = new Map<string, number>();
 
   return {
     calls,
+    visionRequests,
     async generateImage(o: GenerateImageOpts) {
       calls.images++;
       // 三视图尺寸 → 三视图 fixture；首帧尺寸 → 绿幕 fixture
@@ -49,6 +59,16 @@ export function createFakeArkClient(opts: FakeArkOptions): ArkClient & {
     },
     async downloadVideo(_url: string, destPath: string) {
       await copyFile(opts.greenVideoMp4, destPath);
+    },
+    async visionChat(o: VisionChatOpts) {
+      calls.visions++;
+      visionRequests.push(o);
+      if (opts.visionReply === undefined) {
+        throw new Error('FakeArkClient: visionReply not configured');
+      }
+      return typeof opts.visionReply === 'function'
+        ? opts.visionReply(o)
+        : opts.visionReply;
     },
   };
 }
