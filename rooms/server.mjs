@@ -14,11 +14,15 @@ import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT || 24252);
 /**
- * 监听地址。生产走 nginx 反代（wss），所以只听回环——
- * 「24252 不对公网开放」由此成为结构事实，而不是只靠防火墙规则不出错。
- * 本机开发/smoke 不受影响（也是连 127.0.0.1）。
+ * 监听地址。
+ *
+ * 主路是 nginx 反代的 wss（`wss://albertbeta.cn/rooms`），本来只听回环最干净；
+ * 但域名/证书是单点——挂了房间功能就整体不可用。所以同时听公网，
+ * 给客户端留一条明文兜底路（客户端主路失败才回退，且回退时会明示未加密）。
+ *
+ * 想收回公网暴露：`HOST=127.0.0.1` 即可（同时记得摘掉客户端的回退地址）。
  */
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0';
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'rooms.json');
 

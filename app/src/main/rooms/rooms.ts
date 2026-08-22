@@ -30,13 +30,21 @@ import {
 } from './rooms-rules';
 
 /**
- * 房间服务地址：**wss**（2026-08-22 上线，借道 albertbeta.cn 的 nginx 反代到本机 24252）。
+ * 房间服务地址，**按顺序尝试**：域名 wss 为主，IP 明文为兜底。
  *
- * 必须是 wss 而非 ws：公共房间传的是用户手打的聊天正文，暴露面比 1v1 的状态枚举
- * 大一个量级（spec §8.5）。24252 端口本身不对公网开放，只走反代。
- * 若哪天退回 ws://，`isSecureTransport()` 会自动让入房弹窗补上「传输未加密」的提示。
+ * 为什么要兜底：域名 + 证书是单点，一挂房间功能就整体不可用（证书有到期日，
+ * DNS 也可能出问题）。所以主路连不上时自动降级到 IP 直连。
+ *
+ * 代价说清楚：兜底路是**明文**，聊天正文会裸奔过公网。所以
+ * `isSecureTransport()` 在降级后返回 false，入房弹窗会自动补上「当前未加密」
+ * ——用户看到的提示永远跟实际链路一致，不会出现「以为加密其实没有」。
+ *
+ * `QBOT_ROOMS_URL` 指定时只用它、不做回退（开发调试要的是确定性）。
  */
-const DEFAULT_ROOMS_URL = 'wss://albertbeta.cn/rooms';
+const ROOMS_URL_CHAIN = [
+  'wss://albertbeta.cn/rooms',
+  'ws://14.103.59.73:24252',
+] as const;
 const CONNECT_TIMEOUT_MS = 8_000;
 const REQUEST_TIMEOUT_MS = 8_000;
 /** 在场心跳：on-change 之外的兜底重发（同 link 的 15s 心跳思路，房间人多所以放宽到 30s） */
@@ -75,6 +83,8 @@ let localActivity: AgentActivity = 'idle';
 let lastPresence: string | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let closedByUs = false;
+/** 实际连上的地址（决定 isSecureTransport 的答案；未连接时为 null） */
+let activeUrl: string | null = null;
 
 /** 在飞的请求（一次一个类型；create/join/list 各自等自己的应答帧） */
 const pending = new Map<
@@ -97,9 +107,12 @@ export function getRoomsStatus(): RoomsStatus {
 /**
  * 当前链路是否加密（wss）。渲染端据此决定入房明示要不要加「传输未加密」那句——
  * 与其含糊带过，不如把实情写在用户点「知道了」之前（spec §8.5）。
+ *
+ * 判断依据是**实际连上的地址**而不是候选表首项：降级到 IP 明文时必须如实说不加密。
+ * 还没连上时保守报 false——宁可多提示一次，也不能让用户以为加密了其实没有。
  */
 export function isSecureTransport(): boolean {
-  return url().startsWith('wss://');
+  return activeUrl !== null && activeUrl.startsWith('wss://');
 }
 
 function setStatus(next: RoomsStatus): void {
@@ -114,8 +127,15 @@ function push(channel: string, payload: unknown): void {
 
 // ── 连接 ───────────────────────────────────────────────────
 
+/** 候选地址表：显式指定则只用它，否则走主路→兜底链 */
+function candidates(): readonly string[] {
+  const override = process.env.QBOT_ROOMS_URL;
+  return override ? [override] : ROOMS_URL_CHAIN;
+}
+
+/** 当前生效地址（连上过才有意义；没连上时取第一个候选用于展示） */
 function url(): string {
-  return process.env.QBOT_ROOMS_URL || DEFAULT_ROOMS_URL;
+  return activeUrl ?? candidates()[0];
 }
 
 async function connect(): Promise<WsLike> {
@@ -123,33 +143,59 @@ async function connect(): Promise<WsLike> {
   if (!WebSocketCtor) throw new Error('WebSocket unavailable (need Electron with Node >= 22)');
   closedByUs = false;
   setStatus({ phase: 'connecting' });
-  const socket = await new Promise<WsLike>((resolve, reject) => {
-    const s = new WebSocketCtor!(url());
+
+  // 依次试候选地址：主路（域名 wss）连不上就降级到兜底（IP 明文）
+  const errors: string[] = [];
+  for (const candidate of candidates()) {
+    try {
+      const socket = await open(candidate);
+      ws = socket;
+      activeUrl = candidate;
+      await hello();
+      return socket;
+    } catch (err) {
+      errors.push(`${candidate}: ${err instanceof Error ? err.message : String(err)}`);
+      // 半开的连接要收掉，否则它稍后 onclose 会污染下一次尝试的状态
+      if (ws) { const stale = ws; ws = null; activeUrl = null; try { stale.close(); } catch { /* 已经死了 */ } }
+    }
+  }
+  activeUrl = null;
+  setStatus({ phase: 'off', error: '房间服务连不上' });
+  // 详细原因只进日志（含地址），给用户的是一句人话
+  console.error('[rooms] all candidates failed:', errors.join(' | '));
+  throw new Error('房间服务连不上');
+}
+
+/** 连单个地址（不做 hello，不改全局状态——失败时调用方好干净地换下一个） */
+function open(target: string): Promise<WsLike> {
+  return new Promise<WsLike>((resolve, reject) => {
+    const s = new WebSocketCtor!(target);
+    let settled = false;
+    const done = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
     const timer = setTimeout(() => {
-      s.close();
-      reject(new Error('房间服务连不上'));
+      done(() => {
+        try { s.close(); } catch { /* noop */ }
+        reject(new Error('连接超时'));
+      });
     }, CONNECT_TIMEOUT_MS);
-    s.addEventListener('open', () => {
-      clearTimeout(timer);
-      resolve(s);
-    });
-    s.addEventListener('error', () => {
-      clearTimeout(timer);
-      reject(new Error('房间服务连不上'));
-    });
+    s.addEventListener('open', () => done(() => resolve(s)));
+    s.addEventListener('error', () => done(() => reject(new Error('连接失败'))));
     s.addEventListener('message', (ev) => handleMessage(ev.data));
     s.addEventListener('close', () => {
-      clearTimeout(timer);
-      if (ws === s) handleClosed();
+      // 连上之后才断：走正常的掉线处理（连接期的失败已被上面 reject 掉）
+      if (settled && ws === s) handleClosed();
     });
   });
-  ws = socket;
-  await hello();
-  return socket;
 }
 
 function handleClosed(): void {
   ws = null;
+  activeUrl = null;
   currentRoomId = null;
   roomCache = null;
   stopHeartbeat();

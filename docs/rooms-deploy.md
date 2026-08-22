@@ -5,11 +5,20 @@
 
 ## 已上线（2026-08-22）
 
-**生产地址：`wss://albertbeta.cn/rooms`**（客户端 `DEFAULT_ROOMS_URL` 默认值）
+**生产地址（按顺序尝试）**：
+1. `wss://albertbeta.cn/rooms` —— 主路，加密
+2. `ws://14.103.59.73:24252` —— 兜底，**明文**
+
+域名 + 证书是单点（证书有到期日、DNS 也可能出问题），一挂房间功能就整体不可用，
+所以留了明文兜底路。客户端主路连不上才降级，且降级后 `isSecureTransport()`
+返回 false，入房弹窗自动补上「当前未加密」——提示永远跟实际链路一致。
+
+> ⏳ **兜底路待放行**：ufw 已放行 24252，但**火山引擎控制台的安全组入方向还没放**，
+> 所以目前 IP 直连仍不可达（实测超时）。放行后兜底立即生效，无需改代码。
+> 只想用主路的话：服务端设 `HOST=127.0.0.1` 并从客户端候选表里摘掉 IP 那条。
 
 - 服务：`qbot-rooms.service`，`/opt/qbot-rooms/`，数据 `/var/lib/qbot-rooms/rooms.json`
-- **只监听 `127.0.0.1:24252`**：公网访问一律走 nginx 反代，端口不对外开放这件事
-  是结构事实（bind 地址），不只是防火墙约定。ufw 也未放行 24252
+- 监听 `0.0.0.0:24252`：主路走 nginx 反代（wss），同时为兜底路开放公网直连
 - wss 借道既有 `albertbeta.cn`（DigiCert 证书，有效期至 2026-10-14），
   在 `/etc/nginx/sites-available/albertbeta.cn` 里加了一段 `location /rooms`
 - 改 nginx 前已备份到 `/root/albertbeta.cn.bak.<时间戳>`；改后既有站点
@@ -51,8 +60,13 @@ systemctl enable --now qbot-rooms
 journalctl -u qbot-rooms -n 10 --no-pager       # 应看到 listening on 127.0.0.1:24252
 ```
 
-**不需要放行 24252**：服务只监听回环，公网一律走 443 反代（见第二节）。
-这与 relay/market 不同——那两个是直接暴露端口的老做法。
+放行 24252（兜底路要用）：
+
+```bash
+ufw allow 24252/tcp
+# ⚠ 还要在火山引擎控制台 → 安全组 → 入方向 → 放行 TCP 24252
+#   （relay 当初就栽在这一步：ufw 放了但安全组没放，表现为连接超时）
+```
 
 验证：
 
