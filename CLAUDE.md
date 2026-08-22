@@ -7,13 +7,13 @@
 | 路径 | 职责 |
 |---|---|
 | `pipeline/` | 生成管线，**纯 Node 零 Electron 依赖**，可独立 CLI 使用（`npx tsx pipeline/src/cli.ts`） |
-| `app/` | Electron 客户端（electron-vite；main / preload / 五 renderer：pet + hatch + room 小房间 + bubble 气泡 + studio 配置面板） |
+| `app/` | Electron 客户端（electron-vite；main / preload / 四 renderer：pet + room 小房间 + bubble 气泡 + console 控制台） |
 | `app/src/main/pipeline-bridge.ts` | **唯一** import `@qbot/pipeline` 的地方 |
 | `app/src/main/agent-server.ts` | agent 联动：127.0.0.1 HTTP 收 hook 事件 → 会话合成 → 广播 pet 窗 |
 | `app/src/main/agent-message.ts` | agent 消息纯逻辑：markdown 展平、截断、来源标签、transcript 解析（可单测） |
 | `app/src/main/hooks/claude.ts` | Claude Code hooks 安装器（托盘显式同意，写 ~/.claude/settings.json） |
 | `app/src/main/music-monitor.ts` | 网易云音乐监控（Windows SMTC，常驻 PowerShell 进程） |
-| `app/src/renderer/studio/` | Studio 配置面板：人设编辑、自定义动作、Claude Code 联动配置 |
+| `app/src/renderer/console/` | **统一控制台**：左侧栏二级目录（角色/配置/社区/连接/系统），`panes/*.ts` 一 pane 一文件，懒挂载 |
 | `assets/mascot/` | 官方预置角色源（同步于 `app/resources/presets/mascot/`） |
 | `docs/superpowers/specs/` | 已批准的设计 spec（权威）；`DESIGN.md` 是最初的产品/技术调研 |
 | `config.local.json` | **gitignored**，存 API keys（arkApiKey / gptImageApiKey） |
@@ -35,24 +35,32 @@
 - **正文首选 Stop payload 的 `last_assistant_message`**（新版 Claude Code 直接给字符串，免读文件、无落盘竞态、无路径信任问题）；`transcript_path` 尾块读取只作老版本/别家 agent 的兜底
 - 正文 140 字截断（markdown 展平成单行）、停留 10s 淡出、最多同时 3 枚、同会话就地替换不叠加
 - 来源标签 = `cwd` 的目录名（`cwd` 在 Stop 和 Notification 里都有；`gitBranch` 只有 transcript 里有故不用）；**同名来源并存时补 `#<session前4位>`**（worktree 场景必需）
-- 气泡窗是第 4 个 renderer：固定 340×500 透明置顶穿透窗，`focusable:false`，创建后**只 setPosition 永不改尺寸**；跟随桌宠靠 `petWindow.on('move'|'resize')`
+- 气泡窗是独立 renderer：固定 340×500 透明置顶穿透窗，`focusable:false`，创建后**只 setPosition 永不改尺寸**；跟随桌宠靠 `petWindow.on('move'|'resize')`
 
-## Studio 配置面板（工作室）
+## 统一控制台（原 Studio / 市场 / 孵化 / 设置 / 调试面板五合一）
 
-- **桌宠右键菜单「角色工作室」**打开独立配置窗口（第 5 个 renderer：`studio`）
-- **人设编辑**：角色 persona 可视化编辑，后续所有动作生成会注入人设到 prompt
-- **Claude Code 联动配置**：为每个 agent 活动（thinking/working/waiting/error/done）+ 听歌（music）指定播放的动作，支持自定义动作
-- **动作 Prompt 查看/编辑**：查看每个动作的 poseDesc/motionDesc，可修改后影响后续 redo
-- **自定义动作**：输入动作名（支持中文）+ poseDesc/motionDesc/时长 → 提交后后台生成（数分钟），完成后自动出现在联动下拉选项和桌宠右键菜单
-- **生成参数回溯**：查看当前角色的三视图 prompt、每个动作的首帧/视频 prompt（从 `.job/state.json` + `manifest.json` 重建）
-- 自定义动作生成进度通过 `studio:customAction` 事件广播，Studio 页自动刷新
-- 数据存储：`manifest.json` 新增 `persona`/`customActions`/`agentActions` 字段
+- **桌宠右键「控制台…」或托盘**打开单窗（880×640，renderer `console`），左侧栏五组十项：
+  - 角色：我的角色（切换/改名/删除）、孵化新角色（drop→brewing→pick→progress→certificate 五屏）
+  - 配置：人设与动作、场景动作（Claude/听歌/开会 三类映射）、生成 Prompt
+  - 社区：装扮市场　连接：Claude Code、联机　系统：设置、开发者工具
+- **pane 懒挂载常驻**：首次激活才 `mount()`，切走只隐藏 → 未保存输入不丢；再次可见调 `onVisible()`
+  （孵化据此主动 `seedFromStatus`，兜底懒挂载错过的 `awaiting_pick` 事件）
+- **深链** `createConsoleWindow(pane)`：已开窗→直接发 `ui:showScreen`；新窗→`did-finish-load` once 后发
+- **样式作用域** `[data-pane="..."]` 前缀 + 控制台自己一套 `.btn`/`.btn.primary`/`.btn.danger` 语义类
+  （三套页面原本各自定义裸 `button`，`button.danger` 一个红底白字一个白底红字，合并必炸）
+- **`alert`/`confirm` 全部替换**为 pane 内非阻塞 toast / confirmBox：原生对话框会冻住整个 renderer，
+  单窗下意味着所有 pane 一起卡死；后台事件触发的那个还会凭空弹出
+- **`location.reload()` 全部替换**为局部 `refresh()`：单窗下 reload 会清空所有 pane 的未保存输入。
+  连带把 `ASSET_NONCE` 从常量改成可变（原先靠 reload 才刷新，否则重生动作后吃缓存显示旧动画）、
+  `onCustomAction` 订阅移出重渲染路径（原挂在 `bindEvents` 里，每次重渲染注册一次、从不退订）
+- **状态推送收口**在 `windows.ts:sendToWindows()`：agent/music/meeting/progress/settings 五路
+  原先只发 pet 窗，控制台要显示实时状态就得都加上，收成一个 helper 避免每处手写
 
 ## 飞书会议联动
 
 - 监控本地飞书客户端会议模块（byteview）的明文日志检测本机入会/离会：`<LarkShell>/sdk_storage/log/native-pc-sdk/byteview-PCSDK-FALCON_<日期>.log`，标记 `onJoinChannelSuccess` / `join-work-flow:leaveRoom`（RTC 引擎入口函数名，跨版本稳定；1v1 通话也算会中）
 - **为什么不走 OpenAPI**：飞书没有「查询/订阅某用户当前是否在会中」的能力（join/leave 事件只对 OpenAPI 预约的会议触发），详见 `docs/feishu-meeting-monitor-design.md`
-- 会中桌宠举牌「正在开会」+ 切 meeting 态动作（默认 `tea`，Studio「飞书开会时」可配）；优先级 `drag > agent > meeting > music > visit > auto/idle`
+- 会中桌宠举牌「正在开会」+ 切 meeting 态动作（默认 `tea`，控制台「场景动作 → 飞书开会时」可配）；优先级 `drag > agent > meeting > music > visit > auto/idle`
 - 失效保护三连（防钉死在会中态）：飞书进程消失（30s pgrep）、会中日志停滞 5min、IO 连续失败 10 次降级禁用；启动读日志尾 256KB 播种（会中重启 QBot 也能识别）
 - 零权限、零网络、零 npm 依赖；日志目录不存在（未装飞书/非 mac|win）静默禁用；Windows 日志路径按同构推断**未实测**
 - 核心文件：`app/src/main/meeting-monitor.ts`（轮询/失效保护）+ `meeting-log-parser.ts`（纯逻辑，可单测）
@@ -60,7 +68,7 @@
 ## 网易云音乐联动（Windows 专属）
 
 - 通过 **SMTC (SystemMediaTransportControls)** API 监控云音乐播放状态
-- 检测到播放时桌宠**举牌显示「曲名 - 歌手」**并切换到摇摆动作（默认 `talk_happy`，可在 Studio 配置）
+- 检测到播放时桌宠**举牌显示「曲名 - 歌手」**并切换到摇摆动作（默认 `talk_happy`，控制台「场景动作」可配）
 - 常驻一个 PowerShell 进程内部每 3 秒轮询，进程意外退出会退避重启
 - 状态机新增 **music 态**，优先级 `drag > agent > meeting > music > visit > auto/idle`（Claude 干活/开会时音乐不打断）
 - 非 Windows 平台静默禁用，零新增 npm 依赖
@@ -87,23 +95,27 @@
 - 用途：听歌时显示曲目、未来可扩展显示自定义消息
 - 核心文件：`app/src/renderer/pet/signboard.ts` (84 行)
 
-## 串门功能
+## 串门功能（呈现机制保留，本机自动触发已下线）
 
-- 两只桌宠互访聊天（已实现基础框架，对话逻辑待完善）
-- 串门频率：10~14 分钟一次（原 15~30s 已调整）
-- 状态机新增 **visit 态**，优先级 `drag > agent > music > visit > auto/idle`
-- 核心文件：`app/src/renderer/pet/visit.ts` (106 行)
+- 两只桌宠并排互访聊天的**呈现层完整保留**：`visit.ts` 编排、状态机 `visit` 态、
+  `VISIT_START/END` 事件、`setPetVisitMode` 的窗口加宽、双角色对视的 flip 计算
+- **本机自动触发已删除**（原每 10~14 分钟随机挑一只本地角色来访）：那是自娱式随机演出，
+  不是联机能力。触发器 `visitTimer`/`scheduleVisit`/`tryTriggerVisit` 全部移除
+- 现在没有任何入口能进 visit 态 —— 这套机制是留给**联机串门**（对端桌宠走过来）复用的，
+  故意不删。`visit.ts` 的 `getExchangeRound()`/`getTurnLabel()` 原只喂调试面板，现为死代码但无害
+- 状态机优先级链未变：`drag > agent > meeting > music > visit > auto/idle`
 
-## 调试面板
+## 开发者工具（原桌宠内嵌调试面板）
 
-- 桌宠右键菜单「调试面板」展开/收起，展开后显示：
-  - 当前状态机状态 + 串门状态
-  - 事件日志（最多 50 条）
-  - 角色管理（切换/删除）
-  - 举牌控制（输入文字 → 举牌/收牌）
-  - 串门触发/结束按钮
-- 纯开发工具，生产环境可隐藏
-- 核心文件：`app/src/renderer/pet/debug-panel.ts` (261 行)
+- 桌宠窗内的调试面板已**删除**（`debug-panel.ts` + 106 行 CSS + `body.has-debug-panel`
+  挤压 `#stage` 到 65% 高度的布局）。`#stage` 恢复常驻 100% 高度
+- 保留的能力搬进控制台：**角色切换/改名/删除**（「我的角色」——删除此前只有面板一个入口，
+  IPC 早就有，UI 没了就够不着）、**四个注水按钮**（「开发者工具」）
+- **丢弃**：事件日志、桌宠实时状态读出（活在 pet renderer 模块作用域里，
+  搬过去要新建 pet↔main↔console 双向 relay，成本最高价值最低）
+- **本机自动串门触发器一并删除**（`visitTimer`/`scheduleVisit`/`tryTriggerVisit`）。
+  但 `visit.ts`、状态机 `visit` 态、`VISIT_START/END`、`setPetVisitMode` 窗口加宽**都保留**——
+  那是可复用的双角色并排呈现机制，联机串门要用（所以 `state-machine.ts` 和测试一行未改）
 
 ## 常用命令
 
@@ -164,9 +176,26 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 20. **`GetAsyncKeyState` 首次轮询必然脏**：它的返回值里带「自上次调用以来是否被按过」位，进程启动后第一次扫 256 个 vk，会把 QBot 启动**之前**用户敲的键一次性算进来（实测能白送几十点）。所以 `input-monitor.ts` 有个 `seeded` 标志：第一轮只用来建立基线、一律返回 0。同理任何「按下沿」计数都必须先播种再计数，不能一上来就 diff
 21. **等距房间的可走区必须比地板小一圈**：`RoomSpec.floor` 是脚底锚点的多边形，但角色有高度（`petHeight` 185px），脚底贴到地板真实边界时上半身早就压进墙里，表现为「走到墙边还在走」（碰墙不停）。靠墙的边要沿法向内收 ≈45px；2:1 等距下「沿边内收 d」换算成顶点位移不是简单加减 d，得把两条相邻边各自偏移后求交点。开口方向（前面两条边）不要收，收了白丢可走面积。改这个数据前先确认：`scaleForY` 取的是 floor 的 y 极值（跟着变、自洽），`depthZ` 取 `spec.height`（不受影响），`sanitizePlacements` 不做多边形包含判定（已存盘的家具摆放不会被判无效）
 
+22. **多页合一个窗时，三样东西必炸**：(a) 裸标签选择器 —— 原 hatch/studio/market 各自定义
+    裸 `button`，`button.danger` 一个红底白字一个白底红字，合并后按加载顺序互相覆盖，
+    所以控制台改用 `.btn` 语义类 + `[data-pane]` 作用域；(b) `location.reload()` ——
+    单窗下它清空**所有** pane 的未保存输入，而 studio 有 7 处，其中两处由后台生成事件触发，
+    会在用户正在别的 pane 打字时炸掉输入；(c) `alert`/`confirm` —— 模态阻塞整个 renderer，
+    单窗下所有 pane 一起冻住，后台事件触发的那个还会凭空弹出。全部换成 pane 内非阻塞 UI。
+    附带两个隐性依赖：`ASSET_NONCE` 这类「靠 reload 才更新」的模块级常量必须改可变，
+    挂在重渲染路径上、从不退订的订阅（靠 reload 销毁上下文兜底）必须显式退订
+23. **懒挂载的 pane 会错过它挂载前的事件**：孵化 pane 首次打开前，管线可能已经发过
+    `awaiting_pick` —— 事件发给空气，候选图不出现，管线永久挂在 `pickResolver` 上等人挑。
+    所以 pane 每次变可见都要主动拉一次快照（`getHatchStatus` 能从 `.job/state.json` 重建，
+    含候选图 URL），不能只依赖事件流。同理 `studio:regenerateTurnaround` 必须显式切到孵化 pane
+    并把窗口提前（这也修掉了原先「孵化窗没开就静默挂死」的既存 bug）
+
 ## 已知未解决
 
-- 出生证明画廊 `<video>` 全空白（文件本身验证正常，桌宠窗口同 URL 能播；重复渲染已修）
+- 出生证明画廊 `<video>` 全空白（文件本身验证正常，桌宠窗口同 URL 能播；重复渲染已修）。
+  搬进控制台孵化 pane 后渲染上下文变了，**未复验**是否仍存在
+- 控制台的孵化 pane 只验到「续跑入口出现 + 五屏骨架正常」，**完整孵化一只新角色未实机跑**
+  （要真实 API，生图分/张 + 视频约 ¥1/条）；`saveCard` 截图在滚动容器里的取景也未验
 - Windows 打包已跑通并实测联动（见 `docs/windows-build-and-release.md`）；**mac 打包仍未验证成功**
 - 包未做代码签名 → Windows 首次运行撞 SmartScreen「未知发布者」
 - `DEFAULTS.concurrency` 定义了但没接限流（S 档就 6 个动作，恰好全开）

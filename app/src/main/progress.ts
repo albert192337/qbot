@@ -34,7 +34,7 @@ import {
   sanitizeProgress,
   settleIdle,
 } from './progress-rules';
-import { getPetWindow, getRoomWindow } from './windows';
+import { sendToWindows } from './windows';
 
 /** 首次运行送几个空箱子：否则新用户开局装饰托盘全锁着，房间看着像坏了 */
 const STARTER_BOXES = 2;
@@ -123,10 +123,8 @@ function scheduleBroadcast(): void {
   broadcastTimer = setTimeout(() => {
     broadcastTimer = null;
     if (!cache) return;
-    // pet 窗有调试面板，room 窗有背包/合成；其余窗口不消费
-    getPetWindow()?.webContents.send('progress:changed', cache);
-    const room = getRoomWindow();
-    if (room && !room.isDestroyed()) room.webContents.send('progress:changed', cache);
+    // pet 窗消费（注水按钮在控制台后主要是监控显示）、room 窗有背包/合成
+    sendToWindows('progress:changed', cache);
   }, BROADCAST_THROTTLE_MS);
 }
 

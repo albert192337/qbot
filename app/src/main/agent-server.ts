@@ -28,7 +28,7 @@ import {
 } from './agent-message';
 import { readLastAssistantEntry } from './transcript';
 import { pushAgentMessage } from './bubble';
-import { getPetWindow } from './windows';
+import { sendToWindows } from './windows';
 import { pushLocalAgentActivity } from './link/link';
 import { addAgentRun } from './progress';
 
@@ -74,7 +74,7 @@ function broadcastIfChanged(): void {
     return;
   }
   lastBroadcast = next;
-  getPetWindow()?.webContents.send('agent:status', next);
+  sendToWindows('agent:status', next);
   pushLocalAgentActivity(next.activity); // 联机钩子：只出状态枚举（spec §四）
 }
 

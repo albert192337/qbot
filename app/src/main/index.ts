@@ -8,13 +8,13 @@ import { charactersDir, getCharacter, listCharacters, seedPresets } from './char
 import { getSettings, setSettings } from './config';
 import { registerIpc } from './ipc';
 import { rebuildTray } from './tray';
-import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds } from './windows';
+import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds, sendToWindows } from './windows';
 import { startAgentServer } from './agent-server';
 import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
 import { startMeetingMonitor, stopMeetingMonitor } from './meeting-monitor';
 import { startInputMonitor, stopInputMonitor } from './input-monitor';
 import { flushProgress, startProgressTicker, stopProgressTicker } from './progress';
-import { setLinkStatusListener, stopLink, createLinkRoom, joinLinkRoom, notifyActiveCharacterChanged } from './link/link';
+import { setLinkStatusListener, getLinkStatus, stopLink, createLinkRoom, joinLinkRoom, notifyActiveCharacterChanged } from './link/link';
 
 /** qbot-asset 响应的 Content-Type（漏了类型 Chromium 会拒绝解码 <video>） */
 const ASSET_MIME: Record<string, string> = {
@@ -119,8 +119,11 @@ app.whenReady().then(async () => {
 
   registerIpc();
   await seedPresets();
-  // 联机状态变化 → 托盘标签刷新（在这接线避免 link ↔ tray 循环 import）
-  setLinkStatusListener(() => void rebuildTray());
+  // 联机状态变化 → 托盘标签刷新 + 控制台联机 pane 实时状态（在这接线避免 link ↔ tray 循环 import）
+  setLinkStatusListener(() => {
+    void rebuildTray();
+    sendToWindows('link:changed', getLinkStatus());
+  });
   // dev 自动联机（QBOT_USER_DATA 双实例验证用；正常入口是托盘菜单）
   if (process.env.QBOT_LINK_CREATE) {
     void createLinkRoom()

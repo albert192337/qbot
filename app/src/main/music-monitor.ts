@@ -16,7 +16,7 @@
  * Windows-only：其他平台静默禁用。
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { getPetWindow } from './windows';
+import { sendToWindows } from './windows';
 import { pushLocalMusic } from './link/link';
 import type { MusicStatus } from '../shared/ipc-types';
 
@@ -110,7 +110,7 @@ function updateStatus(next: MusicStatus): void {
     return;
   }
   currentStatus = next;
-  getPetWindow()?.webContents.send('music:status', next);
+  sendToWindows('music:status', next);
   pushLocalMusic(next); // 联机钩子：曲名是否出本机由 linkShareSong 开关在 link.ts 里把关
 }
 

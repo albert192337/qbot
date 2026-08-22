@@ -1,7 +1,6 @@
 /** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 + 串门 + 调试面板 */
 import type { ActionId, PlayableId } from '@qbot/pipeline';
 import type { AgentActivity, CharacterMeta, MeetingStatus, MusicStatus } from '../../shared/ipc-types';
-import { DebugPanel } from './debug-panel';
 import { Player } from './player';
 import { randomDelay, step, type PetState, type StepContext } from './state-machine';
 import { Signboard } from './signboard';
@@ -39,27 +38,7 @@ const speaker = new Speaker({
   canSpeak: () => state.kind === 'idle',
   playAction: (action) => dispatch({ type: 'PLAY_ACTION', action }),
   hasAction: (action) => available.includes(action),
-  onSpeak: (text, mood) => {
-    debug.onSpeak(text, mood);
-    updateDebugState();
-  },
 });
-
-// ── 调试面板 ──────────────────────────────────────────────
-const debug = new DebugPanel();
-
-function updateDebugState(): void {
-  const v = visitOrchestrator;
-  debug.setState({
-    petState: state.kind,
-    visitActive: v.isActive(),
-    visitorName: visitorCharacter?.manifest?.name,
-    exchangeRound: v.getExchangeRound(),
-    turn: v.getTurnLabel(),
-    lastUtterance: debug.lastUtterance,
-    lastMood: debug.lastMood,
-  });
-}
 
 // ── 朝向计算 ──────────────────────────────────────────
 /** 根据角色的 talk_happy 动作朝向设置 CSS flip 类。
@@ -91,103 +70,23 @@ const visitOrchestrator = new VisitOrchestrator({
     document.body.classList.add('visit-mode');
     applyVisitFacing();
     window.qbot.pet.setVisitMode(true);
-    debug.log(`串门开始 — ${visitor.manifest?.name ?? visitor.dirId} 来访`);
-    updateDebugState();
   },
   onVisitorPlay(action: VisitAction) {
     visitorPlayer.playLooping(action);
-    debug.log(`访客 → ${action}`);
-    updateDebugState();
   },
   onHostPlay(action: VisitAction) {
     player.playLooping(action);
     state = { kind: 'visit', action, loopsLeft: 99 };
     dispatch({ type: 'VISIT_START', action, loops: 99 });
-    debug.log(`宿主 → ${action}`);
-    updateDebugState();
   },
   onVisitEnd() {
-    debug.log(`串门结束 — ${visitorCharacter?.manifest?.name ?? '?'} 离开`);
     endVisit();
     player.play('idle');
     state = { kind: 'idle' };
     dispatch({ type: 'VISIT_END' });
     scheduleTimer();
-    scheduleVisit();
-    updateDebugState();
   },
 });
-
-// 调试面板按钮回调
-debug.onTriggerVisit = () => tryTriggerVisit();
-debug.onEndVisit = () => {
-  if (visitOrchestrator.isActive()) {
-    visitOrchestrator.cancelVisit();
-    endVisit();
-    player.play('idle');
-    state = { kind: 'idle' };
-    scheduleTimer();
-    scheduleVisit();
-    debug.log('手动结束串门');
-    updateDebugState();
-  }
-};
-debug.onDeleteCharacter = async (dirId) => {
-  await window.qbot.characters.delete(dirId);
-  debug.log(`删除角色: ${dirId}`);
-  refreshCharacterList();
-};
-debug.onActivateCharacter = async (dirId) => {
-  await window.qbot.characters.activate(dirId);
-  debug.log(`切换角色: ${dirId}`);
-};
-
-// ── 举牌回调 ──────────────────────────────────────────
-debug.onShowSignboard = (text) => {
-  hostSignboard.setText(text);
-  hostSignboard.show();
-  debug.log(`举牌: "${text}"`);
-};
-debug.onHideSignboard = () => {
-  hostSignboard.hide();
-  debug.log('收牌');
-};
-
-// ── 游戏化积累：调试注水 + 状态订阅 ─────────────────────
-debug.onAddIdleTime = async () => {
-  const p = await window.qbot.progress.debugAddIdleMs(15 * 60 * 1000);
-  debug.setProgress(p);
-  debug.log(`挂机 +15 分钟 → 箱子 ${p.boxes}`);
-};
-debug.onGrantBox = async () => {
-  const p = await window.qbot.progress.debugGrantBoxes(1);
-  debug.setProgress(p);
-  debug.log(`箱子 +1 → ${p.boxes}`);
-};
-debug.onGrantPoints = async () => {
-  const p = await window.qbot.progress.debugGrantPoints(500);
-  debug.setProgress(p);
-  debug.log(`点数 +500 → ${p.points}`);
-};
-debug.onGrantFurniture = async () => {
-  const { stickerId, progress } = await window.qbot.progress.debugGrantFurniture();
-  debug.setProgress(progress);
-  debug.log(`家具 +1: ${stickerId}`);
-};
-window.qbot.progress.onChanged((p) => debug.setProgress(p));
-void window.qbot.progress.get().then((p) => debug.setProgress(p));
-
-async function refreshCharacterList(): Promise<void> {
-  const all = await window.qbot.characters.list();
-  const active = await window.qbot.characters.getActive();
-  debug.updateCharacterList(
-    all.map(c => ({
-      dirId: c.dirId,
-      name: c.manifest?.name ?? c.dirId,
-      isActive: c.dirId === active?.dirId,
-    }))
-  );
-}
 
 function voiceSettings(s: {
   voiceEnabled?: boolean;
@@ -355,67 +254,10 @@ function clearTimer(): void {
   }
 }
 
-// ── 串门定时器 ──────────────────────────────────────────
-let visitTimer: ReturnType<typeof setTimeout> | null = null;
-
-function scheduleVisit(): void {
-  clearVisitTimer();
-  // 串门频率：约 10 分钟一次
-  const minMs = 10 * 60_000;
-  const maxMs = 14 * 60_000;
-  const delay = minMs + Math.floor(rng.random() * (maxMs - minMs));
-  debug.log(`下次串门: ${Math.round(delay / 1000)}s 后`);
-  visitTimer = setTimeout(() => tryTriggerVisit(), delay);
-}
-
-function clearVisitTimer(): void {
-  if (visitTimer) {
-    clearTimeout(visitTimer);
-    visitTimer = null;
-  }
-}
-
-async function tryTriggerVisit(): Promise<void> {
-  visitTimer = null;
-  debug.log('尝试触发串门...');
-  if (visitOrchestrator.isActive()) {
-    debug.log('串门跳过 — 已在活跃中');
-    scheduleVisit();
-    return;
-  }
-  if (state.kind !== 'idle') {
-    debug.log(`串门跳过 — 状态非idle: ${state.kind}`);
-    scheduleVisit();
-    return;
-  }
-  if (!currentCharacter) {
-    debug.log('串门跳过 — 无当前角色');
-    scheduleVisit();
-    return;
-  }
-  const all = await window.qbot.characters.list();
-  const candidates = all.filter(
-    (c) => c.manifest && c.dirId !== currentCharacter!.dirId && c.manifest.actions.talk_happy.status === 'done',
-  );
-  debug.log(`可用角色: ${all.filter(c => c.manifest).length}个, 候选访客: ${candidates.length}个`);
-  if (candidates.length === 0) {
-    debug.log('串门触发失败 — 无可用来访角色');
-    scheduleVisit();
-    return;
-  }
-  const visitor = candidates[Math.floor(rng.random() * candidates.length)];
-  visitOrchestrator.startVisit(visitor);
-}
-
 function dispatch(event: Parameters<typeof step>[1]): void {
   stepCtx.available = available;
   const result = step(state, event, stepCtx);
   state = result.state;
-
-  // ── 调试日志 ──
-  if (event.type === 'TIMER_FIRE') debug.log('定时器触发 → 随机动作');
-  if (event.type === 'POINTER_DOWN') debug.log('拖拽开始');
-  if (event.type === 'POINTER_UP' && state.kind === 'idle') debug.log('拖拽结束');
 
   // ── 串门信号处理 ──
   if (result.visiterEnd) {
@@ -423,8 +265,6 @@ function dispatch(event: Parameters<typeof step>[1]): void {
     endVisit();
     player.play('idle');
     scheduleTimer();
-    scheduleVisit();
-    updateDebugState();
   }
 
   if (result.play) {
@@ -478,13 +318,9 @@ function activateCharacter(meta: CharacterMeta): void {
   player.play('idle');
   scheduleTimer();
   speaker.setCharacter(meta.manifest.id, meta.manifest.voice);
-  debug.log(`角色激活: ${meta.manifest.name} (${meta.dirId})`);
-  updateDebugState();
-  refreshCharacterList();
-  // 切角色时清掉进行中的串门，重新排
+  // 切角色时清掉进行中的串门
   visitOrchestrator.cancelVisit();
   endVisit();
-  scheduleVisit();
   if (agentActivity !== 'idle') dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
   if (meetingStatus.inMeeting && agentActivity === 'idle') dispatch({ type: 'MEETING_STATUS', inMeeting: true });
   if (musicStatus.playing && agentActivity === 'idle' && !meetingStatus.inMeeting) dispatch({ type: 'MUSIC_STATUS', playing: true });
@@ -507,7 +343,6 @@ document.addEventListener('visibilitychange', () => {
   scheduleTimer();
   visitOrchestrator.cancelVisit();
   endVisit();
-  scheduleVisit();
   if (agentActivity !== 'idle') dispatch({ type: 'AGENT_STATUS', activity: agentActivity });
   if (meetingStatus.inMeeting && agentActivity === 'idle') dispatch({ type: 'MEETING_STATUS', inMeeting: true });
   if (musicStatus.playing && agentActivity === 'idle' && !meetingStatus.inMeeting) dispatch({ type: 'MUSIC_STATUS', playing: true });
@@ -576,7 +411,6 @@ stage.addEventListener('pointerup', (e) => {
     dragStarted = false;
     dispatch({ type: 'POINTER_UP' });
     hostSignboard.onDragEnd();
-    scheduleVisit();
     return;
   }
   // 双击 = 立即说一句；单击不做任何事（房间入口在右键菜单）
@@ -614,7 +448,6 @@ window.qbot.pet.onMenuCommand((cmd) => {
   else if (cmd.type === 'play') dispatch({ type: 'PLAY_ACTION', action: cmd.action as PlayableId });
   else if (cmd.type === 'signPrompt') showSignPrompt();
   else if (cmd.type === 'signClear') applyUserSign(null);
-  else if (cmd.type === 'debugToggle') debug.toggle();
 });
 
 // ── 手动举牌输入框（联机举牌：本端显示 + 同步对端替身） ─────
