@@ -3,6 +3,7 @@ import { BrowserWindow, app, screen, shell } from 'electron';
 import path from 'node:path';
 import type { CharacterMeta } from '../shared/ipc-types';
 import { layoutRoomPets } from './rooms/rooms-rules';
+import { clampPetScale, petTargetSize } from './pet-geometry';
 
 const PET_SIZE = 360;
 /** 房间宠上屏窗：比本地宠小一档（房友是客人体量），固定尺寸永不 resize */
@@ -31,19 +32,57 @@ let loungeWindow: BrowserWindow | null = null;
 let bubbleWindow: BrowserWindow | null = null;
 let bubbleSide: 'above' | 'below' = 'above';
 let petScale = 1;
+/** 桌宠是否处于串门（双人宽）模式——权威尺寸的一部分，移动时要重申 */
+let petVisitMode = false;
+
+/**
+ * 摆放固定尺寸的透明窗，**每次都重申权威尺寸**。
+ *
+ * 血泪坑：Windows 上分数显示缩放（125%/150%/190%…）时，`setPosition` 会让窗口
+ * 每次调用都长大几像素——拖一次桌宠就从 360 涨到 700+。原因是 Electron 内部
+ * 走「DIP bounds 读回 → 物理像素 → 再换算回 DIP」的往返，非整数 scaleFactor 下
+ * 每次往返都向上取整，误差逐次累积（实测 scaleFactor=1.905：180 的窗 getBounds()
+ * 就已经报 183）。`setBounds` 里带上读回的 width/height 一样中招，因为脏数据源头
+ * 就是读回值本身。
+ *
+ * 唯一稳的写法：显式传**与当前 bounds 无关的**权威尺寸，把累积链掐断。
+ *
+ * `changesSize`：真要改尺寸时才置 true——mac 上 resizable:false 会拦尺寸变更，
+ * 需临时放开（Windows 实测不拦，但保留以免回归 mac）。纯移动不用付这个开销，
+ * 拖拽时这里是每帧调用的热路径。
+ */
+function moveFixedSize(
+  win: BrowserWindow | null,
+  x: number,
+  y: number,
+  size: { width: number; height: number },
+  changesSize = false,
+): void {
+  if (!win || win.isDestroyed()) return;
+  const bounds = {
+    x: Math.round(x),
+    y: Math.round(y),
+    width: size.width,
+    height: size.height,
+  };
+  if (!changesSize) {
+    win.setBounds(bounds);
+    return;
+  }
+  win.setResizable(true);
+  win.setBounds(bounds);
+  win.setResizable(false);
+}
 
 /** 桌宠缩放（0.5~2）：窗口即画布，改窗口尺寸即改桌宠大小；右下角锚定 */
 export function setPetScale(scale: number): void {
-  petScale = Math.min(2, Math.max(0.5, scale || 1));
+  petScale = clampPetScale(scale);
   if (!petWindow || petWindow.isDestroyed()) return;
-  const size = Math.round(PET_SIZE * petScale);
+  const size = petTargetSize(petScale, petVisitMode);
   const [x, y] = petWindow.getPosition();
   const [w, h] = petWindow.getSize();
-  // resizable:false 会拦 setSize → 临时放开
-  petWindow.setResizable(true);
-  petWindow.setBounds({ x: x + w - size, y: y + h - size, width: size, height: size });
-  petWindow.setResizable(false);
-  syncBubbleBounds(); // 不依赖 resize 事件的投递时机
+  moveFixedSize(petWindow, x + w - size.width, y + h - size.height, size, true);
+  syncBubbleBounds();
 }
 
 type RendererPage = 'pet' | 'room' | 'bubble' | 'console' | 'lounge';
@@ -94,7 +133,7 @@ export function syncBubbleBounds(): void {
   if (!b || b.isDestroyed() || !b.isVisible()) return; // 隐藏时不做功（常态）
   if (!petWindow || petWindow.isDestroyed()) return;
   const { x, y, side } = bubbleAnchor(petWindow.getBounds());
-  b.setPosition(x, y, false); // 只移不改尺寸
+  moveFixedSize(b, x, y, { width: BUBBLE_W, height: BUBBLE_H });
   if (side !== bubbleSide) {
     bubbleSide = side;
     b.webContents.send('bubble:anchor', side);
@@ -113,7 +152,8 @@ export function broadcastCharacterActivated(meta: CharacterMeta): void {
 export function createPetWindow(): BrowserWindow {
   if (petWindow && !petWindow.isDestroyed()) return petWindow;
   const { workArea } = screen.getPrimaryDisplay();
-  const size = Math.round(PET_SIZE * petScale);
+  petVisitMode = false;
+  const { width: size } = petTargetSize(petScale);
   petWindow = new BrowserWindow({
     width: size,
     height: size,
@@ -209,19 +249,24 @@ export function findRoomPetMemberId(win: BrowserWindow): string | null {
 
 /**
  * 按当前在线成员顺序重排所有宠窗：屏幕底部居中排开，超一行往上叠
- * （layoutRoomPets 是纯函数，这里只管把结果换算成绝对坐标 + setPosition）。
+ * （layoutRoomPets 是纯函数，这里只管把结果换算成绝对坐标 + setBounds）。
  * 成员进出、petScale 变化后都要调一次；只挪位置，窗口尺寸恒定不变。
+ *
+ * 用 setBounds 而不是 setPosition：分数 DPI 下 setPosition 会让窗口逐次胀大，
+ * 必须每次重申权威尺寸（血泪坑 DPI-setPosition）。
  */
 export function layoutRoomPetWindows(orderedMemberIds: readonly string[]): void {
   const { workArea } = screen.getPrimaryDisplay();
   const slots = layoutRoomPets(orderedMemberIds, workArea.width, ROOM_PET_SIZE, ROOM_PET_GAP);
+  const size = { width: ROOM_PET_SIZE, height: ROOM_PET_SIZE };
   for (const slot of slots) {
     const win = roomPetWindows.get(slot.memberId);
     if (!win || win.isDestroyed()) continue;
-    win.setPosition(
-      Math.round(workArea.x + slot.x),
-      Math.round(workArea.y + workArea.height - slot.bottomOffset),
-      false,
+    moveFixedSize(
+      win,
+      workArea.x + slot.x,
+      workArea.y + workArea.height - slot.bottomOffset,
+      size,
     );
   }
 }
@@ -260,7 +305,7 @@ export function showBubbleWindow(): BrowserWindow {
   if (!win.isVisible()) {
     if (petWindow && !petWindow.isDestroyed()) {
       const { x, y, side } = bubbleAnchor(petWindow.getBounds());
-      win.setPosition(x, y, false);
+      moveFixedSize(win, x, y, { width: BUBBLE_W, height: BUBBLE_H });
       bubbleSide = side;
     }
     win.showInactive(); // 不抢焦点
@@ -286,28 +331,22 @@ function closeBubbleWindow(): void {
   bubbleWindow = null;
 }
 
-/** 拖拽移动（高频调用，不做动画） */
+/** 拖拽移动（高频调用，走 moveFixedSize：分数 DPI 下 setPosition 会胀窗） */
 export function movePetWindow(x: number, y: number): void {
-  petWindow?.setPosition(Math.round(x), Math.round(y), false);
+  moveFixedSize(petWindow, x, y, petTargetSize(petScale, petVisitMode));
 }
 
-/** 进入串门模式：窗口拓宽为双人宽；离开时 restore=true 恢复单人尺寸 */
+/** 进入串门模式：窗口拓宽为双人宽；离开时恢复单人尺寸 */
 export function setPetVisitMode(enter: boolean): void {
+  petVisitMode = enter;
   if (!petWindow || petWindow.isDestroyed()) return;
-  const size = Math.round(PET_SIZE * petScale);
   const [x, y] = petWindow.getPosition();
-  petWindow.setResizable(true);
-  if (enter) {
-    // 向右拓宽，保持角色位置不变
-    petWindow.setBounds({ x: x, y: y, width: size * 2, height: size });
-  } else {
-    petWindow.setBounds({ x: x, y: y, width: size, height: size });
-  }
-  petWindow.setResizable(false);
+  moveFixedSize(petWindow, x, y, petTargetSize(petScale, enter), true);
 }
 
 export function moveRoomWindow(x: number, y: number): void {
-  roomWindow?.setPosition(Math.round(x), Math.round(y), false);
+  const s = roomSize();
+  moveFixedSize(roomWindow, x, y, { width: s, height: s });
 }
 
 /** 房间外沿透明区穿透：forward 让 mousemove 继续进 renderer 以便判定回归实体 */

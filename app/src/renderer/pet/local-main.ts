@@ -5,6 +5,10 @@ import type { AgentActivity, CharacterMeta, MeetingStatus, MusicStatus } from '.
 import { Player } from './player';
 import { randomDelay, step, type PetState, type StepContext } from './state-machine';
 import { Signboard } from './signboard';
+import { ProgressHud } from './hud';
+import { isStaleProgress } from './hud-format';
+import { POINTS_PER_BOX } from '../../shared/furniture';
+import { DECOR_BY_ID } from '../room/decor-pack';
 import { DEFAULT_VOICE_SETTINGS, Speaker, type VoiceSettings } from './voice/speak';
 import { VisitOrchestrator, type VisitAction } from './visit';
 
@@ -39,6 +43,47 @@ const speaker = new Speaker({
   canSpeak: () => state.kind === 'idle',
   playAction: (action) => dispatch({ type: 'PLAY_ACTION', action }),
   hasAction: (action) => available.includes(action),
+});
+
+// ── HUD（点数 + 宝箱）──────────────────────────────────
+const hud = new ProgressHud();
+let hudBusy = false;
+let lastProgress: import('../../shared/ipc-types').Progress | null = null;
+
+hud.onChestClick = () => void doOpenBox();
+
+async function doOpenBox(): Promise<void> {
+  if (hudBusy) return;
+  hudBusy = true;
+  hud.chestBtn.disabled = true;
+  hud.floatSpend(POINTS_PER_BOX);
+  try {
+    const r = await window.qbot.progress.openBox();
+    if (r.ok) {
+      lastProgress = r.progress;
+      hud.setProgress(r.progress);
+      const decor = DECOR_BY_ID[r.stickerId];
+      const name = decor?.name ?? r.stickerId;
+      hostSignboard.setText(`开出了「${name}」`);
+      hostSignboard.show();
+      setTimeout(() => hostSignboard.hide(), 5000);
+    } else {
+      hud.toast(r.error);
+    }
+  } finally {
+    hudBusy = false;
+  }
+}
+
+window.qbot.progress.onChanged((p) => {
+  if (!isStaleProgress(lastProgress, p)) {
+    lastProgress = p;
+    hud.setProgress(p);
+  }
+});
+void window.qbot.progress.get().then((p) => {
+  lastProgress = p;
+  hud.setProgress(p);
 });
 
 // ── 朝向计算 ──────────────────────────────────────────
@@ -388,6 +433,7 @@ stage.addEventListener('pointermove', (e) => {
     visitOrchestrator.cancelVisit();
     endVisit();
     hostSignboard.onDragStart();
+    hud.onDragStart();
     stopDesktopWalk();
     dispatch({ type: 'POINTER_DOWN' });
   }
@@ -412,6 +458,7 @@ stage.addEventListener('pointerup', (e) => {
     dragStarted = false;
     dispatch({ type: 'POINTER_UP' });
     hostSignboard.onDragEnd();
+    hud.onDragEnd();
     return;
   }
   // 双击 = 立即说一句；单击不做任何事（房间入口在右键菜单）

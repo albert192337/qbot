@@ -88,6 +88,11 @@ export const IDLE_MS_PER_BOX = 15 * 60 * 1000;
 /** 合成消耗同档几件 */
 export const CRAFT_COST = 10;
 
+/** 是否够开一个箱子（有箱有点）—— renderer 专用谓词，避免 import 主进程 progress-rules */
+export function canAffordBox(points: number, boxes: number): boolean {
+  return boxes >= 1 && points >= POINTS_PER_BOX;
+}
+
 /**
  * 抽一件家具：先按 TIER_WEIGHT 抽档位，再在档位内等概率抽具体家具。
  *

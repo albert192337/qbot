@@ -202,6 +202,100 @@
         background: #7cc47f;
         color: white;
       }
+      /* ── HUD：点数 + 宝箱（bongo cat 风格底部条） ── */
+      #pet-hud {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 1.5%;
+        z-index: 6;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 5%;
+        pointer-events: none;
+        font-size: clamp(9px, 3.4vh, 15px);
+        transition: opacity 0.3s;
+      }
+      #pet-hud.lifted { opacity: 0; }
+      body.visit-mode #pet-hud { right: 45%; }
+      .hud-pill {
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px 3px 8px;
+        background: rgba(20, 20, 30, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 999px;
+        color: #fff;
+        font-variant-numeric: tabular-nums;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        user-select: none;
+      }
+      .hud-mark { opacity: 0.7; }
+      .hud-num { font-weight: 600; letter-spacing: 0.5px; }
+      .hud-chest {
+        pointer-events: auto;
+        width: clamp(18px, 7vh, 34px);
+        height: clamp(18px, 7vh, 34px);
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        filter: drop-shadow(0 0 0.28em rgba(255, 196, 84, 0.75));
+        animation: hud-breathe 1.9s ease-in-out infinite;
+        transition: opacity 0.2s;
+      }
+      .hud-chest[hidden] { display: none; }
+      .hud-chest.pop {
+        animation: hud-chest-pop 0.45s ease-out, hud-breathe 1.9s ease-in-out 0.45s infinite;
+      }
+      .hud-chest:disabled { animation: none; opacity: 0.45; cursor: not-allowed; }
+      .hud-float {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #ffd166;
+        font-weight: 700;
+        font-size: 1.15em;
+        pointer-events: none;
+        opacity: 0;
+        white-space: nowrap;
+      }
+      .hud-float.go { animation: hud-float-up 1.2s ease-out forwards; }
+      .hud-toast {
+        position: absolute;
+        bottom: calc(100% + 4px);
+        right: 0;
+        padding: 5px 10px;
+        border-radius: 8px;
+        border-left: 3px solid #e0a33e;
+        background: rgba(20, 20, 30, 0.85);
+        color: #f0d68a;
+        font-size: 0.9em;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+        white-space: nowrap;
+      }
+      .hud-toast.show { opacity: 1; }
+      @keyframes hud-breathe {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-9%) scale(1.07); }
+      }
+      @keyframes hud-chest-pop {
+        0% { transform: scale(0.4); }
+        60% { transform: scale(1.14); }
+        100% { transform: scale(1); }
+      }
+      @keyframes hud-float-up {
+        0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        70% { opacity: 0.6; }
+        100% { opacity: 0; transform: translateX(-50%) translateY(-28px); }
+      }
     </style>
   </head>
   <body>
@@ -209,6 +303,7 @@
     <div id="visitor-stage"></div>
     <div id="bubble"></div>
     <div id="menu"></div>
+    <div id="pet-hud" class="lifted"></div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
