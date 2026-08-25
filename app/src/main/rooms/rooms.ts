@@ -1,17 +1,21 @@
 /**
  * 公共房间链路（spec 2026-08-21）：连 rooms 服务、开/加/退房、出在场帧、收广播 → 转 renderer。
  *
- * 与 `link/link.ts` 的关系：**两条独立链路，互不影响，可同时在线**。
- * link 是 1v1 好友替身窗（relay 盲转，零状态）；这条是多人房间（rooms 服务，解析+落盘）。
+ * 原 1v1 联机（link/link.ts + relay）已于 2026-08-24 退役，公共房间是唯一的联机链路；
+ * 好友配对场景由私密房（凭 roomId 进、不上架）顶替。
  *
  * 隐私边界（spec §5.3）：出本机的只有——状态枚举、动作名、用户手打的聊天文字、昵称、缩略图。
  * 气泡正文 / last_assistant_message / transcript / cwd / persona **绝不进这个模块**；
- * 曲名也不发（1v1 有开关是因为对端是好友，公共房间对象是陌生人，不给这个开关）。
+ * 曲名也不发（房间对象是陌生人，不给「分享曲名」这个开关）。
+ *
+ * 角色包分发（2026-08-24 上屏）卸载到 room-pets.ts：包状态机/缓存/网络应答全在那边，
+ * 这里只做帧路由。
  */
 import { getSettings, setSettings } from '../config';
 import type {
   AgentActivity,
   CreateRoomInput,
+  MusicStatus,
   RoomBrief,
   RoomChatMsg,
   RoomKind,
@@ -28,6 +32,7 @@ import {
   normalizeCreateInput,
   NICK_MAX,
 } from './rooms-rules';
+import * as RoomPets from './room-pets';
 
 /**
  * 房间服务地址，**按顺序尝试**：域名 wss 为主，IP 明文为兜底。
@@ -51,7 +56,7 @@ const REQUEST_TIMEOUT_MS = 8_000;
 const PRESENCE_HEARTBEAT_MS = 30_000;
 const WS_OPEN = 1;
 
-/** Node ≥22 内置全局 WebSocket；@types/node 旧版缺声明 → 本地补最小类型（同 relay-ws.ts） */
+/** Node ≥22 内置全局 WebSocket；@types/node 旧版缺声明 → 本地补最小类型 */
 interface WsLike {
   readyState: number;
   send(data: string): void;
@@ -80,6 +85,7 @@ let chatCache: RoomChatMsg[] = [];
 let roomCache: RoomSnapshot | null = null;
 
 let localActivity: AgentActivity = 'idle';
+let localMusic: MusicStatus = { playing: false };
 let lastPresence: string | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let closedByUs = false;
@@ -199,6 +205,7 @@ function handleClosed(): void {
   currentRoomId = null;
   roomCache = null;
   stopHeartbeat();
+  RoomPets.onLeftRoom(); // 连接掉了：宠上屏跟着收场
   for (const [, p] of pending) {
     clearTimeout(p.timer);
     p.reject(new Error('连接已断开'));
@@ -244,6 +251,10 @@ function send(frame: Frame): void {
   if (ws && ws.readyState === WS_OPEN) ws.send(JSON.stringify(frame));
 }
 
+// room-pets 不持连接（避免循环 import），出帧借这个口子；注入一次即可，
+// send() 内部自己判连接状态，room-pets 调用时连接可能已断也没事（静默丢）
+RoomPets.setRoomsSend(send);
+
 function settle(type: string, frame: Frame, err?: Error): void {
   const p = pending.get(type);
   if (!p) return;
@@ -274,6 +285,13 @@ function handleMessage(data: unknown): void {
 
     case 'error': {
       const code = String(frame.code ?? 'unknown');
+      // pack:* 错误是 room-pets 的 fire-and-forget 帧引起的，从不进 pending 表，
+      // 必须先分流掉——否则会被下面「谁在等就给谁」误接到一个不相关的请求上
+      // （比如用户正在拉房间列表，此时房友包传输失败，list 的 promise 不该被牵连）
+      if (code.startsWith('pack:')) {
+        RoomPets.handlePackError(code);
+        break;
+      }
       // 应答类错误：转给在等的那个请求（谁在等就给谁）
       const waiting = [...pending.keys()][0];
       if (waiting) {
@@ -292,6 +310,7 @@ function handleMessage(data: unknown): void {
         if (i >= 0) roomCache.members[i] = member;
         else roomCache.members.push(member);
       }
+      if (member) RoomPets.onMemberIn(member);
       push('rooms:memberIn', member);
       break;
     }
@@ -302,7 +321,20 @@ function handleMessage(data: unknown): void {
         const m = roomCache.members.find((x) => x.memberId === id);
         if (m) { m.online = false; m.mode = undefined; m.action = undefined; }
       }
+      RoomPets.onMemberOut(id);
       push('rooms:memberOut', id);
+      break;
+    }
+
+    case 'member:pack': {
+      const id = String(frame.memberId ?? '');
+      const hash = String(frame.packHash ?? '');
+      const nickname = roomCache?.members.find((m) => m.memberId === id)?.nickname ?? '房友';
+      if (roomCache && frame.roomId === currentRoomId) {
+        const m = roomCache.members.find((x) => x.memberId === id);
+        if (m) m.packHash = hash;
+      }
+      if (hash) RoomPets.onMemberPack(id, nickname, hash);
       break;
     }
 
@@ -320,6 +352,7 @@ function handleMessage(data: unknown): void {
           m.action = payload.action as string | undefined;
         }
       }
+      RoomPets.onPresence(payload.memberId, payload.mode as string | undefined, payload.action as string | undefined);
       // 只打枚举不打内容（同 link.ts 的日志纪律）
       push('rooms:presence', payload);
       break;
@@ -329,9 +362,18 @@ function handleMessage(data: unknown): void {
       const msg = frame.msg as RoomChatMsg | undefined;
       if (!msg) break;
       chatCache = [...chatCache, msg].slice(-50);
+      RoomPets.onChat(msg.memberId, msg.nickname, msg.text);
       push('rooms:chat', msg);
       break;
     }
+
+    // ── 角色包分发应答（转给 room-pets 的状态机）──
+    case 'pack:have:ack':
+    case 'pack:put:ok':
+    case 'pack:begin':
+    case 'pack:chunk':
+      RoomPets.handlePackFrame(frame);
+      break;
 
     case 'chat:deleted': {
       const id = String(frame.id ?? '');
@@ -361,6 +403,7 @@ function handleMessage(data: unknown): void {
       roomCache = null;
       chatCache = [];
       stopHeartbeat();
+      RoomPets.onLeftRoom();
       setStatus({ phase: 'online', memberId: memberId ?? undefined });
       push('rooms:kicked', undefined);
       break;
@@ -379,6 +422,7 @@ function applyJoined(frame: Frame): void {
   push('rooms:history', chatCache);
   startHeartbeat();
   void sendPresence(true);
+  RoomPets.onJoinedRoom(room, memberId);
 }
 
 // ── 在场出帧 ───────────────────────────────────────────────
@@ -394,13 +438,14 @@ function stopHeartbeat(): void {
 }
 
 /**
- * 出在场帧。**只发状态枚举 + 动作名**——不发曲名（陌生人场景不给这个开关，
- * 与 1v1 的 linkShareSong 是有意的区别，spec §5.3）。
+ * 出在场帧。**只发状态枚举 + 动作名**——不发曲名（对象是陌生人，spec §5.3）。
+ * 模式合成：agent 活动优先，其次音乐态，再退 idle（借状态机优先级，同 1v1 老链路）。
  */
 async function sendPresence(force: boolean): Promise<void> {
   if (!currentRoomId || !ws || ws.readyState !== WS_OPEN) return;
+  const mode: string = localActivity !== 'idle' ? localActivity : localMusic.playing ? 'music' : 'idle';
   // 经白名单函数出帧：能出本机的字段由 buildPresenceFrame 一处说了算（有测试守着）
-  const frame = buildPresenceFrame({ activity: localActivity });
+  const frame = buildPresenceFrame({ activity: mode });
   const snapshot = JSON.stringify(frame);
   if (!force && snapshot === lastPresence) return;
   lastPresence = snapshot;
@@ -410,6 +455,12 @@ async function sendPresence(force: boolean): Promise<void> {
 /** agent-server.broadcastIfChanged 的房间钩子（不在房时只记账） */
 export function pushLocalAgentActivity(activity: AgentActivity): void {
   localActivity = activity;
+  void sendPresence(false);
+}
+
+/** music-monitor.updateStatus 的房间钩子（不在房时只记账；只出枚举不带曲名） */
+export function pushLocalMusic(next: MusicStatus): void {
+  localMusic = next;
   void sendPresence(false);
 }
 
@@ -452,7 +503,13 @@ export function leaveRoom(): void {
   roomCache = null;
   chatCache = [];
   stopHeartbeat();
+  RoomPets.onLeftRoom();
   setStatus({ phase: 'online', memberId: memberId ?? undefined });
+}
+
+/** 角色切换钩子（IPC/托盘的激活入口调用）：在房就把新形象重新报给房友 */
+export function notifyRoomCharacterChanged(): void {
+  RoomPets.notifyRoomCharacterChanged();
 }
 
 /**

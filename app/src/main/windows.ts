@@ -2,8 +2,12 @@
 import { BrowserWindow, app, screen, shell } from 'electron';
 import path from 'node:path';
 import type { CharacterMeta } from '../shared/ipc-types';
+import { layoutRoomPets } from './rooms/rooms-rules';
 
 const PET_SIZE = 360;
+/** 房间宠上屏窗：比本地宠小一档（房友是客人体量），固定尺寸永不 resize */
+const ROOM_PET_SIZE = 200;
+const ROOM_PET_GAP = 20;
 /**
  * 小房间窗边长。素材是 1024x1024，560 时 fit~0.55 -- 房间只占屏幕一小块，
  * 家具缩到 ~120px，观感「又小又挤」。放大到 960 让素材接近 1:1。
@@ -19,9 +23,8 @@ const BUBBLE_H = 500;
 const BUBBLE_OVERLAP = 24;
 
 let petWindow: BrowserWindow | null = null;
-/** 联机远端宠窗（?remote=1 复用 pet renderer；独立单例，绝不复用 petWindow——
- *  否则 broadcastCharacterActivated 会把本地角色切换广播进远端窗） */
-let remotePetWindow: BrowserWindow | null = null;
+/** 公共房间宠上屏：键控多窗（memberId -> 窗），全员在线上限即窗口数上限 */
+const roomPetWindows = new Map<string, BrowserWindow>();
 let roomWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let loungeWindow: BrowserWindow | null = null;
@@ -142,27 +145,28 @@ export function createPetWindow(): BrowserWindow {
   return petWindow;
 }
 
-// ── 联机远端宠窗（spec 2026-08-02 §二.3）─────────────────────
+// ── 公共房间宠上屏（2026-08-24）──────────────────────────────
+// 固定尺寸键控多窗，永不 resize（血泪坑 4/18）；位置由 layoutRoomPets 算，
+// 每次成员进出整体重排。窗数量 = 在线成员数，用户已明确选择「尽量全部在线」。
 
-export function getRemotePetWindow(): BrowserWindow | null {
-  return remotePetWindow;
+export function getRoomPetWindow(memberId: string): BrowserWindow | null {
+  return roomPetWindows.get(memberId) ?? null;
 }
 
-export function createRemotePetWindow(): BrowserWindow {
-  if (remotePetWindow && !remotePetWindow.isDestroyed()) return remotePetWindow;
+/** 开一个成员的宠窗（幂等）；位置由随后的 layoutRoomPetWindows 统一摆放 */
+export function ensureRoomPetWindow(memberId: string): BrowserWindow {
+  const existing = roomPetWindows.get(memberId);
+  if (existing && !existing.isDestroyed()) return existing;
   const { workArea } = screen.getPrimaryDisplay();
-  const size = Math.round(PET_SIZE * petScale);
-  // 默认落在本地宠左侧；本地宠不在（角色进房间等）就贴屏幕左下
-  const anchor = petWindow && !petWindow.isDestroyed() ? petWindow.getBounds() : null;
-  remotePetWindow = new BrowserWindow({
-    width: size,
-    height: size,
-    x: anchor ? Math.max(workArea.x, anchor.x - size - 24) : workArea.x + 40,
-    y: anchor ? anchor.y : workArea.y + workArea.height - size - 20,
+  const win = new BrowserWindow({
+    width: ROOM_PET_SIZE,
+    height: ROOM_PET_SIZE,
+    x: workArea.x + workArea.width - ROOM_PET_SIZE, // 摆位前的占位坐标，随即被 layout 覆盖
+    y: workArea.y + workArea.height - ROOM_PET_SIZE,
     transparent: true,
     frame: false,
     hasShadow: false, // 同 pet 窗：不显式关会有残影阴影框
-    resizable: false, // 透明窗 resize 有渲染 bug
+    resizable: false, // 透明窗 resize 有渲染 bug（血泪坑 4/18）
     skipTaskbar: true,
     show: false,
     webPreferences: {
@@ -171,20 +175,57 @@ export function createRemotePetWindow(): BrowserWindow {
       sandbox: false,
     },
   });
-  remotePetWindow.setAlwaysOnTop(true, 'floating');
-  remotePetWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  remotePetWindow.once('ready-to-show', () => remotePetWindow?.show());
-  remotePetWindow.on('closed', () => {
-    remotePetWindow = null;
+  win.setAlwaysOnTop(true, 'floating');
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.once('ready-to-show', () => win.show());
+  win.on('closed', () => {
+    if (roomPetWindows.get(memberId) === win) roomPetWindows.delete(memberId);
   });
-  load(remotePetWindow, 'pet', { remote: '1' });
-  return remotePetWindow;
+  roomPetWindows.set(memberId, win);
+  load(win, 'pet', { roomPet: '1' });
+  return win;
 }
 
-export function closeRemotePetWindow(): void {
-  if (remotePetWindow && !remotePetWindow.isDestroyed()) remotePetWindow.close();
-  remotePetWindow = null;
+export function closeRoomPetWindow(memberId: string): void {
+  const win = roomPetWindows.get(memberId);
+  roomPetWindows.delete(memberId);
+  if (win && !win.isDestroyed()) win.close();
 }
+
+export function closeAllRoomPetWindows(): void {
+  for (const win of roomPetWindows.values()) {
+    if (!win.isDestroyed()) win.close();
+  }
+  roomPetWindows.clear();
+}
+
+/** 反查：IPC 收到某个宠上屏窗的消息时，据此知道是哪个成员（窗数量小，扫表足够快） */
+export function findRoomPetMemberId(win: BrowserWindow): string | null {
+  for (const [memberId, w] of roomPetWindows) {
+    if (w === win) return memberId;
+  }
+  return null;
+}
+
+/**
+ * 按当前在线成员顺序重排所有宠窗：屏幕底部居中排开，超一行往上叠
+ * （layoutRoomPets 是纯函数，这里只管把结果换算成绝对坐标 + setPosition）。
+ * 成员进出、petScale 变化后都要调一次；只挪位置，窗口尺寸恒定不变。
+ */
+export function layoutRoomPetWindows(orderedMemberIds: readonly string[]): void {
+  const { workArea } = screen.getPrimaryDisplay();
+  const slots = layoutRoomPets(orderedMemberIds, workArea.width, ROOM_PET_SIZE, ROOM_PET_GAP);
+  for (const slot of slots) {
+    const win = roomPetWindows.get(slot.memberId);
+    if (!win || win.isDestroyed()) continue;
+    win.setPosition(
+      Math.round(workArea.x + slot.x),
+      Math.round(workArea.y + workArea.height - slot.bottomOffset),
+      false,
+    );
+  }
+}
+
 /** 懒创建：桌宠 99% 时间没有 agent 消息，不预先吃一个 renderer 进程 */
 function createBubbleWindow(): BrowserWindow {
   if (bubbleWindow && !bubbleWindow.isDestroyed()) return bubbleWindow;
@@ -337,7 +378,6 @@ export type ConsolePane =
   | 'prompts'
   | 'market'
   | 'claude'
-  | 'link'
   | 'settings'
   | 'devtools';
 

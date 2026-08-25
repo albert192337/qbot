@@ -1,6 +1,6 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { RoomChatMsg, RoomMember, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, LinkStatus, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, LinkPeerHello, LinkPeerState, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
+import type { RoomChatMsg, RoomMember, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
@@ -237,48 +237,49 @@ const api: QBotApi = {
       return () => ipcRenderer.removeListener('meeting:status', listener);
     },
   },
-  link: {
-    getStatus: () => ipcRenderer.invoke('link:getStatus'),
-    create: () => ipcRenderer.invoke('link:create'),
-    join: (code) => ipcRenderer.invoke('link:join', code),
-    onChanged: (cb) => {
-      const listener = (_ev: unknown, status: LinkStatus) => cb(status);
-      ipcRenderer.on('link:changed', listener);
-      return () => ipcRenderer.removeListener('link:changed', listener);
+  roomPet: {
+    onHello: (cb) => {
+      const listener = (_ev: unknown, info: { nickname: string }) => cb(info);
+      ipcRenderer.on('roomPet:hello', listener);
+      return () => ipcRenderer.removeListener('roomPet:hello', listener);
     },
-    stop: () => ipcRenderer.send('link:stop'),
-    onPeerHello: (cb) => {
-      const listener = (_ev: unknown, info: LinkPeerHello) => cb(info);
-      ipcRenderer.on('link:peerHello', listener);
-      return () => ipcRenderer.removeListener('link:peerHello', listener);
-    },
-    onPeerState: (cb) => {
-      const listener = (_ev: unknown, s: LinkPeerState) => cb(s);
-      ipcRenderer.on('link:peerState', listener);
-      return () => ipcRenderer.removeListener('link:peerState', listener);
-    },
-    onPeerLeft: (cb) => {
-      const listener = () => cb();
-      ipcRenderer.on('link:peerLeft', listener);
-      return () => ipcRenderer.removeListener('link:peerLeft', listener);
-    },
-    onPeerCharacter: (cb) => {
+    onCharacter: (cb) => {
       const listener = (_ev: unknown, meta: LinkPeerCharacter) => cb(meta);
-      ipcRenderer.on('link:peerCharacter', listener);
-      return () => ipcRenderer.removeListener('link:peerCharacter', listener);
+      ipcRenderer.on('roomPet:character', listener);
+      return () => ipcRenderer.removeListener('roomPet:character', listener);
     },
-    onAssetProgress: (cb) => {
+    onProgress: (cb) => {
       const listener = (_ev: unknown, p: LinkAssetProgress) => cb(p);
-      ipcRenderer.on('link:assetProgress', listener);
-      return () => ipcRenderer.removeListener('link:assetProgress', listener);
+      ipcRenderer.on('roomPet:progress', listener);
+      return () => ipcRenderer.removeListener('roomPet:progress', listener);
     },
-    onPeerSign: (cb) => {
-      const listener = (_ev: unknown, text: string | null) => cb(text);
-      ipcRenderer.on('link:peerSign', listener);
-      return () => ipcRenderer.removeListener('link:peerSign', listener);
+    onState: (cb) => {
+      const listener = (_ev: unknown, s: { mode?: LinkMode; action?: string }) => cb(s);
+      ipcRenderer.on('roomPet:state', listener);
+      return () => ipcRenderer.removeListener('roomPet:state', listener);
     },
-    setSign: (text) => ipcRenderer.send('link:setSign', text),
-    getPeerCache: () => ipcRenderer.invoke('link:getPeerCache'),
+    onChat: (cb) => {
+      const listener = (_ev: unknown, msg: { text: string }) => cb(msg);
+      ipcRenderer.on('roomPet:chat', listener);
+      return () => ipcRenderer.removeListener('roomPet:chat', listener);
+    },
+    onPackFailed: (cb) => {
+      const listener = () => cb();
+      ipcRenderer.on('roomPet:packFailed', listener);
+      return () => ipcRenderer.removeListener('roomPet:packFailed', listener);
+    },
+    onLeft: (cb) => {
+      const listener = () => cb();
+      ipcRenderer.on('roomPet:left', listener);
+      return () => ipcRenderer.removeListener('roomPet:left', listener);
+    },
+    wave: () => ipcRenderer.send('roomPet:wave'),
+    leaveRoom: () => ipcRenderer.send('roomPet:leaveRoom'),
+    getCache: () => ipcRenderer.invoke('roomPet:getCache'),
+  },
+  /** 手动举牌（本地显示：pet 窗 signboard；主进程只记账） */
+  sign: {
+    set: (text: string | null) => ipcRenderer.send('sign:set', text),
   },
 };
 

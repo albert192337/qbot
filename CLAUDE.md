@@ -13,8 +13,8 @@
 | `app/src/main/agent-message.ts` | agent 消息纯逻辑：markdown 展平、截断、来源标签、transcript 解析（可单测） |
 | `app/src/main/hooks/claude.ts` | Claude Code hooks 安装器（托盘显式同意，写 ~/.claude/settings.json） |
 | `app/src/main/music-monitor.ts` | 网易云音乐监控（Windows SMTC，常驻 PowerShell 进程） |
-| `app/src/main/rooms/` | 公共房间链路（`rooms.ts` 网络/`rooms-rules.ts` 纯逻辑）；与 `link/` 的 1v1 联机是两条独立链路 |
-| `relay/` `market/` `rooms/` | 三个独立服务端 workspace（单文件 + 最小依赖，可整目录 scp；禁止 import 仓库其他模块） |
+| `app/src/main/rooms/` | 公共房间链路：`rooms.ts` 网络、`rooms-rules.ts` 纯逻辑、`room-pets.ts` 角色包分发状态机、`room-pet-display.ts` 宠上屏窗口编排。2026-08-24 起是唯一联机链路（原 1v1 已退役） |
+| `market/` `rooms/` | 两个独立服务端 workspace（单文件 + 最小依赖，可整目录 scp；禁止 import 仓库其他模块） |
 | `app/src/main/sticker-importer.ts` | 表情包导入：打标→复核→转码落盘→热重载（纯逻辑在 `sticker-rules.ts`） |
 | `app/src/renderer/console/` | **统一控制台**：左侧栏二级目录（角色/配置/社区/连接/系统），`panes/*.ts` 一 pane 一文件，懒挂载 |
 | `assets/mascot/` | 官方预置角色源（同步于 `app/resources/presets/mascot/`） |
@@ -106,26 +106,29 @@
 - 核心文件：`pipeline/src/sticker-import.ts`（打标纯逻辑）+ `chroma.ts:gifToWebm` + `app/src/main/sticker-importer.ts`（IO/IPC）+ `sticker-rules.ts`（纯逻辑可单测）+ Studio「表情包导入」tab
 - spec：`docs/superpowers/specs/2026-08-21-sticker-pack-import-design.md`
 
-## 公共房间（联机社交房）
+## 公共房间（联机唯一链路）
 
-- **概念是「游戏联机房」**：开房（起名+选类型）→ 上公共列表 → 别人浏览筛选后加入 → 房内轻在场 + 文字聊天。不是等距场景，是虚拟社交单元
+- **概念是「游戏联机房」**：开房（起名+选类型）→ 上公共列表 → 别人浏览筛选后加入 → 房内文字聊天 + **房友的宠上屏**。不是等距场景，是虚拟社交单元
 - 常驻房间（固定 8 位 roomId，关了再开还是同一间）、四类型（摸鱼/自习/夜猫/联机）、4~12 人、可收藏置顶、私密房不上架凭 roomId 进
-- **为什么另起 `rooms/` 服务而不扩 relay**：relay 的隐私声明全靠「paired 后不解析不落盘」这条铁律，而公共房间必须解析帧（列表/聊天广播）+ 落盘（常驻房间/聊天记录），塞进去等于亲手废掉它
-- **成员用 64px 缩略图，不开替身窗**：1v1 会为对端开桌面替身窗并传 ~12MB 角色包，12 人房照做 = 12 个窗 + 132MB，不可行。替身窗保留给 1v1 好友链接
+- **2026-08-24 起是唯一联机链路**：原 1v1 好友配对（`link/` + `relay/`）已退役，私密房顶替好友配对场景。原「替身窗只给 1v1」的限制已推翻——全员上屏
+- **宠上屏**：在线房友每人一只 200px 透明置顶窗，屏幕底部居中排开、超一行往上叠（`layoutRoomPets` 纯函数算位置，只 `setPosition` 永不 `setBounds`/resize，血泪坑 4/18）。成员进出整体重排，掉线 30s 宽限再关窗
+- **角色包走服务端缓存分发**（`room-pets.ts` 状态机 + `rooms/server.mjs` 的 `packs/` 磁盘 LRU 2GB）：进房后 `pack:have` 探测→未缓存则分块 `pack:put` 上传→`pack:announce` 播报指纹→房友按需 `pack:get` 下载→本地 `.peer-<hash>/` 缓存。不做 P2P 盲转（12 人房发送方要为每个接收方重传 N-1 次）
+- 包格式复用 `app/src/main/asset-pack.ts`（sanitize manifest 剥离 persona + 动作 webm，sha256 前 16 位为 hash）；同角色 hash 撞车只传一次
 - **聊天最近 50 条**环形缓冲随房落盘，进房 `joined` 帧一次带回；服务端权威限流（3s 冷却、10 条/分钟、连发同内容拒、200 字截断），客户端 `rooms-rules.ts` 有份同规则预挡只为即时反馈
-- **隐私边界写成可执行断言**：出帧统一走 `buildPresenceFrame`/`buildChatFrame` 白名单函数，测试塞满曲名/气泡正文/cwd/persona/transcript 断言一个都出不去。聊天输入框是**唯一**文字出口，禁止加「分享 agent 结论到房间」这类便利入口
-- **公共房间不发曲名**（1v1 有 `linkShareSong` 开关是因为对端是好友，这里对象是陌生人——是有意的区别不是漏了开关）
+- **隐私边界写成可执行断言**：出帧统一走 `buildPresenceFrame`/`buildChatFrame` 白名单函数，测试塞满曲名/气泡正文/cwd/persona/transcript 断言一个都出不去。聊天输入框是**唯一**文字出口，禁止加「分享 agent 结论到房间」这类便利入口。角色包只含美术资产（persona 打包前剥离）
+- **公共房间不发曲名**（对象是陌生人，无分享开关——是有意的边界）
 - 生产地址按序尝试 `wss://albertbeta.cn/rooms`（主路，借道既有域名 nginx 反代）→ `ws://14.103.59.73:24252`（兜底，明文）。`isSecureTransport()` 按**实际连上的地址**判断，降级后入房弹窗自动补「当前未加密」
 - 举报只记计数 + 消息快照，**不自动删帖封人**（自部署服务无审核能力，误伤代价高于漏判）
 - **不给房间专属游戏化奖励**：会立刻制造「挂房刷箱子」最优策略，与社交在场的目标相反。房内在线照常计入现有挂机，合作产出留后续模块（绑互动不绑时长）
-- spec：`docs/superpowers/specs/2026-08-21-public-rooms-design.md`；部署：`docs/rooms-deploy.md`
+- spec：`docs/superpowers/specs/2026-08-21-public-rooms-design.md` + `docs/superpowers/specs/2026-08-24-rooms-pets-on-screen-design.md`；部署：`docs/rooms-deploy.md`
 
 ## 举牌功能
 
 - **长柄木牌**：牌子在上、杆在下，跟随角色显示在右侧
 - 拖拽时自动隐藏，松手后延时 1.5s 弹出（带 poof-in 特效）
-- 用途：听歌时显示曲目、未来可扩展显示自定义消息
-- 核心文件：`app/src/renderer/pet/signboard.ts` (84 行)
+- 纯本地功能（2026-08-24 前曾同步 1v1 对端替身，联机退役后无网络出口）
+- 用途：听歌时显示曲目、agent 工作状态、会议提示、用户手动输入
+- 核心文件：`app/src/renderer/pet/signboard.ts` + `app/src/main/local-sign.ts`（本地记账）
 
 ## 串门功能（呈现机制保留，本机自动触发已下线）
 

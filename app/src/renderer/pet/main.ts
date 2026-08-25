@@ -1,11 +1,11 @@
 /**
- * pet 入口分叉：本地宠（AI 状态机全家桶，local-main）
- * 或联机远端宠（?remote=1，NetworkDriver 收帧驱动，remote-main）。
- * 同一 renderer 入口复用全部资源加载/样式，见 spec 2026-08-02 §二.3。
+ * pet 入口分叉二选一：本地宠（AI 状态机全家桶，local-main）
+ * 或公共房间宠上屏（?roomPet=1，room-pet-main，spec 2026-08-24）。
+ * 同一 renderer 入口复用全部资源加载/样式。
  */
-const isRemote = new URLSearchParams(location.search).get('remote') === '1';
-if (isRemote) {
-  void import('./remote-main');
+const params = new URLSearchParams(location.search);
+if (params.get('roomPet') === '1') {
+  void import('./room-pet-main');
 } else {
   void import('./local-main');
 }

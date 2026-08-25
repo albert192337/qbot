@@ -10,8 +10,60 @@
  */
 import type { RoomBrief, RoomChatMsg, RoomKind } from '../../shared/ipc-types';
 
-/** 协议版本：与 rooms/server.mjs 的 PROTO_VER 必须一致 */
-export const PROTO_VER = 1;
+/** 协议版本：与 rooms/server.mjs 的 PROTO_VER 必须一致。v2 = 角色包分发（上屏） */
+export const PROTO_VER = 2;
+
+/** 角色包指纹格式（sha256 前 16 位十六进制，同服务端） */
+export const PACK_HASH_RE = /^[0-9a-f]{16}$/;
+
+/**
+ * `.peer-` 缓存 LRU 淘汰：给定候选目录（已排除在用的）+ 保留上限，
+ * 返回该删的目录名（最旧优先）。纯函数，不碰文件系统（room-pets.ts 负责 IO）。
+ */
+export function selectPruneTargets(
+  candidates: readonly { name: string; mtime: number }[],
+  keep: number,
+): string[] {
+  const excess = candidates.length - keep;
+  if (excess <= 0) return [];
+  return [...candidates].sort((a, b) => a.mtime - b.mtime).slice(0, excess).map((c) => c.name);
+}
+
+/** 宠上屏的一个槽位：相对工作区左边缘的 x + 相对**底边缘**的向上偏移 */
+export interface RoomPetSlot {
+  memberId: string;
+  x: number;
+  /** 离工作区底边的距离（像素，越大越靠上）；调用方自己换算成绝对 y */
+  bottomOffset: number;
+}
+
+/**
+ * 宠上屏布局：按进房顺序排开，行从屏幕底部往上叠、每行水平居中。
+ * 纯函数（不碰 Electron screen API），只 setPosition 用——**永不 setBounds**
+ * （血泪坑 4/18：透明窗 resize 有渲染 bug，尺寸恒定，只挪位置）。
+ */
+export function layoutRoomPets(
+  memberIds: readonly string[],
+  workAreaWidth: number,
+  petSize: number,
+  gap: number,
+): RoomPetSlot[] {
+  if (memberIds.length === 0) return [];
+  const perRow = Math.max(1, Math.floor((workAreaWidth + gap) / (petSize + gap)));
+  return memberIds.map((memberId, i) => {
+    const row = Math.floor(i / perRow);
+    const rowStart = row * perRow;
+    const inThisRow = Math.min(perRow, memberIds.length - rowStart);
+    const rowWidth = inThisRow * petSize + (inThisRow - 1) * gap;
+    const rowStartX = (workAreaWidth - rowWidth) / 2;
+    const col = i - rowStart;
+    return {
+      memberId,
+      x: rowStartX + col * (petSize + gap),
+      bottomOffset: (row + 1) * petSize + row * gap,
+    };
+  });
+}
 
 // ── 上限（与服务端同值）────────────────────────────────────
 export const NAME_MAX = 24;
@@ -140,6 +192,12 @@ export function errorText(code: string): string {
     case 'proto_mismatch': return 'QBot 版本太旧，请升级后再进房';
     case 'not_in_room': return '你不在房间里';
     case 'need_hello': return '连接未就绪，请重试';
+    // ── 角色包（上屏）──
+    case 'pack:not_found': return '房友的角色包还没就绪';
+    case 'pack:busy': return '角色包正在传输中';
+    case 'pack:bad': return '角色包校验失败';
+    case 'pack:too_big': return '角色包太大，无法在房间展示';
+    case 'pack:rate_limited': return '角色包上传太频繁，稍后再试';
     default: return `房间服务出错（${code}）`;
   }
 }
@@ -167,8 +225,7 @@ export const PRESENCE_ALLOWED_KEYS = ['t', 'mode', 'action'] as const;
 /**
  * 构造 presence 帧：**只取状态枚举和动作名**。
  *
- * 公共房间的对象是陌生人，所以连曲名都不发——这与 1v1 有 `linkShareSong`
- * 开关是有意的区别（好友 vs 陌生人），不是漏了个开关。
+ * 公共房间的对象是陌生人，所以连曲名都不发——这是有意的边界，不是漏了开关。
  */
 export function buildPresenceFrame(
   snapshot: LocalStateSnapshot,

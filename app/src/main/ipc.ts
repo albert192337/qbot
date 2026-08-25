@@ -7,10 +7,12 @@ import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipelin
 import type { PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind } from '../shared/ipc-types';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, type ConsolePane } from './windows';
+import { createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, type ConsolePane } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, isSecureTransport, reportChat, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms } from './rooms/rooms';
-import { getLinkStatus, stopLink, notifyActiveCharacterChanged, getPeerCache, getLocalSign, setLocalSign, createLinkRoom, joinLinkRoom } from './link/link';
+import { getLocalSign, setLocalSign } from './local-sign';
+import { notifyRoomCharacterChanged } from './rooms/rooms';
+import { getMemberSnapshot } from './rooms/room-pets';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import {
@@ -82,7 +84,7 @@ export function registerIpc(): void {
     if (!meta || !meta.manifest) throw new Error(`character not found: ${dirId}`);
     await setSettings({ activeCharacter: dirId });
     broadcastCharacterActivated(meta);
-    notifyActiveCharacterChanged(); // 联机中：新形象重新 hello 给对端
+    notifyRoomCharacterChanged(); // 公共房间：新形象重新播报给房友（上屏用）
     await rebuildTray(); // 切换后菜单 radio 状态同步
   });
   ipcMain.handle('characters:getActive', async () => {
@@ -107,13 +109,10 @@ export function registerIpc(): void {
   ipcMain.on('pet:move', (_ev, x: number, y: number) => movePetWindow(x, y));
   ipcMain.on('pet:setVisitMode', (_ev, enter: boolean) => setPetVisitMode(enter));
 
-  // ── link 联机 ──────────────────────────────────────────
-  ipcMain.handle('link:getStatus', () => getLinkStatus());
-  ipcMain.handle('link:getPeerCache', () => getPeerCache());
-  ipcMain.on('link:setSign', (_ev, text: string | null) =>
+  // ── 手动举牌（纯本地记账）────────────────────────────────
+  ipcMain.on('sign:set', (_ev, text: string | null) =>
     setLocalSign(typeof text === 'string' ? text : null),
   );
-  ipcMain.on('link:stop', () => stopLink());
 
   // ── room ───────────────────────────────────────────────
   ipcMain.on('room:open', () => void openRoomWindowSafe());
@@ -178,6 +177,19 @@ export function registerIpc(): void {
   ipcMain.handle('rooms:kick', (_ev, memberId: string) => kickMember(memberId));
   ipcMain.handle('rooms:toggleFavorite', (_ev, roomId: string) => toggleFavorite(roomId));
   ipcMain.handle('rooms:disconnect', () => disconnectRooms());
+
+  // 宠上屏窗（?roomPet=1）：一个窗只服务一个成员，靠发送者反查 memberId，不必带参数
+  ipcMain.on('roomPet:wave', (ev) => {
+    const win = BrowserWindow.fromWebContents(ev.sender);
+    const memberId = win && findRoomPetMemberId(win);
+    if (memberId) waveAt(memberId);
+  });
+  ipcMain.on('roomPet:leaveRoom', () => leaveRoom());
+  ipcMain.handle('roomPet:getCache', (ev) => {
+    const win = BrowserWindow.fromWebContents(ev.sender);
+    const memberId = win && findRoomPetMemberId(win);
+    return memberId ? getMemberSnapshot(memberId) : null;
+  });
 
   // 桌宠右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
   // 只留「玩宠动作 + 去处」两段——所有配置/管理都收进控制台（一个窗、左侧栏二级目录），
@@ -282,10 +294,6 @@ export function registerIpc(): void {
     await rebuildTray();
     return installed;
   });
-
-  // ── link 联机（控制台「连接」组新增建房/加入）───────────
-  ipcMain.handle('link:create', () => createLinkRoom());
-  ipcMain.handle('link:join', (_ev, code: string) => joinLinkRoom(code));
 
   // ── music 联动 ─────────────────────────────────────────
   ipcMain.handle('music:getStatus', () => getMusicStatus());

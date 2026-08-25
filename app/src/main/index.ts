@@ -7,15 +7,15 @@ import path from 'node:path';
 import { charactersDir, getCharacter, listCharacters, seedPresets } from './characters';
 import { getSettings, setSettings } from './config';
 import { registerIpc } from './ipc';
+import { wireRoomPetDisplay } from './rooms/room-pet-display';
 import { rebuildTray } from './tray';
-import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds, sendToWindows, pushToLounge } from './windows';
+import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds, pushToLounge } from './windows';
 import { startAgentServer } from './agent-server';
 import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
 import { startMeetingMonitor, stopMeetingMonitor } from './meeting-monitor';
 import { startInputMonitor, stopInputMonitor } from './input-monitor';
 import { flushProgress, startProgressTicker, stopProgressTicker } from './progress';
-import { setLinkStatusListener, getLinkStatus, stopLink, createLinkRoom, joinLinkRoom, notifyActiveCharacterChanged } from './link/link';
-import { setLoungePush } from './rooms/rooms';
+import { createRoom, joinRoom, notifyRoomCharacterChanged, setLoungePush } from './rooms/rooms';
 
 /** qbot-asset 响应的 Content-Type（漏了类型 Chromium 会拒绝解码 <video>） */
 const ASSET_MIME: Record<string, string> = {
@@ -119,23 +119,19 @@ app.whenReady().then(async () => {
   screen.on('display-removed', syncBubbleBounds);
 
   registerIpc();
+  wireRoomPetDisplay(); // 公共房间宠上屏：订阅 room-pets 事件驱动窗口
   await seedPresets();
-  // 联机状态变化 → 托盘标签刷新 + 控制台联机 pane 实时状态（在这接线避免 link ↔ tray 循环 import）
-  setLinkStatusListener(() => {
-    void rebuildTray();
-    sendToWindows('link:changed', getLinkStatus());
-  });
   // 房间事件 → lounge 窗（rooms.ts 不直接持有窗口引用，同 link ↔ tray 的解耦）
   setLoungePush(pushToLounge);
-  // dev 自动联机（QBOT_USER_DATA 双实例验证用；正常入口是托盘菜单）
-  if (process.env.QBOT_LINK_CREATE) {
-    void createLinkRoom()
-      .then((code) => console.log('[link] room code:', code))
-      .catch((err) => console.error('[link] create failed:', err));
-  } else if (process.env.QBOT_LINK_JOIN) {
-    void joinLinkRoom(process.env.QBOT_LINK_JOIN)
-      .then(() => console.log('[link] joined'))
-      .catch((err) => console.error('[link] join failed:', err));
+  // dev 自动进/建公共房间（QBOT_USER_DATA 双/三实例验证宠上屏用；正常入口是托盘/右键菜单）
+  if (process.env.QBOT_ROOMS_AUTOJOIN) {
+    void joinRoom(process.env.QBOT_ROOMS_AUTOJOIN)
+      .then(() => console.log('[rooms] auto-joined:', process.env.QBOT_ROOMS_AUTOJOIN))
+      .catch((err) => console.error('[rooms] auto-join failed:', err));
+  } else if (process.env.QBOT_ROOMS_AUTOCREATE) {
+    void createRoom({ name: process.env.QBOT_ROOMS_AUTOCREATE, kind: 'coop', capacity: 12, listed: true })
+      .then((roomId) => console.log('[rooms] auto-created:', roomId))
+      .catch((err) => console.error('[rooms] auto-create failed:', err));
   }
   await rebuildTray();
   void startAgentServer(); // agent 联动状态服务（失败不阻塞桌宠本体）
@@ -153,8 +149,9 @@ app.whenReady().then(async () => {
   const pet = createPetWindow();
   if (initial) {
     await setSettings({ activeCharacter: initial.dirId });
-    // 首启数据目录 + QBOT_LINK_JOIN：配对早于这里的激活，hello 没带上 manifestHash → 补发
-    notifyActiveCharacterChanged();
+    // 首启数据目录 + QBOT_ROOMS_AUTOJOIN：进房早于这里的激活，
+    // announce 没等到 activeCharacter 落盘 → 补发一次
+    notifyRoomCharacterChanged();
     pet.webContents.once('did-finish-load', async () => {
       pet.webContents.send('characters:activated', await getCharacter(initial.dirId));
     });
@@ -174,7 +171,6 @@ app.on('before-quit', (ev) => {
   stopMeetingMonitor();
   stopInputMonitor();
   stopProgressTicker();
-  stopLink();
   // progress 是玩法数据（点数/箱子/库存），不能丢防抖窗口里最后那笔 →
   // 拦一次退出等落盘完再真退。写失败 flushProgress 内部已吞，不会卡住退出
   ev.preventDefault();

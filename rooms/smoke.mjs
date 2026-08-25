@@ -7,10 +7,11 @@
  *
  * 同 relay/smoke.mjs 的定位：不引任何测试框架，失败就非零退出。
  */
+import { createHash } from 'node:crypto';
 import { WebSocket } from 'ws';
 
 const URL = process.env.ROOMS_URL || `ws://127.0.0.1:${process.env.PORT || 24252}`;
-const PROTO_VER = 1;
+const PROTO_VER = 2;
 
 let failures = 0;
 function check(cond, label) {
@@ -88,6 +89,15 @@ class Client {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** 轮询直到条件满足或超时（收多帧类测试用：wait() 只能找「第一个」匹配帧） */
+async function waitFor(cond, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (!cond()) {
+    if (Date.now() > deadline) throw new Error('waitFor timeout');
+    await sleep(25);
+  }
+}
 
 async function main() {
   console.log(`[smoke] target ${URL}`);
@@ -245,6 +255,114 @@ async function main() {
   alice.send({ t: 'wave', targetMemberId: bob.memberId });
   const wave = await bob.wait('wave');
   check(wave.fromMemberId === alice.memberId, 'bob 收到 alice 的招呼');
+
+  // ── 8b. 角色包分发（2026-08-24 上屏）──────────────────
+  console.log('\n8b. 角色包分发');
+  // 造一个假角色包：内容随便，hash 必须是 sha256 前 16 位（服务端收齐要校验）
+  const packBuf = Buffer.alloc(300 * 1024, 7); // 300KB = 5 块，够测分块
+  packBuf.write('QBot pack smoke', 100);
+  const packHash = createHash('sha256').update(packBuf).digest('hex').slice(0, 16);
+  const chunks = [];
+  for (let i = 0; i < packBuf.length; i += 64 * 1024) {
+    chunks.push(packBuf.subarray(i, Math.min(i + 64 * 1024, packBuf.length)).toString('base64'));
+  }
+
+  // 非法 hash 直接拒
+  alice.clear();
+  alice.send({ t: 'pack:have', hash: 'not-a-hash' });
+  const badHash = await alice.wait('error');
+  check(badHash.code === 'bad_frame', '非法 hash 被拒 (bad_frame)');
+
+  // 未上传时 have 应报未缓存
+  alice.clear();
+  alice.send({ t: 'pack:have', hash: packHash });
+  const haveAck = await alice.wait('pack:have:ack');
+  check(haveAck.cached === false, '上传前 pack:have 报未缓存');
+
+  // 乱序块被拒（先发 seq 1）
+  alice.clear();
+  alice.send({ t: 'pack:put', hash: packHash, seq: 1, total: chunks.length, data: chunks[1] });
+  const badSeq = await alice.wait('error');
+  check(badSeq.code === 'bad_frame', '乱序分块被拒 (bad_frame)');
+
+  // 正常上传：逐块顺序
+  alice.clear();
+  for (let seq = 0; seq < chunks.length; seq++) {
+    alice.send({ t: 'pack:put', hash: packHash, seq, total: chunks.length, data: chunks[seq] });
+  }
+  const putOk = await alice.wait('pack:put:ok');
+  check(putOk.hash === packHash, '上传收齐回 put:ok');
+
+  // 再 have 报已缓存；重复上传幂等直接 ok
+  alice.clear();
+  alice.send({ t: 'pack:have', hash: packHash });
+  const haveAck2 = await alice.wait('pack:have:ack');
+  check(haveAck2.cached === true, '上传后 pack:have 报已缓存');
+  alice.clear();
+  alice.send({ t: 'pack:put', hash: packHash, seq: 0, total: 1, data: chunks[0] });
+  const putOk2 = await alice.wait('pack:put:ok');
+  check(putOk2.hash === packHash, '重复上传幂等回 ok');
+
+  // 内容与 hash 不符被拒
+  const liarsHash = createHash('sha256').update(Buffer.from('liar')).digest('hex').slice(0, 16);
+  alice.clear();
+  alice.send({ t: 'pack:put', hash: liarsHash, seq: 0, total: 1, data: Buffer.from('not-liar').toString('base64') });
+  const badPack = await alice.wait('error');
+  check(badPack.code === 'pack:bad', '内容 hash 不符被拒 (pack:bad)');
+
+  // 下载：begin + 分块，重组后逐字节一致
+  // （wait() 只按类型找第一帧，多块要用队列过滤收集）
+  bob.clear();
+  bob.send({ t: 'pack:get', hash: packHash });
+  const begin = await bob.wait('pack:begin');
+  check(begin.total === chunks.length && begin.size === packBuf.length, 'pack:begin 带块数和字节数');
+  await waitFor(() => bob.frames.filter((f) => f.t === 'pack:chunk').length >= begin.total, 5000);
+  const got = bob.frames.filter((f) => f.t === 'pack:chunk');
+  check(got.every((c, i) => c.seq === i && c.hash === packHash), '分块按序到达');
+  const reassembled = Buffer.concat(got.map((c) => Buffer.from(c.data, 'base64')));
+  check(reassembled.equals(packBuf), '下载重组与原包逐字节一致');
+
+  // 下载中途再发一个 get：应回 busy（单连接一次一个下载）
+  const manyChunks = Buffer.alloc(150 * 1024, 9);
+  const manyHash = createHash('sha256').update(manyChunks).digest('hex').slice(0, 16);
+  const manyParts = [];
+  for (let i = 0; i < manyChunks.length; i += 64 * 1024) {
+    manyParts.push(manyChunks.subarray(i, Math.min(i + 64 * 1024, manyChunks.length)).toString('base64'));
+  }
+  carol.clear();
+  for (let seq = 0; seq < manyParts.length; seq++) {
+    carol.send({ t: 'pack:put', hash: manyHash, seq, total: manyParts.length, data: manyParts[seq] });
+  }
+  await carol.wait('pack:put:ok');
+  carol.clear();
+  carol.send({ t: 'pack:get', hash: manyHash });
+  await carol.wait('pack:begin');
+  carol.send({ t: 'pack:get', hash: manyHash });
+  const busy = await carol.wait('error');
+  check(busy.code === 'pack:busy', '下载中再请求被拒 (pack:busy)');
+  // 收完这个包（避免影响后续测试的 downloading 状态）
+  await waitFor(() => carol.frames.filter((f) => f.t === 'pack:chunk').length >= manyParts.length, 5000);
+
+  // 不存在的包
+  bob.clear();
+  bob.send({ t: 'pack:get', hash: 'deadbeefdeadbeef' });
+  const packNotFound = await bob.wait('error');
+  check(packNotFound.code === 'pack:not_found', '下载不存在的包被拒 (pack:not_found)');
+
+  // announce -> 房内广播 member:pack
+  bob.clear();
+  alice.send({ t: 'pack:announce', hash: packHash });
+  const mp = await bob.wait('member:pack');
+  check(mp.memberId === alice.memberId && mp.packHash === packHash, 'announce 广播到房内 (member:pack)');
+
+  // member:in / joined 快照都带 packHash
+  carol.clear();
+  carol.send({ t: 'leave', roomId });
+  await sleep(200);
+  carol.send({ t: 'join', roomId });
+  const rejoinedPack = await carol.wait('joined');
+  const aliceMember = rejoinedPack.room.members.find((m) => m.memberId === alice.memberId);
+  check(aliceMember?.packHash === packHash, '进房快照带在线成员的 packHash');
 
   // ── 9. 容量上限 ────────────────────────────────────────
   console.log('\n9. 容量');

@@ -13,7 +13,7 @@ import {
   packCharacterDir,
   sanitizeManifest,
   unpackCharacter,
-} from '../src/main/link/asset-pack';
+} from '../src/main/asset-pack';
 
 const cleanups: string[] = [];
 

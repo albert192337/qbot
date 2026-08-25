@@ -1,6 +1,6 @@
 /**
  * 装扮市场客户端（spec: 2026-08-02-skin-market-design §三）：
- * HTTP 全走主进程（免 CORS、服务器地址单点）；打包复用 link/asset-pack
+ * HTTP 全走主进程（免 CORS、服务器地址单点）；打包复用 asset-pack
  * （persona 已在打包层脱敏）；下载本地复算 hash 校验后原子入库并激活。
  */
 import { nativeImage } from 'electron';
@@ -11,7 +11,7 @@ import path from 'node:path';
 import type { MarketSkin } from '../shared/ipc-types';
 import { charactersDir, getCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { packCharacterDir, unpackCharacter } from './link/asset-pack';
+import { packCharacterDir, unpackCharacter } from './asset-pack';
 import { rebuildTray } from './tray';
 import { broadcastCharacterActivated } from './windows';
 

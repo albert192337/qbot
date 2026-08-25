@@ -106,7 +106,7 @@ window.qbot.settings.onChanged((s) => speaker.setSettings(voiceSettings(s)));
 // ── 举牌文字：单一来源，优先级 手动举牌 > 一次性 > agent > meeting > music ─
 /** 一次性文字（如「工作完成！」），显示后由下一次 refresh 清掉 */
 let signboardOneShot: string | null = null;
-/** 手动举牌（右键菜单输入；联机时同步对端替身，收牌前一直举着） */
+/** 手动举牌（右键菜单输入；纯本地显示，收牌前一直举着） */
 let userSign: string | null = null;
 
 function refreshSignboard(): void {
@@ -450,13 +450,13 @@ window.qbot.pet.onMenuCommand((cmd) => {
   else if (cmd.type === 'signClear') applyUserSign(null);
 });
 
-// ── 手动举牌输入框（联机举牌：本端显示 + 同步对端替身） ─────
+// ── 手动举牌输入框（纯本地的牌子，无网络出口） ─────
 let signEntry: HTMLInputElement | null = null;
 
 function applyUserSign(text: string | null): void {
   userSign = text?.trim() ? text.trim().slice(0, 60) : null;
   refreshSignboard();
-  window.qbot.link.setSign(userSign); // 未配对时主进程只记账，不发帧
+  window.qbot.sign.set(userSign); // 联机退役后纯本地记账，无网络出口
 }
 
 function hideSignPrompt(): void {

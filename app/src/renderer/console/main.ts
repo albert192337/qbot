@@ -15,7 +15,6 @@ export type PaneId =
   | 'prompts'
   | 'market'
   | 'claude'
-  | 'link'
   | 'settings'
   | 'devtools';
 
@@ -62,7 +61,6 @@ const GROUPS: { label: string; defs: Omit<PaneDef, 'group'>[] }[] = [
     label: '连接',
     defs: [
       { id: 'claude', label: 'Claude Code', icon: '🤖', load: () => import('./panes/claude') },
-      { id: 'link', label: '联机', icon: '🔗', load: () => import('./panes/link') },
     ],
   },
   {

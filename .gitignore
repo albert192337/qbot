@@ -17,3 +17,6 @@ app/release/
 
 # rooms 服务运行时数据（房间注册表 + 聊天记录）
 rooms/data/
+
+# 本地工作计划/笔记（不提交）
+.claude/plans/

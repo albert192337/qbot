@@ -35,8 +35,6 @@ export interface Settings {
   talkFrequency?: 'quiet' | 'normal' | 'chatty';
   /** Claude Code 联动 hooks 已安装（托盘开关的记忆位） */
   claudeHooksInstalled?: boolean;
-  /** 联机：把正在听的曲名分享给对端（默认 false，spec §一「同步粒度」） */
-  linkShareSong?: boolean;
   /** 装扮市场：上传署名昵称（默认「匿名」） */
   marketNickname?: string;
   /** 装扮市场：hash → 管理码（下架自己上传的皮肤用） */
@@ -57,6 +55,8 @@ export interface Settings {
   roomsFavorites?: string[];
   /** 已同意公共房间的发言须知（首次入房明示，spec §5.3） */
   roomsChatConsent?: boolean;
+  /** 在公共房间展示我的桌宠（默认 true；关闭则不上传角色包、房友只见缩略图） */
+  roomsShowMyPet?: boolean;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */
@@ -201,54 +201,36 @@ export interface PetMenuActionEntry {
 export type PetMenuCommand =
   | { type: 'speak' }
   | { type: 'play'; action: string }
-  /** 弹举牌输入框（联机举牌：本端显示 + 同步对端替身） */
+  /** 弹举牌输入框（纯本地的牌子） */
   | { type: 'signPrompt' }
   | { type: 'signClear' };
 
-// ── 联机 presence（spec 2026-08-02-multiplayer-presence-design）──────────
-/** 对端高层状态：agent 活动 + 听歌（隐私边界见 spec §四，只有枚举/动作名/放行曲名出本机） */
+// ── presence 状态类型（2026-08-24 起由公共房间上屏复用；原 1v1 联机已退役）──
+/** 对端高层状态：agent 活动 + 听歌（隐私边界：只有枚举/动作名出本机，曲名不出） */
 export type LinkMode = AgentActivity | 'music';
 
-/** 联机 state 帧（peer ↔ peer，经 relay 盲转） */
+/** 对端 state 帧（房间 presence / 上屏宠窗驱动 NetworkDriver 用） */
 export interface LinkPeerState {
   mode: LinkMode;
-  /** 动作提示（对端 Studio 配了自定义动作时带上；缺省由接收端按替身角色自己的映射解析） */
+  /** 动作提示（对端 Studio 配了自定义动作时带上；缺省按替身角色自己的映射解析） */
   action?: string;
-  /** 对端开了「分享曲名」才有 */
-  song?: string;
 }
 
-/** 联机 hello 帧（配对成功后互报） */
-export interface LinkPeerHello {  charName: string;
-  /** 角色资产包指纹（L1 资产分发缓存键；老版本对端没有） */
-  manifestHash?: string;
-}
-
-/** 对端真身角色就位（缓存命中 / 传输完成），远端窗以此加载渲染 */
+/** 对端真身角色就位（服务端缓存下载完成），上屏宠窗以此加载渲染 */
 export interface LinkPeerCharacter {
   /** `.peer-<hash>` 缓存目录名（qbot-asset:// 的 host） */
   dirId: string;
   manifest: Manifest;
 }
 
-/** 角色包传输进度（远端窗占位提示用） */
+/** 角色包传输进度（上屏宠窗占位提示用） */
 export interface LinkAssetProgress {
   received: number;
   total: number;
 }
 
-/** 联机链路状态（托盘菜单 + 远端窗右键菜单消费） */
-export interface LinkStatus {
-  phase: 'off' | 'connecting' | 'waiting' | 'paired';
-  /** waiting/paired 时：本房房间码（自己建的房才有） */
-  roomCode?: string;
-  /** paired 且收到 hello 后：对端角色名 */
-  peerName?: string;
-}
-
 // ── 公共房间（spec 2026-08-21-public-rooms-design）───────────────────────
-// 与上面的 1v1 联机是**两条独立链路**：那条是好友替身窗（relay 盲转），
-// 这条是多人房间（rooms 服务，解析+落盘）。别把两边的类型混用。
+// 原 1v1 联机已退役（2026-08-24）；以下类型是唯一的联机链路（多人房间）。
 
 /** 房间类型（列表筛选骨架） */
 export type RoomKind = 'idle' | 'study' | 'night' | 'coop';
@@ -275,6 +257,8 @@ export interface RoomMember {
   /** 在线时才有：复用联机的状态枚举 */
   mode?: LinkMode;
   action?: string;
+  /** 在线时才有：角色包指纹（服务端缓存键，上屏用） */
+  packHash?: string;
 }
 
 /** 房内快照（进房时拿到） */
@@ -430,37 +414,32 @@ export interface QBotApi {
     /** pet 窗口订阅：会议状态变化 */
     onStatus(cb: (status: MeetingStatus) => void): () => void;
   };
-  link: {
-    /** 当前联机链路状态 */
-    getStatus(): Promise<LinkStatus>;
-    /** 建房，返回 6 位房间码（控制台「联机」pane） */
-    create(): Promise<string>;
-    /** 用房间码加入（控制台「联机」pane 的输入框） */
-    join(code: string): Promise<void>;
-    /** 订阅链路状态变化（主进程 setLinkStatusListener 搭车推送） */
-    onChanged(cb: (status: LinkStatus) => void): () => void;
-    /** 断开联机（远端窗右键菜单；托盘走主进程直调） */
-    stop(): void;
-    /** 远端宠窗订阅：对端角色名（hello 帧） */
-    onPeerHello(cb: (info: LinkPeerHello) => void): () => void;
-    /** 远端宠窗订阅：对端状态帧（驱动 NetworkDriver） */
-    onPeerState(cb: (s: LinkPeerState) => void): () => void;
-    /** 远端宠窗订阅：对端掉线（打瞌睡；30s 未重连主进程会关窗） */
-    onPeerLeft(cb: () => void): () => void;
-    /** 远端宠窗订阅：对端真身角色就位（缓存命中 / 传输完成） */
-    onPeerCharacter(cb: (meta: LinkPeerCharacter) => void): () => void;
-    /** 远端宠窗订阅：角色包传输进度（占位提示） */
-    onAssetProgress(cb: (p: LinkAssetProgress) => void): () => void;
-    /** 远端宠窗订阅：对端手动举牌（null=收牌） */
-    onPeerSign(cb: (text: string | null) => void): () => void;
-    /** 本端手动举牌（null=收牌）：配对期间同步给对端替身显示 */
-    setSign(text: string | null): void;
-    /** 远端宠窗启动自取快照（动态 import 竞态兜底：注册完监听后拉一次） */
-    getPeerCache(): Promise<{
-      hello: LinkPeerHello | null;
+  /** 手动举牌（纯本地：pet 窗 signboard 显示，主进程只记账；无网络出口） */
+  sign: {
+    set(text: string | null): void;
+  };
+  /**
+   * 公共房间的宠上屏窗（?roomPet=1，spec 2026-08-24）。每个窗对应一个房友，
+   * 主进程按窗口定向推送（不带 memberId——一个窗只服务一个成员，天然隔离）。
+   */
+  roomPet: {
+    onHello(cb: (info: { nickname: string }) => void): () => void;
+    onCharacter(cb: (meta: LinkPeerCharacter) => void): () => void;
+    onProgress(cb: (p: LinkAssetProgress) => void): () => void;
+    onState(cb: (s: { mode?: LinkMode; action?: string }) => void): () => void;
+    /** 房友发言：本地渲染成聊天气泡（内容已经过服务端广播给你，不是新增出站面） */
+    onChat(cb: (msg: { text: string }) => void): () => void;
+    onPackFailed(cb: () => void): () => void;
+    onLeft(cb: () => void): () => void;
+    /** 右键菜单：打招呼 */
+    wave(): void;
+    /** 右键菜单：退出房间（同 lounge 的退出按钮） */
+    leaveRoom(): void;
+    /** 启动自取快照（动态 import 竞态兜底，同 link.getPeerCache） */
+    getCache(): Promise<{
+      hello: { nickname: string } | null;
       character: LinkPeerCharacter | null;
-      state: LinkPeerState | null;
-      sign: string | null;
+      state: { mode?: LinkMode; action?: string } | null;
     }>;
   };
   market: {
@@ -473,7 +452,7 @@ export interface QBotApi {
     /** 下架自己上传的皮肤（凭本地管理码） */
     remove(hash: string): Promise<void>;
   };
-  /** 公共房间（spec 2026-08-21）：与上面的 link 是两条独立链路 */
+  /** 公共房间（spec 2026-08-21）：联机唯一链路（原 1v1 已退役） */
   rooms: {
     open(): void;
     list(kind?: RoomKind, q?: string): Promise<RoomBrief[]>;

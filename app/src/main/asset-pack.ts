@@ -1,18 +1,20 @@
 /**
- * 联机 L1 资产分发：角色包的打包/分块/重组（spec §三.2 asset:request / asset:chunk）。
- * 纯 Node 零 Electron 依赖，可单测。
+ * 角色包的打包/分块/重组。纯 Node 零 Electron 依赖，可单测。
  *
  * 包格式：[4B BE header长度][JSON header {files:[{path,size}]}][文件字节顺序拼接]
  * 内容 = 脱敏 manifest.json + manifest 引用的已完成动作 webm；
  * manifestHash = sha256(整包).slice(0,16)，同时是接收端缓存目录 `.peer-<hash>` 的键。
  *
- * 隐私（spec §四硬规则）：persona 文本永不出本机 → 打包前从 manifest 剥离。
+ * 使用方：公共房间的服务端缓存分发（rooms/）、皮肤市场下载（market）。
+ * （曾经的 1v1 盲转分块也走这里；块大小以 rooms 服务 128KB 帧上限为准）
+ *
+ * 隐私（spec §四硬规则）：persona 文本永不出本机，打包前从 manifest 剥离。
  */
 import { createHash } from 'node:crypto';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-/** 单块原始字节数（base64 后 ≈87KB，relay maxPayload 256KB 内余量充足） */
+/** 单块原始字节数（base64 后 ≈87KB，rooms 服务 128KB 帧上限内余量充足） */
 export const CHUNK_SIZE = 64 * 1024;
 /** 总块数上限（× 64KB = 512MB，防对端恶意 total 撑爆内存） */
 const MAX_CHUNKS = 8192;

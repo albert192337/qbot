@@ -4,9 +4,6 @@
  * 关键改造：统一成**改动即生效**。原实现是混合语义——两个 API key 要点「保存」、
  * 其余四项改动即生效；pane 之间切换会丢未保存的 key。key 走 change 事件
  * （blur 或回车才触发，不会每敲一个字符写一次盘）。
- *
- * 顺带补 linkShareSong 开关：字段与主进程逻辑（link.ts 据此决定曲名是否出本机）
- * 早就完备，但此前没有任何 UI 能打开它。
  */
 import type { Settings } from '../../../shared/ipc-types';
 
@@ -72,10 +69,11 @@ function template(s: Settings): string {
 
   <h3>隐私</h3>
   <div class="set-row">
-    <label class="set-check"><input id="set-share-song" type="checkbox" ${s.linkShareSong ? 'checked' : ''} /> 联机时把正在听的曲名分享给对端</label>
+    <label class="set-check"><input id="set-show-pet" type="checkbox" ${s.roomsShowMyPet !== false ? 'checked' : ''} /> 在公共房间展示我的桌宠</label>
   </div>
-  <p class="studio-hint">默认关闭。关闭时对端只知道你「在听歌」，不知道听什么。
-  键盘监控只累计次数，哪个键从不离开本机、不联网、不落盘。</p>
+  <p class="studio-hint">开启后进房会把你的桌宠形象（动作动画，不含人设文字）缓存到房间服务器，供房友桌面显示。关闭则房友只见你的缩略图。
+  键盘监控只累计次数，哪个键从不离开本机、不联网、不落盘。
+  公共房间只出状态枚举与动作名，曲名/会话内容绝不进房间。</p>
 </div>`;
 }
 
@@ -99,8 +97,8 @@ function syncFrom(host: HTMLElement, s: Settings): void {
   }
   const freq = host.querySelector<HTMLSelectElement>('#set-talk-frequency');
   if (freq) freq.value = s.talkFrequency ?? 'normal';
-  const share = host.querySelector<HTMLInputElement>('#set-share-song');
-  if (share) share.checked = !!s.linkShareSong;
+  const showPet = host.querySelector<HTMLInputElement>('#set-show-pet');
+  if (showPet) showPet.checked = s.roomsShowMyPet !== false;
 }
 
 function bind(host: HTMLElement): void {
@@ -134,7 +132,7 @@ function bind(host: HTMLElement): void {
       talkFrequency: (e.target as HTMLSelectElement).value as 'quiet' | 'normal' | 'chatty',
     });
   });
-  q<HTMLInputElement>('#set-share-song').addEventListener('change', (e) => {
-    void window.qbot.settings.set({ linkShareSong: (e.target as HTMLInputElement).checked });
+  q<HTMLInputElement>('#set-show-pet').addEventListener('change', (e) => {
+    void window.qbot.settings.set({ roomsShowMyPet: (e.target as HTMLInputElement).checked });
   });
 }

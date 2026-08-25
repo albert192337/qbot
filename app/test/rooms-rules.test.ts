@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildChatFrame,
   buildPresenceFrame,
+  PACK_HASH_RE,
   PRESENCE_ALLOWED_KEYS,
   CAPACITY_DEFAULT,
   CAPACITY_MAX,
@@ -18,9 +19,11 @@ import {
   errorText,
   filterRooms,
   isRoomKind,
+  layoutRoomPets,
   mergeChat,
   normalizeCreateInput,
   precheckChat,
+  selectPruneTargets,
   sortRooms,
 } from '../src/main/rooms/rooms-rules';
 import type { RoomBrief, RoomChatMsg } from '../src/shared/ipc-types';
@@ -288,5 +291,82 @@ describe('隐私铁律：chat 帧只接用户手打的文字', () => {
 
   it('只有 t/text 两个字段（不夹带来源/会话 id）', () => {
     expect(Object.keys(buildChatFrame('hi')!).sort()).toEqual(['t', 'text']);
+  });
+});
+
+describe('角色包指纹格式（PACK_HASH_RE，与服务端一致）', () => {
+  it('接受 sha256 前 16 位小写十六进制', () => {
+    expect(PACK_HASH_RE.test('ab2042c9fe29136d')).toBe(true);
+  });
+
+  it('拒绝大写/超长/非十六进制', () => {
+    expect(PACK_HASH_RE.test('AB2042C9FE29136D')).toBe(false);
+    expect(PACK_HASH_RE.test('ab2042c9fe29136d00')).toBe(false);
+    expect(PACK_HASH_RE.test('not-a-hash-value')).toBe(false);
+  });
+});
+
+describe('宠上屏布局（layoutRoomPets）', () => {
+  it('没人时返回空', () => {
+    expect(layoutRoomPets([], 1000, 200, 20)).toEqual([]);
+  });
+
+  it('一行装得下：水平居中，都在第一行（bottomOffset 相同）', () => {
+    const slots = layoutRoomPets(['a', 'b', 'c', 'd'], 1000, 200, 20);
+    // perRow = floor(1020/220) = 4，四个正好一行：整体宽 860，居中留白 (1000-860)/2=70
+    expect(slots.map((s) => s.x)).toEqual([70, 290, 510, 730]);
+    expect(slots.every((s) => s.bottomOffset === 200)).toBe(true);
+  });
+
+  it('超过一行装的数量：换行叠高，第二行 bottomOffset 更大（更靠上）', () => {
+    const slots = layoutRoomPets(['a', 'b', 'c', 'd', 'e'], 1000, 200, 20);
+    expect(slots[4].bottomOffset).toBeGreaterThan(slots[0].bottomOffset);
+    expect(slots[4].bottomOffset).toBe(420); // 第二行只有 1 个，居中于 1000 宽
+    expect(slots[4].x).toBe(400);
+  });
+
+  it('单人房：整体居中', () => {
+    const slots = layoutRoomPets(['solo'], 1000, 200, 20);
+    expect(slots).toEqual([{ memberId: 'solo', x: 400, bottomOffset: 200 }]);
+  });
+
+  it('极窄工作区（小于一只宽度）：至少一行一个，不整除也不崩', () => {
+    const slots = layoutRoomPets(['a', 'b'], 150, 200, 20);
+    expect(slots).toHaveLength(2);
+    expect(slots[0].bottomOffset).toBe(200);
+    expect(slots[1].bottomOffset).toBeGreaterThan(slots[0].bottomOffset); // 挤不下一行，各占一行
+  });
+
+  it('memberId 顺序保留（按进房顺序排，不重排）', () => {
+    const slots = layoutRoomPets(['z', 'a', 'm'], 1000, 200, 20);
+    expect(slots.map((s) => s.memberId)).toEqual(['z', 'a', 'm']);
+  });
+});
+
+describe('.peer- 缓存 LRU 淘汰（selectPruneTargets）', () => {
+  it('不超上限时什么都不删', () => {
+    const c = [{ name: 'a', mtime: 1 }, { name: 'b', mtime: 2 }];
+    expect(selectPruneTargets(c, 4)).toEqual([]);
+  });
+
+  it('超上限按最旧优先删，只删超出的数量', () => {
+    const c = [
+      { name: 'newest', mtime: 30 },
+      { name: 'oldest', mtime: 10 },
+      { name: 'middle', mtime: 20 },
+    ];
+    expect(selectPruneTargets(c, 1)).toEqual(['oldest', 'middle']);
+  });
+
+  it('keep 为 0 时全删；候选为空时不删', () => {
+    expect(selectPruneTargets([{ name: 'a', mtime: 1 }], 0)).toEqual(['a']);
+    expect(selectPruneTargets([], 4)).toEqual([]);
+  });
+
+  it('不修改传入的数组（纯函数）', () => {
+    const c = [{ name: 'a', mtime: 2 }, { name: 'b', mtime: 1 }];
+    const copy = [...c];
+    selectPruneTargets(c, 0);
+    expect(c).toEqual(copy);
   });
 });
