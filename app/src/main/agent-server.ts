@@ -32,6 +32,7 @@ import { sendToWindows } from './windows';
 import { pushLocalAgentActivity as pushRoomsActivity } from './rooms/rooms';
 import { addAgentRun } from './progress';
 import { AGENT } from '../shared/config';
+import { withTimeout } from '../shared/timeout';
 
 // 已在shared/config.ts中定义，保留注释用于参考
 // const PORTS = [24242, 24243, 24244, 24245, 24246];
@@ -132,6 +133,8 @@ async function emitAgentMessage(ev: PendingMessage): Promise<void> {
   }
 }
 
+import { withTimeout } from '../shared/timeout';
+
 function handleStatePost(agentId: string, body: unknown): number {
   if (typeof body !== 'object' || body === null) return 400;
   const data = body as Record<string, unknown>;
@@ -199,6 +202,12 @@ function sweep(): void {
 function listen(port: number): Promise<http.Server> {
   return new Promise((resolve, reject) => {
     const srv = http.createServer((req, res) => {
+      // 为每个请求设置超时
+      req.setTimeout(30000, () => {
+        console.error('agent-server: 请求超时', req.url);
+        res.writeHead(408).end();
+      });
+
       const url = new URL(req.url ?? '/', 'http://127.0.0.1');
       if (req.method === 'GET' && url.pathname === '/state') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -210,8 +219,12 @@ function listen(port: number): Promise<http.Server> {
         let size = 0;
         req.on('data', (c: Buffer) => {
           size += c.length;
-          if (size > BODY_LIMIT) req.destroy();
-          else chunks.push(c);
+          if (size > BODY_LIMIT) {
+            req.destroy();
+            res.writeHead(413).end();
+            return;
+          }
+          chunks.push(c);
         });
         req.on('end', () => {
           let code = 400;

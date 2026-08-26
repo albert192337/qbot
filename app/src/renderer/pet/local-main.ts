@@ -1,4 +1,5 @@
 /** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 + 串门 + 调试面板 */
+import './error-handler';
 import type { ActionId, PlayableId } from '@qbot/pipeline';
 import type { AgentActivity, CharacterMeta, MeetingStatus, MusicStatus } from '../../shared/ipc-types';
 import { Player } from './player';

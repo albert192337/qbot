@@ -33,7 +33,8 @@ import {
   NICK_MAX,
 } from './rooms-rules';
 import * as RoomPets from './room-pets';
-import { ROOMS } from '../shared/config';
+import { ROOMS } from '../../shared/config';
+import { withTimeout, withRetry } from '../shared/timeout';
 
 /**
  * 房间服务地址，**按顺序尝试**：域名 wss 为主，IP 明文为兜底。
@@ -479,8 +480,10 @@ export function pushLocalMusic(next: MusicStatus): void {
 /** 拉房间列表（未连接则先连）。kind/q 交服务端筛一道，客户端还会本地再筛 */
 export async function listRooms(kind?: RoomKind, q?: string): Promise<RoomBrief[]> {
   await connect();
-  const frame = await request({ t: 'list', kind, q }, 'rooms');
-  return Array.isArray(frame.rooms) ? (frame.rooms as RoomBrief[]) : [];
+  return withRetry(async () => {
+    const frame = await request({ t: 'list', kind, q }, 'rooms');
+    return Array.isArray(frame.rooms) ? (frame.rooms as RoomBrief[]) : [];
+  }, 3, 1000);
 }
 
 /** 开房：成功后把房主管理码存本地（改设置/踢人要用），并自动进房 */
@@ -488,22 +491,26 @@ export async function createRoom(input: CreateRoomInput): Promise<string> {
   const normalized = normalizeCreateInput(input);
   if (!normalized) throw new Error('房间名不能为空');
   await connect();
-  const frame = await request({ t: 'create', ...normalized }, 'room');
-  const roomId = String(frame.roomId ?? '');
-  const ownerToken = String(frame.ownerToken ?? '');
-  if (!roomId) throw new Error('开房失败');
-  const settings = await getSettings();
-  await setSettings({
-    roomsOwnerTokens: { ...settings.roomsOwnerTokens, [roomId]: ownerToken },
-  });
-  await joinRoom(roomId);
-  return roomId;
+  return withRetry(async () => {
+    const frame = await request({ t: 'create', ...normalized }, 'room');
+    const roomId = String(frame.roomId ?? '');
+    const ownerToken = String(frame.ownerToken ?? '');
+    if (!roomId) throw new Error('开房失败');
+    const settings = await getSettings();
+    await setSettings({
+      roomsOwnerTokens: { ...settings.roomsOwnerTokens, [roomId]: ownerToken },
+    });
+    await joinRoom(roomId);
+    return roomId;
+  }, 3, 1000);
 }
 
 export async function joinRoom(roomId: string): Promise<RoomSnapshot> {
   await connect();
-  const frame = await request({ t: 'join', roomId: roomId.trim().toUpperCase() }, 'joined');
-  return frame.room as RoomSnapshot;
+  return withRetry(async () => {
+    const frame = await request({ t: 'join', roomId: roomId.trim().toUpperCase() }, 'joined');
+    return frame.room as RoomSnapshot;
+  }, 3, 1000);
 }
 
 export function leaveRoom(): void {

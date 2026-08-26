@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { open, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
+import { initErrorHandler } from './error-handler';
 import { charactersDir, getCharacter, listCharacters, seedPresets } from './characters';
 import { getSettings, setSettings } from './config';
 import { registerIpc } from './ipc';
@@ -49,6 +50,11 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.whenReady().then(async () => {
+  // 初始化全局错误处理
+  initErrorHandler();
+
+  // 资源泄漏检测和自动清理
+  startResourceMonitoring();
   protocol.handle('qbot-asset', async (req) => {
     const url = new URL(req.url);
     const base = charactersDir();
@@ -183,3 +189,30 @@ app.on('before-quit', (ev) => {
 app.on('activate', () => {
   if (!getPetWindow()) createPetWindow();
 });
+
+/**
+ * 资源泄漏检测和自动清理
+ */
+function startResourceMonitoring(): void {
+  // 每5分钟检查一次资源使用情况
+  setInterval(() => {
+    // 检查内存使用
+    const memUsage = process.memoryUsage();
+    const memUsageMB = {
+      rss: (memUsage.rss / 1024 / 1024).toFixed(2),
+      heapTotal: (memUsage.heapTotal / 1024 / 1024).toFixed(2),
+      heapUsed: (memUsage.heapUsed / 1024 / 1024).toFixed(2),
+      external: (memUsage.external / 1024 / 1024).toFixed(2),
+    };
+
+    console.log('[resource-monitor] 内存使用情况:', memUsageMB);
+
+    // 如果堆内存超过200MB，强制垃圾回收
+    if (memUsage.heapUsed > 200 * 1024 * 1024 && global.gc) {
+      console.warn('[resource-monitor] 高内存使用警告，强制垃圾回收');
+      global.gc();
+    }
+
+    // 其他资源清理逻辑可以在这里添加
+  }, 5 * 60 * 1000);
+}

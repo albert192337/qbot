@@ -13,6 +13,7 @@ import {
   layoutRoomPetWindows,
 } from '../windows';
 import { onRoomPetEvent, type RoomPetEvent } from './room-pets';
+import { myMemberId, memberStates } from './room-pets';
 
 /** member:out 后的宽限：宽限内 member:in 复活同一窗，避免闪断重连时窗口一开一关 */
 const MEMBER_GONE_GRACE_MS = 5 * 60 * 1000; // 5分钟，避免频繁闪断

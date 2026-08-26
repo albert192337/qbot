@@ -170,6 +170,7 @@ const downloadQueue: string[] = [];
 let activeDownloadHash: string | null = null;
 /** 进房时记下的自己（memberId）；null = 不在房 */
 let myMemberId: string | null = null;
+export { myMemberId, memberStates };
 
 function peerCacheDir(hash: string): string {
   return path.join(charactersDir(), `${PEER_CACHE_PREFIX}${hash}`);
