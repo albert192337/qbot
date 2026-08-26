@@ -12,6 +12,7 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { PIPELINE } from '../app/src/shared/config';
 
 const execFileP = promisify(execFile);
 
@@ -40,8 +41,8 @@ export interface AlphaStats {
  * - 残留绿边不靠调大 similarity 解决（上面两条已证明会吃角色本体），
  *   而是靠 rim-only despill 在轮廓环带上压绿（见 RIM_DESPILL_MIX）
  */
-export const CHROMAKEY_SIMILARITY = 0.1;
-export const CHROMAKEY_BLEND = 0.07;
+export const CHROMAKEY_SIMILARITY = PIPELINE.CHROMAKEY_SIMILARITY;
+export const CHROMAKEY_BLEND = PIPELINE.CHROMAKEY_BLEND;
 
 /**
  * rim-only despill：只在角色轮廓环带上压减绿通道，消除抗锯齿/色度子采样产生的绿边。
@@ -62,16 +63,28 @@ export const CHROMAKEY_BLEND = 0.07;
  *
  * mix=0.5 为实测最优：绿边 G+70→G+0，白色本体与薄荷绿内部均零改动。
  */
-export const RIM_DESPILL_MIX = 0.5;
+export const RIM_DESPILL_MIX = PIPELINE.RIM_DESPILL_MIX;
 /** 环带宽度（dilate/erode 次数）：1 = 覆盖轮廓外一圈混色像素，实测足够 */
-export const RIM_DESPILL_BAND = 1;
+export const RIM_DESPILL_BAND = PIPELINE.RIM_DESPILL_BAND;
+
+/**
+ * 检查ffmpeg是否可用
+ */
+export async function checkFfmpegAvailable(ffmpegPath: string = 'ffmpeg'): Promise<boolean> {
+  try {
+    await execFileP(ffmpegPath, ['-version'], { encoding: 'buffer', timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * alpha 收边像素数（旧方案，默认关闭 —— 现由 rim-only despill 取代）。
  * 保留参数是为了 rekey CLI 能对存量角色回退对照，以及 despill 关闭时的兜底。
  * 注意：与 rim despill 同时开启会破坏画面（见上），keyActionVideo 已互斥处理。
  */
-export const ALPHA_ERODE_PX = 0;
+export const ALPHA_ERODE_PX = PIPELINE.ALPHA_ERODE_PX;
 
 /** 归一化目标：角色 alpha 覆盖面积占画布比例 / 底边基线位置（所有动作一致 → 视觉等大）。
  *  0.18 = 按现有 6 个动作在旧 bbox 口径下的归一化后覆盖率中位数实测标定，
@@ -87,14 +100,26 @@ export const NORM_SCALE_MAX = 2.5;
 async function runFfmpeg(
   ffmpegPath: string,
   args: string[],
-  opts: { captureStdout?: boolean } = {},
+  opts: { captureStdout?: boolean; timeout?: number } = {},
 ): Promise<Buffer> {
-  const { stdout } = await execFileP(ffmpegPath, ['-v', 'error', ...args], {
-    encoding: 'buffer',
-    maxBuffer: 64 * 1024 * 1024,
-    ...(opts.captureStdout ? {} : {}),
-  });
-  return stdout;
+  const timeout = opts.timeout ?? 300_000; // 默认5分钟超时
+  try {
+    const { stdout } = await execFileP(ffmpegPath, ['-v', 'error', ...args], {
+      encoding: 'buffer',
+      maxBuffer: 64 * 1024 * 1024,
+      timeout,
+      ...(opts.captureStdout ? {} : {}),
+    });
+    return stdout;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new Error(`ffmpeg 可执行文件未找到，请确保已安装 ffmpeg：${ffmpegPath}`);
+    }
+    if ((error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
+      throw new Error(`ffmpeg 命令超时（超过 ${timeout}ms）`);
+    }
+    throw error;
+  }
 }
 
 /** rawvideo RGB24 buffer → 平均色 hex（TS 版替代 DESIGN.md 里的 python 单行） */

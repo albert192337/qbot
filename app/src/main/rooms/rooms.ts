@@ -33,6 +33,7 @@ import {
   NICK_MAX,
 } from './rooms-rules';
 import * as RoomPets from './room-pets';
+import { ROOMS } from '../shared/config';
 
 /**
  * 房间服务地址，**按顺序尝试**：域名 wss 为主，IP 明文为兜底。
@@ -46,14 +47,11 @@ import * as RoomPets from './room-pets';
  *
  * `QBOT_ROOMS_URL` 指定时只用它、不做回退（开发调试要的是确定性）。
  */
-const ROOMS_URL_CHAIN = [
-  'wss://albertbeta.cn/rooms',
-  'ws://14.103.59.73:24252',
-] as const;
-const CONNECT_TIMEOUT_MS = 8_000;
-const REQUEST_TIMEOUT_MS = 8_000;
-/** 在场心跳：on-change 之外的兜底重发（同 link 的 15s 心跳思路，房间人多所以放宽到 30s） */
-const PRESENCE_HEARTBEAT_MS = 15_000; // 15秒，更频繁的心跳确保连接稳定
+// 已在shared/config.ts中定义，保留注释用于参考
+// const ROOMS_URL_CHAIN = ['wss://albertbeta.cn/rooms', 'ws://14.103.59.73:24252'] as const;
+// const CONNECT_TIMEOUT_MS = 8_000;
+// const REQUEST_TIMEOUT_MS = 8_000;
+// const PRESENCE_HEARTBEAT_MS = 15_000;
 const WS_OPEN = 1;
 
 /** Node ≥22 内置全局 WebSocket；@types/node 旧版缺声明 → 本地补最小类型 */
@@ -136,7 +134,7 @@ function push(channel: string, payload: unknown): void {
 /** 候选地址表：显式指定则只用它，否则走主路→兜底链 */
 function candidates(): readonly string[] {
   const override = process.env.QBOT_ROOMS_URL;
-  return override ? [override] : ROOMS_URL_CHAIN;
+  return override ? [override] : ROOMS.URL_CHAIN;
 }
 
 /** 当前生效地址（连上过才有意义；没连上时取第一个候选用于展示） */
@@ -188,7 +186,7 @@ function open(target: string): Promise<WsLike> {
         try { s.close(); } catch { /* noop */ }
         reject(new Error('连接超时'));
       });
-    }, CONNECT_TIMEOUT_MS);
+    }, ROOMS.CONNECT_TIMEOUT_MS);
     s.addEventListener('open', () => done(() => resolve(s)));
     s.addEventListener('error', () => done(() => reject(new Error('连接失败'))));
     s.addEventListener('message', (ev) => handleMessage(ev.data));
@@ -206,13 +204,24 @@ function handleClosed(): void {
   roomCache = null;
   stopHeartbeat();
   RoomPets.onLeftRoom(); // 连接掉了：宠上屏跟着收场
-  for (const [, p] of pending) {
+  // 清理所有pending请求
+  const pendingCopy = new Map(pending);
+  pending.clear();
+  for (const [, p] of pendingCopy) {
     clearTimeout(p.timer);
     p.reject(new Error('连接已断开'));
   }
-  pending.clear();
   // 主动断开是正常收场；被动断开要让 UI 看到原因
   setStatus(closedByUs ? { phase: 'off' } : { phase: 'off', error: '与房间服务的连接断开了' });
+
+  // 自动重连：如果不是主动关闭，尝试重新连接
+  if (!closedByUs && status.phase !== 'off') {
+    setTimeout(() => {
+      if (ws === null && !closedByUs) {
+        connect().catch(() => {});
+      }
+    }, 5000); // 5秒后自动重连
+  }
 }
 
 async function hello(): Promise<void> {
@@ -241,7 +250,7 @@ function request(frame: Frame, expect: string): Promise<Frame> {
     const timer = setTimeout(() => {
       pending.delete(expect);
       reject(new Error('房间服务无响应'));
-    }, REQUEST_TIMEOUT_MS);
+    }, ROOMS.REQUEST_TIMEOUT_MS);
     pending.set(expect, { resolve, reject, timer });
     ws.send(JSON.stringify(frame));
   });
@@ -270,7 +279,8 @@ function handleMessage(data: unknown): void {
   let frame: Frame;
   try {
     frame = JSON.parse(String(data)) as Frame;
-  } catch {
+  } catch (err) {
+    console.debug('rooms: 收到非JSON消息', data);
     return; // 非 JSON 帧直接丢
   }
   switch (frame.t) {
@@ -429,7 +439,7 @@ function applyJoined(frame: Frame): void {
 
 function startHeartbeat(): void {
   if (heartbeatTimer) return;
-  heartbeatTimer = setInterval(() => void sendPresence(true), PRESENCE_HEARTBEAT_MS);
+  heartbeatTimer = setInterval(() => void sendPresence(true), ROOMS.PRESENCE_HEARTBEAT_MS);
 }
 
 function stopHeartbeat(): void {
@@ -590,8 +600,21 @@ export function getRoomsCache(): {
 export function disconnectRooms(): void {
   closedByUs = true;
   leaveRoom();
-  ws?.close();
-  ws = null;
+
+  // 关闭WebSocket连接
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+
   stopHeartbeat();
+
+  // 清空所有pending请求
+  const pendingCopy = new Map(pending);
+  pending.clear();
+  for (const [, p] of pendingCopy) {
+    clearTimeout(p.timer);
+  }
+
   setStatus({ phase: 'off' });
 }

@@ -31,24 +31,21 @@ import { pushAgentMessage } from './bubble';
 import { sendToWindows } from './windows';
 import { pushLocalAgentActivity as pushRoomsActivity } from './rooms/rooms';
 import { addAgentRun } from './progress';
+import { AGENT } from '../shared/config';
 
-const PORTS = [24242, 24243, 24244, 24245, 24246];
-const BODY_LIMIT = 64 * 1024;
-/** 会话无事件超时（CLI 崩溃/断网收不到 SessionEnd） */
-const STALE_MS = 10 * 60_000;
-/** 扫描周期：TTL 衰减靠它兑现，所以要明显小于最短 TTL（done 45s） */
-const SWEEP_MS = 10_000;
-/** Stop 时 transcript 最后一行可能还没落盘 → 等一下重读 */
-const TRANSCRIPT_RETRY_MS = 250;
-/**
- * 回复的 timestamp 比事件到达时刻早于此值即视为「上一轮的回复」。
- * 读到过期内容比读不到更糟（会显示上一个问题的答案），宁可不冒泡。
- */
-const STALE_REPLY_MS = 15_000;
+// 已在shared/config.ts中定义，保留注释用于参考
+// const PORTS = [24242, 24243, 24244, 24245, 24246];
+const BODY_LIMIT = AGENT.BODY_LIMIT;
+const STALE_MS = AGENT.STALE_MS;
+const SWEEP_MS = AGENT.SWEEP_MS;
+const TRANSCRIPT_RETRY_MS = AGENT.TRANSCRIPT_RETRY_MS;
+const STALE_REPLY_MS = AGENT.STALE_REPLY_MS;
 
 const sessions = new Map<string, SessionEntry>();
 /** 每会话的消息代际：新事件到达即让在飞的 transcript 读作废 */
 const msgSeq = new Map<string, number>();
+// 已在shared/config.ts中定义，保留注释用于参考
+// const MAX_SESSIONS = 1000;
 let lastBroadcast: AgentStatus = { activity: 'idle', sessions: 0 };
 let server: http.Server | null = null;
 let sweepTimer: ReturnType<typeof setInterval> | null = null;
@@ -180,8 +177,18 @@ function handleStatePost(agentId: string, body: unknown): number {
 
 function sweep(): void {
   const now = Date.now();
+  // 清理过期会话
   for (const [key, s] of sessions) {
     if (now - s.updatedAt > STALE_MS) {
+      sessions.delete(key);
+      msgSeq.delete(key);
+    }
+  }
+  // 超过最大会话数时清理最旧的会话
+  if (sessions.size > AGENT.MAX_SESSIONS) {
+    const entries = Array.from(sessions.entries()).sort((a, b) => a[1].updatedAt - b[1].updatedAt);
+    const toDelete = entries.slice(0, sessions.size - MAX_SESSIONS);
+    for (const [key] of toDelete) {
       sessions.delete(key);
       msgSeq.delete(key);
     }
@@ -209,11 +216,13 @@ function listen(port: number): Promise<http.Server> {
         req.on('end', () => {
           let code = 400;
           try {
+            const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
             code = handleStatePost(
               url.searchParams.get('agent') ?? 'unknown',
-              JSON.parse(Buffer.concat(chunks).toString('utf8')),
+              body,
             );
-          } catch {
+          } catch (err) {
+            console.error('agent-server: 处理POST请求失败', err);
             /* 非法 JSON → 400 */
           }
           res.writeHead(code).end();
@@ -222,13 +231,19 @@ function listen(port: number): Promise<http.Server> {
       }
       res.writeHead(404).end();
     });
-    srv.once('error', reject);
-    srv.listen(port, '127.0.0.1', () => resolve(srv));
+    srv.once('error', (err) => {
+      console.error('[agent-server] 服务器错误', err);
+      reject(err);
+    });
+    srv.listen(port, '127.0.0.1', () => {
+      console.log('[agent-server] 服务器启动在端口', port);
+      resolve(srv);
+    });
   });
 }
 
 export async function startAgentServer(): Promise<void> {
-  for (const port of PORTS) {
+  for (const port of AGENT.PORTS) {
     try {
       server = await listen(port);
     } catch {
@@ -250,6 +265,17 @@ export async function startAgentServer(): Promise<void> {
 export function stopAgentServer(): void {
   if (sweepTimer) clearInterval(sweepTimer);
   sweepTimer = null;
-  server?.close();
-  server = null;
+
+  // 关闭HTTP服务器
+  if (server) {
+    server.close((err) => {
+      if (err) console.error('agent-server: 关闭服务器失败', err);
+    });
+    server = null;
+  }
+
+  // 清空所有会话
+  sessions.clear();
+  msgSeq.clear();
+  lastBroadcast = { activity: 'idle', sessions: 0 };
 }
