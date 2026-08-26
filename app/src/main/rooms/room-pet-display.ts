@@ -15,7 +15,7 @@ import {
 import { onRoomPetEvent, type RoomPetEvent } from './room-pets';
 
 /** member:out 后的宽限：宽限内 member:in 复活同一窗，避免闪断重连时窗口一开一关 */
-const MEMBER_GONE_GRACE_MS = 30_000;
+const MEMBER_GONE_GRACE_MS = 5 * 60 * 1000; // 5分钟，避免频繁闪断
 
 /** 在场成员顺序（用于布局；进房先后，退房不重排剩余成员顺序） */
 let order: string[] = [];
@@ -66,9 +66,13 @@ function handle(e: RoomPetEvent): void {
         e.memberId,
         setTimeout(() => {
           graceTimers.delete(e.memberId);
+          // 从成员列表中移除
           order = order.filter((id) => id !== e.memberId);
+          // 关闭角色窗口
           closeRoomPetWindow(e.memberId);
           relayout();
+          // 清理成员状态
+          memberStates?.delete(e.memberId);
         }, MEMBER_GONE_GRACE_MS),
       );
       break;

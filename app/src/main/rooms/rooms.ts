@@ -53,7 +53,7 @@ const ROOMS_URL_CHAIN = [
 const CONNECT_TIMEOUT_MS = 8_000;
 const REQUEST_TIMEOUT_MS = 8_000;
 /** 在场心跳：on-change 之外的兜底重发（同 link 的 15s 心跳思路，房间人多所以放宽到 30s） */
-const PRESENCE_HEARTBEAT_MS = 30_000;
+const PRESENCE_HEARTBEAT_MS = 15_000; // 15秒，更频繁的心跳确保连接稳定
 const WS_OPEN = 1;
 
 /** Node ≥22 内置全局 WebSocket；@types/node 旧版缺声明 → 本地补最小类型 */

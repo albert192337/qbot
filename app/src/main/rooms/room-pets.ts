@@ -277,6 +277,12 @@ function emitPackFailed(hash: string): void {
   for (const [memberId, m] of memberStates) {
     if (m.hash === hash && !m.character) {
       emit({ kind: 'packFailed', memberId, nickname: m.nickname });
+      // 失败后一段时间后重新尝试下载
+      setTimeout(() => {
+        if (memberStates.has(memberId) && m.hash === hash && !m.character) {
+          ensureMemberPack(memberId, m.nickname, hash);
+        }
+      }, 5_000);
     }
   }
 }
@@ -460,11 +466,16 @@ export function handlePackError(code: string): void {
         finishDownload(hash);
         if (!downloadQueue.includes(hash)) downloadQueue.unshift(hash); // 插队重试
         pumpDownloadQueue();
-      }, NOT_FOUND_RETRY_MS);
+      }, NOT_FOUND_RETRY_MS * (dl.retries + 1)); // 指数退避，增加重试间隔
       return;
     }
     finishDownload(hash);
     emitPackFailed(hash);
+    // 失败后一段时间后重新尝试
+    setTimeout(() => {
+      if (!downloadQueue.includes(hash)) downloadQueue.push(hash);
+      pumpDownloadQueue();
+    }, 10_000);
     return;
   }
   if (code === 'pack:busy') {
