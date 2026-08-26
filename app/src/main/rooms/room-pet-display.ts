@@ -42,6 +42,10 @@ function handle(e: RoomPetEvent): void {
   switch (e.kind) {
     case 'roomJoined':
       order = [];
+      // 确保本地用户自己也被添加到成员列表中
+      if (myMemberId && !order.includes(myMemberId)) {
+        order.push(myMemberId);
+      }
       break;
 
     case 'memberIn': {

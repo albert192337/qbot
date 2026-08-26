@@ -328,9 +328,8 @@ export function onJoinedRoom(room: RoomSnapshot, selfId: string | null): void {
 }
 
 export function onMemberIn(member: RoomMember): void {
-  if (member.memberId === myMemberId) return;
   emit({ kind: 'memberIn', member });
-  if (!announcedHash && !uploading) void announceLocalPack(); // 第一个房友来了：补播报
+  if (!announcedHash && !uploading && member.memberId !== myMemberId) void announceLocalPack(); // 第一个房友来了：补播报
   if (member.packHash) ensureMemberPack(member.memberId, member.nickname, member.packHash);
 }
 
@@ -347,7 +346,6 @@ export function onMemberPack(memberId: string, nickname: string, hash: string): 
 }
 
 export function onPresence(memberId: string, mode?: string, action?: string): void {
-  if (memberId === myMemberId) return;
   const m = memberStates.get(memberId);
   if (m) {
     m.mode = mode;
