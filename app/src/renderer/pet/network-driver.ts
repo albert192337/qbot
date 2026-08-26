@@ -37,6 +37,7 @@ export class NetworkDriver {
   /** 当前粘性循环动作（done 播完 / 拖拽松手要回到它） */
   private sticky: PlayableId = 'idle';
   private lastMode: string | null = null;
+  private lastAction: string | undefined = undefined;
   private doneLoopsLeft = 0;
   private dragging = false;
 
@@ -55,11 +56,16 @@ export class NetworkDriver {
   /** 对端 state 帧（含 15s 心跳重发——同 mode 去重，别把 done 庆祝播成循环） */
   applyState(state: LinkPeerState): void {
     if (this.available.length === 0) return;
-    if (state.mode === this.lastMode && state.mode !== 'idle') {
+
+    // 检查是否是重复帧
+    if (state.mode === this.lastMode && state.action === this.lastAction && state.mode !== 'idle') {
       // 心跳/重复帧：music 曲名变化由 UI 层处理，动作不重启
       return;
     }
+
+    // 更新最后状态
     this.lastMode = state.mode;
+    this.lastAction = state.action;
 
     if (state.mode === 'done') {
       // 一次性庆祝：播 N 遍回 idle（onVideoEnded 推进）
@@ -103,6 +109,7 @@ export class NetworkDriver {
   peerLeft(): void {
     if (this.available.length === 0) return;
     this.lastMode = null;
+    this.lastAction = undefined;
     this.sticky = this.has('sleep') ? ('sleep' as PlayableId) : 'idle';
     if (!this.dragging) this.callbacks.play(this.sticky, true);
   }
@@ -115,7 +122,12 @@ export class NetworkDriver {
 
   dragEnd(): void {
     this.dragging = false;
-    if (this.available.length > 0) this.callbacks.play(this.sticky, true);
+    // 确保我们有可用的动作列表
+    if (this.available.length > 0) {
+      // 如果sticky动作不存在，回退到idle
+      const playAction = this.has(this.sticky) ? this.sticky : 'idle';
+      this.callbacks.play(playAction, true);
+    }
   }
 
   private has(action: string): boolean {

@@ -69,6 +69,11 @@ window.qbot.roomPet.onProgress(({ received, total }) => {
 
 window.qbot.roomPet.onState((s) => {
   gone = false;
+  // 确保我们有可用的动作列表
+  if (driver.available.length === 0 && s.character) {
+    const available = player.load(s.character.dirId, s.character.manifest);
+    driver.setCharacter(available, s.character.manifest.agentActions);
+  }
   driver.applyState({ mode: s.mode ?? 'idle', action: s.action });
   refreshSignboard();
 });
@@ -127,8 +132,9 @@ stage.addEventListener('pointerdown', (e) => {
   dragStarted = false;
   downClientX = e.clientX;
   downClientY = e.clientY;
-  offsetX = e.clientX;
-  offsetY = e.clientY;
+  // 记录窗口的初始位置
+  offsetX = e.screenX - window.screenX;
+  offsetY = e.screenY - window.screenY;
   stage.setPointerCapture(e.pointerId);
   hideMenu();
 });
@@ -150,7 +156,11 @@ stage.addEventListener('pointermove', (e) => {
     requestAnimationFrame(() => {
       rafPending = false;
       if (dragStarted) {
-        window.qbot.pet.move(lastScreenX - offsetX, lastScreenY - offsetY);
+        // 移动当前远程角色窗口
+        window.moveTo(
+          Math.round(lastScreenX - offsetX),
+          Math.round(lastScreenY - offsetY)
+        );
       }
     });
   }
