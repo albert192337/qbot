@@ -34,7 +34,7 @@ import {
 } from './rooms-rules';
 import * as RoomPets from './room-pets';
 import { ROOMS } from '../../shared/config';
-import { withTimeout, withRetry } from '../shared/timeout';
+import { withTimeout, withRetry } from '../../shared/timeout';
 
 /**
  * 房间服务地址，**按顺序尝试**：域名 wss 为主，IP 明文为兜底。
