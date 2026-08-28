@@ -141,6 +141,7 @@ function handleStatePost(agentId: string, body: unknown): number {
   const event = typeof data.hook_event_name === 'string' ? data.hook_event_name : '';
   const rawSession = typeof data.session_id === 'string' && data.session_id ? data.session_id : 'default';
   const key = sessionKeyOf(agentId, rawSession);
+  console.debug('[agent-server] 收到事件:', event, 'agent:', agentId, 'session:', rawSession);
 
   if (event === 'SessionEnd') {
     sessions.delete(key);
@@ -180,11 +181,13 @@ function handleStatePost(agentId: string, body: unknown): number {
 
 function sweep(): void {
   const now = Date.now();
+  let cleaned = 0;
   // 清理过期会话
   for (const [key, s] of sessions) {
     if (now - s.updatedAt > STALE_MS) {
       sessions.delete(key);
       msgSeq.delete(key);
+      cleaned++;
     }
   }
   // 超过最大会话数时清理最旧的会话
@@ -194,7 +197,11 @@ function sweep(): void {
     for (const [key] of toDelete) {
       sessions.delete(key);
       msgSeq.delete(key);
+      cleaned++;
     }
+  }
+  if (cleaned > 0) {
+    console.debug('[agent-server] 清理了', cleaned, '个过期会话');
   }
   broadcastIfChanged(); // TTL 衰减（done/waiting/working…）也靠周期扫描兑现
 }

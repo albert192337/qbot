@@ -54,6 +54,11 @@ import { withTimeout, withRetry } from '../../shared/timeout';
 // const REQUEST_TIMEOUT_MS = 8_000;
 // const PRESENCE_HEARTBEAT_MS = 15_000;
 const WS_OPEN = 1;
+const INITIAL_RECONNECT_DELAY_MS = 1000;
+const MAX_RECONNECT_DELAY_MS = 30000;
+const HEARTBEAT_TIMEOUT_MS = 10000;
+let reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Node ≥22 内置全局 WebSocket；@types/node 旧版缺声明 → 本地补最小类型 */
 interface WsLike {
@@ -157,6 +162,12 @@ async function connect(): Promise<WsLike> {
       ws = socket;
       activeUrl = candidate;
       await hello();
+      // 重置重试延迟
+      reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       return socket;
     } catch (err) {
       errors.push(`${candidate}: ${err instanceof Error ? err.message : String(err)}`);
@@ -195,6 +206,12 @@ function open(target: string): Promise<WsLike> {
       // 连上之后才断：走正常的掉线处理（连接期的失败已被上面 reject 掉）
       if (settled && ws === s) handleClosed();
     });
+    // 新增：pong监听器，检测心跳超时
+    let lastPongTime = Date.now();
+    s.addEventListener('pong', () => {
+      lastPongTime = Date.now();
+    });
+    (s as any).lastPongTime = lastPongTime;
   });
 }
 
@@ -217,11 +234,14 @@ function handleClosed(): void {
 
   // 自动重连：如果不是主动关闭，尝试重新连接
   if (!closedByUs && status.phase !== 'off') {
-    setTimeout(() => {
+    const delay = reconnectDelay;
+    reconnectTimer = setTimeout(() => {
       if (ws === null && !closedByUs) {
         connect().catch(() => {});
+        // 更新重试延迟，指数退避
+        reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS);
       }
-    }, 5000); // 5秒后自动重连
+    }, delay);
   }
 }
 
@@ -242,15 +262,28 @@ async function hello(): Promise<void> {
 }
 
 /** 发一帧并等指定类型的应答（error 帧一律 reject） */
-function request(frame: Frame, expect: string): Promise<Frame> {
+const MAX_REQUEST_RETRIES = 3;
+function request(frame: Frame, expect: string, retries = 0): Promise<Frame> {
   return new Promise<Frame>((resolve, reject) => {
     if (!ws || ws.readyState !== WS_OPEN) {
+      if (retries < MAX_REQUEST_RETRIES) {
+        // 延迟后重试，指数退避
+        setTimeout(() => {
+          resolve(request(frame, expect, retries + 1));
+        }, 1000 * retries);
+        return;
+      }
       reject(new Error('房间服务未连接'));
       return;
     }
     const timer = setTimeout(() => {
       pending.delete(expect);
-      reject(new Error('房间服务无响应'));
+      if (retries < MAX_REQUEST_RETRIES) {
+        // 重试请求
+        resolve(request(frame, expect, retries + 1));
+      } else {
+        reject(new Error('房间服务无响应'));
+      }
     }, ROOMS.REQUEST_TIMEOUT_MS);
     pending.set(expect, { resolve, reject, timer });
     ws.send(JSON.stringify(frame));
@@ -440,7 +473,23 @@ function applyJoined(frame: Frame): void {
 
 function startHeartbeat(): void {
   if (heartbeatTimer) return;
-  heartbeatTimer = setInterval(() => void sendPresence(true), ROOMS.PRESENCE_HEARTBEAT_MS);
+  heartbeatTimer = setInterval(() => {
+    if (!ws) return;
+    // 检查最后一次pong的时间
+    const socket = ws as any;
+    const lastPong = socket.lastPongTime ?? 0;
+    if (Date.now() - lastPong > HEARTBEAT_TIMEOUT_MS) {
+      // 心跳超时，关闭连接触发重连
+      console.error('[rooms] 心跳超时，关闭连接');
+      socket.close();
+      return;
+    }
+    // 发送ping等待pong
+    if (typeof (ws as any).ping === 'function') {
+      (ws as any).ping();
+    }
+    void sendPresence(true);
+  }, ROOMS.PRESENCE_HEARTBEAT_MS);
 }
 
 function stopHeartbeat(): void {
@@ -615,6 +664,13 @@ export function disconnectRooms(): void {
   }
 
   stopHeartbeat();
+  // 清除重连定时器
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  // 重置重试延迟
+  reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
 
   // 清空所有pending请求
   const pendingCopy = new Map(pending);

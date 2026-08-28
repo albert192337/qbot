@@ -159,6 +159,7 @@ interface DownloadState {
   total: number;
   retries: number;
   retryTimer: ReturnType<typeof setTimeout> | null;
+  timeoutTimer: ReturnType<typeof setTimeout> | null;
 }
 
 /** memberId -> 状态（只含在线且要上屏的成员） */
@@ -231,7 +232,13 @@ function pumpDownloadQueue(): void {
     // 排队期间可能已无人需要它（成员退房）
     if (![...memberStates.values()].some((m) => m.hash === hash)) continue;
     activeDownloadHash = hash;
-    downloads.set(hash, { assembler: new ChunkAssembler(hash), total: 0, retries: 0, retryTimer: null });
+    const timeoutTimer = setTimeout(() => {
+      console.error('[room-pets] 下载超时', hash);
+      finishDownload(hash);
+      if (!downloadQueue.includes(hash)) downloadQueue.push(hash);
+      pumpDownloadQueue();
+    }, 30000);
+    downloads.set(hash, { assembler: new ChunkAssembler(hash), total: 0, retries: 0, retryTimer: null, timeoutTimer });
     sendFrame?.({ t: 'pack:get', hash });
     for (const [memberId, m] of memberStates) {
       if (m.hash === hash && !m.character) {
@@ -246,6 +253,7 @@ function pumpDownloadQueue(): void {
 function finishDownload(hash: string): void {
   const dl = downloads.get(hash);
   if (dl?.retryTimer) clearTimeout(dl.retryTimer);
+  if (dl?.timeoutTimer) clearTimeout(dl.timeoutTimer);
   downloads.delete(hash);
   if (activeDownloadHash === hash) activeDownloadHash = null;
   pumpDownloadQueue();

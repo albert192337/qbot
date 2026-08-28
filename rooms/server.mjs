@@ -47,14 +47,14 @@ const PROTO_VER = 2;
 const MAX_PAYLOAD = 128 * 1024;
 
 // ── 容量（spec §8.2） ──────────────────────────────────────
-const MAX_ROOMS = 200;
-const MAX_ROOMS_PER_CONN = 3;
+const MAX_ROOMS = 500;
+const MAX_ROOMS_PER_CONN = 10;
 const CAPACITY_MIN = 4;
 const CAPACITY_MAX = 12;
 const CAPACITY_DEFAULT = 8;
 /** 空房回收：7 天无人进就删（常驻的前提是别无限累积） */
 const ROOM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const PING_INTERVAL_MS = 30 * 1000;
+const PING_INTERVAL_MS = 60 * 1000;
 /** 脏写落盘间隔 */
 const FLUSH_MS = 30 * 1000;
 
@@ -67,7 +67,7 @@ const CHAT_KEEP = 50;
 
 // ── 聊天限流（spec §5.2） ─────────────────────────────────
 const CHAT_COOLDOWN_MS = 3000;
-const CHAT_PER_MIN = 10;
+const CHAT_PER_MIN = 30;
 const CHAT_DUP_LIMIT = 3;
 
 // ── 角色包缓存（2026-08-24 上屏功能）────────────────────────
@@ -77,13 +77,13 @@ const CHAT_DUP_LIMIT = 3;
 const PACKS_DIR = path.join(DATA_DIR, 'packs');
 /** 单包上限（正常包 ~12MB，多动作/导入贴纸的角色更大，64MB 兜底） */
 const PACK_MAX_BYTES = 64 * 1024 * 1024;
-/** 缓存总量上限（LRU 淘汰） */
-const PACK_CACHE_MAX = Number(process.env.PACK_CACHE_MAX || 2 * 1024 * 1024 * 1024);
+/** 缓存总量上限（LRU 淘汰），8GiB内存可提升到8GB */
+const PACK_CACHE_MAX = Number(process.env.PACK_CACHE_MAX || 8 * 1024 * 1024 * 1024);
 /** 下载限速：块间停顿（~1.3MB/s，对小 VPS 的上行礼貌些） */
 const PACK_CHUNK_DELAY_MS = 5;
 /** 单连接上传流量窗口：5 分钟 192MB（够传 1 个包 + 重试 + 切角色，防刷盘刷带宽） */
 const PACK_PUT_WINDOW_MS = 5 * 60_000;
-const PACK_PUT_WINDOW_BYTES = 192 * 1024 * 1024;
+const PACK_PUT_WINDOW_BYTES = 512 * 1024 * 1024;
 const HASH_RE = /^[0-9a-f]{16}$/;
 const PACK_CHUNK = 64 * 1024;
 
