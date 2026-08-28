@@ -56,7 +56,7 @@ import { withTimeout, withRetry } from '../../shared/timeout';
 const WS_OPEN = 1;
 const INITIAL_RECONNECT_DELAY_MS = 1000;
 const MAX_RECONNECT_DELAY_MS = 30000;
-const HEARTBEAT_TIMEOUT_MS = 10000;
+const HEARTBEAT_TIMEOUT_MS = 30000;
 let reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
