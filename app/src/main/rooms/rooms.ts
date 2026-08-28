@@ -57,8 +57,21 @@ const WS_OPEN = 1;
 const INITIAL_RECONNECT_DELAY_MS = 1000;
 const MAX_RECONNECT_DELAY_MS = 30000;
 const HEARTBEAT_TIMEOUT_MS = 30000;
+const MAX_CONNECT_RETRIES_BEFORE_JITTER = 3; // 连续3次失败后才启用抖动重连
 let reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let connectFailCount = 0; // 连接失败计数器
+
+// 消息队列缓存：断线期间缓存待发送的消息
+interface QueuedMessage {
+  frame: Frame;
+  expect?: string;
+  retryCount: number;
+  timestamp: number;
+}
+const messageQueue: QueuedMessage[] = [];
+const MAX_QUEUE_SIZE = 100; // 最大队列大小，避免内存溢出
+const MAX_MESSAGE_RETRIES = 3; // 消息最大重试次数
 
 /** Node ≥22 内置全局 WebSocket；@types/node 旧版缺声明 → 本地补最小类型 */
 interface WsLike {
@@ -148,11 +161,29 @@ function url(): string {
   return activeUrl ?? candidates()[0];
 }
 
-async function connect(): Promise<WsLike> {
+// 快速重连模式：跳过指数退避，直接尝试重连
+let fastReconnectMode = false;
+
+async function connect(useFastReconnect = false): Promise<WsLike> {
   if (ws && ws.readyState === WS_OPEN) return ws;
   if (!WebSocketCtor) throw new Error('WebSocket unavailable (need Electron with Node >= 22)');
   closedByUs = false;
   setStatus({ phase: 'connecting' });
+
+  // 连接失败计数，用于抖动缓冲
+  connectFailCount++;
+
+  // 仅在连续失败超过阈值后才启用指数退避
+  const delay = useFastReconnect || connectFailCount < MAX_CONNECT_RETRIES_BEFORE_JITTER
+    ? 0
+    : reconnectDelay;
+
+  // 如果需要延迟，等待后再尝试
+  if (delay > 0) {
+    await new Promise(resolve => setTimeout(resolve, delay));
+    // 更新重试延迟，指数退避
+    reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS);
+  }
 
   // 依次试候选地址：主路（域名 wss）连不上就降级到兜底（IP 明文）
   const errors: string[] = [];
@@ -162,12 +193,15 @@ async function connect(): Promise<WsLike> {
       ws = socket;
       activeUrl = candidate;
       await hello();
-      // 重置重试延迟
+      // 连接成功，重置状态
+      connectFailCount = 0;
       reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
+      // 连接成功后发送队列中的消息
+      flushMessageQueue();
       return socket;
     } catch (err) {
       errors.push(`${candidate}: ${err instanceof Error ? err.message : String(err)}`);
@@ -238,10 +272,65 @@ function handleClosed(): void {
     reconnectTimer = setTimeout(() => {
       if (ws === null && !closedByUs) {
         connect().catch(() => {});
-        // 更新重试延迟，指数退避
-        reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS);
       }
     }, delay);
+  }
+}
+
+// 刷新消息队列：发送所有缓存的消息
+function flushMessageQueue(): void {
+  if (messageQueue.length === 0) return;
+  console.log(`[rooms] 重连成功，刷新消息队列，共 ${messageQueue.length} 条待发送消息`);
+
+  // 逐个发送队列中的消息
+  for (const queued of [...messageQueue]) {
+    // 超过重试次数的消息直接丢弃
+    if (queued.retryCount >= MAX_MESSAGE_RETRIES) {
+      messageQueue.splice(messageQueue.indexOf(queued), 1);
+      if (queued.expect) {
+        const p = pending.get(queued.expect);
+        if (p) {
+          p.reject(new Error('消息重试次数过多，已放弃发送'));
+          pending.delete(queued.expect);
+        }
+      }
+      continue;
+    }
+
+    try {
+      // 重新发送消息
+      if (queued.expect) {
+        // 有期望应答的请求，使用request函数
+        // 注意：这里会重新设置超时和重试计数
+        void request(queued.frame, queued.expect).then(
+          (frame) => {
+            if (queued.expect) {
+              const p = pending.get(queued.expect);
+              if (p) p.resolve(frame);
+            }
+          },
+          (err) => {
+            // 发送失败，增加重试计数
+            queued.retryCount++;
+            queued.timestamp = Date.now();
+          }
+        );
+      } else {
+        // 普通消息，直接发送
+        send(queued.frame);
+      }
+      // 发送成功，从队列中移除
+      messageQueue.splice(messageQueue.indexOf(queued), 1);
+    } catch (err) {
+      // 发送失败，增加重试计数
+      queued.retryCount++;
+      queued.timestamp = Date.now();
+    }
+  }
+
+  // 如果还有剩余消息，设置定时器稍后重试
+  if (messageQueue.length > 0) {
+    setTimeout(() => flushMessageQueue(), 1000);
   }
 }
 
@@ -266,22 +355,35 @@ const MAX_REQUEST_RETRIES = 3;
 function request(frame: Frame, expect: string, retries = 0): Promise<Frame> {
   return new Promise<Frame>((resolve, reject) => {
     if (!ws || ws.readyState !== WS_OPEN) {
-      if (retries < MAX_REQUEST_RETRIES) {
-        // 延迟后重试，指数退避
-        setTimeout(() => {
-          resolve(request(frame, expect, retries + 1));
-        }, 1000 * retries);
-        return;
+      // 连接断开，将请求加入队列
+      if (messageQueue.length >= MAX_QUEUE_SIZE) {
+        // 队列已满，移除最旧的消息
+        messageQueue.shift();
       }
-      reject(new Error('房间服务未连接'));
+      messageQueue.push({
+        frame,
+        expect,
+        retryCount: retries,
+        timestamp: Date.now()
+      });
+      reject(new Error('房间服务未连接，消息已加入队列'));
       return;
     }
     const timer = setTimeout(() => {
       pending.delete(expect);
       if (retries < MAX_REQUEST_RETRIES) {
         // 重试请求
+        const queued = messageQueue.find(q => q.frame === frame && q.expect === expect);
+        if (queued) {
+          queued.retryCount++;
+        }
         resolve(request(frame, expect, retries + 1));
       } else {
+        // 移除队列中的失败请求
+        const index = messageQueue.findIndex(q => q.frame === frame && q.expect === expect);
+        if (index !== -1) {
+          messageQueue.splice(index, 1);
+        }
         reject(new Error('房间服务无响应'));
       }
     }, ROOMS.REQUEST_TIMEOUT_MS);
@@ -291,7 +393,21 @@ function request(frame: Frame, expect: string, retries = 0): Promise<Frame> {
 }
 
 function send(frame: Frame): void {
-  if (ws && ws.readyState === WS_OPEN) ws.send(JSON.stringify(frame));
+  if (ws && ws.readyState === WS_OPEN) {
+    ws.send(JSON.stringify(frame));
+  } else {
+    // 连接断开，将消息加入队列
+    if (messageQueue.length >= MAX_QUEUE_SIZE) {
+      // 队列已满，移除最旧的消息
+      messageQueue.shift();
+    }
+    messageQueue.push({
+      frame,
+      retryCount: 0,
+      timestamp: Date.now()
+    });
+    console.debug('[rooms] 连接断开，消息已加入队列，当前队列大小：', messageQueue.length);
+  }
 }
 
 // room-pets 不持连接（避免循环 import），出帧借这个口子；注入一次即可，
