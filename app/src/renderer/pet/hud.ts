@@ -4,7 +4,7 @@
  * 设计约定（PLAN.md §2）：pointer-events:none 容器，只有药丸和宝箱可点。
  */
 import type { Progress } from '../../shared/ipc-types';
-import { POINTS_PER_BOX, canAffordBox } from '../../shared/furniture';
+import { POINTS_PER_BOX, canAffordBox, shouldShowChest } from '../../shared/furniture';
 import { formatPoints, shouldTweenPoints, spendLabel } from './hud-format';
 
 /** 宝箱内联 SVG —— 梯形箱体 + 弧形盖 + 金色锁扣 */
@@ -74,7 +74,19 @@ export class ProgressHud {
   /** 幂等更新：走 shouldTween 门控，防回弹 */
   setProgress(p: Progress): void {
     const pts = p.points ?? 0;
-    this.chestBtn.hidden = !canAffordBox(pts, p.boxes ?? 0);
+    const boxes = p.boxes ?? 0;
+    const show = shouldShowChest(boxes);
+    this.chestBtn.hidden = !show;
+    if (show) {
+      const affordable = canAffordBox(pts, boxes);
+      this.chestBtn.disabled = !affordable;
+      if (!affordable) {
+        const need = POINTS_PER_BOX - pts;
+        this.chestBtn.title = `还差 ${need} 点开箱`;
+      } else {
+        this.chestBtn.title = '开箱';
+      }
+    }
     if (shouldTweenPoints(this.lastPoints, pts)) {
       this.tweenPoints(this.lastPoints, pts);
     } else {

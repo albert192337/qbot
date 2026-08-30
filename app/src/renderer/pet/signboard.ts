@@ -48,26 +48,28 @@ export class Signboard {
     this.el.classList.add('poof-in');
   }
 
-  /** 立即隐藏 */
+  /** 立即隐藏，并清空文字（避免 onDragEnd 因残留文字又弹出来） */
   hide(): void {
     this.clearPending();
+    this.board.textContent = '';
     if (!this.visible) return;
     this.visible = false;
     this.el.classList.remove('show', 'poof-in');
   }
 
-  /** 拖拽时调用：立即隐藏 */
+  /** 拖拽时调用：临时藏起（不丢文字，松手后自动弹回） */
   onDragStart(): void {
-    this.hide();
+    this.clearPending();
+    this.el.classList.remove('show', 'poof-in');
   }
 
-  /** 拖拽结束后调用：延时 1.5s 后弹出 */
+  /** 拖拽结束后调用：延时 1.5s 后弹回（有文字才弹） */
   onDragEnd(): void {
-    if (!this.board.textContent) return; // 没有文字就不弹
+    if (!this.board.textContent) return;
     this.clearPending();
     this.pendingTimer = setTimeout(() => {
       this.pendingTimer = null;
-      this.show();
+      if (this.board.textContent) this.show();
     }, 1500);
   }
 
