@@ -241,11 +241,10 @@ function open(target: string): Promise<WsLike> {
       if (settled && ws === s) handleClosed();
     });
     // 新增：pong监听器，检测心跳超时
-    let lastPongTime = Date.now();
+    (s as any).lastPongTime = Date.now();
     s.addEventListener('pong', () => {
-      lastPongTime = Date.now();
+      (s as any).lastPongTime = Date.now();
     });
-    (s as any).lastPongTime = lastPongTime;
   });
 }
 
