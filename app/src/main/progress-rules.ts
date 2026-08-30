@@ -20,6 +20,7 @@ import type { Progress } from '../shared/ipc-types';
 // 这里原样转出，让主进程侧只认一个 import 来源
 export {
   CRAFT_COST,
+  DEFAULT_MAX_BOXES,
   IDLE_MS_PER_BOX,
   POINTS_PER_AGENT_RUN,
   POINTS_PER_BOX,
@@ -88,6 +89,29 @@ export function settleIdle(
   const total = idleMs + d;
   const gained = Math.floor(total / IDLE_MS_PER_BOX);
   return { idleMs: total - gained * IDLE_MS_PER_BOX, gained };
+}
+
+/**
+ * 带上限的挂机结算。箱子堆到 maxBoxes 就停止产出——
+ * 不封顶的话离开一周回来几百个箱子，开箱这个动作本身就没意义了。
+ *
+ * 满仓时**冻结 idleMs**（不累加也不清零）：开掉一个箱子后从原处续攒，
+ * 而不是白挂机一整天再从 0 开始。
+ */
+export function settleIdleCapped(
+  idleMs: number,
+  deltaMs: number,
+  boxes: number,
+  maxBoxes: number,
+  capMs: number = IDLE_DELTA_CAP_MS,
+): { idleMs: number; gained: number } {
+  const max = Math.max(0, Math.floor(maxBoxes));
+  const have = Math.max(0, Math.floor(boxes));
+  if (have >= max) return { idleMs, gained: 0 };
+  const { idleMs: rest, gained: raw } = settleIdle(idleMs, deltaMs, capMs);
+  const gained = Math.min(raw, max - have);
+  // 撞上限时余量一起丢：留着会让下一次开箱后瞬间又跳出一个箱子
+  return { idleMs: gained < raw ? 0 : rest, gained };
 }
 
 /** 距下一个箱子的进度 0~1（UI 进度条用） */

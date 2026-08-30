@@ -24,6 +24,7 @@ import {
   pickCraftSacrifice,
   sanitizeProgress,
   settleIdle,
+  settleIdleCapped,
   tierCounts,
 } from '../src/main/progress-rules';
 

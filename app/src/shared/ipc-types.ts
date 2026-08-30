@@ -57,6 +57,9 @@ export interface Settings {
   roomsChatConsent?: boolean;
   /** 在公共房间展示我的桌宠（默认 true；关闭则不上传角色包、房友只见缩略图） */
   roomsShowMyPet?: boolean;
+
+  /** 未开箱子的堆叠上限（默认 DEFAULT_MAX_BOXES=3，满了停止挂机结算） */
+  maxBoxes?: number;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */

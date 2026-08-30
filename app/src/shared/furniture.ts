@@ -87,11 +87,33 @@ export const POINTS_PER_BOX = 500;
 export const IDLE_MS_PER_BOX = 15 * 60 * 1000;
 /** 合成消耗同档几件 */
 export const CRAFT_COST = 10;
+/**
+ * 未开箱子的堆叠上限（设置里可调）。满了就停止挂机结算——
+ * 不封顶的话离开一周回来几百个箱子，开箱这个动作就没意义了。
+ */
+export const DEFAULT_MAX_BOXES = 3;
+
+/** 箱子上限合法化：设置里可能存进脏值（手改 config.json / 旧版本残留） */
+export function clampMaxBoxes(n: unknown): number {
+  const v = Math.floor(Number(n));
+  if (!Number.isFinite(v)) return DEFAULT_MAX_BOXES;
+  return Math.max(1, Math.min(99, v));
+}
 
 /** 是否够开一个箱子（有箱有点）—— renderer 专用谓词，避免 import 主进程 progress-rules */
 export function canAffordBox(points: number, boxes: number): boolean {
   return boxes >= 1 && points >= POINTS_PER_BOX;
 }
+
+/**
+ * 宝箱图标是否露出。只看「有没有箱子」，不看点数够不够——
+ * 有箱缺点时也要显示（点了给 toast 说明还差多少），否则用户不知道自己攒了箱子。
+ * 能不能点由 canAffordBox 决定。
+ */
+export function shouldShowChest(boxes: number): boolean {
+  return Math.floor(boxes) >= 1;
+}
+
 
 /**
  * 抽一件家具：先按 TIER_WEIGHT 抽档位，再在档位内等概率抽具体家具。

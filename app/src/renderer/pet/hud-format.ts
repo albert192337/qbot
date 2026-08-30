@@ -44,3 +44,46 @@ export function shouldTweenPoints(prev: number, next: number): boolean {
 export function spendLabel(n: number): string {
   return `−${n}`;
 }
+
+/**
+ * 距下一个箱子的倒计时，mm:ss。
+ * 箱子已满上限时挂机不再产出 → 返回 null，调用方改文案（倒计时会一直冻在同一个值，
+ * 显示出来像卡住了）。
+ */
+export function nextBoxCountdown(
+  idleMs: number,
+  boxes: number,
+  perBoxMs: number,
+  maxBoxes: number,
+): string | null {
+  if (boxes >= maxBoxes) return null;
+  const left = Math.max(0, perBoxMs - Math.max(0, idleMs));
+  const total = Math.ceil(left / 1000);
+  const mm = Math.floor(total / 60);
+  const ss = total % 60;
+  return `${mm}:${String(ss).padStart(2, '0')}`;
+}
+
+/** 点数区气泡文案：能倒计时就报时间，箱子满了就说满了 */
+export function idleHintText(
+  idleMs: number,
+  boxes: number,
+  perBoxMs: number,
+  maxBoxes: number,
+): string {
+  return nextBoxCountdown(idleMs, boxes, perBoxMs, maxBoxes) ?? `宝箱已满 ${boxes}/${maxBoxes}`;
+}
+
+/**
+ * 宝箱下方的存量圆点（仿掌机图标的档位点）。
+ * 长度 = 上限，前 boxes 个实心（未开），其余空心（已开掉的位）。
+ *
+ * 只有 1 个箱子时返回空数组：单箱画一个点是噪声，图标本身已经表达了「有一个」。
+ * 全开完 → boxes 归 0 → 空数组 → 整条消失。
+ */
+export function boxDots(boxes: number, maxBoxes: number): boolean[] {
+  const max = Math.max(0, Math.floor(maxBoxes));
+  const have = Math.max(0, Math.min(Math.floor(boxes), max));
+  if (have <= 1) return [];
+  return Array.from({ length: max }, (_, i) => i < have);
+}

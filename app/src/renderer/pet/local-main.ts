@@ -62,7 +62,7 @@ async function doOpenBox(): Promise<void> {
     if (r.ok) {
       lastProgress = r.progress;
       hud.setProgress(r.progress);
-      const decor = DECOR_BY_ID[r.stickerId];
+      const decor = DECOR_BY_ID.get(r.stickerId);
       const name = decor?.name ?? r.stickerId;
       hostSignboard.setText(`开出了「${name}」`);
       hostSignboard.show();

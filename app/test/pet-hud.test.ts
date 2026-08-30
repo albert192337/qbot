@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
+  boxDots,
   formatPoints,
+  idleHintText,
   isStaleProgress,
+  nextBoxCountdown,
   shouldTweenPoints,
   spendLabel,
 } from '../src/renderer/pet/hud-format';
-import { canAffordBox, POINTS_PER_BOX } from '../src/shared/furniture';
+import {
+  canAffordBox,
+  clampMaxBoxes,
+  DEFAULT_MAX_BOXES,
+  IDLE_MS_PER_BOX,
+  POINTS_PER_BOX,
+  shouldShowChest,
+} from '../src/shared/furniture';
 import type { Progress } from '../src/shared/ipc-types';
 
 // ── formatPoints ──────────────────────────────────────
@@ -99,5 +109,106 @@ describe('canAffordBox', () => {
   });
   it('都没够 → false', () => {
     expect(canAffordBox(0, 0)).toBe(false);
+  });
+});
+
+// ── shouldShowChest ───────────────────────────────────
+describe('shouldShowChest', () => {
+  it('有箱子就显示，不管点数够不够', () => {
+    expect(shouldShowChest(1)).toBe(true);
+    expect(shouldShowChest(3)).toBe(true);
+  });
+  it('没箱子不显示', () => {
+    expect(shouldShowChest(0)).toBe(false);
+  });
+  it('脏值当没有', () => {
+    expect(shouldShowChest(-1)).toBe(false);
+    expect(shouldShowChest(0.5)).toBe(false);
+  });
+});
+
+// ── clampMaxBoxes ─────────────────────────────────────
+describe('clampMaxBoxes', () => {
+  it('正常值原样返回', () => {
+    expect(clampMaxBoxes(3)).toBe(3);
+    expect(clampMaxBoxes(1)).toBe(1);
+    expect(clampMaxBoxes(10)).toBe(10);
+  });
+  it('undefined / 脏值回落默认', () => {
+    expect(clampMaxBoxes(undefined)).toBe(DEFAULT_MAX_BOXES);
+    expect(clampMaxBoxes(NaN)).toBe(DEFAULT_MAX_BOXES);
+    expect(clampMaxBoxes('abc')).toBe(DEFAULT_MAX_BOXES);
+  });
+  it('下界夹到 1（0 个上限会让挂机永远白挂）', () => {
+    expect(clampMaxBoxes(0)).toBe(1);
+    expect(clampMaxBoxes(-5)).toBe(1);
+  });
+  it('上界夹到 99', () => {
+    expect(clampMaxBoxes(1000)).toBe(99);
+  });
+  it('小数向下取整', () => {
+    expect(clampMaxBoxes(3.9)).toBe(3);
+  });
+});
+
+// ── nextBoxCountdown ──────────────────────────────────
+describe('nextBoxCountdown', () => {
+  const MAX = 3;
+  it('刚开始挂机 → 满时长', () => {
+    expect(nextBoxCountdown(0, 0, IDLE_MS_PER_BOX, MAX)).toBe('15:00');
+  });
+  it('挂了一半', () => {
+    expect(nextBoxCountdown(IDLE_MS_PER_BOX / 2, 0, IDLE_MS_PER_BOX, MAX)).toBe('7:30');
+  });
+  it('秒数补零', () => {
+    // 剩 5:04
+    expect(nextBoxCountdown(IDLE_MS_PER_BOX - 304_000, 0, IDLE_MS_PER_BOX, MAX)).toBe('5:04');
+  });
+  it('快满时不为负', () => {
+    expect(nextBoxCountdown(IDLE_MS_PER_BOX, 0, IDLE_MS_PER_BOX, MAX)).toBe('0:00');
+    expect(nextBoxCountdown(IDLE_MS_PER_BOX + 9999, 0, IDLE_MS_PER_BOX, MAX)).toBe('0:00');
+  });
+  it('箱子已满 → null（倒计时会冻住，不该显示）', () => {
+    expect(nextBoxCountdown(0, MAX, IDLE_MS_PER_BOX, MAX)).toBeNull();
+    expect(nextBoxCountdown(0, MAX + 1, IDLE_MS_PER_BOX, MAX)).toBeNull();
+  });
+  it('脏 idleMs 当 0', () => {
+    expect(nextBoxCountdown(-5, 0, IDLE_MS_PER_BOX, MAX)).toBe('15:00');
+  });
+});
+
+// ── idleHintText ──────────────────────────────────────
+describe('idleHintText', () => {
+  it('未满报倒计时', () => {
+    expect(idleHintText(0, 1, IDLE_MS_PER_BOX, 3)).toBe('15:00');
+  });
+  it('满了报满', () => {
+    expect(idleHintText(0, 3, IDLE_MS_PER_BOX, 3)).toBe('宝箱已满 3/3');
+  });
+});
+
+// ── boxDots ───────────────────────────────────────────
+describe('boxDots', () => {
+  it('单个箱子不画点（图标本身已表达）', () => {
+    expect(boxDots(1, 3)).toEqual([]);
+  });
+  it('没箱子不画点', () => {
+    expect(boxDots(0, 3)).toEqual([]);
+  });
+  it('2/3 → 长度为上限，前两个实心', () => {
+    expect(boxDots(2, 3)).toEqual([true, true, false]);
+  });
+  it('满仓全实心', () => {
+    expect(boxDots(3, 3)).toEqual([true, true, true]);
+  });
+  it('上限 5 时长度为 5', () => {
+    expect(boxDots(2, 5)).toEqual([true, true, false, false, false]);
+  });
+  it('boxes 超过上限时夹住，不溢出', () => {
+    expect(boxDots(9, 3)).toEqual([true, true, true]);
+  });
+  it('脏值不炸', () => {
+    expect(boxDots(-1, 3)).toEqual([]);
+    expect(boxDots(2.7, 3)).toEqual([true, true, false]);
   });
 });
