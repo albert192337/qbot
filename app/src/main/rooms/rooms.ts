@@ -240,10 +240,11 @@ function open(target: string): Promise<WsLike> {
       // 连上之后才断：走正常的掉线处理（连接期的失败已被上面 reject 掉）
       if (settled && ws === s) handleClosed();
     });
-    // 新增：pong监听器，检测心跳超时
+    // 初始化lastPongTime和pong监听器
     (s as any).lastPongTime = Date.now();
     s.addEventListener('pong', () => {
       (s as any).lastPongTime = Date.now();
+      console.debug('[rooms] 收到pong响应，更新lastPongTime');
     });
   });
 }
@@ -590,18 +591,23 @@ function startHeartbeat(): void {
   if (heartbeatTimer) return;
   heartbeatTimer = setInterval(() => {
     if (!ws) return;
-    // 检查最后一次pong的时间
     const socket = ws as any;
-    const lastPong = socket.lastPongTime ?? 0;
-    if (Date.now() - lastPong > HEARTBEAT_TIMEOUT_MS) {
-      // 心跳超时，关闭连接触发重连
+    // 初始化lastPongTime如果不存在
+    if (!socket.lastPongTime) {
+      socket.lastPongTime = Date.now();
+    }
+    if (Date.now() - socket.lastPongTime > HEARTBEAT_TIMEOUT_MS) {
       console.error('[rooms] 心跳超时，关闭连接');
       socket.close();
       return;
     }
-    // 发送ping等待pong
-    if (typeof (ws as any).ping === 'function') {
-      (ws as any).ping();
+    // 发送ping并在pong回调中更新时间
+    if (typeof socket.ping === 'function') {
+      socket.ping({}, (err) => {
+        if (!err) {
+          socket.lastPongTime = Date.now();
+        }
+      });
     }
     void sendPresence(true);
   }, ROOMS.PRESENCE_HEARTBEAT_MS);
