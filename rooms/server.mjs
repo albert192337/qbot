@@ -556,6 +556,14 @@ const handlers = {
     leaveRoom(ws);
   },
 
+  // 应用层心跳。客户端跑的是 Node 内置全局 WebSocket（undici 的 WHATWG 实现），
+  // 那个 API 没有协议层 ping/pong（服务端 ping 被 undici 自动回 pong，但对 JS 不可见），
+  // 客户端只能靠「发一帧收一帧」验证双向链路。不认识这帧的旧服务端会回
+  // bad_frame 错误帧——那也是一帧，同样能证明链路活着，所以客户端兼容两种回法。
+  ping(ws) {
+    send(ws, { t: 'pong' });
+  },
+
   presence(ws, f) {
     if (!ws.roomId) return;
     ws.mode = typeof f.mode === 'string' ? f.mode.slice(0, 16) : 'idle';

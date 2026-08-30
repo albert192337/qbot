@@ -246,6 +246,7 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
     并把窗口提前（这也修掉了原先「孵化窗没开就静默挂死」的既存 bug）
 24. **macOS 的 `tar` 会把 `._*` AppleDouble 文件打进包**：scp 部署服务端时那些文件会跟着上服务器（`npm install` 不受影响但目录很脏，`._package.json` 之类还可能被误读）。打包一律 `COPYFILE_DISABLE=1 tar czf ...`，或落地后 `rm -f ._*`
 25. **云安全组和 ufw 是两道**：VPS 上 `ufw allow <port>` 只是第一道，火山引擎控制台的安全组入方向没放行的话表现为**连接超时**（不是拒绝，容易误判成服务没起）。relay 当初栽过，公共房间的 IP 兜底路又栽了一次
+26. **Node 内置全局 WebSocket（undici 的 WHATWG 实现）没有 `.ping()` 方法、也不派发 `pong` 事件**：协议层 ping/pong 在内部自动处理（服务端 `ws.ping()` 它会自动回 pong，所以**服务端**的活性检测没问题），但对 JS 完全不可见。`rooms.ts` 曾靠「发 ping 等 pong 回调续命」做客户端心跳，结果 lastPongTime 永远停在连接建立那一刻，进房 30s 后必误判超时把自己掐了（828bf2a/71fe362 两个 fix 都在修一个不存在的 API，直到 2026-08-30 实测复现才定位）。正确做法是**应用层心跳**：发 `{t:'ping'}` JSON 帧（`rooms/server.mjs` 回 `{t:'pong'}`，旧服务端回 bad_frame 错误帧也算入帧）、把「收到任何入帧」一律当续命。附带一个躺了很久的死代码：被动断线的重连条件拿 `status.phase !== 'off'` 判断，而它前面一行 setStatus 刚把 phase 设成 'off'，条件永假——断线后从不会自动重连；现在重连成功还会自动回房
 
 ## 已知未解决
 

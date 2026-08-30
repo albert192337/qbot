@@ -106,6 +106,15 @@ let localMusic: MusicStatus = { playing: false };
 let lastPresence: string | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let closedByUs = false;
+/**
+ * 最近一次收到服务端任何帧的时间。心跳超时的判定依据：
+ * Node 内置全局 WebSocket 是 undici 的 WHATWG 实现，**没有 `.ping()` 方法、
+ * 也不派发 `pong` 事件**（协议层 ping/pong 在内部自动处理，对 JS 不可见），
+ * 所以「靠 pong 回调续命」的方案在这个 API 上是死路--lastPongTime 永远停在
+ * 连接建立那一刻，进房 30s 后必然误判超时把自己掐了（复现见 2026-08-30）。
+ * 改成应用层心跳：主动发 {t:'ping'}，收到任何帧（pong/错误帧/广播）都续命。
+ */
+let lastAliveAt = 0;
 /** 实际连上的地址（决定 isSecureTransport 的答案；未连接时为 null） */
 let activeUrl: string | null = null;
 
@@ -235,21 +244,22 @@ function open(target: string): Promise<WsLike> {
     }, ROOMS.CONNECT_TIMEOUT_MS);
     s.addEventListener('open', () => done(() => resolve(s)));
     s.addEventListener('error', () => done(() => reject(new Error('连接失败'))));
-    s.addEventListener('message', (ev) => handleMessage(ev.data));
+    s.addEventListener('message', (ev) => {
+      // 任何入帧都证明链路活着（pong / 聊天 / 在场广播一视同仁），
+      // 心跳超时判定吃的就是这个时间戳
+      lastAliveAt = Date.now();
+      handleMessage(ev.data);
+    });
     s.addEventListener('close', () => {
       // 连上之后才断：走正常的掉线处理（连接期的失败已被上面 reject 掉）
       if (settled && ws === s) handleClosed();
-    });
-    // 初始化lastPongTime和pong监听器
-    (s as any).lastPongTime = Date.now();
-    s.addEventListener('pong', () => {
-      (s as any).lastPongTime = Date.now();
-      console.debug('[rooms] 收到pong响应，更新lastPongTime');
     });
   });
 }
 
 function handleClosed(): void {
+  // 被动掉线前在的房：重连成功后自动回房（心跳误杀/网络抖动对用户表现为无感）
+  const droppedRoomId = currentRoomId;
   ws = null;
   activeUrl = null;
   currentRoomId = null;
@@ -266,15 +276,38 @@ function handleClosed(): void {
   // 主动断开是正常收场；被动断开要让 UI 看到原因
   setStatus(closedByUs ? { phase: 'off' } : { phase: 'off', error: '与房间服务的连接断开了' });
 
-  // 自动重连：如果不是主动关闭，尝试重新连接
-  if (!closedByUs && status.phase !== 'off') {
-    const delay = reconnectDelay;
-    reconnectTimer = setTimeout(() => {
-      if (ws === null && !closedByUs) {
-        connect().catch(() => {});
+  // 被动断开才重连（注意：不能拿 status.phase 判断--上面 setStatus 刚把它设成 'off'，
+  // 旧代码就是栽在这：重连条件永远不成立，掉线后只能等用户手动再操作）
+  if (!closedByUs) scheduleReconnect(droppedRoomId);
+}
+
+/**
+ * 掉线重连 + 自动回房。指数退避（上限 30s），失败按上限间隔一直重试，
+ * 直到用户主动断开（disconnectRooms 会清 reconnectTimer）。
+ */
+function scheduleReconnect(roomId: string | null): void {
+  if (reconnectTimer) return;
+  const delay = reconnectDelay;
+  reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS);
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+    if (ws !== null || closedByUs) return;
+    try {
+      await connect();
+    } catch {
+      scheduleReconnect(roomId);
+      return;
+    }
+    if (roomId) {
+      try {
+        // joined 帧会重建房间缓存/聊天历史/心跳/宠上屏（applyJoined 全套）
+        await joinRoom(roomId);
+      } catch {
+        // 房间回不去了（被删/满员/被踢）：保持在线，不再回试
+        console.error('[rooms] 重连后回房失败，留在已连接状态');
       }
-    }, delay);
-  }
+    }
+  }, delay);
 }
 
 // 刷新消息队列：发送所有缓存的消息
@@ -452,6 +485,9 @@ function handleMessage(data: unknown): void {
         RoomPets.handlePackError(code);
         break;
       }
+      // 旧版服务端不认识应用层 ping 帧，回了 bad_frame：这帧本身证明链路活着
+      // （心跳吃的就是它），且不是任何在飞请求的应答，往下走会误杀 pending
+      if (code === 'bad_frame') break;
       // 应答类错误：转给在等的那个请求（谁在等就给谁）
       const waiting = [...pending.keys()][0];
       if (waiting) {
@@ -461,6 +497,10 @@ function handleMessage(data: unknown): void {
       }
       break;
     }
+
+    // ── 心跳应答（活性已在 message 监听器里记账，这里无需做事）──
+    case 'pong':
+      break;
 
     // ── 房内广播 ──
     case 'member:in': {
@@ -589,26 +629,19 @@ function applyJoined(frame: Frame): void {
 
 function startHeartbeat(): void {
   if (heartbeatTimer) return;
+  // 进房重置基线：连接建立到进房之间可能隔着逛列表的几分钟，
+  // 不重置的话第一次 tick 就拿旧时间戳误判超时
+  lastAliveAt = Date.now();
   heartbeatTimer = setInterval(() => {
-    if (!ws) return;
-    const socket = ws as any;
-    // 初始化lastPongTime如果不存在
-    if (!socket.lastPongTime) {
-      socket.lastPongTime = Date.now();
-    }
-    if (Date.now() - socket.lastPongTime > HEARTBEAT_TIMEOUT_MS) {
-      console.error('[rooms] 心跳超时，关闭连接');
-      socket.close();
+    if (!ws || ws.readyState !== WS_OPEN) return;
+    if (Date.now() - lastAliveAt > HEARTBEAT_TIMEOUT_MS) {
+      console.error('[rooms] 心跳超时（30s 无任何入帧），关闭连接');
+      try { ws.close(); } catch { /* 已经死了 */ }
       return;
     }
-    // 发送ping并在pong回调中更新时间
-    if (typeof socket.ping === 'function') {
-      socket.ping({}, (err) => {
-        if (!err) {
-          socket.lastPongTime = Date.now();
-        }
-      });
-    }
+    // 应用层 ping：证明双向链路（旧服务端不认识这帧会回 bad_frame 错误帧，
+    // 也是入帧、同样续命，所以新旧服务端都能用）
+    send({ t: 'ping' });
     void sendPresence(true);
   }, ROOMS.PRESENCE_HEARTBEAT_MS);
 }

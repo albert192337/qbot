@@ -256,6 +256,15 @@ async function main() {
   const wave = await bob.wait('wave');
   check(wave.fromMemberId === alice.memberId, 'bob 收到 alice 的招呼');
 
+  // ── 8a. 应用层心跳（2026-08-30 心跳误杀修复）──────────
+  // 客户端的 WebSocket 是 undici WHATWG 实现、没有协议层 ping/pong，
+  // 靠这帧验双向链路；不认识它的旧服务端会回 bad_frame（客户端也认）
+  console.log('\n8a. 应用层心跳');
+  alice.clear();
+  alice.send({ t: 'ping' });
+  const pong = await alice.wait('pong');
+  check(pong.t === 'pong', 'ping 收到 pong 应答');
+
   // ── 8b. 角色包分发（2026-08-24 上屏）──────────────────
   console.log('\n8b. 角色包分发');
   // 造一个假角色包：内容随便，hash 必须是 sha256 前 16 位（服务端收齐要校验）
