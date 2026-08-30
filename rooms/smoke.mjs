@@ -332,7 +332,10 @@ async function main() {
   check(reassembled.equals(packBuf), '下载重组与原包逐字节一致');
 
   // 下载中途再发一个 get：应回 busy（单连接一次一个下载）
-  const manyChunks = Buffer.alloc(150 * 1024, 9);
+  // 包要够大：服务端流是 64KB 块 × 5ms 节流，太小的包十几毫秒就流完了，
+  // 经公网 wss 打时第二个 get 到达时下载早结束（RTT 一百多毫秒），busy 永远等不到。
+  // 2MB = 32 块 ≈ 160ms 流时长，足够盖住两倍 RTT；本机跑也不拖时间。
+  const manyChunks = Buffer.alloc(2 * 1024 * 1024, 9);
   const manyHash = createHash('sha256').update(manyChunks).digest('hex').slice(0, 16);
   const manyParts = [];
   for (let i = 0; i < manyChunks.length; i += 64 * 1024) {
