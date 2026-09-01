@@ -67,6 +67,14 @@ function template(s: Settings): string {
     </select>
   </div>
 
+  <h3>行为模式</h3>
+  <div class="set-row">
+    <label class="set-check"><input id="set-free-mode" type="checkbox" ${s.freeMode ? 'checked' : ''} /> 自由模式（让桌宠用 AI 自主思考）</label>
+  </div>
+  <p class="studio-hint">关闭时是<b>陪伴模式</b>：桌宠按内置规则行动，完全本地、零花费。
+  开启后叠加 <b>LLM 脑</b>：桌宠会调用大模型（用上面的方舟 API Key）自己判断时机、即兴说话做动作，
+  约 15 分钟才思考一次，花费极低；规则脑照常保底。没有 Key 时开关不生效。</p>
+
   <h3>隐私</h3>
   <div class="set-row">
     <label class="set-check"><input id="set-show-pet" type="checkbox" ${s.roomsShowMyPet !== false ? 'checked' : ''} /> 在公共房间展示我的桌宠</label>
@@ -99,6 +107,8 @@ function syncFrom(host: HTMLElement, s: Settings): void {
   if (freq) freq.value = s.talkFrequency ?? 'normal';
   const showPet = host.querySelector<HTMLInputElement>('#set-show-pet');
   if (showPet) showPet.checked = s.roomsShowMyPet !== false;
+  const freeMode = host.querySelector<HTMLInputElement>('#set-free-mode');
+  if (freeMode) freeMode.checked = !!s.freeMode;
 }
 
 function bind(host: HTMLElement): void {
@@ -134,5 +144,8 @@ function bind(host: HTMLElement): void {
   });
   q<HTMLInputElement>('#set-show-pet').addEventListener('change', (e) => {
     void window.qbot.settings.set({ roomsShowMyPet: (e.target as HTMLInputElement).checked });
+  });
+  q<HTMLInputElement>('#set-free-mode').addEventListener('change', (e) => {
+    void window.qbot.settings.set({ freeMode: (e.target as HTMLInputElement).checked });
   });
 }

@@ -60,6 +60,13 @@ export interface Settings {
 
   /** 未开箱子的堆叠上限（默认 DEFAULT_MAX_BOXES=3，满了停止挂机结算） */
   maxBoxes?: number;
+
+  /**
+   * 自由模式（桌面行为 spec）：开启后在规则脑（陪伴模式，保底）之外额外启用
+   * LLM 脑——桌宠用 arkApiKey 调大模型自主决定即兴行为。需要 arkApiKey；
+   * 关闭/无 key 时纯规则脑，行为完全本地、零 API 花费。
+   */
+  freeMode?: boolean;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */
@@ -652,6 +659,8 @@ export interface QBotApi {
     stopAll(): Promise<void>;
     /** 触发规则引擎评估（手动指定 trigger） */
     trigger(trigger: string): Promise<void>;
+    /** 自由模式：手动触发一次 LLM 思考（绕过节流，仍受开关+key 门控） */
+    debugThink(): Promise<void>;
   };
 
   /** 行为引擎 → pet 窗：播指定动作（state-machine 的 PLAY_ACTION 入口） */

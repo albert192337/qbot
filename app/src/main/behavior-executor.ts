@@ -21,6 +21,7 @@ import { setLocalSign } from './local-sign';
 import { recordBehavior } from './perception';
 import { showBubbleWindow } from './windows';
 import { validateScript, type BehaviorScript, type BehaviorStep } from '../shared/behavior-dsl';
+import { setBehaviorExecutor } from './behavior-rules';
 
 /** 当前正在执行的行为（null = 空闲） */
 let current: {
@@ -35,14 +36,10 @@ const queue: BehaviorScript[] = [];
 /** 队列最大长度（防止堆积） */
 const MAX_QUEUE = 3;
 
-/** 启动执行器（注册到 behavior-rules） */
+/** 启动执行器（注册到 behavior-rules）。
+ *  静态 import 安全：behavior-rules 不反向依赖本模块（execute 回调靠 setter 注入） */
 export function startBehaviorExecutor(): void {
-  // 注册回调给规则引擎
-  // 这里做动态 import 避免循环依赖：behavior-rules → behavior-executor → behavior-rules
-  // 用 setBehaviorExecutor 做 setter 注入
-  import('./behavior-rules').then(({ setBehaviorExecutor: setExecutor }) => {
-    setExecutor(execute);
-  });
+  setBehaviorExecutor(execute);
 }
 
 /**
@@ -160,6 +157,8 @@ function executeStep(step: BehaviorStep): Promise<void> {
       }
 
       case 'say': {
+        // 记行为史（LLM 脑据此避免重复台词；防重复自己的依据）
+        void recordBehavior({ at: Date.now(), kind: 'say', detail: step.text });
         // 走气泡窗口
         const win = showBubbleWindow();
         const msg = {

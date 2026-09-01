@@ -115,10 +115,11 @@ export function wireBehaviorTriggers(): void {
   startupAt = Date.now();
 
   onPerceptionChanged((ev) => {
-    // 每类事件翻译成 trigger；一次事件最多映射一个 trigger
+    // 每类事件翻译成 trigger；一次事件最多映射一个 trigger。
+    // 活动边沿把 ev.at 传进去（idle 基准要排除当前事件，见 buildContextAsync）。
     switch (ev.type) {
       case 'app_focus':
-        void triggerRules('app_switch');
+        void triggerRules('app_switch', ev.at);
         break;
       case 'agent': {
         // error 连击计数（规则条件用）；done 是「跑完一轮」的边沿
@@ -128,26 +129,26 @@ export function wireBehaviorTriggers(): void {
           consecutiveErrors = 0;
         }
         if (ev.activity === 'done' && lastAgentActivity !== 'done') {
-          void triggerRules('agent_stop');
+          void triggerRules('agent_stop', ev.at);
         } else if (ev.activity === 'error' && lastAgentActivity !== 'error') {
-          void triggerRules('agent_error');
+          void triggerRules('agent_error', ev.at);
         }
         lastAgentActivity = ev.activity;
         break;
       }
       case 'meeting':
-        if (!ev.inMeeting) void triggerRules('meeting_end');
+        if (!ev.inMeeting) void triggerRules('meeting_end', ev.at);
         break;
       case 'music':
-        if (ev.playing) void triggerRules('music_start');
-        else void triggerRules('music_end');
+        if (ev.playing) void triggerRules('music_start', ev.at);
+        else void triggerRules('music_end', ev.at);
         break;
       case 'interact':
-        if (ev.kind === 'click') void triggerRules('pet_click');
-        else if (ev.kind === 'drag_end') void triggerRules('pet_drag_end');
+        if (ev.kind === 'click') void triggerRules('pet_click', ev.at);
+        else if (ev.kind === 'drag_end') void triggerRules('pet_drag_end', ev.at);
         break;
       case 'startup':
-        void triggerRules('startup');
+        void triggerRules('startup', ev.at);
         break;
     }
   });
@@ -180,13 +181,27 @@ function getLastInteractFromSnapshot(events: Array<{ type: string; at: number }>
 }
 
 /** 异步构造评估上下文（真账本 + 各监控器当前状态） */
-async function buildContextAsync(now: Date): Promise<RuleContext> {
+async function buildContextAsync(now: Date, eventAt?: number): Promise<RuleContext> {
   const focus = currentFocus();
   const agent = getAgentStatus();
   const meeting = getMeetingStatus();
   const music = getMusicStatus();
   const snap = await getSnapshot();
   const available = getAvailableActions ? getAvailableActions() : ['idle', 'drag'];
+
+  // idle 基准：活动边沿（切应用/点击/启动）触发时，当前事件刚把账本
+  // lastActivityAt 更新成「现在」，直接读会让 idle_minutes_ge 永远算 0
+  // （「好久不见」规则因此永不命中）。要算「这次回来之前闲了多久」→
+  // 从事件流找早于当前事件的上一条用户活动事件。
+  let lastActivityAt = snap.ledger.lastActivityAt;
+  if (eventAt) {
+    const prev = snap.events.find(
+      (e) =>
+        e.at < eventAt &&
+        (e.type === 'app_focus' || e.type === 'interact' || e.type === 'startup'),
+    );
+    if (prev) lastActivityAt = prev.at;
+  }
 
   return {
     now,
@@ -196,7 +211,7 @@ async function buildContextAsync(now: Date): Promise<RuleContext> {
       totalSwitches: snap.ledger.totalSwitches,
       apps: snap.ledger.apps as Record<string, { focusMs: number; switches: number }>,
       firstActivityAt: snap.ledger.firstActivityAt,
-      lastActivityAt: snap.ledger.lastActivityAt,
+      lastActivityAt,
     },
     agent: {
       activity: agent.activity || 'idle',
@@ -218,12 +233,12 @@ async function buildContextAsync(now: Date): Promise<RuleContext> {
  * 触发评估：某个 trigger 边沿进来了，跑一轮规则匹配，选一条执行。
  * 没命中 / 预算超了 / 全部冷却 → 什么都不做，记一条决策日志。
  */
-export async function triggerRules(trigger: RuleTrigger): Promise<void> {
+export async function triggerRules(trigger: RuleTrigger, eventAt?: number): Promise<void> {
   if (!loaded) await loadBuiltinRules();
   if (rules.length === 0) return;
 
   const now = new Date();
-  const ctx = await buildContextAsync(now);
+  const ctx = await buildContextAsync(now, eventAt);
   const dateKey = todayKey(now);
 
   // 1. 筛选命中规则（条件 + 仲裁一起过，没过的记原因）

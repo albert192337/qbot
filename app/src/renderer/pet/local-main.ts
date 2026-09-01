@@ -223,10 +223,17 @@ window.qbot.music.onStatus(onMusicStatus);
 void window.qbot.music.getStatus().then(onMusicStatus);
 
 // ── 行为引擎 → 播指定动作（规则命中的行为脚本走这里；同 PLAY_ACTION 语义：播 N 遍回原状态）──
+// 高优先级粘性态（agent 干活/开会/听歌）下行为动作让位：PLAY_ACTION 会把状态机
+// 切到 auto，播完回 idle 就再也回不到原粘性态（表现为 Claude 干着活桌宠突然不演了）。
+// 这些态下台词气泡照常（气泡不走状态机），只跳过动作。
+function behaviorCanPlay(): boolean {
+  return state.kind !== 'agent' && state.kind !== 'meeting' && state.kind !== 'music';
+}
 window.qbot.behaviorAction.onPlay(({ action, loops }) => {
   // 动作不可用（角色没这个动作）时静默忽略——执行器的语义解析已尽量给可用的，
   // 这里是最后一道闸
   if (available.length === 0 || !available.includes(action as PlayableId)) return;
+  if (!behaviorCanPlay()) return; // agent/meeting/music 粘性态：动作让位
   dispatch({ type: 'PLAY_ACTION', action: action as PlayableId });
   // loops > 1：state-machine 的 PLAY_ACTION 固定播 1 遍，多遍靠重发（等一动画时长）
   if (loops > 1) {
@@ -234,7 +241,8 @@ window.qbot.behaviorAction.onPlay(({ action, loops }) => {
       (currentCharacter?.manifest.customActions?.[action]?.durationSec ?? 3) * 1000;
     for (let i = 1; i < loops; i++) {
       setTimeout(() => {
-        if (available.includes(action as PlayableId)) {
+        // 重播时也要确认还在可演状态（这期间可能进了 agent/meeting）
+        if (available.includes(action as PlayableId) && behaviorCanPlay()) {
           dispatch({ type: 'PLAY_ACTION', action: action as PlayableId });
         }
       }, dur * i);

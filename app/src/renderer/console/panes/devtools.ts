@@ -53,6 +53,7 @@ export async function mount(host: HTMLElement): Promise<void> {
         <option value="pet_click">pet_click（戳了一下）</option>
       </select>
       <button class="btn ghost" data-behavior="trigger">触发评估</button>
+      <button class="btn ghost" data-behavior="think">LLM 思考一次</button>
       <button class="btn danger" data-behavior="stop">停止所有行为</button>
     </div>
     <div id="dev-rules" class="dev-stats">读取中…</div>
@@ -109,6 +110,15 @@ export async function mount(host: HTMLElement): Promise<void> {
           }
           await window.qbot.behavior.trigger(t);
           toast(host, `已触发 ${t} 评估（看桌宠反应 / 决策日志）`);
+        } else if (action === 'think') {
+          btn.disabled = true;
+          try {
+            await window.qbot.behavior.debugThink();
+            toast(host, '已让 LLM 脑思考一次（看决策日志 llm: 开头条目；需开自由模式 + 有 Key）');
+            await refreshRules();
+          } finally {
+            btn.disabled = false;
+          }
         } else if (action === 'stop') {
           await window.qbot.behavior.stopAll();
           toast(host, '已停止所有行为');

@@ -44,6 +44,7 @@ import {
 } from './perception';
 import { getAllRules, debugTrigger, triggerRules } from './behavior-rules';
 import { getExecutorState, stopAllBehaviors } from './behavior-executor';
+import { debugThink } from './brain-llm';
 
 export function registerIpc(): void {
   // 开小房间：房间窗标题用激活角色名（右键菜单与 room:open 共用）
@@ -342,5 +343,9 @@ export function registerIpc(): void {
   });
   ipcMain.handle('behavior:trigger', (_ev, trigger: string) => {
     void triggerRules(trigger as any);
+  });
+  // 自由模式 LLM 脑：手动触发一次思考（绕过节流，仍受 freeMode 开关 + key 门控）
+  ipcMain.handle('behavior:debugThink', async () => {
+    await debugThink();
   });
 }

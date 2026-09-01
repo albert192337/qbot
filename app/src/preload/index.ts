@@ -313,6 +313,7 @@ const api: QBotApi = {
     getExecutorState: () => ipcRenderer.invoke('behavior:getExecutorState'),
     stopAll: () => ipcRenderer.invoke('behavior:stopAll'),
     trigger: (trigger) => ipcRenderer.invoke('behavior:trigger', trigger),
+    debugThink: () => ipcRenderer.invoke('behavior:debugThink'),
   },
 };
 

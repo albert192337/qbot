@@ -19,7 +19,8 @@ import { flushProgress, startProgressTicker, stopProgressTicker } from './progre
 import { createRoom, joinRoom, notifyRoomCharacterChanged, setLoungePush } from './rooms/rooms';
 import { emitEvent, flush as flushPerception, onAppFocus, startFrontAppPolling, stopFrontAppPolling } from './perception';
 import { loadBuiltinRules, setAvailableActionsGetter, wireBehaviorTriggers, stopBehaviorScheduler } from './behavior-rules';
-import { startBehaviorExecutor } from './behavior-executor';
+import { startBehaviorExecutor, execute as executeBehavior } from './behavior-executor';
+import { setBrainExecutor, wireBrain } from './brain-llm';
 
 /** qbot-asset 响应的 Content-Type（漏了类型 Chromium 会拒绝解码 <video>） */
 const ASSET_MIME: Record<string, string> = {
@@ -151,9 +152,11 @@ app.whenReady().then(async () => {
 
   // ── 感知层 + 行为规则引擎（桌面行为 spec：事件流 → 规则 → 行为脚本）──
   startBehaviorExecutor(); // DSL 执行器（内部把 execute 注册给规则调度器）
+  setBrainExecutor(executeBehavior); // LLM 脑共用同一个执行器
   setAvailableActionsGetter(getActivePlayables); // 激活角色的可播放动作（windows.ts 维护）
   await loadBuiltinRules(); // 内置规则包
   wireBehaviorTriggers(); // 订阅感知事件流 → 规则 trigger 边沿
+  wireBrain(); // 自由模式 LLM 脑（内部按 settings.freeMode + arkApiKey 自行门控）
   // macOS 隐藏 dock（accessory 模式）下 browser-window-focus 不可靠 → 轮询 osascript；
   // 非 mac 平台（Windows 聚焦事件可靠）仍走窗口聚焦
   if (process.platform !== 'darwin') {
