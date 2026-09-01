@@ -118,3 +118,17 @@ window.qbot.bubble.onClear(clearAll);
 window.qbot.bubble.onAnchor((side) => {
   document.body.classList.toggle('below', side === 'below');
 });
+
+// ── 行为引擎说话气泡（规则命中的 say 步骤走这里）──
+// 复用 agent 气泡栈：绿边默认样式、同栈限 3 枚、到点淡出全一致。
+// sessionKey 固定 'behavior' → 行为气泡互相就地替换（同屏最多一枚，不跟 agent 抢位）
+window.qbot.behaviorSay.onSay(({ text, durationMs }) => {
+  onMessage({
+    sessionKey: 'behavior',
+    source: '桌宠',
+    sessionShort: '',
+    kind: 'done',
+    text,
+    at: Date.now() + Math.max(0, durationMs - 10_000), // TTL 固定 10s；要更短就把 at 往前拨
+  });
+});

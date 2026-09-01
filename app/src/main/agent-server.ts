@@ -30,6 +30,7 @@ import { readLastAssistantEntry } from './transcript';
 import { pushAgentMessage } from './bubble';
 import { sendToWindows } from './windows';
 import { pushLocalAgentActivity as pushRoomsActivity } from './rooms/rooms';
+import { emitEvent } from './perception';
 import { addAgentRun } from './progress';
 import { AGENT } from '../shared/config';
 import { withTimeout } from '../shared/timeout';
@@ -74,6 +75,12 @@ function broadcastIfChanged(): void {
   lastBroadcast = next;
   sendToWindows('agent:status', next);
   pushRoomsActivity(next.activity); // 公共房间钩子：只出状态枚举（2026-08-21 spec §5.3）
+  void emitEvent({
+    type: 'agent',
+    at: Date.now(),
+    activity: next.activity,
+    sessions: next.sessions,
+  }); // 感知层：事件流 + 账本（行为规则引擎在 perception 事件订阅里接边沿触发）
 }
 
 interface PendingMessage {
@@ -133,8 +140,6 @@ async function emitAgentMessage(ev: PendingMessage): Promise<void> {
   }
 }
 
-import { withTimeout } from '../shared/timeout';
-
 function handleStatePost(agentId: string, body: unknown): number {
   if (typeof body !== 'object' || body === null) return 400;
   const data = body as Record<string, unknown>;
@@ -193,7 +198,7 @@ function sweep(): void {
   // 超过最大会话数时清理最旧的会话
   if (sessions.size > AGENT.MAX_SESSIONS) {
     const entries = Array.from(sessions.entries()).sort((a, b) => a[1].updatedAt - b[1].updatedAt);
-    const toDelete = entries.slice(0, sessions.size - MAX_SESSIONS);
+    const toDelete = entries.slice(0, sessions.size - AGENT.MAX_SESSIONS);
     for (const [key] of toDelete) {
       sessions.delete(key);
       msgSeq.delete(key);

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
-import type { PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind } from '../shared/ipc-types';
+import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind } from '../shared/ipc-types';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
 import { createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, type ConsolePane } from './windows';
@@ -35,6 +35,15 @@ import { getAgentStatus } from './agent-server';
 import { getMusicStatus } from './music-monitor';
 import { getMeetingStatus } from './meeting-monitor';
 import { claudeHooksPresent, toggleClaudeHooks } from './hooks/claude';
+import {
+  emitEvent,
+  getSnapshot,
+  onPerceptionChanged,
+  recordBehavior,
+  recordDecision,
+} from './perception';
+import { getAllRules, debugTrigger, triggerRules } from './behavior-rules';
+import { getExecutorState, stopAllBehaviors } from './behavior-executor';
 
 export function registerIpc(): void {
   // 开小房间：房间窗标题用激活角色名（右键菜单与 room:open 共用）
@@ -302,4 +311,36 @@ export function registerIpc(): void {
   ipcMain.handle('meeting:getStatus', () => getMeetingStatus());
   // ── bubble ─────────────────────────────────────────────
   ipcMain.on('bubble:empty', () => hideBubbleWindow());
+
+  // ── perception 感知层（阶段 A：事件流/账本/行为史/决策日志）──
+  ipcMain.handle('perception:get', () => getSnapshot());
+  ipcMain.on('perception:report', (_ev, kind: PerceptionInteractKind) => {
+    const now = Date.now();
+    void emitEvent({ type: 'interact', at: now, kind });
+  });
+  // 调试注入：假 app_focus 事件，验证「事件→账本」链路
+  ipcMain.handle('perception:injectTest', async (_ev, appName?: string) => {
+    const name = (appName as string | undefined)?.trim() || 'Code（假快照）';
+    await emitEvent({ type: 'app_focus', at: Date.now(), app: name, windowTitle: name });
+  });
+
+  // 感知数据变化 → 统一广播（pet 窗 + 控制台都能收到）
+  onPerceptionChanged(() => {
+    sendToWindows('perception:changed', null);
+  });
+
+  // ── behavior 行为规则调试（仅开发者工具用）──
+  ipcMain.handle('behavior:getRules', () =>
+    getAllRules().map((r) => ({ id: r.id, name: r.name, weight: r.weight, enabled: true })),
+  );
+  ipcMain.handle('behavior:debugTrigger', (_ev, ruleId: string) => {
+    debugTrigger(ruleId);
+  });
+  ipcMain.handle('behavior:getExecutorState', () => getExecutorState());
+  ipcMain.handle('behavior:stopAll', () => {
+    stopAllBehaviors();
+  });
+  ipcMain.handle('behavior:trigger', (_ev, trigger: string) => {
+    void triggerRules(trigger as any);
+  });
 }

@@ -141,12 +141,32 @@ export function syncBubbleBounds(): void {
 }
 
 /** 激活角色变化：广播给 pet 窗（必要时创建）和 room 窗（存在时） */
+/** 当前激活角色的可播放动作（合并顺序同 renderer player.load：标准 → 贴纸 → 自定义） */
+let activePlayables: string[] = [];
+
 export function broadcastCharacterActivated(meta: CharacterMeta): void {
+  // 主进程侧同步一份可用动作（行为引擎的动作解析要用；与 player.load 同口径：
+  // 生成动作看 status，贴纸/自定义动作落盘即可用）
+  const m = meta.manifest;
+  const ids: string[] = [];
+  for (const [id, a] of Object.entries(m.actions ?? {})) {
+    if (a.status === 'done') ids.push(id);
+  }
+  for (const id of Object.keys(m.importedActions ?? {})) ids.push(id);
+  for (const [id, a] of Object.entries(m.customActions ?? {})) {
+    if (a.status === 'done') ids.push(id);
+  }
+  activePlayables = ids;
   const pet = petWindow && !petWindow.isDestroyed() ? petWindow : createPetWindow();
   pet.webContents.send('characters:activated', meta);
   if (roomWindow && !roomWindow.isDestroyed()) {
     roomWindow.webContents.send('characters:activated', meta);
   }
+}
+
+/** 行为规则引擎的 setAvailableActionsGetter 接这里（无需 import 角色模块） */
+export function getActivePlayables(): string[] {
+  return activePlayables;
 }
 
 export function createPetWindow(): BrowserWindow {
