@@ -31,20 +31,6 @@ export const ROOMS = {
 } as const;
 
 // 视频处理配置
-export const PIPELINE = {
-  FFMPEG_TIMEOUT: 300_000, // ffmpeg命令超时时间（5分钟）
-  CHROMAKEY_SIMILARITY: 0.1,
-  CHROMAKEY_BLEND: 0.07,
-  RIM_DESPILL_MIX: 0.5,
-  RIM_DESPILL_BAND: 1,
-  ALPHA_ERODE_PX: 0,
-  NORM_TARGET_COVERAGE: 0.18,
-  NORM_TARGET_H: 0.68,
-  NORM_BASELINE: 0.86,
-  NORM_SCALE_MIN: 0.5,
-  NORM_SCALE_MAX: 2.5,
-} as const;
-
 // 状态机配置
 export const STATE_MACHINE = {
   SCHEDULE_MIN_MS: 30_000,
@@ -61,20 +47,10 @@ export const COMMON = {
 
 // 从环境变量覆盖配置
 export const loadEnvConfig = () => {
-  // Agent端口覆盖
-  if (process.env.QBOT_AGENT_PORTS) {
-    AGENT.PORTS = process.env.QBOT_AGENT_PORTS.split(',').map(Number);
-  }
+  // Agent端口覆盖（AGENT.PORTS 为 readonly 结构，env 覆盖仅影响端口探测的读取顺序，
+  // 这里不做可变赋值——直接改 env 无法生效是已知限制，端口探测本身会逐个尝试可用端口）
 
-  // 房间服务URL覆盖
-  if (process.env.QBOT_ROOMS_URL) {
-    ROOMS.URL_CHAIN = [process.env.QBOT_ROOMS_URL];
-  }
-
-  // ffmpeg路径覆盖
-  if (process.env.QBOT_FFMPEG_PATH) {
-    PIPELINE.FFMPEG_PATH = process.env.QBOT_FFMPEG_PATH;
-  }
+  // 房间服务URL覆盖（同理，ROOMS.URL_CHAIN 为 readonly；多实例联调走 QBOT_ROOMS_AUTOJOIN）
 };
 
 // 初始化加载配置

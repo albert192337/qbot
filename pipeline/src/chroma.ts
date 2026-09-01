@@ -12,9 +12,19 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { PIPELINE } from '../app/src/shared/config';
 
 const execFileP = promisify(execFile);
+
+// ── 抠像参数（实测标定，全部从 app/shared/config 回归本地：pipeline 不得 import app）──
+/** colorkey 相似度/混合度（0.1/0.07：0.24:0.06 吃绿系角色、0.15:0.04 吃黑皮衣，此值实测最优） */
+const CHROMAKEY_SIMILARITY_VAL = 0.1;
+const CHROMAKEY_BLEND_VAL = 0.07;
+/** rim-only despill 强度（0.5：绿边 G+70→G+0，白本体与绿内部零改动） */
+const RIM_DESPILL_MIX_VAL = 0.5;
+/** 轮廓环带宽度（dilate/erode 次数，1 = 一圈混色像素实测足够） */
+const RIM_DESPILL_BAND_VAL = 1;
+/** alpha 收边像素（旧方案默认关闭，由 rim despill 取代；rekey 对照用） */
+const ALPHA_ERODE_PX_VAL = 0;
 
 /** computeAlphaStats 的结果：归一化 [0,1] 包围盒 + 脚线 + 平均不透明覆盖率 */
 export interface AlphaStats {
@@ -41,8 +51,8 @@ export interface AlphaStats {
  * - 残留绿边不靠调大 similarity 解决（上面两条已证明会吃角色本体），
  *   而是靠 rim-only despill 在轮廓环带上压绿（见 RIM_DESPILL_MIX）
  */
-export const CHROMAKEY_SIMILARITY = PIPELINE.CHROMAKEY_SIMILARITY;
-export const CHROMAKEY_BLEND = PIPELINE.CHROMAKEY_BLEND;
+export const CHROMAKEY_SIMILARITY = CHROMAKEY_SIMILARITY_VAL;
+export const CHROMAKEY_BLEND = CHROMAKEY_BLEND_VAL;
 
 /**
  * rim-only despill：只在角色轮廓环带上压减绿通道，消除抗锯齿/色度子采样产生的绿边。
@@ -63,9 +73,9 @@ export const CHROMAKEY_BLEND = PIPELINE.CHROMAKEY_BLEND;
  *
  * mix=0.5 为实测最优：绿边 G+70→G+0，白色本体与薄荷绿内部均零改动。
  */
-export const RIM_DESPILL_MIX = PIPELINE.RIM_DESPILL_MIX;
+export const RIM_DESPILL_MIX = RIM_DESPILL_MIX_VAL;
 /** 环带宽度（dilate/erode 次数）：1 = 覆盖轮廓外一圈混色像素，实测足够 */
-export const RIM_DESPILL_BAND = PIPELINE.RIM_DESPILL_BAND;
+export const RIM_DESPILL_BAND = RIM_DESPILL_BAND_VAL;
 
 /**
  * 检查ffmpeg是否可用
@@ -84,7 +94,7 @@ export async function checkFfmpegAvailable(ffmpegPath: string = 'ffmpeg'): Promi
  * 保留参数是为了 rekey CLI 能对存量角色回退对照，以及 despill 关闭时的兜底。
  * 注意：与 rim despill 同时开启会破坏画面（见上），keyActionVideo 已互斥处理。
  */
-export const ALPHA_ERODE_PX = PIPELINE.ALPHA_ERODE_PX;
+export const ALPHA_ERODE_PX = ALPHA_ERODE_PX_VAL;
 
 /** 归一化目标：角色 alpha 覆盖面积占画布比例 / 底边基线位置（所有动作一致 → 视觉等大）。
  *  0.18 = 按现有 6 个动作在旧 bbox 口径下的归一化后覆盖率中位数实测标定，
