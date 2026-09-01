@@ -22,6 +22,8 @@ export interface ActionInfo {
   motionDesc: string;
   durationSec: number;
   isCustom: boolean;
+  /** M 档表现力动作（官方预制一次性表演，未生成的可在此生成） */
+  isExpression?: boolean;
 }
 
 /**
@@ -40,7 +42,15 @@ export function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** 汇总标准动作 + 自定义动作，供动作列表与联动下拉共用 */
+/** M 档表现力动作的中文标签（本地重声明，坑 12：renderer 不能 value-import pipeline） */
+export const EXPRESSION_LABELS: Record<string, string> = {
+  smug: '得意坏笑',
+  point: '指认',
+  turn_away: '背过身',
+  cheer: '庆祝欢呼',
+};
+
+/** 汇总标准动作 + M 档表现力动作 + 自定义动作，供动作列表与联动下拉共用 */
 export function collectActions(m: Manifest, prompts?: PromptData): ActionInfo[] {
   const actions: ActionInfo[] = [];
   for (const [id, a] of Object.entries(m.actions) as [ActionId, ManifestAction][]) {
@@ -67,6 +77,32 @@ export function collectActions(m: Manifest, prompts?: PromptData): ActionInfo[] 
     });
   }
   return actions;
+}
+
+/**
+ * M 档表现力动作清单（含未生成的）：供「人设与动作」pane 的生成入口展示。
+ * 已生成的从 manifest 读状态；未生成的合成 status = 'none' 条目。
+ */
+export function collectExpressionActions(m: Manifest): ActionInfo[] {
+  const ALL: Array<[string, string]> = [
+    ['smug', '得意坏笑'],
+    ['point', '指认'],
+    ['turn_away', '背过身'],
+    ['cheer', '庆祝欢呼'],
+  ];
+  return ALL.map(([id, label]) => {
+    const a = m.expressionActions?.[id];
+    return {
+      id,
+      label,
+      status: a?.status ?? 'none',
+      poseDesc: '',
+      motionDesc: '',
+      durationSec: a?.durationSec ?? 5,
+      isCustom: false,
+      isExpression: true,
+    };
+  });
 }
 
 export interface StudioContext {

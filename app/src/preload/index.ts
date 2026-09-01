@@ -182,6 +182,9 @@ const api: QBotApi = {
       ipcRenderer.invoke('studio:saveTurnaroundPrompt', dirId, prompt),
     regenerateActions: (dirId, actionIds) =>
       ipcRenderer.invoke('studio:regenerateActions', dirId, actionIds),
+    /** M 档表现力动作：官方 prompt 按需生成（幂等，已生成不重复花钱） */
+    generateExpressionAction: (dirId, action) =>
+      ipcRenderer.invoke('studio:generateExpressionAction', dirId, action),
     regenerateTurnaround: (dirId) =>
       ipcRenderer.invoke('studio:regenerateTurnaround', dirId),
     pickStickerDir: () => ipcRenderer.invoke('studio:pickStickerDir'),

@@ -146,13 +146,16 @@ let activePlayables: string[] = [];
 
 export function broadcastCharacterActivated(meta: CharacterMeta): void {
   // 主进程侧同步一份可用动作（行为引擎的动作解析要用；与 player.load 同口径：
-  // 生成动作看 status，贴纸/自定义动作落盘即可用）
+  // 生成动作看 status，贴纸落盘即可用；M 档表现力动作也算生成动作看 status）
   const m = meta.manifest;
   const ids: string[] = [];
   for (const [id, a] of Object.entries(m.actions ?? {})) {
     if (a.status === 'done') ids.push(id);
   }
   for (const id of Object.keys(m.importedActions ?? {})) ids.push(id);
+  for (const [id, a] of Object.entries(m.expressionActions ?? {})) {
+    if (a.status === 'done') ids.push(id);
+  }
   for (const [id, a] of Object.entries(m.customActions ?? {})) {
     if (a.status === 'done') ids.push(id);
   }

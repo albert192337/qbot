@@ -41,16 +41,17 @@ const INTENT_MAP: Record<string, PlayableId[]> = {
   // ── 常见情绪/状态意图 ──
   happy: ['talk_happy', 'tea', 'idle'],
   glad: ['talk_happy', 'tea', 'idle'],
-  excited: ['talk_happy', 'tea', 'idle'],
-  celebrate: ['talk_happy', 'tea', 'idle'],
-  cheer: ['talk_happy', 'tea', 'idle'],
+  excited: ['cheer', 'talk_happy', 'tea', 'idle'],
+  celebrate: ['cheer', 'talk_happy', 'tea', 'idle'],
+  cheer: ['cheer', 'talk_happy', 'tea', 'idle'],
 
   annoyed: ['talk_annoyed', 'tea', 'idle'],
   angry: ['talk_annoyed', 'tea', 'idle'],
   upset: ['talk_annoyed', 'tea', 'idle'],
   pout: ['talk_annoyed', 'tea', 'idle'],
-  smug: ['talk_annoyed', 'tea', 'idle'], // M 档没生成时降级
-  sassy: ['talk_annoyed', 'tea', 'idle'],
+  // M 档表现力动作（生成后精确命中；没生成的角色沿链降级到 S 档）
+  smug: ['smug', 'talk_annoyed', 'tea', 'idle'],
+  sassy: ['smug', 'talk_annoyed', 'tea', 'idle'],
 
   thinking: ['tea', 'idle'],
   thought: ['tea', 'idle'],
@@ -74,10 +75,10 @@ const INTENT_MAP: Record<string, PlayableId[]> = {
   // ── 常用中文意图（模型可能直接输出中文）──
   开心: ['talk_happy', 'tea', 'idle'],
   高兴: ['talk_happy', 'tea', 'idle'],
-  庆祝: ['talk_happy', 'tea', 'idle'],
-  生气: ['talk_annoyed', 'tea', 'idle'],
+  庆祝: ['cheer', 'talk_happy', 'tea', 'idle'],
+  生气: ['turn_away', 'talk_annoyed', 'tea', 'idle'],
   烦躁: ['talk_annoyed', 'tea', 'idle'],
-  傲娇: ['talk_annoyed', 'tea', 'idle'],
+  傲娇: ['smug', 'turn_away', 'talk_annoyed', 'tea', 'idle'],
   思考: ['tea', 'idle'],
   喝茶: ['tea', 'idle'],
   睡觉: ['sleep', 'idle'],
@@ -85,12 +86,16 @@ const INTENT_MAP: Record<string, PlayableId[]> = {
   无聊: ['sleep', 'tea', 'idle'],
   招手: ['talk_happy', 'tea', 'idle'],
   你好: ['talk_happy', 'tea', 'idle'],
+  得意: ['smug', 'talk_annoyed', 'tea', 'idle'],
+  指认: ['point', 'talk_happy', 'tea', 'idle'],
+  背过身: ['turn_away', 'talk_annoyed', 'tea', 'idle'],
+  欢呼: ['cheer', 'talk_happy', 'tea', 'idle'],
 
-  // ── M 档动作（目前 S 档没有的，先放降级链末尾，等 M 档生成后自动提升） ──
-  point: ['talk_happy', 'tea', 'idle'], // M 档生成后: ['point', 'talk_happy', ...]
-  turn_away: ['talk_annoyed', 'tea', 'idle'],
-  cheer_up: ['talk_happy', 'tea', 'idle'],
-  clap: ['talk_happy', 'tea', 'idle'],
+  // ── M 档动作意图（smug/point/turn_away/cheer 已在上方各链首位）──
+  point: ['point', 'talk_happy', 'tea', 'idle'],
+  turn_away: ['turn_away', 'talk_annoyed', 'tea', 'idle'],
+  cheer_up: ['cheer', 'talk_happy', 'tea', 'idle'],
+  clap: ['cheer', 'talk_happy', 'tea', 'idle'],
   facepalm: ['talk_annoyed', 'tea', 'idle'],
   dance: ['talk_happy', 'tea', 'idle'],
   shock: ['talk_annoyed', 'tea', 'idle'],

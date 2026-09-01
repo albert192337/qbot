@@ -13,7 +13,7 @@ import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCac
 import { getLocalSign, setLocalSign } from './local-sign';
 import { notifyRoomCharacterChanged } from './rooms/rooms';
 import { getMemberSnapshot } from './rooms/room-pets';
-import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround } from './pipeline-bridge';
+import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround, generateExpressionAction } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import {
   analyzeStickers,
@@ -237,6 +237,10 @@ export function registerIpc(): void {
   });
   ipcMain.handle('studio:addCustomAction', async (_ev, dirId: string, name: string, poseDesc: string, motionDesc: string, durationSec: number) => {
     await addCustomAction(dirId, name, poseDesc, motionDesc, durationSec);
+  });
+  // M 档表现力动作：官方 prompt 表按需生成（复用自定义动作管线，幂等不重复花钱）
+  ipcMain.handle('studio:generateExpressionAction', async (_ev, dirId: string, action: string) => {
+    await generateExpressionAction(dirId, action as any);
   });
   ipcMain.handle('studio:deleteCustomAction', async (_ev, dirId: string, name: string) => {
     await deleteCustomAction(dirId, name);

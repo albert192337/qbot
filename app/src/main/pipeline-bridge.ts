@@ -29,8 +29,11 @@ import {
   actionSpec,
   DEFAULT_CHARACTER_DESC,
   ACTION_IDS,
+  EXPRESSION_ACTION_IDS,
+  expressionActionSpec,
   type CharacterForm,
   type CharacterStyle,
+  type ExpressionActionId,
   type ImageProvider,
   type JobState,
   type Manifest,
@@ -329,6 +332,158 @@ export async function savePersona(dirId: string, persona: string): Promise<void>
 
 /** 动作名合法字符：字母数字下划线或中文（用作文件名，禁路径分隔符与保留字符） */
 const ACTION_NAME_RE = /^[\w一-鿿]+$/;
+
+/** 读角色的 characterForm（M 档按形态取 prompt 变体；state.json 缺失回落人形） */
+async function readCharacterForm(outDir: string): Promise<CharacterForm | undefined> {
+  try {
+    const raw = await readFile(path.join(outDir, '.job', 'state.json'), 'utf8');
+    return (JSON.parse(raw) as JobState).characterForm;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 生成 M 档表现力动作（spec 2026-08-21-expression-action-tier §6）。
+ * 复用自定义动作管线（首帧→视频→抠像→webm/gif→回写 manifest→热重载），
+ * prompt 取官方 EXPRESSION 表（非用户输入），落 manifest.expressionActions。
+ * 幂等：已 done 的不重复生成（花钱）；pending/failed 视为可重试重生成。
+ */
+export async function generateExpressionAction(
+  dirId: string,
+  action: ExpressionActionId,
+): Promise<void> {
+  if (!EXPRESSION_ACTION_IDS.includes(action)) {
+    throw new Error(`未知的 M 档动作：${action}`);
+  }
+  const outDir = path.join(charactersDir(), dirId);
+  const manifestPath = path.join(outDir, 'manifest.json');
+  const raw = await readFile(manifestPath, 'utf8');
+  const manifest = JSON.parse(raw) as Manifest;
+  if (manifest.expressionActions?.[action]?.status === 'done') {
+    return; // 已生成，不重复花钱
+  }
+
+  // API key 等配置在返回前校验：detach 后的错误渲染层拿不到
+  const cfg = await buildConfig();
+  const form = await readCharacterForm(outDir);
+  const spec = expressionActionSpec(action, form);
+
+  // 写 manifest：标记 pending
+  manifest.expressionActions = {
+    ...manifest.expressionActions,
+    [action]: {
+      webm: `actions/${action}.webm`,
+      gif: `actions/${action}.gif`,
+      durationSec: spec.durationSec,
+      status: 'pending',
+    },
+  };
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  broadcastCustomAction(dirId, action, 'pending');
+
+  // 后台生成（同 addCustomAction 的 detach 策略）
+  void generateExpressionActionInner({
+    dirId, outDir, manifestPath, action,
+    poseDesc: spec.poseDesc,
+    motionDesc: spec.motionDesc,
+    durationSec: spec.durationSec,
+    persona: manifest.persona,
+    manifest, cfg,
+  });
+}
+
+/** M 档生成流程：与 generateCustomAction 同一链路，只是回写 expressionActions */
+async function generateExpressionActionInner(a: {
+  dirId: string;
+  outDir: string;
+  manifestPath: string;
+  action: ExpressionActionId;
+  poseDesc: string;
+  motionDesc: string;
+  durationSec: number;
+  persona?: string;
+  manifest: Manifest;
+  cfg: PipelineConfig;
+}): Promise<void> {
+  const { dirId, outDir, manifestPath, action, poseDesc, motionDesc, durationSec, persona, manifest, cfg } = a;
+  try {
+    const turnaround = await readFile(path.join(outDir, 'turnaround.png'));
+    const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
+    const ark = createArkClient(cfg);
+
+    const frameBuf = await ark.generateImage({
+      prompt: buildCustomFramePrompt(poseDesc, manifest, persona),
+      refImageDataUrl: toDataUrl(turnaround),
+      size: '2048x2048',
+    });
+    const frameRel = `.job/${action}_frame.png`;
+    await writeFile(path.join(outDir, frameRel), frameBuf);
+
+    const taskId = await ark.submitVideoTask({
+      prompt: buildCustomVideoPrompt(motionDesc, manifest, durationSec),
+      frameDataUrl: toDataUrl(frameBuf),
+    });
+    const deadline = Date.now() + 15 * 60 * 1000;
+    let videoUrl: string | undefined;
+    for (;;) {
+      const t = await ark.getVideoTask(taskId);
+      if (t.status === 'succeeded') { videoUrl = t.videoUrl; break; }
+      if (t.status === 'failed') throw new Error(`video task failed: ${t.error}`);
+      if (Date.now() > deadline) throw new Error('video poll timeout');
+      await new Promise(r => setTimeout(r, 5000));
+    }
+    const videoRel = `.job/${action}.mp4`;
+    await ark.downloadVideo(videoUrl!, path.join(outDir, videoRel));
+
+    // 抠像转码与 stages.ts keyActionVideo 同一套（理由见 generateCustomAction 注释）
+    const videoAbs = path.join(outDir, videoRel);
+    const drift = await checkVideoDrift(videoAbs, ffmpegPath);
+    if (drift.fail) {
+      throw new Error(`绿幕背景漂移 ${drift.maxDrift}/255 超限，视频不可用`);
+    }
+    let keys = selectDualKeys(await sampleBackgroundColors(videoAbs, ffmpegPath));
+    if (keys.length === 0) {
+      keys = [await sampleKeyColor(videoAbs, ffmpegPath)];
+    }
+    const stats = await computeAlphaStats(videoAbs, keys, ffmpegPath);
+    const size = await probeSize(videoAbs, ffmpegPath);
+    const normVf = stats ? normalizeFilter(stats, size.width, size.height) : undefined;
+    await toWebm(videoAbs, path.join(outDir, 'actions', `${action}.webm`), keys, ffmpegPath, normVf);
+    await toGif(videoAbs, path.join(outDir, 'actions', `${action}.gif`), keys, ffmpegPath, normVf);
+
+    await patchExpressionActionStatus(manifestPath, action, 'done');
+    broadcastCustomAction(dirId, action, 'done');
+    const meta = await getCharacter(dirId);
+    if (meta?.manifest && (await getSettings()).activeCharacter === dirId) {
+      broadcastCharacterActivated(meta);
+    }
+    await rebuildTray();
+  } catch (err) {
+    const msg = String(err instanceof Error ? err.message : err);
+    console.error(`Expression action ${action} failed:`, err);
+    await patchExpressionActionStatus(manifestPath, action, 'failed');
+    broadcastCustomAction(dirId, action, 'failed', msg);
+  }
+}
+
+/** 回写单个 M 档动作的状态（重读 manifest 避免覆盖并发改动，同 patchCustomActionStatus） */
+async function patchExpressionActionStatus(
+  manifestPath: string,
+  action: string,
+  status: 'done' | 'failed',
+): Promise<void> {
+  try {
+    const m = JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest;
+    if (m.expressionActions?.[action]) {
+      m.expressionActions[action].status = status;
+      await writeFile(manifestPath, JSON.stringify(m, null, 2));
+    }
+  } catch (err) {
+    console.error(`[expression] 回写状态失败 (${action} → ${status}):`, err);
+  }
+}
+
 
 /** 广播自定义动作生成进度（Studio 页据此刷新） */
 function broadcastCustomAction(

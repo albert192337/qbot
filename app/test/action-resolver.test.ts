@@ -112,6 +112,24 @@ describe('resolveAction', () => {
     expect(r.action).toBe('point');
     expect(r.matchLevel).toBe('exact');
   });
+
+  it('M 档全套可用时，smug/turn_away/cheer 意图精确命中 M 档动作', () => {
+    const avail = [...S_TIER, 'smug', 'point', 'turn_away', 'cheer'];
+    expect(resolveAction('smug', avail).action).toBe('smug');
+    expect(resolveAction('turn_away', avail).action).toBe('turn_away');
+    expect(resolveAction('cheer', avail).action).toBe('cheer');
+    expect(resolveAction('celebrate', avail).action).toBe('cheer');
+    expect(resolveAction('得意', avail).action).toBe('smug');
+    expect(resolveAction('欢呼', avail).action).toBe('cheer');
+  });
+
+  it('M 档不可用时沿链降级到 S 档（未生成 M 档的角色）', () => {
+    // smug → talk_annoyed；cheer → talk_happy；turn_away → talk_annoyed
+    expect(resolveAction('smug', S_TIER).action).toBe('talk_annoyed');
+    expect(resolveAction('cheer', S_TIER).action).toBe('talk_happy');
+    expect(resolveAction('turn_away', S_TIER).action).toBe('talk_annoyed');
+    expect(resolveAction('celebrate', S_TIER).action).toBe('talk_happy');
+  });
 });
 
 describe('resolveFirstAvailable', () => {

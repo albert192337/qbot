@@ -256,6 +256,14 @@
       .status-done { background: var(--success); color: var(--neutral); }
       .status-pending { background: var(--warning); color: var(--neutral); }
       .status-failed { background: var(--error); color: var(--neutral); }
+      .status-none { background: var(--border); color: var(--secondary); }
+      /* M 档表现力动作：卡片网格 */
+      .expr-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 12px;
+        margin-bottom: 8px;
+      }
       /* 场景动作表格 */
       .scene-grid {
         background: var(--card);

@@ -35,6 +35,9 @@ const MIN_THINK_INTERVAL_MS = 15 * 60_000;
 const BRAIN_INTENTS = [
   'happy',
   'smug',
+  'point',
+  'turn_away',
+  'cheer',
   'sleepy',
   'thinking',
   'annoyed',

@@ -591,6 +591,8 @@ export interface QBotApi {
     saveTurnaroundPrompt(dirId: string, prompt: string): Promise<void>;
     /** 按当前 prompt 重新生成指定动作（**花钱**，每动作约 ¥1） */
     regenerateActions(dirId: string, actionIds: string[]): Promise<void>;
+    /** M 档表现力动作（smug/point/turn_away/cheer）：官方 prompt 按需生成 */
+    generateExpressionAction(dirId: string, action: string): Promise<void>;
     /** 重新生成三视图并连带重生全部动作（**花钱**，约 6 条视频）；挑图走孵化窗 */
     regenerateTurnaround(dirId: string): Promise<void>;
 

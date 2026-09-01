@@ -3,7 +3,13 @@
  * 模板文本逐字取自 DESIGN.md §3.3（实测有效），不要随意改写措辞。
  * 纯函数模块，无 IO。
  */
-import type { ActionId, ActionSpec, CharacterForm, CharacterStyle } from './types.js';
+import type {
+  ActionId,
+  ActionSpec,
+  CharacterForm,
+  CharacterStyle,
+  ExpressionActionId,
+} from './types.js';
 
 /**
  * MVP 用固定通用描述填槽（spec §8 风险项：还原度不够时接 VLM 自动提取）。
@@ -159,6 +165,97 @@ export const FAITHFUL_ACTIONS: Record<ActionId, ActionSpec> = {
     durationSec: 5,
   },
 };
+
+// ── M 档表现力动作（spec 2026-08-21-expression-action-tier §4）──────────────
+// 一次性表演动作（播完回落 idle），文案逐字取自 spec，不要随意改写措辞。
+// 人形 pose 三档共用；motion 分 chibi（耳朵）/ faithful（头发）；抽象档整套独立。
+
+/** M 档人形动作（chibi 默认；faithful 只换 motion，pose 共用此表） */
+export const EXPRESSION_ACTIONS: Record<ExpressionActionId, ActionSpec> = {
+  smug: {
+    poseDesc:
+      '角色四分之三侧身朝向画面右侧，微微仰头眯眼坏笑，嘴角单边上扬，一只手抬到胸前手背轻贴下巴，表情得意。角色自身的手和双臂保持自然可见，手中不持任何物体，画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
+    motionDesc:
+      '角色眯眼坏笑，肩膀随着无声的窃笑一耸一耸，头微微左右晃动，偶尔挑一下眉，耳朵得意地抖动。角色不位移。',
+    durationSec: 5,
+  },
+  point: {
+    poseDesc:
+      '角色四分之三侧身朝向画面右侧，自己的一只手臂抬起向画面右前方伸直指出，食指明确指向右前方，另一只手自然下垂，表情认真中带一点得意。角色自身的手和双臂保持自然可见，手中不持任何物体，画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
+    motionDesc:
+      '角色保持指向画面右前方的姿势，手臂小幅前后点动强调所指方向，头随之朝同方向偏转，眉毛上扬，耳朵竖起。手臂始终不放下，角色不位移。',
+    durationSec: 5,
+  },
+  turn_away: {
+    poseDesc:
+      '角色背对画面站立，只看得到后脑和背影，头微微偏向一侧像在赌气，双臂在身前交叉抱起（从背后看得到手肘的轮廓）。画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
+    motionDesc:
+      '角色背对画面站着不动，只有肩膀随呼吸轻微起伏，中途头微微转向侧后方瞄一眼又立刻扭回去，耳朵向后压。角色不位移。',
+    durationSec: 5,
+  },
+  cheer: {
+    poseDesc:
+      '角色正面朝向画面，双臂高高举起向上张开，张嘴大笑，眼睛弯成月牙，表情兴奋雀跃。角色自身的手和双臂保持自然可见，手中不持任何物体，画面中不出现彩带、不出现礼花、不出现任何符号或文字，不出现其他人的手或身体部位，不出现任何额外人物或物体。',
+    motionDesc:
+      '角色举着双臂原地欢呼跳跃，双臂上下挥动，落地后再次跃起，笑容灿烂，耳朵随跳跃上下弹动。角色始终在原地上下跳动，左右不位移。',
+    durationSec: 5,
+  },
+};
+
+/** M 档高保真（faithful）motion：pose 同人形，只把耳朵换成头发 */
+export const EXPRESSION_FAITHFUL_MOTION: Record<ExpressionActionId, string> = {
+  smug: '角色眯眼坏笑，肩膀随着无声的窃笑一耸一耸，头微微左右晃动，偶尔挑一下眉，头发随之轻轻晃动。角色不位移。',
+  point:
+    '角色保持指向画面右前方的姿势，手臂小幅前后点动强调所指方向，头随之朝同方向偏转，眉毛上扬，头发随动作轻轻晃动。手臂始终不放下，角色不位移。',
+  turn_away:
+    '角色背对画面站着不动，只有肩膀随呼吸轻微起伏，中途头微微转向侧后方瞄一眼又立刻扭回去，头发随扭头轻轻甩动。角色不位移。',
+  cheer:
+    '角色举着双臂原地欢呼跳跃，双臂上下挥动，落地后再次跃起，笑容灿烂，头发随跳跃上下飞扬。角色始终在原地上下跳动，左右不位移。',
+};
+
+/** M 档抽象形态（绝不出现部位词，血泪坑 10；情绪/姿态用整体轮廓表达） */
+export const EXPRESSION_ABSTRACT_ACTIONS: Record<ExpressionActionId, ActionSpec> = {
+  smug: {
+    poseDesc: '角色朝向画面右侧，整体微微后仰上扬，姿态透着得意。没有其他任何人物或物体。',
+    motionDesc:
+      '角色整体一耸一耸地小幅抖动，像在无声地窃笑，偶尔轻轻左右摇晃。角色不位移。',
+    durationSec: 5,
+  },
+  point: {
+    poseDesc: '角色整体朝画面右侧倾斜前探，姿态像在明确示意右前方。没有其他任何人物或物体。',
+    motionDesc: '角色朝画面右前方小幅前后点动，像在反复强调那个方向。角色不位移。',
+    durationSec: 5,
+  },
+  turn_away: {
+    poseDesc: '角色整体背朝画面，轮廓偏向一侧，姿态像在赌气。没有其他任何人物或物体。',
+    motionDesc:
+      '角色背朝画面一动不动，只有整体随呼吸极轻微起伏，中途朝侧后方微微转了一下又立刻转回去。角色不位移。',
+    durationSec: 5,
+  },
+  cheer: {
+    poseDesc: '角色整体向上舒展张开，姿态兴奋雀跃。没有其他任何人物或物体。',
+    motionDesc:
+      '角色在原地上下弹跳欢呼，每次落下后再次弹起，整体随之舒展收缩。角色始终在原地上下跳动，左右不位移。',
+    durationSec: 5,
+  },
+};
+
+/** 按形态/风格取 M 档动作文案（与 actionSpec 同构） */
+export function expressionActionSpec(
+  action: ExpressionActionId,
+  form: CharacterForm = 'humanoid',
+  style?: CharacterStyle,
+): ActionSpec {
+  if (form === 'abstract') return EXPRESSION_ABSTRACT_ACTIONS[action];
+  if (style === 'faithful') {
+    return {
+      poseDesc: EXPRESSION_ACTIONS[action].poseDesc,
+      motionDesc: EXPRESSION_FAITHFUL_MOTION[action],
+      durationSec: 5,
+    };
+  }
+  return EXPRESSION_ACTIONS[action];
+}
 
 /** 按角色形态与生成风格取动作文案 */
 export function actionSpec(

@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   ABSTRACT_ACTIONS,
   ACTIONS,
+  EXPRESSION_ABSTRACT_ACTIONS,
+  EXPRESSION_ACTIONS,
   FAITHFUL_ACTIONS,
   framePrompt,
   turnaroundPrompt,
   videoPrompt,
 } from '../src/prompts.js';
-import { ACTION_IDS } from '../src/types.js';
+import { ACTION_IDS, EXPRESSION_ACTION_IDS } from '../src/types.js';
 
 describe('prompts', () => {
   it('三视图模板含三视角与白底约束', () => {
@@ -156,6 +158,37 @@ describe('prompts', () => {
     // 「服装」允许出现在"不要添加…"的排除句里，只查会引导画出来的正面措辞
     for (const kw of ['站立', '双臂', '发型']) {
       expect(t).not.toContain(kw);
+    }
+  });
+
+  it('M 档：四个动作的 prompt 三变体齐全且文案含核心动作语义', () => {
+    expect(EXPRESSION_ACTION_IDS).toEqual(['smug', 'point', 'turn_away', 'cheer']);
+    for (const id of EXPRESSION_ACTION_IDS) {
+      // 需要空手的动作必须逐项排除道具（spec §2：只写「空无一物」拦不住模型塞东西）。
+      // turn_away 背身抱臂不适用此断言（spec 原文如此）
+      if (id !== 'turn_away') {
+        expect(EXPRESSION_ACTIONS[id].poseDesc).toContain('手中不持任何物体');
+      }
+      // motion 以「角色不位移」收尾（turn_away 的「左右不位移」也算合规变体）
+      expect(EXPRESSION_ACTIONS[id].motionDesc).toMatch(/角色不位移|左右不位移/);
+      // 抽象档存在且不空
+      expect(EXPRESSION_ABSTRACT_ACTIONS[id].poseDesc.length).toBeGreaterThan(10);
+    }
+    // 关键语义抽查：坏笑/指出/背对/欢呼
+    expect(EXPRESSION_ACTIONS.smug.poseDesc).toContain('坏笑');
+    expect(EXPRESSION_ACTIONS.point.poseDesc).toContain('指出');
+    expect(EXPRESSION_ACTIONS.turn_away.poseDesc).toContain('背对画面');
+    expect(EXPRESSION_ACTIONS.cheer.poseDesc).toContain('双臂高高举起');
+  });
+
+  it('M 档抽象变体不含部位词（血泪坑 10 同款守卫）', () => {
+    const bodyParts = ['双臂', '双手', '手臂', '食指', '耳朵', '头发', '肩膀', '双腿', '嘴巴', '眉毛'];
+    for (const id of EXPRESSION_ACTION_IDS) {
+      const text =
+        EXPRESSION_ABSTRACT_ACTIONS[id].poseDesc + EXPRESSION_ABSTRACT_ACTIONS[id].motionDesc;
+      for (const kw of bodyParts) {
+        expect(text, `M 档抽象 ${id} 不应包含「${kw}」`).not.toContain(kw);
+      }
     }
   });
 

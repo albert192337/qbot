@@ -9,6 +9,7 @@
 import {
   bumpAssetNonce,
   collectActions,
+  collectExpressionActions,
   confirmBox,
   esc,
   getAssetNonce,
@@ -91,6 +92,26 @@ async function refresh(): Promise<void> {
     html += `</div>`;
   }
 
+  // ── M 档表现力动作 ──
+  const expressions = collectExpressionActions(ctx.m);
+  html += `<h3>表现力动作（M 档）</h3>`;
+  html += `<p class="studio-hint">一次性表演动作（得意坏笑/指认/背过身/庆祝欢呼），桌宠的吐槽、庆祝、闹别扭都靠它们演出。
+  按需生成（每个约 ¥1、5 分钟左右），生成后规则与 AI 的即兴行为会自动用上。</p>`;
+  html += `<div class="expr-grid">`;
+  for (const ex of expressions) {
+    const frameUrl =
+      ex.status === 'done' ? `qbot-asset://${ctx.dirId}/actions/${ex.id}.webm?v=${getAssetNonce()}` : '';
+    html += `<div class="action-card expr-card" data-expr="${esc(ex.id)}">`;
+    html += `<div class="meta"><b>${esc(ex.label)}</b> (${esc(ex.id)}) `;
+    html += `<span class="status status-${ex.status}">${ex.status === 'none' ? '未生成' : ex.status}</span></div>`;
+    if (frameUrl) html += `<video src="${frameUrl}" muted autoplay loop playsinline></video>`;
+    if (ex.status !== 'done') {
+      html += `<div class="btn-row"><button class="gen-expr btn" data-id="${esc(ex.id)}">生成（约 ¥1）</button></div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+
   // ── add custom action ──
   html += `<h3>新增自定义动作</h3>`;
   html += `<p class="studio-hint">提交后在后台生成，需要几分钟；完成后本页自动刷新，届时可在「场景动作」里选用。</p>`;
@@ -117,6 +138,19 @@ function bind(root: HTMLElement, dirId: string): void {
     void guard(root, btn, '保存中…', async () => {
       await window.qbot.studio.savePersona(dirId, ta.value);
       toast(root, '人设已保存 ✓');
+    });
+  });
+
+  // 生成 M 档表现力动作
+  root.querySelectorAll<HTMLButtonElement>('.gen-expr').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id!;
+      void guard(root, btn, '提交中…', async () => {
+        // 主进程写完 pending 条目就返回，生成在后台跑（数分钟）
+        await window.qbot.studio.generateExpressionAction(dirId, id);
+        toast(root, `已开始生成「${id}」，约 5 分钟，完成后本页自动刷新`);
+        await refresh();
+      });
     });
   });
 

@@ -17,6 +17,21 @@ export const ACTION_IDS = [
 export type ActionId = (typeof ACTION_IDS)[number];
 
 /**
+ * M 档表现力动作（spec 2026-08-21-expression-action-tier）：一次性表演动作，
+ * 播完回落 idle（区别于 S 档的常驻状态循环）。**不进孵化流程**，按需增量生成。
+ * 首批 4 个（agent 元层评论 + 沉默类 + done 态），后续扩到 12。
+ * 顺序即解锁优先级：smug → point → turn_away → cheer。
+ */
+export const EXPRESSION_ACTION_IDS = [
+  'smug', // 得意坏笑（损人设物理载体：吐槽/反成就/agent 嘴替）
+  'point', // 指认（举证/做戏/元层）
+  'turn_away', // 背过身（沉默类整族：闹别扭而非卡死）
+  'cheer', // 庆祝欢呼（done 态/正向成就/伏笔兑现）
+] as const;
+
+export type ExpressionActionId = (typeof EXPRESSION_ACTION_IDS)[number];
+
+/**
  * 可播放动作 id：6 个标准动作 **或** 用户自定义动作名（manifest.customActions 的 key）。
  * `string & {}` 的写法保留 ActionId 的编辑器自动补全，同时接受任意自定义名。
  */
@@ -155,6 +170,12 @@ export interface Manifest {
   persona?: string;
   /** 自定义动作（用户新增的额外动作，key 为 action name） */
   customActions?: Record<string, ManifestAction>;
+  /**
+   * M 档表现力动作（官方预制的一次性表演动作，spec 2026-08-21-expression-action-tier）。
+   * key 为 ExpressionActionId（smug/point/turn_away/cheer…），按需增量生成、不进孵化流程。
+   * 与 customActions 分开存：官方动作 vs 用户自建，UI 分区、不误删、房间分发显式带上。
+   */
+  expressionActions?: Record<string, ManifestAction>;
   /**
    * 表情包导入动作：key = 动作槽位（覆盖同名标准动作）。
    * 缺省 = 未导入。删除本字段即一步回退到生成动作。

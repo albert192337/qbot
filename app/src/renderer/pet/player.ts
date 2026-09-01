@@ -42,14 +42,15 @@ export class Player {
      */
     const nonce = Date.now();
     /**
-     * 合并顺序（sticker-import spec §4.3）：标准动作 → 导入贴纸 → 自定义动作。
-     * 后写的覆盖同名 key，所以导入贴纸能盖掉同名标准动作，
+     * 合并顺序（sticker-import spec §4.3）：标准动作 → 导入贴纸 → M 档表现力动作
+     * → 自定义动作。后写的覆盖同名 key，所以导入贴纸能盖掉同名标准动作，
      * 而用户显式建的自定义动作优先级最高。
      * 贴纸只有 webm 没有 gif，且没有 status 字段（落盘即可用）。
      */
     const all: [string, { webm: string; status?: string }][] = [
       ...(Object.entries(manifest.actions) as [string, ManifestAction][]),
       ...Object.entries(manifest.importedActions ?? {}),
+      ...(Object.entries(manifest.expressionActions ?? {}) as [string, ManifestAction][]),
       ...(Object.entries(manifest.customActions ?? {}) as [string, ManifestAction][]),
     ];
     for (const [id, action] of all) {
