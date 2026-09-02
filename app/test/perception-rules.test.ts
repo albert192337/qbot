@@ -6,8 +6,16 @@ import type { Ledger, PerceptionEvent } from '../src/shared/perception';
 import { aggregateEvent, emptyDay } from '../src/main/perception-rules';
 
 function ev(type: PerceptionEvent['type'], at: number, extra?: Record<string, unknown>): PerceptionEvent {
-  if (type === 'app_focus') {
-    return { type, at, app: (extra?.app as string) ?? 'app-x', windowTitle: (extra?.windowTitle as string) ?? 'X' };
+  if (type === 'app_focus' || type === 'foreground_change') {
+    return {
+      type,
+      at,
+      platform: 'macos',
+      source: 'macos-nsworkspace-system-events',
+      detailLevel: 'full',
+      app: (extra?.app as string) ?? 'app-x',
+      windowTitle: (extra?.windowTitle as string) ?? 'X',
+    };
   }
   if (type === 'agent') return { type, at, activity: 'working', sessions: 1 };
   if (type === 'meeting') return { type, at, inMeeting: true };
@@ -38,6 +46,24 @@ describe('账本聚合', () => {
     expect(day.apps['原神']?.switches).toBe(1);
     expect(day.apps['VS Code']?.switches).toBe(1);
     expect(day.totalSwitches).toBe(2);
+  });
+
+  it('同一应用内的窗口标题变化不计为应用切换', () => {
+    const ledger: Ledger = {};
+    aggregateEvent(ledger, ev('app_focus', 1000, { app: 'Code' }));
+    aggregateEvent(ledger, {
+      type: 'foreground_change',
+      at: 2000,
+      platform: 'macos',
+      source: 'macos-nsworkspace-system-events',
+      detailLevel: 'full',
+      app: 'Code',
+      windowTitle: '另一个文件.ts',
+    });
+    expect(ledger['1970-01-01'].totalSwitches).toBe(1);
+    expect(ledger['1970-01-01'].apps.Code?.switches).toBe(1);
+    expect(ledger['1970-01-01'].eventCount).toBe(2);
+    expect(ledger['1970-01-01'].lastActivityAt).toBe(1000);
   });
 
   it('跨天：事件按日期落到各自的账本', () => {

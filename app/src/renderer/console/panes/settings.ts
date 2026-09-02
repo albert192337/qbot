@@ -79,7 +79,11 @@ function template(s: Settings): string {
   <div class="set-row">
     <label class="set-check"><input id="set-show-pet" type="checkbox" ${s.roomsShowMyPet !== false ? 'checked' : ''} /> 在公共房间展示我的桌宠形象</label>
   </div>
+  <div class="set-row">
+    <label class="set-check"><input id="set-foreground-observation" type="checkbox" ${s.foregroundObservationEnabled === true ? 'checked' : ''} /> 本地记录前台应用和窗口标题</label>
+  </div>
   <p class="studio-hint">开启后进房会把你的桌宠形象（动作动画，不含人设文字）缓存到房间服务器，供房友桌面显示。关闭则房友只见你的缩略图。
+  前台应用记录默认关闭；开启后会把应用名、窗口标题、进程名/路径保存在本机感知日志中 7 天，可在「开发者工具」查看，不会同步到公共房间。
   键盘监控只累计次数，哪个键从不离开本机、不联网、不落盘。
   公共房间会实时同步状态、动作和当前牌面；手动文字、完成提示、会议状态、歌曲名与歌手可能被房友看到。牌面不写入房间记录；未显示在牌面上的会话正文、项目路径和人设不会同步。</p>
 </div>`;
@@ -144,6 +148,9 @@ function bind(host: HTMLElement): void {
   });
   q<HTMLInputElement>('#set-show-pet').addEventListener('change', (e) => {
     void window.qbot.settings.set({ roomsShowMyPet: (e.target as HTMLInputElement).checked });
+  });
+  q<HTMLInputElement>('#set-foreground-observation').addEventListener('change', (e) => {
+    void window.qbot.settings.set({ foregroundObservationEnabled: (e.target as HTMLInputElement).checked });
   });
   q<HTMLInputElement>('#set-free-mode').addEventListener('change', (e) => {
     void window.qbot.settings.set({ freeMode: (e.target as HTMLInputElement).checked });

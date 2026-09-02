@@ -77,6 +77,16 @@
 - 非 Windows 平台静默禁用，零新增 npm 依赖
 - 核心文件：`app/src/main/music-monitor.ts` (175 行)
 
+## 前台应用感知（macOS / Windows）
+
+- 独立隐私开关 `foregroundObservationEnabled`，**默认关闭**；控制台「设置 → 隐私」开启后每 3 秒采集一次，关闭立即停轮询并清空当前态
+- macOS：`NSWorkspace.frontmostApplication` 读取应用名/PID/Bundle ID/可执行路径；`System Events` 尝试读取前台窗口标题、位置、尺寸和全屏状态，未授予辅助功能权限时降级为应用级信息
+- Windows：PowerShell 内调用 User32 `GetForegroundWindow` / `GetWindowText` / `GetWindowThreadProcessId` / `GetWindowRect`，再用 `Get-Process` 补进程名、产品名、可执行路径和响应状态
+- 应用变化记 `app_focus`；同应用内窗口标题或进程元数据变化记 `foreground_change`，避免误触发 `app_switch` 行为和误增应用切换次数
+- 原始记录只落本机 `perception.json`，保留 7 天；不读取窗口正文、不截屏、不进入公共房间 presence，原始标题也不进入 LLM 上下文
+- 控制台「开发者工具 → 前台应用记录」显示采集状态、权限降级原因、当前快照和最近 30 条变化
+- 核心文件：`app/src/main/foreground-app.ts` + `foreground-app-macos.ts` + `foreground-app-windows.ts` + `perception.ts`
+
 ## 游戏化积累（挂机箱子 / 点数 / 开箱 / 合成）
 
 - **点数**：敲键盘 1 点/次（`app/src/main/input-monitor.ts`），Claude Code 每跑完一轮（`Stop`）10 点（`agent-server.ts` 接线）

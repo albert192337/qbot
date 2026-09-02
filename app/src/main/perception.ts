@@ -9,21 +9,22 @@
  *
  * 落盘策略同 progress.ts：内存缓存 + 防抖写盘。账本按天键控。
  *
- * 前台应用追踪：macOS 上 Electron 的 browser-window-focus 在隐藏 dock 的
- * accessory 模式下不触发，改用 osascript 轮询 frontmost application（本机实测
- * 无需额外授权；轮询间隔长，开销可接受）。
+ * 前台应用追踪：macOS 用 NSWorkspace + System Events，Windows 用 User32 +
+ * Get-Process。两边都只读应用/窗口/进程元数据，不读取窗口正文；变化才落事件。
  */
 import { app } from 'electron';
-import { execFile } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   BehaviorEntry,
   DecisionLog,
+  ForegroundAppSnapshot,
+  ForegroundMonitorState,
   Ledger,
   PerceptionEvent,
   PerceptionSnapshot,
 } from '../shared/perception';
+import { captureForegroundApp, foregroundEventType, isOwnForegroundApp } from './foreground-app';
 import { aggregateEvent, emptyDay, todayKey } from './perception-rules';
 
 /** 事件流保留窗口 */
@@ -46,6 +47,26 @@ let cache: PerceptionState | null = null;
 let loading: Promise<PerceptionState> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let emitListeners = new Set<(ev: PerceptionEvent) => void>();
+
+function initialForegroundMonitor(): ForegroundMonitorState {
+  if (process.platform === 'darwin') {
+    return {
+      platform: 'macos',
+      source: 'macos-nsworkspace-system-events',
+      status: 'disabled',
+      pollIntervalMs: FRONT_POLL_MS,
+    };
+  }
+  if (process.platform === 'win32') {
+    return {
+      platform: 'windows',
+      source: 'windows-user32',
+      status: 'disabled',
+      pollIntervalMs: FRONT_POLL_MS,
+    };
+  }
+  return { platform: 'unsupported', status: 'unsupported', pollIntervalMs: FRONT_POLL_MS };
+}
 
 function filePath(): string {
   return path.join(app.getPath('userData'), 'perception.json');
@@ -167,54 +188,93 @@ export async function getSnapshot(): Promise<PerceptionSnapshot> {
     ledger: s.ledger[key] ?? emptyDay(),
     behaviors: [...s.behaviors].reverse().slice(0, 100),
     decisions: [...s.decisions].reverse().slice(0, 100),
-  };}
+    foreground: currentForeground ? { ...currentForeground } : null,
+    foregroundMonitor: { ...foregroundMonitor },
+  };
+}
 
 // ── 应用前台追踪：当前聚焦的窗口应用 + 停留时长 ──────────────
-/** macOS 轮询前台应用（osascript）；非 mac 平台用 browser-window-focus（index.ts 接） */
-const FRONT_POLL_MS = 10_000;
+/** 原生查询本身会起短命子进程，3 秒兼顾切换可见度与常驻开销。 */
+const FRONT_POLL_MS = 3_000;
 let currentApp: string | null = null;
 let currentAppSince = 0;
+let currentForeground: ForegroundAppSnapshot | null = null;
+let foregroundMonitor = initialForegroundMonitor();
 let frontPollTimer: ReturnType<typeof setInterval> | null = null;
+let frontPollBusy = false;
+let foregroundObservationEnabled = false;
 
-/** 上报前台应用（幂等：应用没变不重复发事件；变了才记录并累计） */
-export async function onAppFocus(appName: string): Promise<void> {
-  const now = Date.now();
-  const name = appName.trim() || '(无标题)';
-  if (currentApp !== name) {
-    if (currentApp) {
-      // 切走的时刻由下次上报时结算（focusMs 在账本里按「切换次数 + 时间戳」推导，
-      // 完整时长累计在阶段 B 接入 use-duration 时补）
-    }
-    currentApp = name;
-    currentAppSince = now;
-    await emitEvent({ type: 'app_focus', at: now, app: name, windowTitle: name });
+/** 上报前台快照：应用、标题或进程身份变化时才记一条事件。 */
+async function recordForegroundCapture(snapshot: ForegroundAppSnapshot): Promise<void> {
+  const eventType = foregroundEventType(currentForeground, snapshot);
+  currentForeground = snapshot;
+  foregroundMonitor = {
+    platform: snapshot.platform,
+    source: snapshot.source,
+    status: snapshot.detailLevel === 'full' ? 'running' : 'degraded',
+    pollIntervalMs: FRONT_POLL_MS,
+    lastCaptureAt: snapshot.at,
+    ...(snapshot.detailLevel === 'basic'
+      ? { lastError: '已读到前台应用，但窗口标题不可用；macOS 可检查辅助功能权限。' }
+      : {}),
+  };
+  if (!eventType) return;
+  if (eventType === 'app_focus') {
+    currentApp = snapshot.app;
+    currentAppSince = snapshot.at;
+  }
+  await emitEvent({ type: eventType, ...snapshot });
+}
+
+async function pollForegroundApp(): Promise<void> {
+  if (!foregroundObservationEnabled || frontPollBusy || foregroundMonitor.platform === 'unsupported') return;
+  frontPollBusy = true;
+  try {
+    const snapshot = await captureForegroundApp();
+    if (!foregroundObservationEnabled) return;
+    if (!snapshot) throw new Error('前台应用返回为空');
+    if (isOwnForegroundApp(snapshot, process.pid, process.execPath)) return;
+    await recordForegroundCapture(snapshot);
+  } catch (err) {
+    foregroundMonitor = {
+      ...foregroundMonitor,
+      status: currentForeground ? 'degraded' : 'error',
+      lastError: (err instanceof Error ? err.message : String(err)).replace(/\s+/g, ' ').trim().slice(0, 300),
+    };
+  } finally {
+    frontPollBusy = false;
   }
 }
 
-/** macOS：osascript 轮询 frontmost application（失败静默，不阻塞） */
+/** macOS / Windows：启动原生前台应用轮询。 */
 export function startFrontAppPolling(): void {
-  if (process.platform !== 'darwin' || frontPollTimer) return;
-  const poll = (): void => {
-    execFile(
-      'osascript',
-      ['-e', 'tell application "System Events" to get name of first application process whose frontmost is true'],
-      { timeout: 3_000 },
-      (err, stdout) => {
-        if (err) return; // 权限/进程退出等 → 静默跳过本轮
-        const name = stdout.trim();
-        if (name) void onAppFocus(name);
-      },
-    );
-  };
-  poll();
-  frontPollTimer = setInterval(poll, FRONT_POLL_MS);
+  if (frontPollTimer || foregroundMonitor.platform === 'unsupported') return;
+  foregroundObservationEnabled = true;
+  foregroundMonitor = { ...foregroundMonitor, status: 'running', lastError: undefined };
+  void pollForegroundApp();
+  frontPollTimer = setInterval(() => void pollForegroundApp(), FRONT_POLL_MS);
+}
+
+export function setForegroundObservationEnabled(enabled: boolean): void {
+  if (enabled) {
+    startFrontAppPolling();
+    return;
+  }
+  stopFrontAppPolling();
 }
 
 export function stopFrontAppPolling(): void {
+  foregroundObservationEnabled = false;
   if (frontPollTimer) {
     clearInterval(frontPollTimer);
     frontPollTimer = null;
   }
+  if (foregroundMonitor.platform !== 'unsupported') {
+    foregroundMonitor = { ...foregroundMonitor, status: 'disabled', lastError: undefined };
+  }
+  currentForeground = null;
+  currentApp = null;
+  currentAppSince = 0;
 }
 
 /** 当前前台应用（快照/决策上下文用） */

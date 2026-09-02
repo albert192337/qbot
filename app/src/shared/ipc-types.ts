@@ -58,6 +58,9 @@ export interface Settings {
   /** 在公共房间展示我的桌宠（默认 true；关闭则不上传角色包、房友只见缩略图） */
   roomsShowMyPet?: boolean;
 
+  /** 本地记录前台应用与窗口标题（默认 false；原始记录保留 7 天，不出本机） */
+  foregroundObservationEnabled?: boolean;
+
   /** 未开箱子的堆叠上限（默认 DEFAULT_MAX_BOXES=3，满了停止挂机结算） */
   maxBoxes?: number;
 

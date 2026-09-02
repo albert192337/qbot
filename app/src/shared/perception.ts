@@ -8,9 +8,48 @@
  * 决策日志：每次触发的完整推理记录（命中条件/候选/选中/未选中原因）。
  */
 
+export type ForegroundPlatform = 'macos' | 'windows';
+export type ForegroundCaptureSource = 'macos-nsworkspace-system-events' | 'windows-user32';
+export type ForegroundDetailLevel = 'full' | 'basic';
+export type ForegroundWindowState = 'normal' | 'minimized' | 'maximized' | 'fullscreen' | 'unknown';
+
+export interface ForegroundWindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** 一次前台应用采集；只含系统公开的窗口/进程元数据，不读取窗口正文。 */
+export interface ForegroundAppSnapshot {
+  at: number;
+  platform: ForegroundPlatform;
+  source: ForegroundCaptureSource;
+  detailLevel: ForegroundDetailLevel;
+  app: string;
+  windowTitle?: string;
+  processId?: number;
+  processName?: string;
+  bundleId?: string;
+  executablePath?: string;
+  windowBounds?: ForegroundWindowBounds;
+  windowState?: ForegroundWindowState;
+  isResponding?: boolean;
+}
+
+export interface ForegroundMonitorState {
+  platform: ForegroundPlatform | 'unsupported';
+  source?: ForegroundCaptureSource;
+  status: 'disabled' | 'idle' | 'running' | 'degraded' | 'error' | 'unsupported';
+  pollIntervalMs: number;
+  lastCaptureAt?: number;
+  lastError?: string;
+}
+
 /** 感知到的原始事件（统一进事件流） */
 export type PerceptionEvent =
-  | { type: 'app_focus'; at: number; app: string; windowTitle: string }
+  | ({ type: 'app_focus' } & ForegroundAppSnapshot)
+  | ({ type: 'foreground_change' } & ForegroundAppSnapshot)
   | { type: 'agent'; at: number; activity: string; sessions: number }
   | { type: 'meeting'; at: number; inMeeting: boolean }
   | { type: 'music'; at: number; playing: boolean; title?: string; artist?: string }
@@ -80,4 +119,8 @@ export interface PerceptionSnapshot {
   behaviors: BehaviorEntry[];
   /** 决策日志（倒序，最多 100 条） */
   decisions: DecisionLog[];
+  /** 当前前台应用的最后一次成功采集 */
+  foreground: ForegroundAppSnapshot | null;
+  /** 采集器运行状态；便于区分“没有标题”和“权限不足/采集失败” */
+  foregroundMonitor: ForegroundMonitorState;
 }

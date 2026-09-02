@@ -17,7 +17,7 @@ import { startMeetingMonitor, stopMeetingMonitor } from './meeting-monitor';
 import { startInputMonitor, stopInputMonitor } from './input-monitor';
 import { flushProgress, startProgressTicker, stopProgressTicker } from './progress';
 import { createRoom, joinRoom, notifyRoomCharacterChanged, setLoungePush } from './rooms/rooms';
-import { emitEvent, flush as flushPerception, onAppFocus, startFrontAppPolling, stopFrontAppPolling } from './perception';
+import { emitEvent, flush as flushPerception, setForegroundObservationEnabled, stopFrontAppPolling } from './perception';
 import { loadBuiltinRules, setAvailableActionsGetter, wireBehaviorTriggers, stopBehaviorScheduler } from './behavior-rules';
 import { startBehaviorExecutor, execute as executeBehavior } from './behavior-executor';
 import { setBrainExecutor, wireBrain } from './brain-llm';
@@ -157,18 +157,11 @@ app.whenReady().then(async () => {
   await loadBuiltinRules(); // 内置规则包
   wireBehaviorTriggers(); // 订阅感知事件流 → 规则 trigger 边沿
   wireBrain(); // 自由模式 LLM 脑（内部按 settings.freeMode + arkApiKey 自行门控）
-  // macOS 隐藏 dock（accessory 模式）下 browser-window-focus 不可靠 → 轮询 osascript；
-  // 非 mac 平台（Windows 聚焦事件可靠）仍走窗口聚焦
-  if (process.platform !== 'darwin') {
-    app.on('browser-window-focus', (_ev, win) => {
-      if (win === getPetWindow()) return; // 桌宠自己的窗不产生「用户在用什么应用」
-      void onAppFocus(win.getTitle() || '(无标题窗口)');
-    });
-  } else {
-    startFrontAppPolling();
-  }
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
+  // 系统前台窗口不能靠 Electron 的 browser-window-focus 判断（它只覆盖本应用窗口）。
+  // 标题敏感度高，遵循独立开关、默认关闭；macOS / Windows 分别走原生只读采集器。
+  setForegroundObservationEnabled(settings.foregroundObservationEnabled === true);
   if (settings.petScale) setPetScale(settings.petScale);
   const characters = (await listCharacters()).filter((c) => c.manifest);
   const initial =

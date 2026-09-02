@@ -41,6 +41,7 @@ import {
   onPerceptionChanged,
   recordBehavior,
   recordDecision,
+  setForegroundObservationEnabled,
 } from './perception';
 import { getAllRules, debugTrigger, triggerRules } from './behavior-rules';
 import { getExecutorState, stopAllBehaviors } from './behavior-executor';
@@ -160,6 +161,10 @@ export function registerIpc(): void {
   ipcMain.handle('settings:set', async (_ev, patch) => {
     const next = await setSettings(patch);
     if (typeof patch?.petScale === 'number') setPetScale(patch.petScale); // 实时生效
+    if (typeof patch?.foregroundObservationEnabled === 'boolean') {
+      setForegroundObservationEnabled(patch.foregroundObservationEnabled);
+      sendToWindows('perception:changed', null);
+    }
     // 语音设置实时生效（pet + room）
     sendToWindows('settings:changed', next);
   });
@@ -329,7 +334,18 @@ export function registerIpc(): void {
   // 调试注入：假 app_focus 事件，验证「事件→账本」链路
   ipcMain.handle('perception:injectTest', async (_ev, appName?: string) => {
     const name = (appName as string | undefined)?.trim() || 'Code（假快照）';
-    await emitEvent({ type: 'app_focus', at: Date.now(), app: name, windowTitle: name });
+    const windows = process.platform === 'win32';
+    await emitEvent({
+      type: 'app_focus',
+      at: Date.now(),
+      platform: windows ? 'windows' : 'macos',
+      source: windows ? 'windows-user32' : 'macos-nsworkspace-system-events',
+      detailLevel: 'full',
+      app: name,
+      windowTitle: `${name} · 调试窗口`,
+      processId: process.pid,
+      processName: 'qbot-debug',
+    });
   });
 
   // 感知数据变化 → 统一广播（pet 窗 + 控制台都能收到）

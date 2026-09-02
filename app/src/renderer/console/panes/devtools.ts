@@ -11,6 +11,7 @@ import { toast } from './_studio-shared';
 
 let root: HTMLElement | null = null;
 let unsubProgress: (() => void) | null = null;
+let unsubPerception: (() => void) | null = null;
 
 export async function mount(host: HTMLElement): Promise<void> {
   root = host;
@@ -61,6 +62,13 @@ export async function mount(host: HTMLElement): Promise<void> {
   </div>
 
   <div class="conn-card">
+    <h3>前台应用记录</h3>
+    <p class="studio-hint">只在本机记录系统公开的应用名、窗口标题和进程元数据，不读取窗口正文，也不会同步到公共房间。原始记录随感知事件保留 7 天。</p>
+    <div id="dev-foreground-current" class="dev-stats">读取中…</div>
+    <div id="dev-foreground-events" class="dev-foreground-events">读取中…</div>
+  </div>
+
+  <div class="conn-card">
     <h3>感知数据（四流）</h3>
     <div class="btn-row">
       <button class="btn ghost" data-perc="refresh">刷新感知</button>
@@ -76,6 +84,8 @@ export async function mount(host: HTMLElement): Promise<void> {
   renderProgress(p);
   unsubProgress?.();
   unsubProgress = window.qbot.progress.onChanged(renderProgress);
+  unsubPerception?.();
+  unsubPerception = window.qbot.perception.onChanged(() => void refreshPerception());
 
   await refreshRules();
   await refreshPerception();
@@ -157,6 +167,8 @@ async function refreshRules(): Promise<void> {
 export function unmount(): void {
   unsubProgress?.();
   unsubProgress = null;
+  unsubPerception?.();
+  unsubPerception = null;
   root = null;
 }
 
@@ -175,13 +187,61 @@ function renderProgress(p: Progress): void {
 
 /** 感知四流简化视图：最近事件 / 今日账本 / 最近决策（手动刷新，调试够用） */
 async function refreshPerception(): Promise<void> {
+  const foregroundEl = root?.querySelector<HTMLElement>('#dev-foreground-current');
+  const foregroundEventsEl = root?.querySelector<HTMLElement>('#dev-foreground-events');
   const evEl = root?.querySelector<HTMLElement>('#dev-perc-events');
   const ledgerEl = root?.querySelector<HTMLElement>('#dev-perc-ledger');
   const decEl = root?.querySelector<HTMLElement>('#dev-perc-decisions');
-  if (!evEl || !ledgerEl || !decEl) return;
+  if (!foregroundEl || !foregroundEventsEl || !evEl || !ledgerEl || !decEl) return;
   const snap = await window.qbot.perception.get();
 
   const time = (at: number) => new Date(at).toLocaleTimeString('zh-CN', { hour12: false });
+  const monitor = snap.foregroundMonitor;
+  const monitorStatus =
+    monitor.status === 'running'
+      ? '正常'
+      : monitor.status === 'degraded'
+        ? '部分可用'
+        : monitor.status === 'disabled'
+          ? '未开启（可在设置中开启）'
+          : monitor.status === 'unsupported'
+            ? '当前平台不支持'
+            : monitor.status === 'error'
+              ? '采集失败'
+              : '未启动';
+  const foreground = snap.foreground;
+  foregroundEl.innerHTML = foreground
+    ? `<div><b>${escapeHtml(foreground.app)}</b> · ${escapeHtml(monitorStatus)} · ${escapeHtml(foreground.platform)}</div>` +
+      `<div>窗口：${escapeHtml(foreground.windowTitle ?? '（标题不可用）')}</div>` +
+      `<div>进程：${escapeHtml(foreground.processName ?? '未知')}${foreground.processId ? ` · PID ${foreground.processId}` : ''}</div>` +
+      (foreground.windowBounds
+        ? `<div>窗口：${foreground.windowBounds.width}×${foreground.windowBounds.height} @ ${foreground.windowBounds.x}, ${foreground.windowBounds.y}${foreground.windowState ? ` · ${escapeHtml(foreground.windowState)}` : ''}</div>`
+        : foreground.windowState
+          ? `<div>窗口状态：${escapeHtml(foreground.windowState)}</div>`
+          : '') +
+      (typeof foreground.isResponding === 'boolean'
+        ? `<div>响应状态：${foreground.isResponding ? '正常' : '无响应'}</div>`
+        : '') +
+      (foreground.bundleId ? `<div>Bundle ID：${escapeHtml(foreground.bundleId)}</div>` : '') +
+      (foreground.executablePath ? `<div class="dev-foreground-path">路径：${escapeHtml(foreground.executablePath)}</div>` : '') +
+      `<div>来源：${escapeHtml(foreground.source)} · ${foreground.detailLevel === 'full' ? '完整窗口元数据' : '仅应用级元数据'} · ${time(foreground.at)}</div>` +
+      (monitor.lastError ? `<div class="dev-perc-skip">${escapeHtml(monitor.lastError)}</div>` : '')
+    : `<div><b>${escapeHtml(monitorStatus)}</b> · ${escapeHtml(monitor.platform)}</div>` +
+      (monitor.lastError ? `<div class="dev-perc-skip">${escapeHtml(monitor.lastError)}</div>` : '');
+
+  const foregroundEvents = snap.events
+    .filter((e) => e.type === 'app_focus' || e.type === 'foreground_change')
+    .slice(0, 30);
+  foregroundEventsEl.innerHTML =
+    foregroundEvents.length === 0
+      ? '<div class="dev-perc-skip">（暂无前台切换记录）</div>'
+      : foregroundEvents
+          .map(
+            (e) =>
+              `<div class="dev-foreground-row"><span>${time(e.at)}</span><b>${escapeHtml(e.app)}</b><span>${escapeHtml(e.windowTitle || '（无窗口标题）')}</span></div>`,
+          )
+          .join('');
+
   const events = snap.events.slice(0, 10);
   evEl.innerHTML =
     events.length === 0
@@ -189,8 +249,8 @@ async function refreshPerception(): Promise<void> {
       : events
           .map((e) => {
             const detail =
-              e.type === 'app_focus'
-                ? `app: ${e.app}`
+              e.type === 'app_focus' || e.type === 'foreground_change'
+                ? `app: ${escapeHtml(e.app)}${e.windowTitle ? ` · ${escapeHtml(e.windowTitle)}` : ''}`
                 : e.type === 'agent'
                   ? `activity: ${e.activity} · sessions: ${e.sessions}`
                   : e.type === 'meeting'
@@ -227,4 +287,13 @@ async function refreshPerception(): Promise<void> {
               }${d.skippedReason ? ` <span class="dev-perc-skip">(${d.skippedReason})</span>` : ''}</div>`,
           )
           .join('');
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

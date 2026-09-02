@@ -23,8 +23,11 @@ export function aggregateEvent(ledger: Ledger, ev: PerceptionEvent): Ledger {
     ledger[key] = day;
   }
   day.eventCount++;
-  day.firstActivityAt ??= ev.at;
-  day.lastActivityAt = ev.at;
+  // 同一应用内的标题/窗口状态可能由页面自己刷新，不足以证明用户有新活动。
+  if (ev.type !== 'foreground_change') {
+    day.firstActivityAt ??= ev.at;
+    day.lastActivityAt = ev.at;
+  }
 
   if (ev.type === 'app_focus') {
     const stat: AppDayStat = day.apps[ev.app] ?? { focusMs: 0, switches: 0 };

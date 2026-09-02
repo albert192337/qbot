@@ -573,6 +573,25 @@
       }
       .dev-rule .dev-try { padding: 2px 10px; font-size: 12px; }
       .dev-perc-skip { color: var(--secondary); font-style: italic; opacity: 0.7; }
+      .dev-foreground-events {
+        margin-top: 12px;
+        max-height: 240px;
+        overflow: auto;
+        border-top: 1px solid var(--border);
+        font-size: 13px;
+      }
+      .dev-foreground-row {
+        display: grid;
+        grid-template-columns: 72px minmax(120px, 0.7fr) minmax(220px, 1.6fr);
+        gap: 10px;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--border);
+        align-items: baseline;
+      }
+      .dev-foreground-row span:last-child,
+      .dev-foreground-path {
+        overflow-wrap: anywhere;
+      }
       /* ══ 孵化 pane（id 前缀 hatch- 防撞）══ */
       .hatch-body { padding: 24px 32px 40px; max-width: 1200px; }
       .hatch-screen { display: none; }
