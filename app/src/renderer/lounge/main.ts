@@ -291,7 +291,7 @@ function sysLine(text: string): void {
 // ── 交互：开房 / 进房 / 发言 ───────────────────────────────
 
 async function doJoin(roomId: string): Promise<void> {
-  // 首次入房明示（spec §5.3）：发言会离开本机，必须让用户知情后再进
+  // 首次入房明示（spec §5.3）：发言、状态与当前牌面会离开本机，必须让用户知情后再进
   const settings = await window.qbot.settings.get();
   if (!settings.roomsChatConsent) {
     const agreed = await askConsent(await window.qbot.rooms.isSecure());
@@ -318,12 +318,14 @@ function askConsent(secure: boolean): Promise<boolean> {
     p.textContent =
       '公共房间里，你的发言会发送到房间服务器，房内所有人都能看到，' +
       '并且会保留最近 50 条供后来的人查看。\n\n' +
-      '桌宠状态（在思考/在敲代码等）也会同步给房友，但只是状态本身——' +
-      '具体项目、文件名、AI 对话内容都不会离开你的电脑。\n\n' +
+      '桌宠状态（在思考/在敲代码/在开会/在听歌等）和桌宠当前实际举起的牌面文字也会实时同步给房友。' +
+      '这意味着手动输入的牌子、工作完成提示，以及正在播放的歌曲名和歌手都可能被房友看到。' +
+      '牌面文字只随在线状态实时转发，不写入房间记录；收牌或离线后不再保留。\n\n' +
+      '没有显示在牌子上的具体项目、文件名、工作目录、AI 对话正文、人设和 transcript 都不会同步。\n\n' +
       '进房后，你的桌宠形象（动作动画，不含人设文字）会缓存到房间服务器，' +
-      '供房友桌面显示；可在「设置」里关闭「展示我的桌宠」。' +
-      // wss 未就绪时必须说实话（spec §8.5），别让用户以为聊天是加密的
-      (secure ? '' : '\n\n⚠ 当前与房间服务器的连接未加密，同网络下他人可能看到你的发言。');
+      '供房友桌面显示；可在「设置」里关闭「展示我的桌宠形象」。关闭后只停止上传形象，状态和牌面仍会同步。' +
+      // wss 未就绪时必须说实话（spec §8.5），别让用户以为聊天或牌面是加密的
+      (secure ? '' : '\n\n⚠ 当前与房间服务器的连接未加密，同网络下他人可能看到你的发言和牌面文字。');
     p.style.whiteSpace = 'pre-line';
     const row = document.createElement('div');
     row.className = 'row';

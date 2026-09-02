@@ -384,7 +384,12 @@ function roomSnapshot(room) {
   if (peers) {
     for (const p of peers) {
       if (p.memberId) {
-        presence[p.memberId] = { mode: p.mode || 'idle', action: p.action, packHash: p.packHash };
+        presence[p.memberId] = {
+          mode: p.mode || 'idle',
+          action: p.action,
+          sign: p.sign,
+          packHash: p.packHash,
+        };
       }
     }
   }
@@ -403,6 +408,7 @@ function roomSnapshot(room) {
       online: !!presence[m.memberId],
       mode: presence[m.memberId]?.mode,
       action: presence[m.memberId]?.action,
+      sign: presence[m.memberId]?.sign,
       packHash: presence[m.memberId]?.packHash,
     })),
   };
@@ -548,7 +554,14 @@ const handlers = {
     broadcast(room.roomId, {
       t: 'member:in',
       roomId: room.roomId,
-      member: { ...member, online: true, mode: ws.mode, packHash: ws.packHash },
+      member: {
+        ...member,
+        online: true,
+        mode: ws.mode,
+        action: ws.action,
+        sign: ws.sign,
+        packHash: ws.packHash,
+      },
     }, ws);
   },
 
@@ -568,13 +581,15 @@ const handlers = {
     if (!ws.roomId) return;
     ws.mode = typeof f.mode === 'string' ? f.mode.slice(0, 16) : 'idle';
     ws.action = typeof f.action === 'string' ? f.action.slice(0, 32) : undefined;
-    // 只转发状态枚举 + 动作名——曲名等内容在客户端就没进帧（spec §5.3）
+    ws.sign = clampText(f.sign, 60) || undefined;
+    // 牌面是用户当前可见内容，透明同步；未显示在牌面上的 agent/工程信息仍不进入协议。
     broadcast(ws.roomId, {
       t: 'presence',
       roomId: ws.roomId,
       memberId: ws.memberId,
       mode: ws.mode,
       action: ws.action,
+      sign: ws.sign,
     }, ws);
   },
 

@@ -64,9 +64,8 @@ async function doOpenBox(): Promise<void> {
       hud.setProgress(r.progress);
       const decor = DECOR_BY_ID.get(r.stickerId);
       const name = decor?.name ?? r.stickerId;
-      hostSignboard.setText(`开出了「${name}」`);
-      hostSignboard.show();
-      setTimeout(() => hostSignboard.hide(), 5000);
+      showAndSyncSign(`开出了「${name}」`);
+      setTimeout(() => refreshSignboard(), 5000);
     } else {
       hud.toast(r.error);
     }
@@ -149,39 +148,54 @@ function voiceSettings(s: {
 void window.qbot.settings.get().then((s) => speaker.setSettings(voiceSettings(s)));
 window.qbot.settings.onChanged((s) => speaker.setSettings(voiceSettings(s)));
 
-// ── 举牌文字：单一来源，优先级 手动举牌 > 一次性 > agent > meeting > music ─
+// ── 举牌文字：单一来源，优先级 手动举牌 > 一次性 > agent > meeting > music；最终牌面同步到房间 ─
 /** 一次性文字（如「工作完成！」），显示后由下一次 refresh 清掉 */
 let signboardOneShot: string | null = null;
-/** 手动举牌（右键菜单输入；纯本地显示，收牌前一直举着） */
+/** 手动举牌（右键菜单输入；收牌前一直举着） */
 let userSign: string | null = null;
+let syncedSignText: string | null = null;
+const SIGN_TEXT_MAX = 60;
+
+function showAndSyncSign(text: string): void {
+  const visibleText = text.replace(/\s+/g, ' ').trim().slice(0, SIGN_TEXT_MAX);
+  hostSignboard.setText(visibleText);
+  hostSignboard.show();
+  if (visibleText !== syncedSignText) {
+    syncedSignText = visibleText;
+    window.qbot.sign.sync(visibleText);
+  }
+}
+
+function hideAndSyncSign(): void {
+  hostSignboard.hide();
+  if (syncedSignText !== null) {
+    syncedSignText = null;
+    window.qbot.sign.sync(null);
+  }
+}
 
 function refreshSignboard(): void {
   if (userSign) {
-    hostSignboard.setText(userSign);
-    hostSignboard.show();
+    showAndSyncSign(userSign);
     return;
   }
   if (signboardOneShot) {
-    hostSignboard.setText(signboardOneShot);
-    hostSignboard.show();
+    showAndSyncSign(signboardOneShot);
     signboardOneShot = null;
     return;
   }
   if (agentActivity !== 'idle') {
-    hostSignboard.setText('工作中…');
-    hostSignboard.show();
+    showAndSyncSign('工作中…');
   } else if (meetingStatus.inMeeting) {
-    hostSignboard.setText('正在开会');
-    hostSignboard.show();
+    showAndSyncSign('正在开会');
   } else if (musicStatus.playing) {
-    hostSignboard.setText(
+    showAndSyncSign(
       musicStatus.title
         ? `听歌中: ${musicStatus.title}${musicStatus.artist ? ` - ${musicStatus.artist}` : ''}`
         : '听歌中…',
     );
-    hostSignboard.show();
   } else {
-    hostSignboard.hide();
+    hideAndSyncSign();
   }
 }
 
@@ -528,13 +542,13 @@ window.qbot.pet.onMenuCommand((cmd) => {
   else if (cmd.type === 'signClear') applyUserSign(null);
 });
 
-// ── 手动举牌输入框（纯本地的牌子，无网络出口） ─────
+// ── 手动举牌输入框（当前牌面会通过 refreshSignboard 透明同步到公共房间） ─────
 let signEntry: HTMLInputElement | null = null;
 
 function applyUserSign(text: string | null): void {
   userSign = text?.trim() ? text.trim().slice(0, 60) : null;
   refreshSignboard();
-  window.qbot.sign.set(userSign); // 联机退役后纯本地记账，无网络出口
+  window.qbot.sign.set(userSign);
 }
 
 function hideSignPrompt(): void {

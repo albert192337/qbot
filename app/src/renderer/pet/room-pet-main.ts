@@ -1,13 +1,13 @@
 /**
  * 公共房间宠上屏入口（?roomPet=1，spec 2026-08-24）：一个窗只服务一个房友，
  * 主进程按窗定向推送（帧里不带 memberId）。复用本地宠 Player + 联机
- * NetworkDriver + Signboard，去掉 1v1 remote-main 里跟对端语义相关的部分
- * （断线宽限倒计时/曲名/手动举牌同步——房间那边没有对应概念）。
+ * NetworkDriver + Signboard，去掉 1v1 remote-main 里跟对端语义相关的部分。
  *
- * 名牌常驻显示昵称（人多时才认得出谁是谁），聊天广播临时顶掉名牌 8s 后回落。
+ * 名牌常驻显示昵称；同步牌面会替代昵称，聊天广播临时顶掉牌面 8s 后回落。
  */
 import { NetworkDriver } from './network-driver';
 import { Player } from './player';
+import { resolveRoomPetSign } from './room-pet-sign';
 import { Signboard } from './signboard';
 
 const stage = document.getElementById('stage')!;
@@ -19,33 +19,19 @@ const driver = new NetworkDriver({
   play: (action, loop) => (loop ? player.playLooping(action) : player.play(action)),
 });
 
-/** 牌子优先级：传输进度 > 聊天气泡（8s）> 常驻昵称牌 */
+/** 牌子优先级：离线 > 传输进度 > 聊天气泡（8s）> 同步牌面 > 常驻昵称牌 */
 let nickname = '房友';
 let transferText: string | null = null;
 let chatClearTimer: ReturnType<typeof setTimeout> | null = null;
 let chatText: string | null = null;
+let presenceSign: string | null = null;
 let gone = false;
 const CHAT_BUBBLE_MS = 8_000;
 /** 聊天正文超长截断（全文在 lounge 窗；宠头顶的牌子就那么宽） */
 const CHAT_BUBBLE_MAX = 60;
 
 function refreshSignboard(): void {
-  if (gone) {
-    signboard.setText(`${nickname} 离开了…`);
-    signboard.show();
-    return;
-  }
-  if (transferText) {
-    signboard.setText(transferText);
-    signboard.show();
-    return;
-  }
-  if (chatText) {
-    signboard.setText(chatText);
-    signboard.show();
-    return;
-  }
-  signboard.setText(nickname);
+  signboard.setText(resolveRoomPetSign({ nickname, gone, transferText, chatText, presenceSign }));
   signboard.show();
 }
 
@@ -69,11 +55,7 @@ window.qbot.roomPet.onProgress(({ received, total }) => {
 
 window.qbot.roomPet.onState((s) => {
   gone = false;
-  // 确保我们有可用的动作列表
-  if (driver.available.length === 0 && s.character) {
-    const available = player.load(s.character.dirId, s.character.manifest);
-    driver.setCharacter(available, s.character.manifest.agentActions);
-  }
+  presenceSign = s.sign?.trim() || null;
   driver.applyState({ mode: s.mode ?? 'idle', action: s.action });
   refreshSignboard();
 });
@@ -110,7 +92,10 @@ void window.qbot.roomPet.getCache().then((snap) => {
     const available = player.load(snap.character.dirId, snap.character.manifest);
     driver.setCharacter(available, snap.character.manifest.agentActions);
   }
-  if (snap.state) driver.applyState({ mode: snap.state.mode ?? 'idle', action: snap.state.action });
+  if (snap.state) {
+    presenceSign = snap.state.sign?.trim() || null;
+    driver.applyState({ mode: snap.state.mode ?? 'idle', action: snap.state.action });
+  }
   refreshSignboard();
 });
 

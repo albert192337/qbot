@@ -58,7 +58,11 @@ function handle(e: RoomPetEvent): void {
       }
       push(e.member.memberId, 'roomPet:hello', { nickname: e.member.nickname });
       if (e.member.mode) {
-        push(e.member.memberId, 'roomPet:state', { mode: e.member.mode, action: e.member.action });
+        push(e.member.memberId, 'roomPet:state', {
+          mode: e.member.mode,
+          action: e.member.action,
+          sign: e.member.sign,
+        });
       }
       break;
     }
@@ -92,7 +96,7 @@ function handle(e: RoomPetEvent): void {
       break;
 
     case 'presence':
-      push(e.memberId, 'roomPet:state', { mode: e.mode, action: e.action });
+      push(e.memberId, 'roomPet:state', { mode: e.mode, action: e.action, sign: e.sign });
       break;
 
     case 'chat':

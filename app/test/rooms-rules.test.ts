@@ -227,10 +227,11 @@ describe('errorText', () => {
 // 与 link-asset-pack 的「persona 不出包」同一形状：把边界写成可执行的断言，
 // 而不是靠注释和自觉。新增字段若想出本机，必须先改白名单并改这里的测试。
 
-describe('隐私铁律：presence 帧不带任何敏感内容', () => {
-  /** 本机全量状态：故意塞满敏感字段，断言它们一个都出不去 */
+describe('presence 白名单：只同步状态、动作和当前牌面', () => {
+  /** 本机全量状态：牌面允许同步，其余未展示内容仍不得出网 */
   const dirty = {
     activity: 'working',
+    signText: '听歌中: 周杰伦 - 晴天',
     songTitle: '周杰伦 - 晴天',
     bubbleText: '我把 auth.ts 的登录 bug 修好了',
     lastAssistantMessage: '已修复 src/auth.ts:42 的空指针',
@@ -239,15 +240,18 @@ describe('隐私铁律：presence 帧不带任何敏感内容', () => {
     transcriptPath: '/Users/me/.claude/projects/x/transcript.jsonl',
   };
 
-  it('只出 t/mode/action 三个字段', () => {
+  it('只出 t/mode/action/sign 四个字段', () => {
     const frame = buildPresenceFrame(dirty, 'tea');
     expect(Object.keys(frame).sort()).toEqual([...PRESENCE_ALLOWED_KEYS].sort());
   });
 
-  it('序列化后不含曲名（公共房间对陌生人，连曲名都不发）', () => {
-    const wire = JSON.stringify(buildPresenceFrame(dirty, 'tea'));
-    expect(wire).not.toContain('晴天');
-    expect(wire).not.toContain('周杰伦');
+  it('同步当前实际牌面文字', () => {
+    expect(buildPresenceFrame(dirty, 'tea').sign).toBe('听歌中: 周杰伦 - 晴天');
+  });
+
+  it('牌面文字折叠空白并截断到 60 字', () => {
+    const frame = buildPresenceFrame({ activity: 'idle', signText: `  ${'牌'.repeat(80)}  ` });
+    expect(frame.sign).toBe('牌'.repeat(60));
   });
 
   it('序列化后不含气泡正文 / last_assistant_message', () => {

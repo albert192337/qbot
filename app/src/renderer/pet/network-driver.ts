@@ -11,6 +11,7 @@ import type { PlayableId } from '@qbot/pipeline';
 import type { LinkPeerState } from '../../shared/ipc-types';
 import {
   AGENT_ACTION,
+  DEFAULT_MEETING_ACTION,
   DEFAULT_MUSIC_ACTION,
   DONE_ACTION,
   DONE_LOOPS,
@@ -25,6 +26,7 @@ export interface ActionMapConfig {
   doneAction?: PlayableId;
   doneLoops?: number;
   musicAction?: PlayableId;
+  meetingAction?: PlayableId;
 }
 
 export interface NetworkDriverCallbacks {
@@ -83,6 +85,8 @@ export class NetworkDriver {
       this.sticky = this.resolve(state.action, 'idle') ?? 'idle';
     } else if (state.mode === 'music') {
       this.sticky = this.resolve(state.action, this.cfg.musicAction ?? DEFAULT_MUSIC_ACTION) ?? 'idle';
+    } else if (state.mode === 'meeting') {
+      this.sticky = this.resolve(state.action, this.cfg.meetingAction ?? DEFAULT_MEETING_ACTION) ?? 'idle';
     } else {
       const mapped = this.cfg[state.mode] ?? AGENT_ACTION[state.mode];
       this.sticky = this.resolve(state.action, mapped) ?? 'idle';

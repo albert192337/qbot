@@ -8,7 +8,7 @@
  * （11 × 12MB 上行），而且晚进房的人赶不上发送方在线窗口。
  *
  * 隐私：包内容经 asset-pack sanitize（persona 剥离，有测试守着）；
- * `roomsShowMyPet` 关 = 不上传不播报，房友只见缩略图。
+ * `roomsShowMyPet` 关 = 不上传角色包，房友只见缩略图；presence 状态与牌面仍由 rooms.ts 广播。
  *
  * 本模块只管状态与分发；窗口开合/布局/推送由 onRoomPetEvent 订阅方负责（M2）。
  * 纯状态机风格：网络应答都从 handlePackFrame / handlePackError 回来，不做 await 链。
@@ -52,7 +52,7 @@ export type RoomPetEvent =
   | { kind: 'memberOut'; memberId: string }
   | { kind: 'character'; memberId: string; nickname: string; character: LinkPeerCharacter }
   | { kind: 'progress'; memberId: string; received: number; total: number }
-  | { kind: 'presence'; memberId: string; mode?: string; action?: string }
+  | { kind: 'presence'; memberId: string; mode?: string; action?: string; sign?: string }
   | { kind: 'chat'; memberId: string; nickname: string; text: string }
   | { kind: 'packFailed'; memberId: string; nickname: string }
   | { kind: 'roomLeft' };
@@ -145,12 +145,13 @@ export function notifyRoomCharacterChanged(): void {
 
 interface MemberState {
   nickname: string;
-  hash: string;
+  hash?: string;
   /** 就位的角色（本地缓存命中或下载完成）；null = 还在路上 */
   character: LinkPeerCharacter | null;
   /** 最近一次在场状态（窗口启动自取快照用；同 1v1 peerState 缓存的思路） */
   mode?: string;
   action?: string;
+  sign?: string;
 }
 
 interface DownloadState {
@@ -300,7 +301,9 @@ function emitPackFailed(hash: string): void {
 async function prunePeerCache(): Promise<void> {
   try {
     const inUse = new Set<string>();
-    for (const m of memberStates.values()) inUse.add(m.hash);
+    for (const m of memberStates.values()) {
+      if (m.hash) inUse.add(m.hash);
+    }
     const candidates: Array<{ name: string; mtime: number }> = [];
     for (const entry of await readdir(charactersDir(), { withFileTypes: true })) {
       if (!entry.isDirectory() || !entry.name.startsWith(PEER_CACHE_PREFIX)) continue;
@@ -337,6 +340,15 @@ export function onJoinedRoom(room: RoomSnapshot, selfId: string | null): void {
 }
 
 export function onMemberIn(member: RoomMember): void {
+  const known = memberStates.get(member.memberId);
+  memberStates.set(member.memberId, {
+    nickname: member.nickname,
+    hash: member.packHash ?? known?.hash,
+    character: known?.character ?? null,
+    mode: member.mode,
+    action: member.action,
+    sign: member.sign,
+  });
   emit({ kind: 'memberIn', member });
   if (!announcedHash && !uploading && member.memberId !== myMemberId) void announceLocalPack(); // 第一个房友来了：补播报
   if (member.packHash) ensureMemberPack(member.memberId, member.nickname, member.packHash);
@@ -354,13 +366,14 @@ export function onMemberPack(memberId: string, nickname: string, hash: string): 
   ensureMemberPack(memberId, nickname, hash);
 }
 
-export function onPresence(memberId: string, mode?: string, action?: string): void {
+export function onPresence(memberId: string, mode?: string, action?: string, sign?: string): void {
   const m = memberStates.get(memberId);
   if (m) {
     m.mode = mode;
     m.action = action;
+    m.sign = sign;
   }
-  emit({ kind: 'presence', memberId, mode, action });
+  emit({ kind: 'presence', memberId, mode, action, sign });
 }
 
 /**
@@ -372,10 +385,11 @@ export function getMemberSnapshot(memberId: string): {
   character: LinkPeerCharacter | null;
   mode?: string;
   action?: string;
+  sign?: string;
 } | null {
   const m = memberStates.get(memberId);
   if (!m) return null;
-  return { nickname: m.nickname, character: m.character, mode: m.mode, action: m.action };
+  return { nickname: m.nickname, character: m.character, mode: m.mode, action: m.action, sign: m.sign };
 }
 
 export function onChat(memberId: string, nickname: string, text: string): void {

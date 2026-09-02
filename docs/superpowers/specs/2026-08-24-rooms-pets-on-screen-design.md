@@ -55,15 +55,16 @@
 
 删除：`app/src/main/link/`（link.ts/relay-ws.ts/transport.ts）、`relay/` workspace、`renderer/pet/remote-main.ts`、控制台联机 pane、托盘联机菜单、`linkShareSong` 设置、`LinkStatus`/`LinkPeerHello` 类型、`QBOT_LINK_CREATE/JOIN` 环境变量。
 
-保留：`visit.ts`（串门呈现机制，CLAUDE.md 既定结论——本机自动触发已下线但呈现层留作未来联机串门）；`LinkMode`/`LinkPeerCharacter`/`LinkPeerState`/`LinkAssetProgress` 类型（rooms presence 复用）；手动举牌（抽成 `local-sign.ts`，纯本地无网络出口）。
+保留：`visit.ts`（串门呈现机制，CLAUDE.md 既定结论——本机自动触发已下线但呈现层留作未来联机串门）；`LinkMode`/`LinkPeerCharacter`/`LinkPeerState`/`LinkAssetProgress` 类型（rooms presence 复用）；手动举牌由 `local-sign.ts` 记账，当前实际牌面通过 rooms presence 同步。
 
-音乐态接入房间 presence：`music-monitor` 改调 `rooms.pushLocalMusic`，presence 合成 agent 活动 > music > idle（只发 `mode='music'` 枚举，不带曲名）。
+音乐态和会议态接入房间 presence：presence 合成 agent 活动 > meeting > music > idle；同时发送桌宠当前实际牌面，所以歌曲标题/艺术家和会议提示会随牌面同步。
 
 ## 五、隐私
 
 - 包内容 = sanitize manifest（persona 剥离，有 `asset-pack.test.ts` 守）+ 动作 webm；**纯美术资产，无文本隐私面**
-- `roomsShowMyPet` 设置（默认 true）：关 = 不上传不播报，房友只见缩略图
-- presence 仍只发状态枚举+动作名（`buildPresenceFrame` 白名单+测试）；曲名不出房间
+- `roomsShowMyPet` 设置（默认 true）：关 = 不上传角色包，但在线状态与牌面仍按房间协议广播
+- presence 发送状态枚举、动作名和当前实际牌面（`buildPresenceFrame` 白名单+测试）；牌面只存在于在线连接和实时快照，不写入房间持久化数据
+- 未显示在牌面上的 agent 回复、气泡正文、cwd、transcript、persona 仍不出房间
 - 服务端日志只记数量（pack 上传/下载计数），包内容绝不进日志
 - 首次入房弹窗需补一句角色包缓存说明（M4 收尾）
 

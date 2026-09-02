@@ -173,9 +173,10 @@ async function main() {
   // ── 4. 在场状态 ────────────────────────────────────────
   console.log('\n4. 在场状态');
   alice.clear();
-  bob.send({ t: 'presence', mode: 'working', action: 'tea' });
+  bob.send({ t: 'presence', mode: 'working', action: 'tea', sign: '正在修复问题' });
   const pres = await alice.wait('presence');
   check(pres.memberId === bob.memberId && pres.mode === 'working', 'alice 收到 bob 的状态变化');
+  check(pres.sign === '正在修复问题', 'alice 收到 bob 的牌面文字');
 
   // ── 5. 聊天与最近记录 ──────────────────────────────────
   console.log('\n5. 聊天');
@@ -215,6 +216,10 @@ async function main() {
   check(Array.isArray(rejoined.chat) && rejoined.chat.length >= 3, `重进带回历史 (${rejoined.chat.length} 条)`);
   check(rejoined.chat.some((c) => c.text === '今天需求又变了'), '历史里有之前的发言');
   check(rejoined.chat[0].at <= rejoined.chat[rejoined.chat.length - 1].at, '历史按时间正序');
+  check(
+    rejoined.room.members.find((m) => m.memberId === bob.memberId)?.sign === '正在修复问题',
+    '后来进房的人从快照看到当前牌面',
+  );
 
   // ── 7. 撤回自己的发言 ──────────────────────────────────
   console.log('\n7. 撤回');

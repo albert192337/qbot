@@ -257,7 +257,7 @@ const api: QBotApi = {
       return () => ipcRenderer.removeListener('roomPet:progress', listener);
     },
     onState: (cb) => {
-      const listener = (_ev: unknown, s: { mode?: LinkMode; action?: string }) => cb(s);
+      const listener = (_ev: unknown, s: { mode?: LinkMode; action?: string; sign?: string }) => cb(s);
       ipcRenderer.on('roomPet:state', listener);
       return () => ipcRenderer.removeListener('roomPet:state', listener);
     },
@@ -280,9 +280,10 @@ const api: QBotApi = {
     leaveRoom: () => ipcRenderer.send('roomPet:leaveRoom'),
     getCache: () => ipcRenderer.invoke('roomPet:getCache'),
   },
-  /** 手动举牌（本地显示：pet 窗 signboard；主进程只记账） */
+  /** 举牌：手动牌记账 + 当前实际牌面同步 */
   sign: {
     set: (text: string | null) => ipcRenderer.send('sign:set', text),
+    sync: (text: string | null) => ipcRenderer.send('sign:sync', text),
   },
   perception: {
     get: () => ipcRenderer.invoke('perception:get'),

@@ -4,9 +4,9 @@
  * 原 1v1 联机（link/link.ts + relay）已于 2026-08-24 退役，公共房间是唯一的联机链路；
  * 好友配对场景由私密房（凭 roomId 进、不上架）顶替。
  *
- * 隐私边界（spec §5.3）：出本机的只有——状态枚举、动作名、用户手打的聊天文字、昵称、缩略图。
- * 气泡正文 / last_assistant_message / transcript / cwd / persona **绝不进这个模块**；
- * 曲名也不发（房间对象是陌生人，不给「分享曲名」这个开关）。
+ * 隐私边界（spec §5.3）：出本机的只有——状态枚举、动作名、桌宠当前实际显示的牌面文字、
+ * 用户手打的聊天文字、昵称、缩略图。牌面可能包含手动文字、完成提示、会议状态、曲名/歌手；
+ * 没显示在牌面上的气泡正文 / last_assistant_message / transcript / cwd / persona **绝不进这个模块**。
  *
  * 角色包分发（2026-08-24 上屏）卸载到 room-pets.ts：包状态机/缓存/网络应答全在那边，
  * 这里只做帧路由。
@@ -15,6 +15,7 @@ import { getSettings, setSettings } from '../config';
 import type {
   AgentActivity,
   CreateRoomInput,
+  MeetingStatus,
   MusicStatus,
   RoomBrief,
   RoomChatMsg,
@@ -102,7 +103,9 @@ let chatCache: RoomChatMsg[] = [];
 let roomCache: RoomSnapshot | null = null;
 
 let localActivity: AgentActivity = 'idle';
+let localMeeting: MeetingStatus = { inMeeting: false };
 let localMusic: MusicStatus = { playing: false };
+let localSign: string | null = null;
 let lastPresence: string | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let closedByUs = false;
@@ -519,7 +522,7 @@ function handleMessage(data: unknown): void {
       const id = String(frame.memberId ?? '');
       if (roomCache && frame.roomId === currentRoomId) {
         const m = roomCache.members.find((x) => x.memberId === id);
-        if (m) { m.online = false; m.mode = undefined; m.action = undefined; }
+        if (m) { m.online = false; m.mode = undefined; m.action = undefined; m.sign = undefined; }
       }
       RoomPets.onMemberOut(id);
       push('rooms:memberOut', id);
@@ -543,6 +546,7 @@ function handleMessage(data: unknown): void {
         memberId: String(frame.memberId ?? ''),
         mode: frame.mode,
         action: frame.action,
+        sign: typeof frame.sign === 'string' ? frame.sign : undefined,
       };
       if (roomCache && frame.roomId === currentRoomId) {
         const m = roomCache.members.find((x) => x.memberId === payload.memberId);
@@ -550,9 +554,15 @@ function handleMessage(data: unknown): void {
           m.online = true;
           m.mode = payload.mode as RoomMember['mode'];
           m.action = payload.action as string | undefined;
+          m.sign = payload.sign;
         }
       }
-      RoomPets.onPresence(payload.memberId, payload.mode as string | undefined, payload.action as string | undefined);
+      RoomPets.onPresence(
+        payload.memberId,
+        payload.mode as string | undefined,
+        payload.action as string | undefined,
+        payload.sign,
+      );
       // 只打枚举不打内容（同 link.ts 的日志纪律）
       push('rooms:presence', payload);
       break;
@@ -652,14 +662,21 @@ function stopHeartbeat(): void {
 }
 
 /**
- * 出在场帧。**只发状态枚举 + 动作名**——不发曲名（对象是陌生人，spec §5.3）。
- * 模式合成：agent 活动优先，其次音乐态，再退 idle（借状态机优先级，同 1v1 老链路）。
+ * 出在场帧：状态枚举 + 动作名 + 当前实际牌面文字。
+ * 模式合成：agent 活动优先，其次会议、音乐态，再退 idle。
  */
 async function sendPresence(force: boolean): Promise<void> {
   if (!currentRoomId || !ws || ws.readyState !== WS_OPEN) return;
-  const mode: string = localActivity !== 'idle' ? localActivity : localMusic.playing ? 'music' : 'idle';
+  const mode: string =
+    localActivity !== 'idle'
+      ? localActivity
+      : localMeeting.inMeeting
+        ? 'meeting'
+        : localMusic.playing
+          ? 'music'
+          : 'idle';
   // 经白名单函数出帧：能出本机的字段由 buildPresenceFrame 一处说了算（有测试守着）
-  const frame = buildPresenceFrame({ activity: mode });
+  const frame = buildPresenceFrame({ activity: mode, signText: localSign });
   const snapshot = JSON.stringify(frame);
   if (!force && snapshot === lastPresence) return;
   lastPresence = snapshot;
@@ -672,9 +689,21 @@ export function pushLocalAgentActivity(activity: AgentActivity): void {
   void sendPresence(false);
 }
 
-/** music-monitor.updateStatus 的房间钩子（不在房时只记账；只出枚举不带曲名） */
+/** music-monitor.updateStatus 的房间钩子（不在房时只记账；曲名若显示在牌面，由 sign:sync 单独同步） */
 export function pushLocalMusic(next: MusicStatus): void {
   localMusic = next;
+  void sendPresence(false);
+}
+
+/** meeting-monitor 的房间钩子（不在房时只记账） */
+export function pushLocalMeeting(next: MeetingStatus): void {
+  localMeeting = next;
+  void sendPresence(false);
+}
+
+/** pet renderer 报告当前实际牌面；内容会透明同步给同房成员 */
+export function pushLocalSign(text: string | null): void {
+  localSign = text;
   void sendPresence(false);
 }
 

@@ -9,7 +9,7 @@ import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from '
 import { getSettings, setSettings } from './config';
 import { createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, type ConsolePane } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
-import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, isSecureTransport, reportChat, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms } from './rooms/rooms';
+import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, isSecureTransport, reportChat, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms, pushLocalSign } from './rooms/rooms';
 import { getLocalSign, setLocalSign } from './local-sign';
 import { notifyRoomCharacterChanged } from './rooms/rooms';
 import { getMemberSnapshot } from './rooms/room-pets';
@@ -122,6 +122,9 @@ export function registerIpc(): void {
   // ── 手动举牌（纯本地记账）────────────────────────────────
   ipcMain.on('sign:set', (_ev, text: string | null) =>
     setLocalSign(typeof text === 'string' ? text : null),
+  );
+  ipcMain.on('sign:sync', (_ev, text: string | null) =>
+    pushLocalSign(typeof text === 'string' ? text : null),
   );
 
   // ── room ───────────────────────────────────────────────

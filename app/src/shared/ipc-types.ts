@@ -219,14 +219,16 @@ export type PetMenuCommand =
   | { type: 'signClear' };
 
 // ── presence 状态类型（2026-08-24 起由公共房间上屏复用；原 1v1 联机已退役）──
-/** 对端高层状态：agent 活动 + 听歌（隐私边界：只有枚举/动作名出本机，曲名不出） */
-export type LinkMode = AgentActivity | 'music';
+/** 对端高层状态：agent 活动 + 开会 + 听歌 */
+export type LinkMode = AgentActivity | 'meeting' | 'music';
 
 /** 对端 state 帧（房间 presence / 上屏宠窗驱动 NetworkDriver 用） */
 export interface LinkPeerState {
   mode: LinkMode;
   /** 动作提示（对端 Studio 配了自定义动作时带上；缺省按替身角色自己的映射解析） */
   action?: string;
+  /** 对端桌宠当前实际显示的牌面文字；空值表示只显示昵称 */
+  sign?: string;
 }
 
 /** 对端真身角色就位（服务端缓存下载完成），上屏宠窗以此加载渲染 */
@@ -270,6 +272,8 @@ export interface RoomMember {
   /** 在线时才有：复用联机的状态枚举 */
   mode?: LinkMode;
   action?: string;
+  /** 在线时才有：桌宠当前实际显示的牌面文字 */
+  sign?: string;
   /** 在线时才有：角色包指纹（服务端缓存键，上屏用） */
   packHash?: string;
 }
@@ -427,9 +431,10 @@ export interface QBotApi {
     /** pet 窗口订阅：会议状态变化 */
     onStatus(cb: (status: MeetingStatus) => void): () => void;
   };
-  /** 手动举牌（纯本地：pet 窗 signboard 显示，主进程只记账；无网络出口） */
+  /** 举牌：set 记录手动牌，sync 将当前实际牌面同步到公共房间 */
   sign: {
     set(text: string | null): void;
+    sync(text: string | null): void;
   };
   /**
    * 公共房间的宠上屏窗（?roomPet=1，spec 2026-08-24）。每个窗对应一个房友，
@@ -439,7 +444,7 @@ export interface QBotApi {
     onHello(cb: (info: { nickname: string }) => void): () => void;
     onCharacter(cb: (meta: LinkPeerCharacter) => void): () => void;
     onProgress(cb: (p: LinkAssetProgress) => void): () => void;
-    onState(cb: (s: { mode?: LinkMode; action?: string }) => void): () => void;
+    onState(cb: (s: { mode?: LinkMode; action?: string; sign?: string }) => void): () => void;
     /** 房友发言：本地渲染成聊天气泡（内容已经过服务端广播给你，不是新增出站面） */
     onChat(cb: (msg: { text: string }) => void): () => void;
     onPackFailed(cb: () => void): () => void;
@@ -452,7 +457,7 @@ export interface QBotApi {
     getCache(): Promise<{
       hello: { nickname: string } | null;
       character: LinkPeerCharacter | null;
-      state: { mode?: LinkMode; action?: string } | null;
+      state: { mode?: LinkMode; action?: string; sign?: string } | null;
     }>;
   };
   market: {

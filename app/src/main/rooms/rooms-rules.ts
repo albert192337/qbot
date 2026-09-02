@@ -210,6 +210,8 @@ export function errorText(code: string): string {
  */
 export interface LocalStateSnapshot {
   activity: string;
+  /** 当前桌宠实际显示的牌面文字；公共房间透明同步，空值表示未举牌 */
+  signText?: string | null;
   /** 以下字段本机可见，但**绝不出本机**：列在这里是为了让测试能证明它们没被带出去 */
   songTitle?: string;
   bubbleText?: string;
@@ -220,22 +222,23 @@ export interface LocalStateSnapshot {
 }
 
 /** presence 帧允许出现的字段——白名单，新增字段必须先过这里 */
-export const PRESENCE_ALLOWED_KEYS = ['t', 'mode', 'action'] as const;
+export const PRESENCE_ALLOWED_KEYS = ['t', 'mode', 'action', 'sign'] as const;
 
 /**
- * 构造 presence 帧：**只取状态枚举和动作名**。
- *
- * 公共房间的对象是陌生人，所以连曲名都不发——这是有意的边界，不是漏了开关。
+ * 构造 presence 帧：状态枚举、动作名，以及桌宠当前实际显示的牌面文字。
+ * 牌面之外的 agent 正文、工程路径、人格与 transcript 仍严格禁止出本机。
  */
 export function buildPresenceFrame(
   snapshot: LocalStateSnapshot,
   action?: string,
-): { t: 'presence'; mode: string; action?: string } {
-  const frame: { t: 'presence'; mode: string; action?: string } = {
+): { t: 'presence'; mode: string; action?: string; sign?: string } {
+  const frame: { t: 'presence'; mode: string; action?: string; sign?: string } = {
     t: 'presence',
     mode: snapshot.activity || 'idle',
   };
   if (action) frame.action = clampText(action, 32);
+  const sign = clampText(snapshot.signText, 60);
+  if (sign) frame.sign = sign;
   return frame;
 }
 

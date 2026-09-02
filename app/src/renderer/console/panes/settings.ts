@@ -77,11 +77,11 @@ function template(s: Settings): string {
 
   <h3>隐私</h3>
   <div class="set-row">
-    <label class="set-check"><input id="set-show-pet" type="checkbox" ${s.roomsShowMyPet !== false ? 'checked' : ''} /> 在公共房间展示我的桌宠</label>
+    <label class="set-check"><input id="set-show-pet" type="checkbox" ${s.roomsShowMyPet !== false ? 'checked' : ''} /> 在公共房间展示我的桌宠形象</label>
   </div>
   <p class="studio-hint">开启后进房会把你的桌宠形象（动作动画，不含人设文字）缓存到房间服务器，供房友桌面显示。关闭则房友只见你的缩略图。
   键盘监控只累计次数，哪个键从不离开本机、不联网、不落盘。
-  公共房间只出状态枚举与动作名，曲名/会话内容绝不进房间。</p>
+  公共房间会实时同步状态、动作和当前牌面；手动文字、完成提示、会议状态、歌曲名与歌手可能被房友看到。牌面不写入房间记录；未显示在牌面上的会话正文、项目路径和人设不会同步。</p>
 </div>`;
 }
 
