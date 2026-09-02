@@ -97,6 +97,10 @@ async function refresh(): Promise<void> {
   html += `<h3>表现力动作（M 档）</h3>`;
   html += `<p class="studio-hint">一次性表演动作（得意坏笑/指认/背过身/庆祝欢呼），桌宠的吐槽、庆祝、闹别扭都靠它们演出。
   按需生成（每个约 ¥1、5 分钟左右），生成后规则与 AI 的即兴行为会自动用上。</p>`;
+  const allDone = expressions.every((ex) => ex.status === 'done');
+  if (!allDone) {
+    html += `<div class="btn-row"><button id="gen-all-expr" class="btn">生成全部 ${expressions.filter((ex) => ex.status !== 'done').length} 个（约 ¥${expressions.filter((ex) => ex.status !== 'done').length}）</button></div>`;
+  }
   html += `<div class="expr-grid">`;
   for (const ex of expressions) {
     const frameUrl =
@@ -151,6 +155,31 @@ function bind(root: HTMLElement, dirId: string): void {
         toast(root, `已开始生成「${id}」，约 5 分钟，完成后本页自动刷新`);
         await refresh();
       });
+    });
+  });
+
+  // 生成全部 M 档动作（逐个提交；只在「未生成/失败」时提交，done/pending 一律跳过避免重复扣费）
+  const genAllBtn = root.querySelector<HTMLButtonElement>('#gen-all-expr');
+  genAllBtn?.addEventListener('click', () => {
+    const toGen = Array.from(root.querySelectorAll<HTMLElement>('.expr-card'))
+      .map((c) => (c.dataset.expr!))
+      .filter((id) => {
+        const card = root.querySelector<HTMLElement>(`.expr-card[data-expr="${id}"]`);
+        const st = card?.querySelector('.status')?.textContent;
+        return st === '未生成' || st === 'failed';
+      });
+    if (toGen.length === 0) {
+      toast(root, '没有需要生成的 M 档动作');
+      return;
+    }
+    void guard(root, genAllBtn, '生成中…', async () => {
+      for (const id of toGen) {
+        await window.qbot.studio.generateExpressionAction(dirId, id);
+        toast(root, `已提交「${id}」`);
+      }
+      toast(root, `已提交 ${toGen.length} 个，约 5 分钟/个，完成后本页自动刷新`);
+      // 不在这里 refresh：逐个完成时 onCustomAction 订阅会触发 refresh，
+      // 现在刷新会让按钮还在（此时全 pending 未 done），用户再点会重复提交同一批
     });
   });
 

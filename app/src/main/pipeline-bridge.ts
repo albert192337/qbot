@@ -349,6 +349,23 @@ async function readCharacterForm(outDir: string): Promise<CharacterForm | undefi
  * prompt 取官方 EXPRESSION 表（非用户输入），落 manifest.expressionActions。
  * 幂等：已 done 的不重复生成（花钱）；pending/failed 视为可重试重生成。
  */
+
+/**
+ * 生成新动作的参考图：优先三视图（turnaround.png），
+ * 老角色/市场导入角色没存三视图，回退到 source.png（首帧单图，足以当参考）。
+ * 之前硬读 turnaround.png —— 缺它时任意自定义/表现力动作都 ENOENT 失败，
+ * 这正是「M 档动作生成失败、可用列表里永远没有它们」的物理根因。
+ */
+async function readReferenceImage(outDir: string): Promise<Buffer> {
+  for (const rel of ['turnaround.png', 'source.png']) {
+    try {
+      return await readFile(path.join(outDir, rel));
+    } catch {
+      // 继续尝试下一个
+    }
+  }
+  throw new Error(`角色目录缺参考图（既无 turnaround.png 也无 source.png）：${outDir}`);
+}
 export async function generateExpressionAction(
   dirId: string,
   action: ExpressionActionId,
@@ -408,7 +425,7 @@ async function generateExpressionActionInner(a: {
 }): Promise<void> {
   const { dirId, outDir, manifestPath, action, poseDesc, motionDesc, durationSec, persona, manifest, cfg } = a;
   try {
-    const turnaround = await readFile(path.join(outDir, 'turnaround.png'));
+    const turnaround = await readReferenceImage(outDir);
     const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
     const ark = createArkClient(cfg);
 
@@ -553,7 +570,7 @@ async function generateCustomAction(a: {
 }): Promise<void> {
   const { dirId, outDir, manifestPath, name, poseDesc, motionDesc, durationSec, persona, manifest, cfg } = a;
   try {
-    const turnaround = await readFile(path.join(outDir, 'turnaround.png'));
+    const turnaround = await readReferenceImage(outDir);
     const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
     const ark = createArkClient(cfg);
 

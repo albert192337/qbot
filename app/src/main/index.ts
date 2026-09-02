@@ -167,8 +167,6 @@ app.whenReady().then(async () => {
   } else {
     startFrontAppPolling();
   }
-  void emitEvent({ type: 'startup', at: Date.now() }); // 启动事件（会触发 startup 规则）
-
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
   if (settings.petScale) setPetScale(settings.petScale);
@@ -181,11 +179,17 @@ app.whenReady().then(async () => {
     // 首启数据目录 + QBOT_ROOMS_AUTOJOIN：进房早于这里的激活，
     // announce 没等到 activeCharacter 落盘 → 补发一次
     notifyRoomCharacterChanged();
-    // 走 broadcastCharacterActivated：pet + room 都收到，且主进程同步可用动作缓存
+    // 走 broadcastCharacterActivated：pet + room 都收到，且主进程同步可用动作缓存。
+    // startup 事件必须在角色激活之后发——否则 triggerRules 评估 startup-greeting 时
+    // availableActions 还是空的，wave/talk_happy 全降级到不可见的 idle（行为引擎「无反应」根因之一）
     pet.webContents.once('did-finish-load', async () => {
       const meta = await getCharacter(initial.dirId);
       if (meta) broadcastCharacterActivated(meta);
+      void emitEvent({ type: 'startup', at: Date.now() });
     });
+  } else {
+    // 没有任何角色：桌面是空的，但 LLM 脑/规则脑仍应收到启动边沿
+    void emitEvent({ type: 'startup', at: Date.now() });
   }
 });
 
