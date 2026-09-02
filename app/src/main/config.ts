@@ -16,13 +16,14 @@ export async function getSettings(): Promise<Settings> {
   } catch {
     /* 首次运行无文件 */
   }
-  // dev fallback：仓库根的 config.local.json 提供 arkApiKey
-  if (!settings.arkApiKey && !app.isPackaged) {
+  // dev fallback：仓库根的 config.local.json 提供 API keys；userData 中已配置的值优先
+  if ((!settings.arkApiKey || !settings.gptImageApiKey) && !app.isPackaged) {
     const devConfig = path.resolve(__dirname, '../../../config.local.json');
     if (existsSync(devConfig)) {
       try {
-        const { arkApiKey } = JSON.parse(readFileSync(devConfig, 'utf8'));
-        settings.arkApiKey = arkApiKey;
+        const local = JSON.parse(readFileSync(devConfig, 'utf8')) as Settings;
+        settings.arkApiKey ||= local.arkApiKey;
+        settings.gptImageApiKey ||= local.gptImageApiKey;
       } catch {
         /* ignore */
       }

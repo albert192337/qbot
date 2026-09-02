@@ -55,6 +55,8 @@ let packageDone = false;
 let timerHandle: number | null = null;
 let unsubProgress: (() => void) | null = null;
 
+type ScreenName = 'drop' | 'brewing' | 'pick' | 'progress' | 'certificate';
+
 const $ = <T extends HTMLElement = HTMLElement>(sel: string): T | null =>
   root?.querySelector<T>(sel) ?? null;
 
@@ -157,8 +159,10 @@ async function regenerateAction(actionId: ActionId): Promise<void> {
 // ───────────────────────── 界面渲染 ─────────────────────────
 
 function showScreen(screen: ScreenName): void {
+  if (screen !== 'brewing') brewingSince = null;
+
   // 隐藏所有屏幕
-  document.querySelectorAll('.hatch-screen').forEach(el => {
+  root?.querySelectorAll('.hatch-screen').forEach(el => {
     el.classList.add('hidden');
     el.classList.remove('active');
   });
@@ -173,8 +177,26 @@ function showScreen(screen: ScreenName): void {
   updateStepNavigation(screen);
 }
 
+function showBrewing(): void {
+  if (brewingSince === null) brewingSince = Date.now();
+  const providerName = $('#hatch-provider-name');
+  if (providerName) {
+    providerName.textContent = currentProvider === 'gpt-image-2' ? 'gpt-image-2' : 'Seedream';
+  }
+  const hint = $('#hatch-brewing-hint');
+  if (hint) {
+    hint.textContent =
+      currentProvider === 'gpt-image-2'
+        ? '正在同时生成 3 张候选图。gpt-image-2 通常需要 5–10 分钟'
+        : '正在同时生成 3 张候选图，通常约 1 分钟';
+  }
+  const elapsed = $('#hatch-brewing-elapsed');
+  if (elapsed) elapsed.textContent = '0:00';
+  showScreen('brewing');
+}
+
 function updateStepNavigation(currentScreen: ScreenName): void {
-  const steps = document.querySelectorAll('.hatch-step');
+  const steps = root?.querySelectorAll('.hatch-step') ?? [];
   const screenToStepIndex: Record<ScreenName, number> = {
     'drop': 0,
     'brewing': 1,
@@ -364,6 +386,10 @@ function seedCells(st: HatchStatus): void {
   }
 }
 
+function cellStatus(id: ActionId): ActionStatus {
+  return cellStates.get(id)?.status ?? 'pending';
+}
+
 function updateOverallProgress(): void {
   const ids = Object.keys(ACTION_LABELS) as ActionId[];
   const mean = ids.reduce((sum, id) => sum + STATUS_PROGRESS[cellStatus(id)], 0) / ids.length;
@@ -471,6 +497,61 @@ async function showCertificate(): Promise<void> {
   disableAllInputs(true);
 }
 
+async function saveCertificateCard(): Promise<void> {
+  const card = $('.certificate-card');
+  if (!card) return;
+
+  card.scrollIntoView({ block: 'center' });
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const rect = card.getBoundingClientRect();
+  const saved = await window.qbot.hatch.saveCard({
+    x: Math.round(rect.x),
+    y: Math.round(rect.y),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  });
+  if (saved) showError(null);
+}
+
+async function activatePet(): Promise<void> {
+  if (!currentDirId) return;
+  const name = $<HTMLInputElement>('#hatch-pet-name')?.value.trim();
+  if (name) await window.qbot.characters.rename(currentDirId, name);
+  await window.qbot.characters.activate(currentDirId);
+}
+
+function onProgress(ev: HatchProgress): void {
+  if (!root) return;
+  if (currentDirId && ev.dirId !== currentDirId) return;
+
+  currentDirId = ev.dirId;
+  switch (ev.stage) {
+    case 'turnaround':
+      showBrewing();
+      break;
+    case 'awaiting_pick':
+      if (ev.candidateUrls?.length) renderCandidates(ev.candidateUrls);
+      break;
+    case 'actions':
+      if (!$('#hatch-action-grid')?.childElementCount) buildProgressGrid();
+      actionsSince ??= Date.now();
+      showScreen('progress');
+      if (ev.action && ev.status) updateCell(ev.action, ev.status, ev.frameUrl, ev.error);
+      break;
+    case 'done':
+      packageDone = true;
+      updateOverallProgress();
+      void showCertificate();
+      break;
+    case 'failed':
+      showError(`孵化失败：${ev.error ?? '未知错误'}（可从历史任务继续或重试）`);
+      disableAllInputs(false);
+      showScreen('drop');
+      void loadHistoricalTasks();
+      break;
+  }
+}
+
 // ───────────────────────── 事件绑定 ─────────────────────────
 
 function bindGlobalEvents(): void {
@@ -512,6 +593,10 @@ function bindDropzone(): void {
       if (file) void startHatch(file);
     });
   }
+
+  $('#hatch-btn-browse')?.addEventListener('click', () => {
+    $<HTMLInputElement>('#hatch-file-input')?.click();
+  });
 }
 
 function bindConfigOptions(): void {
@@ -524,6 +609,8 @@ function bindConfigOptions(): void {
 }
 
 function bindActionButtons(): void {
+  $('#hatch-btn-close')?.addEventListener('click', () => window.close());
+
   // 重新生成按钮
   $('#hatch-btn-regen')?.addEventListener('click', async () => {
     if (!currentDirId) return;
@@ -540,6 +627,15 @@ function bindActionButtons(): void {
       showScreen('drop');
     }
   });
+
+  $('#hatch-btn-cancel-progress')?.addEventListener('click', () => {
+    currentDirId = null;
+    disableAllInputs(false);
+    showScreen('drop');
+  });
+
+  $('#hatch-btn-back')?.addEventListener('click', () => showScreen('drop'));
+  $('#hatch-btn-back-progress')?.addEventListener('click', () => showScreen('progress'));
 
   // 保存卡片按钮
   $('#hatch-btn-save')?.addEventListener('click', saveCertificateCard);
@@ -615,7 +711,8 @@ async function loadHistoricalTasks(): Promise<void> {
 // ───────────────────────── 工具函数 ─────────────────────────
 
 function getSelectedProvider(): ImageProvider {
-  return $<HTMLInputElement>('input[name="image-provider"]:checked')?.value || 'seedream';
+  const value = $<HTMLInputElement>('input[name="image-provider"]:checked')?.value;
+  return value === 'gpt-image-2' ? 'gpt-image-2' : 'seedream';
 }
 
 function getSelectedForm(): string {
@@ -627,8 +724,8 @@ function getSelectedStyle(): string {
 }
 
 function disableAllInputs(disabled: boolean): void {
-  const buttons = document.querySelectorAll('button');
-  const inputs = document.querySelectorAll('input[type="radio"]');
+  const buttons = root?.querySelectorAll<HTMLButtonElement>('button') ?? [];
+  const inputs = root?.querySelectorAll<HTMLInputElement>('input[type="radio"]') ?? [];
 
   buttons.forEach(btn => {
     if (!btn.classList.contains('no-disable')) {
