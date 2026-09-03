@@ -17,9 +17,8 @@ export async function mount(host: HTMLElement): Promise<void> {
   root = host;
   host.innerHTML = `
 <div class="studio-body">
-  <h2>开发者工具</h2>
-  <p class="studio-hint">纯调试用。正常玩法里点数靠敲键盘（1 点/次）和 Claude Code 跑完一轮（10 点）攒，
-  箱子靠挂机（15 分钟 1 个），调试时等不起。</p>
+  <div class="page-heading"><div><p class="eyebrow">仅限调试</p><h2>开发者工具</h2><p class="page-summary">检查行为、感知与游戏化状态；普通使用无需进入这里。</p></div></div>
+  <p class="studio-hint">正常玩法里点数靠敲键盘（1 点/次）和 Claude Code 跑完一轮（10 点）攒，箱子靠挂机（15 分钟 1 个）。</p>
 
   <div class="conn-card">
     <h3>当前积累</h3>

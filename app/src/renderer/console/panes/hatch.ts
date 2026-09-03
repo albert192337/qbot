@@ -4,6 +4,8 @@
  */
 import type { ActionId, ActionStatus, ImageProvider } from '@qbot/pipeline';
 import type { HatchProgress, HatchStatus } from '../../../shared/ipc-types';
+import { icon } from '../icons';
+import { confirmBox } from './_studio-shared';
 
 /** 动作中文标签。口径与 _studio-shared 的 STD_LABELS 统一 */
 const ACTION_LABELS: Record<ActionId, string> = {
@@ -115,6 +117,20 @@ async function startHatch(file: File): Promise<void> {
     const form = getSelectedForm();
     const style = getSelectedStyle();
     const name = ($<HTMLInputElement>('#hatch-pet-name')?.value.trim() || '未命名');
+    const settings = await window.qbot.settings.get();
+    const hasKey = provider === 'gpt-image-2' ? !!settings.gptImageApiKey : !!settings.arkApiKey;
+    if (!hasKey) {
+      showError(`尚未配置${provider === 'gpt-image-2' ? ' GPT-Image-2' : '火山方舟'} API Key，请先到「设置 → 模型与 API」完成配置。`);
+      return;
+    }
+    const confirmed = await confirmBox(
+      root!,
+      `开始孵化「${name}」？\n\n将生成 3 张三视图候选、6 张动作首帧和 6 条动作视频。\n` +
+        `模型：${provider === 'gpt-image-2' ? 'gpt-image-2' : 'Seedream'}\n` +
+        `预计时间：${provider === 'gpt-image-2' ? '约 40–70 分钟' : '约 30–50 分钟'}\n` +
+        '预计费用：约 ¥6–8。任务提交后，已发出的 API 请求无法撤回。',
+    );
+    if (!confirmed) return;
 
     disableAllInputs(true);
 
@@ -281,7 +297,7 @@ function createActionCell(actionId: ActionId, label: string): HTMLElement {
   cell.id = `hatch-cell-${actionId}`;
   cell.innerHTML = `
     <div class="action-thumbnail">
-      <span class="status-icon">🥚</span>
+        <span class="status-icon">○</span>
       <img hidden alt="${label}" />
       <span class="status-badge" hidden>✅</span>
     </div>
@@ -340,15 +356,15 @@ function updateCell(action: ActionId, status: ActionStatus, frameUrl?: string, e
 
 function getStatusIcon(status: ActionStatus): string {
   const icons: Record<ActionStatus, string> = {
-    'pending': '🥚',
-    'generating_frame': '⏳',
-    'frame_qc': '🔍',
-    'generating_video': '🎬',
-    'keying': '✂️',
-    'done': '✅',
-    'failed': '❌'
+    'pending': '○',
+    'generating_frame': '↻',
+    'frame_qc': '?',
+    'generating_video': '▶',
+    'keying': '◇',
+    'done': '✓',
+    'failed': '!'
   };
-  return icons[status] || '⏱️';
+  return icons[status] || '·';
 }
 
 async function seedFromStatus(dirId: string): Promise<void> {
@@ -609,8 +625,6 @@ function bindConfigOptions(): void {
 }
 
 function bindActionButtons(): void {
-  $('#hatch-btn-close')?.addEventListener('click', () => window.close());
-
   // 重新生成按钮
   $('#hatch-btn-regen')?.addEventListener('click', async () => {
     if (!currentDirId) return;
@@ -621,11 +635,10 @@ function bindActionButtons(): void {
 
   // 取消按钮
   $('#hatch-btn-cancel')?.addEventListener('click', () => {
-    if (confirm('确定要取消当前孵化吗？')) {
-      currentDirId = null;
-      disableAllInputs(false);
-      showScreen('drop');
-    }
+    currentDirId = null;
+    disableAllInputs(false);
+    showScreen('drop');
+    void loadHistoricalTasks();
   });
 
   $('#hatch-btn-cancel-progress')?.addEventListener('click', () => {
@@ -782,40 +795,37 @@ const TEMPLATE = `
   <!-- 头部区域 -->
   <header class="hatch-header">
     <div class="header-left">
-      <div class="app-icon">🤖</div>
+      <div class="app-icon">Q</div>
       <div class="header-title">
         <h1>角色孵化</h1>
         <p>上传一张角色图片，AI 将自动生成完整动画角色</p>
       </div>
     </div>
-    <button class="btn-close no-disable" id="hatch-btn-close">
-      <span>×</span>
-    </button>
   </header>
 
   <!-- 步骤导航 -->
   <div class="hatch-steps">
     <div class="hatch-step" data-step="drop">
-      <span class="step-icon">📁</span>
+      <span class="step-icon">${icon('create')}</span>
       <span class="step-text">上传参考图</span>
     </div>
     <div class="hatch-step" data-step="brewing">
-      <span class="step-icon">🎨</span>
+      <span class="step-icon">${icon('persona')}</span>
       <span class="step-text">生成三视图</span>
     </div>
     <div class="hatch-step" data-step="progress">
-      <span class="step-icon">🎬</span>
+      <span class="step-icon">${icon('actions')}</span>
       <span class="step-text">动作生成</span>
     </div>
     <div class="hatch-step" data-step="certificate">
-      <span class="step-icon">🎉</span>
+      <span class="step-icon">${icon('characters')}</span>
       <span class="step-text">完成</span>
     </div>
   </div>
 
   <!-- 错误提示 -->
   <div id="hatch-error-banner" class="error-banner">
-    <span class="error-icon">❌</span>
+    <span class="error-icon">!</span>
     <span class="error-message"></span>
   </div>
 
@@ -826,7 +836,7 @@ const TEMPLATE = `
       <div class="drop-container">
         <!-- 拖放区域 -->
         <div id="hatch-dropzone" class="dropzone">
-          <div class="dropzone-icon">🎨</div>
+          <div class="dropzone-icon">${icon('create')}</div>
           <h3>拖放角色图片到这里</h3>
           <p>支持 PNG/JPG 格式，正面全身效果最好</p>
           <input type="file" id="hatch-file-input" accept="image/*" hidden />
@@ -912,7 +922,7 @@ const TEMPLATE = `
         <div class="progress-bar">
           <div class="progress-indeterminate"></div>
         </div>
-        <button class="btn-secondary no-disable" id="hatch-btn-cancel">取消孵化</button>
+        <button class="btn-secondary no-disable" id="hatch-btn-cancel">转到后台继续</button>
       </div>
     </section>
 
@@ -949,7 +959,7 @@ const TEMPLATE = `
           <p class="hint-text">
             生成在后台运行，关闭窗口也不会中断
           </p>
-          <button class="btn-secondary no-disable" id="hatch-btn-cancel-progress">取消孵化</button>
+          <button class="btn-secondary no-disable" id="hatch-btn-cancel-progress">转到后台继续</button>
         </div>
       </div>
     </section>
@@ -986,6 +996,16 @@ const TEMPLATE = `
 </div>
 
 <style>
+@scope ([data-pane="hatch"]) {
+:scope {
+  --primary-hover: #aeea00;
+  --text-primary: var(--tertiary);
+  --text-secondary: var(--secondary);
+  --text-muted: var(--muted);
+  --background: #f9f8f5;
+  --card-background: var(--card);
+  --danger: var(--error);
+}
 /* 全局样式重置 */
 * {
   margin: 0;
@@ -994,20 +1014,6 @@ const TEMPLATE = `
 }
 
 /* 颜色变量 */
-:root {
-  --primary: #3B82F6;
-  --primary-hover: #2563EB;
-  --success: #10B981;
-  --warning: #F59E0B;
-  --danger: #EF4444;
-  --text-primary: #111827;
-  --text-secondary: #374151;
-  --text-muted: #6B7280;
-  --border: #E5E7EB;
-  --background: #F9FAFB;
-  --card-background: #FFFFFF;
-}
-
 /* 容器样式 */
 .hatch-container {
   max-width: 1200px;
@@ -1818,6 +1824,7 @@ button:disabled {
   .action-bar {
     flex-direction: column;
   }
+}
 }
 </style>
 `;

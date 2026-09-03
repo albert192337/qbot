@@ -37,6 +37,7 @@ const api: QBotApi = {
     move: (x, y) => ipcRenderer.send('pet:move', x, y),
     setVisitMode: (enter) => ipcRenderer.send('pet:setVisitMode', enter),
     popupMenu: (actions) => ipcRenderer.send('pet:popupMenu', actions),
+    previewAction: (action) => ipcRenderer.send('pet:previewAction', action),
     onMenuCommand: (cb) => {
       const listener = (_ev: unknown, cmd: PetMenuCommand) => cb(cmd);
       ipcRenderer.on('pet:menuCommand', listener);

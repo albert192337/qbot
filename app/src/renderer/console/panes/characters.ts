@@ -37,10 +37,11 @@ async function refresh(): Promise<void> {
   ]);
   const ready = all.filter((c) => c.manifest);
 
-  let html = '<div class="studio-body"><h2>我的角色</h2>';
+  let html = '<div class="studio-body"><div class="page-heading"><div><p class="eyebrow">角色资产</p><h2>角色库</h2><p class="page-summary">切换当前桌宠，查看动作完整度，或管理本地角色包。</p></div><button id="new-character" class="btn primary">新建角色</button></div>';
   if (ready.length === 0) {
-    html += '<div class="pane-placeholder">还没有角色。去「孵化新角色」丢一张图造一只吧。</div></div>';
+    html += '<div class="pane-placeholder"><b>还没有角色</b><br/>准备一张正面角色图，生成你的第一只桌宠。<div class="btn-row" style="justify-content:center"><button id="empty-new-character" class="btn primary">开始孵化</button></div></div></div>';
     host.innerHTML = html;
+    host.querySelector('#empty-new-character')?.addEventListener('click', () => window.qbot.ui.openConsole('hatch'));
     return;
   }
   html += `<p class="studio-hint">点卡片切换当前上桌的角色。</p>`;
@@ -68,6 +69,7 @@ async function refresh(): Promise<void> {
 }
 
 function bind(host: HTMLElement): void {
+  host.querySelector('#new-character')?.addEventListener('click', () => window.qbot.ui.openConsole('hatch'));
   host.querySelectorAll<HTMLButtonElement>('.use-char').forEach((btn) => {
     btn.addEventListener('click', async () => {
       await window.qbot.characters.activate(btn.dataset.dir!);

@@ -14,7 +14,10 @@ import {
   esc,
   getAssetNonce,
   guard,
+  hasDirtyControls,
   loadStudioContext,
+  markControlsClean,
+  trackDirtyControls,
   toast,
 } from './_studio-shared';
 
@@ -45,6 +48,18 @@ export function unmount(): void {
   boundDirId = null;
 }
 
+export async function onVisible(): Promise<void> {
+  await refresh();
+}
+
+export function hasUnsavedChanges(): boolean {
+  return hasDirtyControls(paneRoot);
+}
+
+export async function discardChanges(): Promise<void> {
+  await refresh();
+}
+
 async function refresh(): Promise<void> {
   const root = paneRoot;
   if (!root) return;
@@ -58,7 +73,7 @@ async function refresh(): Promise<void> {
   const actions = collectActions(ctx.m, ctx.prompts);
 
   let html = '<div class="studio-body">';
-  html += `<h2>人设与动作</h2>`;
+  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台</p><h2>人设与动作</h2><p class="page-summary">维护角色表达方式、动作资产与可播放能力。</p></div></div>`;
 
   // ── persona ──
   html += `<h3>角色人设</h3>`;
@@ -68,12 +83,13 @@ async function refresh(): Promise<void> {
 
   // ── action list ──
   html += `<h3>动作列表</h3>`;
+  html += `<div class="action-toolbar"><input id="action-search" data-transient type="search" placeholder="搜索动作名称或 ID" /><select id="action-status-filter" data-transient><option value="">全部状态</option><option value="done">可用</option><option value="pending">排队中</option><option value="failed">失败</option></select><select id="action-type-filter" data-transient><option value="">全部来源</option><option value="standard">基础动作</option><option value="custom">自定义动作</option></select></div>`;
   for (const a of actions) {
     const frameUrl =
       a.status === 'done'
         ? `qbot-asset://${ctx.dirId}/actions/${a.id}.webm?v=${getAssetNonce()}`
         : '';
-    html += `<div class="action-card" data-action="${esc(a.id)}" data-custom="${a.isCustom ? '1' : '0'}">`;
+    html += `<div class="action-card" data-action="${esc(a.id)}" data-label="${esc(a.label.toLowerCase())}" data-status="${esc(a.status)}" data-kind="${a.isCustom ? 'custom' : 'standard'}">`;
     html += `<div class="meta">`;
     html += `<b>${esc(a.label)}</b> (${esc(a.id)}) `;
     html += `<span class="status status-${a.status}">${a.status}</span> `;
@@ -89,6 +105,7 @@ async function refresh(): Promise<void> {
     if (!a.isCustom) {
       html += `<div class="btn-row"><button class="save-prompt btn" data-id="${esc(a.id)}">保存 Prompt</button></div>`;
     }
+    if (a.status === 'done') html += `<button class="preview-action btn ghost" data-id="${esc(a.id)}">桌面测试</button>`;
     html += `</div>`;
   }
 
@@ -132,15 +149,35 @@ async function refresh(): Promise<void> {
 
   root.innerHTML = html;
   bind(root, ctx.dirId);
+  trackDirtyControls(root);
 }
 
 function bind(root: HTMLElement, dirId: string): void {
+  const filterActions = (): void => {
+    const query = root.querySelector<HTMLInputElement>('#action-search')?.value.trim().toLowerCase() ?? '';
+    const status = root.querySelector<HTMLSelectElement>('#action-status-filter')?.value ?? '';
+    const kind = root.querySelector<HTMLSelectElement>('#action-type-filter')?.value ?? '';
+    root.querySelectorAll<HTMLElement>('.action-card[data-action]').forEach((card) => {
+      const matchesQuery = !query || `${card.dataset.label} ${card.dataset.action}`.includes(query);
+      const matchesStatus = !status || card.dataset.status === status;
+      const matchesKind = !kind || card.dataset.kind === kind;
+      card.hidden = !(matchesQuery && matchesStatus && matchesKind);
+    });
+  };
+  root.querySelectorAll<HTMLInputElement | HTMLSelectElement>('#action-search, #action-status-filter, #action-type-filter').forEach((control) => {
+    control.addEventListener('input', filterActions);
+    control.addEventListener('change', filterActions);
+  });
+  root.querySelectorAll<HTMLButtonElement>('.preview-action').forEach((button) => {
+    button.addEventListener('click', () => window.qbot.pet.previewAction(button.dataset.id!));
+  });
   // 保存 persona
   root.querySelector<HTMLButtonElement>('#save-persona')?.addEventListener('click', (e) => {
     const btn = e.currentTarget as HTMLButtonElement;
     const ta = root.querySelector<HTMLTextAreaElement>('#persona')!;
     void guard(root, btn, '保存中…', async () => {
       await window.qbot.studio.savePersona(dirId, ta.value);
+      markControlsClean(ta);
       toast(root, '人设已保存 ✓');
     });
   });
@@ -206,6 +243,10 @@ function bind(root: HTMLElement, dirId: string): void {
       const motion = card.querySelector<HTMLTextAreaElement>('.motion-desc')?.value ?? '';
       void guard(root, btn, '保存中…', async () => {
         await window.qbot.studio.saveActionPrompt(dirId, id, pose, motion);
+        markControlsClean(
+          card.querySelector<HTMLTextAreaElement>('.pose-desc'),
+          card.querySelector<HTMLTextAreaElement>('.motion-desc'),
+        );
         toast(root, `已保存「${id}」的 prompt（重新生成后才会体现在画面上）`);
       });
     });

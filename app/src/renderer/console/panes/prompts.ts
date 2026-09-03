@@ -5,7 +5,7 @@
  * 重生成会调 API 花钱，确认框改成 pane 内非阻塞对话框（原生 confirm 会冻住整窗）。
  */
 import type { ActionId } from '@qbot/pipeline';
-import { STD_LABELS, confirmBox, esc, guard, loadStudioContext, toast } from './_studio-shared';
+import { STD_LABELS, confirmBox, esc, guard, hasDirtyControls, loadStudioContext, markControlsClean, trackDirtyControls, toast } from './_studio-shared';
 
 let paneRoot: HTMLElement | null = null;
 
@@ -16,6 +16,18 @@ export async function mount(root: HTMLElement): Promise<void> {
 
 export function unmount(): void {
   paneRoot = null;
+}
+
+export async function onVisible(): Promise<void> {
+  await refresh();
+}
+
+export function hasUnsavedChanges(): boolean {
+  return hasDirtyControls(paneRoot);
+}
+
+export async function discardChanges(): Promise<void> {
+  await refresh();
 }
 
 async function refresh(): Promise<void> {
@@ -31,7 +43,7 @@ async function refresh(): Promise<void> {
   const prompts = ctx.prompts;
 
   let html = '<div class="studio-body">';
-  html += `<h2>生成 Prompt</h2>`;
+  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台 · 高级</p><h2>高级生成</h2><p class="page-summary">只有需要精确控制生成结果时才修改完整 Prompt。</p></div></div>`;
 
   html += `<h3>生成参数</h3>`;
   html += `<div class="config-params">`;
@@ -47,14 +59,14 @@ async function refresh(): Promise<void> {
   html += `</div>`;
 
   // ── 三视图 prompt ──
-  html += `<h3>三视图 Prompt ${prompts.turnaroundCustomized ? '<span class="badge-custom">已自定义</span>' : ''}</h3>`;
-  html += `<div class="prompt-block">`;
+  html += `<details class="prompt-block" open>`;
+  html += `<summary><span><b>三视图 Prompt</b><small>所有动作共用的角色参考图</small></span>${prompts.turnaroundCustomized ? '<span class="badge-custom">已自定义</span>' : ''}</summary>`;
   html += `<textarea id="turnaround-prompt" rows="6">${esc(prompts.turnaroundPrompt)}</textarea>`;
   html += `<div class="btn-row">`;
   html += `<button id="save-turnaround" class="btn">保存</button>`;
   html += `<button id="reset-turnaround" class="btn ghost">恢复默认</button>`;
   html += `<button id="regen-turnaround" class="btn danger">保存并重生三视图（约 ¥6）</button>`;
-  html += `</div>`;
+  html += `</details>`;
   html += `<p class="studio-hint">三视图是所有动作的参考图 —— 换了它必须连带重新生成全部 6 个动作，`;
   html += `否则新旧风格对不上。挑图界面会切到「孵化新角色」。</p>`;
   html += `</div>`;
@@ -64,9 +76,8 @@ async function refresh(): Promise<void> {
   for (const [id, p] of Object.entries(prompts.actions)) {
     const label = STD_LABELS[id as ActionId] ?? id;
     const custom = p.framePromptCustomized || p.videoPromptCustomized;
-    html += `<div class="prompt-block" data-action="${esc(id)}">`;
-    html += `<b>${esc(label)}</b> (${esc(id)})`;
-    html += custom ? ` <span class="badge-custom">已自定义</span>` : '';
+    html += `<details class="prompt-block" data-action="${esc(id)}"${custom ? ' open' : ''}>`;
+    html += `<summary><span><b>${esc(label)}</b><small>${esc(id)}</small></span>${custom ? '<span class="badge-custom">已自定义</span>' : ''}</summary>`;
     html += `<label>首帧 Prompt</label>`;
     html += `<textarea class="frame-prompt" rows="5">${esc(p.framePrompt)}</textarea>`;
     html += `<label>视频 Prompt</label>`;
@@ -77,13 +88,14 @@ async function refresh(): Promise<void> {
     html += `<button class="save-full btn" data-id="${esc(id)}">保存</button>`;
     html += `<button class="reset-full btn ghost" data-id="${esc(id)}">恢复默认</button>`;
     html += `<button class="regen-action btn danger" data-id="${esc(id)}">保存并重新生成（约 ¥1）</button>`;
-    html += `</div>`;
+    html += `</details>`;
     html += `</div>`;
   }
   html += '</div>';
 
   root.innerHTML = html;
   bind(root, ctx.dirId);
+  trackDirtyControls(root);
 }
 
 function bind(root: HTMLElement, dirId: string): void {
@@ -94,6 +106,7 @@ function bind(root: HTMLElement, dirId: string): void {
     const btn = e.currentTarget as HTMLButtonElement;
     void guard(root, btn, '保存中…', async () => {
       await window.qbot.studio.saveTurnaroundPrompt(dirId, turnaroundTa().value);
+      markControlsClean(turnaroundTa());
       toast(root, '三视图 prompt 已保存（只在重新生成三视图时生效）');
     });
   });
@@ -141,6 +154,11 @@ function bind(root: HTMLElement, dirId: string): void {
       const { frame, video } = readBlock(id);
       void guard(root, btn, '保存中…', async () => {
         await window.qbot.studio.saveFullPrompts(dirId, id, frame, video);
+        const block = btn.closest('.prompt-block');
+        markControlsClean(
+          block?.querySelector<HTMLTextAreaElement>('.frame-prompt'),
+          block?.querySelector<HTMLTextAreaElement>('.video-prompt'),
+        );
         toast(root, `「${id}」的 prompt 已保存（需重新生成才生效）`);
       });
     });

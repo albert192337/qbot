@@ -7,7 +7,7 @@
  * 与「连接」组的应用级开关（装不装 hooks、连不连机）语义不同，故分属两组。
  */
 import type { ActionId, AgentActionConfig } from '@qbot/pipeline';
-import { STD_LABELS, collectActions, esc, guard, loadStudioContext, toast } from './_studio-shared';
+import { STD_LABELS, collectActions, esc, guard, hasDirtyControls, loadStudioContext, markControlsClean, trackDirtyControls, toast } from './_studio-shared';
 
 /** 各场景缺省动作（与状态机 state-machine.ts 的 DEFAULT_* 保持一致） */
 const DEFAULTS: Record<string, ActionId> = {
@@ -38,11 +38,24 @@ export function unmount(): void {
   paneRoot = null;
 }
 
+export async function onVisible(): Promise<void> {
+  await refresh();
+}
+
+export function hasUnsavedChanges(): boolean {
+  return hasDirtyControls(paneRoot);
+}
+
+export async function discardChanges(): Promise<void> {
+  await refresh();
+}
+
 async function refresh(): Promise<void> {
   const root = paneRoot;
   if (!root) return;
   const ctx = await loadStudioContext(root);
   if (!ctx) return;
+  const claudeConnected = await window.qbot.claude.getStatus();
 
   const ac = ctx.m.agentActions ?? ({} as AgentActionConfig);
   // 只列已生成完成的动作：未完成的选了也播不出来（状态机会退化成 idle）
@@ -62,8 +75,9 @@ async function refresh(): Promise<void> {
   };
 
   let html = '<div class="studio-body">';
-  html += `<h2>场景动作</h2>`;
+  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台</p><h2>场景绑定</h2><p class="page-summary">把已经生成好的动作绑定到工作、音乐与会议状态。</p></div></div>`;
   html += `<p class="studio-hint">桌宠在各场景下播放的动作。只列已生成完成的动作——没生成完的选了也播不出来。</p>`;
+  html += `<div class="integration-strip"><span class="status-chip ${claudeConnected ? 'success' : 'muted'}">Claude Code ${claudeConnected ? '已接入' : '未接入'}</span><span class="status-chip ${navigator.platform.toLowerCase().includes('win') ? 'success' : 'muted'}">网易云监听 ${navigator.platform.toLowerCase().includes('win') ? '可用' : '仅 Windows'}</span><button class="text-action" id="open-claude-settings">管理连接</button></div>`;
 
   html += `<h3>Claude Code</h3>`;
   html += `<div class="scene-grid">`;
@@ -71,6 +85,7 @@ async function refresh(): Promise<void> {
     html += `<div class="scene-row">`;
     html += `<span class="scene-label">${esc(s.label)}<i>${esc(s.hint)}</i></span>`;
     html += select(s.key, ac[s.key as keyof AgentActionConfig] as string | undefined, DEFAULTS[s.key]);
+    html += `<button class="btn quiet test-scene" data-scene="${esc(s.key)}">测试</button>`;
     html += `</div>`;
   }
   // 完成庆祝：动作 + 遍数
@@ -78,6 +93,7 @@ async function refresh(): Promise<void> {
   html += `<span class="scene-label">完成庆祝<i>跑完一轮后播放</i></span>`;
   html += select('doneAction', ac.doneAction, DEFAULTS.doneAction);
   html += `<span class="scene-extra">遍数 <input id="done-loops" type="number" value="${ac.doneLoops ?? 1}" min="1" max="5" /></span>`;
+  html += `<button class="btn quiet test-scene" data-scene="doneAction">测试</button>`;
   html += `</div>`;
   html += `</div>`;
 
@@ -86,10 +102,12 @@ async function refresh(): Promise<void> {
   html += `<div class="scene-row">`;
   html += `<span class="scene-label">听歌摇摆<i>网易云播放中（Windows）</i></span>`;
   html += select('musicAction', ac.musicAction, DEFAULTS.musicAction);
+  html += `<button class="btn quiet test-scene" data-scene="musicAction">测试</button>`;
   html += `</div>`;
   html += `<div class="scene-row">`;
   html += `<span class="scene-label">飞书开会时<i>检测到本机入会</i></span>`;
   html += select('meetingAction', ac.meetingAction, DEFAULTS.meetingAction);
+  html += `<button class="btn quiet test-scene" data-scene="meetingAction">测试</button>`;
   html += `</div>`;
   html += `</div>`;
 
@@ -97,6 +115,7 @@ async function refresh(): Promise<void> {
   html += '</div>';
 
   root.innerHTML = html;
+  trackDirtyControls(root);
 
   root.querySelector<HTMLButtonElement>('#save-scenes')?.addEventListener('click', (e) => {
     const btn = e.currentTarget as HTMLButtonElement;
@@ -109,7 +128,20 @@ async function refresh(): Promise<void> {
     config.doneLoops = loops > 0 ? loops : 1;
     void guard(root, btn, '保存中…', async () => {
       await window.qbot.studio.saveAgentActions(ctx.dirId, config);
+      root.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select').forEach((control) => markControlsClean(control));
       toast(root, '场景动作已保存 ✓（下次触发即生效）');
     });
   });
+  root.querySelectorAll<HTMLButtonElement>('.test-scene').forEach((button) => {
+    button.addEventListener('click', () => {
+      const selectElement = root.querySelector<HTMLSelectElement>(`#scene-${CSS.escape(button.dataset.scene!)}`);
+      if (!selectElement?.value) {
+        toast(root, '当前场景还没有可播放的动作', 'warn');
+        return;
+      }
+      window.qbot.pet.previewAction(selectElement.value);
+      toast(root, `正在桌面预览「${selectElement.selectedOptions[0]?.textContent ?? selectElement.value}」`);
+    });
+  });
+  root.querySelector('#open-claude-settings')?.addEventListener('click', () => window.qbot.ui.openConsole('claude'));
 }

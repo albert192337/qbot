@@ -42,6 +42,34 @@ export function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+type DirtyControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+
+function controlValue(control: DirtyControl): string {
+  if (control instanceof HTMLInputElement && (control.type === 'checkbox' || control.type === 'radio')) {
+    return control.checked ? '1' : '0';
+  }
+  return control.value;
+}
+
+export function trackDirtyControls(root: HTMLElement, selector = 'input:not([data-transient]), textarea:not([data-transient]), select:not([data-transient])'): void {
+  root.querySelectorAll<DirtyControl>(selector).forEach((control) => {
+    control.dataset.initialValue = controlValue(control);
+  });
+}
+
+export function markControlsClean(...controls: Array<DirtyControl | null | undefined>): void {
+  controls.forEach((control) => {
+    if (control) control.dataset.initialValue = controlValue(control);
+  });
+}
+
+export function hasDirtyControls(root: HTMLElement | null, selector = 'input:not([data-transient]), textarea:not([data-transient]), select:not([data-transient])'): boolean {
+  if (!root) return false;
+  return Array.from(root.querySelectorAll<DirtyControl>(selector)).some(
+    (control) => control.dataset.initialValue !== undefined && control.dataset.initialValue !== controlValue(control),
+  );
+}
+
 /** M 档表现力动作的中文标签（本地重声明，坑 12：renderer 不能 value-import pipeline） */
 export const EXPRESSION_LABELS: Record<string, string> = {
   smug: '得意坏笑',
@@ -141,6 +169,8 @@ export function toast(root: HTMLElement, msg: string, kind: 'ok' | 'warn' = 'ok'
   if (!el) {
     el = document.createElement('div');
     el.className = 'studio-toast';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
     root.prepend(el);
   }
   el.textContent = msg;
@@ -156,6 +186,8 @@ export function confirmBox(root: HTMLElement, message: string): Promise<boolean>
     mask.className = 'studio-confirm-mask';
     const box = document.createElement('div');
     box.className = 'studio-confirm';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
     const text = document.createElement('div');
     text.className = 'studio-confirm-text';
     text.textContent = message;
@@ -163,11 +195,14 @@ export function confirmBox(root: HTMLElement, message: string): Promise<boolean>
     row.className = 'studio-confirm-row';
     const no = document.createElement('button');
     no.className = 'btn ghost';
+    no.type = 'button';
     no.textContent = '取消';
     const yes = document.createElement('button');
     yes.className = 'btn danger';
+    yes.type = 'button';
     yes.textContent = '确定';
     const done = (v: boolean): void => {
+      document.removeEventListener('keydown', onKeydown);
       mask.remove();
       resolve(v);
     };
@@ -176,6 +211,12 @@ export function confirmBox(root: HTMLElement, message: string): Promise<boolean>
     mask.addEventListener('click', (e) => {
       if (e.target === mask) done(false);
     });
+    const onKeydown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
+      document.removeEventListener('keydown', onKeydown);
+      done(false);
+    };
+    document.addEventListener('keydown', onKeydown);
     row.append(no, yes);
     box.append(text, row);
     mask.appendChild(box);

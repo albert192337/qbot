@@ -42,10 +42,13 @@
 
 ## 统一控制台（原 Studio / 市场 / 孵化 / 设置 / 调试面板五合一）
 
-- **桌宠右键「控制台…」或托盘**打开单窗（880×640，renderer `console`），左侧栏五组十一项：
-  - 角色：我的角色（切换/改名/删除）、孵化新角色（drop→brewing→pick→progress→certificate 五屏）
-  - 配置：人设与动作、场景动作（Claude/听歌/开会 三类映射）、表情包导入、生成 Prompt
-  - 社区：装扮市场　连接：Claude Code、联机　系统：设置、开发者工具
+- **桌宠右键「控制台…」或托盘**打开单窗（880×640，renderer `console`），当前为四组十一项：
+  - 工作台：总览（当前角色、后台任务、连接状态、积累与公共房间快捷入口）
+  - 角色：角色库（切换/改名/删除）、新建与修复（drop→brewing→pick→progress→certificate 五屏）、人设与动作、场景绑定（Claude/听歌/开会）、GIF 动作导入、高级生成
+  - 连接与社区：Claude Code、装扮市场
+  - 系统：设置；开发者工具默认隐藏，在设置中开启开发者模式后显示
+- 控制台顶栏始终显示当前角色与后台任务数；角色级编辑页在切换页面/角色前检查未保存修改。
+- 公共房间与小房间保持独立窗口，不再作为控制台 pane；控制台只提供快捷入口与相关隐私设置。
 - **pane 懒挂载常驻**：首次激活才 `mount()`，切走只隐藏 → 未保存输入不丢；再次可见调 `onVisible()`
   （孵化据此主动 `seedFromStatus`，兜底懒挂载错过的 `awaiting_pick` 事件）
 - **深链** `createConsoleWindow(pane)`：已开窗→直接发 `ui:showScreen`；新窗→`did-finish-load` once 后发

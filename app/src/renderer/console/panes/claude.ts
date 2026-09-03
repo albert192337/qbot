@@ -24,9 +24,7 @@ export async function mount(host: HTMLElement): Promise<void> {
   root = host;
   host.innerHTML = `
 <div class="studio-body">
-  <h2>Claude Code</h2>
-  <p class="studio-hint">装上 hooks 后，Claude Code 干活时桌宠会实时切换状态：
-  思考 / 工作 / 等你处理 / 出错 / 完成庆祝。各状态播什么动作在「场景动作」里配。</p>
+  <div class="page-heading"><div><p class="eyebrow">连接</p><h2>Claude Code</h2><p class="page-summary">让桌宠感知编码会话，并用动作和气泡反馈当前进度。</p></div></div>
 
   <div class="conn-card">
     <div class="conn-row">
@@ -37,8 +35,13 @@ export async function mount(host: HTMLElement): Promise<void> {
       <span class="conn-label">当前活动</span>
       <span id="claude-activity" class="conn-value">—</span>
     </div>
+    <div class="conn-row">
+      <span class="conn-label">配置文件</span>
+      <span class="conn-value"><code>~/.claude/settings.json</code></span>
+    </div>
     <div class="btn-row">
       <button id="claude-toggle" class="btn" disabled>检测中…</button>
+      <button id="claude-scenes" class="btn ghost">配置状态动作</button>
     </div>
     <p class="studio-hint">安装会写入 <code>~/.claude/settings.json</code>（首次写入前自动备份），
     点击后会弹出系统确认框。卸载同样走这个按钮，幂等可反复切换。</p>
@@ -66,6 +69,9 @@ export async function mount(host: HTMLElement): Promise<void> {
         await refreshHooks();
       }
     })();
+  });
+  host.querySelector<HTMLButtonElement>('#claude-scenes')?.addEventListener('click', () => {
+    window.qbot.ui.openConsole('scene-actions');
   });
 }
 

@@ -7,7 +7,7 @@ import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipelin
 import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind } from '../shared/ipc-types';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
 import { getSettings, setSettings } from './config';
-import { createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, type ConsolePane } from './windows';
+import { createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, getPetWindow, type ConsolePane } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, isSecureTransport, reportChat, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms, pushLocalSign } from './rooms/rooms';
 import { getLocalSign, setLocalSign } from './local-sign';
@@ -239,6 +239,9 @@ export function registerIpc(): void {
       { label: '控制台…', click: () => createConsoleWindow() },
     ]);
     menu.popup({ window: win });
+  });
+  ipcMain.on('pet:previewAction', (_ev, action: string) => {
+    getPetWindow()?.webContents.send('pet:menuCommand', { type: 'play', action } satisfies PetMenuCommand);
   });
   ipcMain.handle('studio:savePersona', async (_ev, dirId: string, persona: string) => {
     await savePersona(dirId, persona);

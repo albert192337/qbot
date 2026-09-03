@@ -432,6 +432,7 @@ export function openRoomWindow(title: string): BrowserWindow {
 
 /** 控制台侧栏 pane 标识（与 renderer/console/main.ts 的 PaneId 对应） */
 export type ConsolePane =
+  | 'home'
   | 'characters'
   | 'hatch'
   | 'persona'

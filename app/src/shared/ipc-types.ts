@@ -70,6 +70,8 @@ export interface Settings {
    * 关闭/无 key 时纯规则脑，行为完全本地、零 API 花费。
    */
   freeMode?: boolean;
+  /** 显示控制台中的开发者工具入口（默认 false） */
+  developerMode?: boolean;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */
@@ -420,6 +422,8 @@ export interface QBotApi {
      * 动作列表由渲染端传入，说话/播动作的执行经 onMenuCommand 回渲染端。
      */
     popupMenu(actions: PetMenuActionEntry[]): void;
+    /** 控制台预览动作：让当前桌宠立即播放一次指定动作 */
+    previewAction(action: string): void;
     onMenuCommand(cb: (cmd: PetMenuCommand) => void): () => void;
   };
   music: {

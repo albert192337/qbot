@@ -1,10 +1,4 @@
-/**
- * 设置 pane：API key / 桌宠大小 / 语音 / 隐私。自 hatch 的 settings 屏迁入（阶段 5）。
- *
- * 关键改造：统一成**改动即生效**。原实现是混合语义——两个 API key 要点「保存」、
- * 其余四项改动即生效；pane 之间切换会丢未保存的 key。key 走 change 事件
- * （blur 或回车才触发，不会每敲一个字符写一次盘）。
- */
+/** 控制台设置：身份、模型、桌宠、语音、行为、隐私与开发者入口。 */
 import type { Settings } from '../../../shared/ipc-types';
 
 let root: HTMLElement | null = null;
@@ -12,15 +6,12 @@ let unsubSettings: (() => void) | null = null;
 
 export async function mount(host: HTMLElement): Promise<void> {
   root = host;
-  const s = await window.qbot.settings.get();
-  host.innerHTML = template(s);
+  const settings = await window.qbot.settings.get();
+  host.innerHTML = template(settings);
   bind(host);
-
-  // 托盘或别的 pane 改了设置 → 同步本页控件（原先 settings:changed 不发给孵化窗）
   unsubSettings?.();
   unsubSettings = window.qbot.settings.onChanged((next) => {
-    if (!root) return;
-    syncFrom(root, next);
+    if (root) syncFrom(root, next);
   });
 }
 
@@ -30,129 +21,143 @@ export function unmount(): void {
   root = null;
 }
 
-function template(s: Settings): string {
-  const scale = s.petScale ?? 1;
-  const vol = s.voiceVolume ?? 70;
-  return `
-<div class="studio-body">
-  <h2>设置</h2>
-
-  <h3>API Key</h3>
-  <p class="studio-hint">孵化新角色与重新生成动作时使用。改动离开输入框即保存。</p>
-  <label for="set-ark-key">火山方舟 Ark API Key</label>
-  <input id="set-ark-key" type="password" placeholder="粘贴你的 API Key" value="${attr(s.arkApiKey)}" />
-  <label for="set-gpt-key">GPT-Image-2 API Key<span class="studio-hint" style="display:inline;margin-left:6px">选该生图后端时才需要</span></label>
-  <input id="set-gpt-key" type="password" placeholder="sk-…" value="${attr(s.gptImageApiKey)}" />
-
-  <h3>桌宠</h3>
-  <div class="set-row">
-    <span class="set-label">大小 <b id="set-scale-value">${Math.round(scale * 100)}%</b></span>
-    <input id="set-scale" type="range" min="0.5" max="2" step="0.1" value="${scale}" />
-  </div>
-
-  <h3>语音</h3>
-  <div class="set-row">
-    <label class="set-check"><input id="set-voice-enabled" type="checkbox" ${s.voiceEnabled ?? true ? 'checked' : ''} /> 开启叽歪语音</label>
-  </div>
-  <div class="set-row">
-    <span class="set-label">音量 <b id="set-volume-value">${vol}</b></span>
-    <input id="set-voice-volume" type="range" min="0" max="100" step="5" value="${vol}" />
-  </div>
-  <div class="set-row">
-    <span class="set-label">说话频率</span>
-    <select id="set-talk-frequency">
-      <option value="quiet"${s.talkFrequency === 'quiet' ? ' selected' : ''}>安静</option>
-      <option value="normal"${(s.talkFrequency ?? 'normal') === 'normal' ? ' selected' : ''}>正常</option>
-      <option value="chatty"${s.talkFrequency === 'chatty' ? ' selected' : ''}>话痨</option>
-    </select>
-  </div>
-
-  <h3>行为模式</h3>
-  <div class="set-row">
-    <label class="set-check"><input id="set-free-mode" type="checkbox" ${s.freeMode ? 'checked' : ''} /> 自由模式（让桌宠用 AI 自主思考）</label>
-  </div>
-  <p class="studio-hint">关闭时是<b>陪伴模式</b>：桌宠按内置规则行动，完全本地、零花费。
-  开启后叠加 <b>LLM 脑</b>：桌宠会调用大模型（用上面的方舟 API Key）自己判断时机、即兴说话做动作，
-  约 15 分钟才思考一次，花费极低；规则脑照常保底。没有 Key 时开关不生效。</p>
-
-  <h3>隐私</h3>
-  <div class="set-row">
-    <label class="set-check"><input id="set-show-pet" type="checkbox" ${s.roomsShowMyPet !== false ? 'checked' : ''} /> 在公共房间展示我的桌宠形象</label>
-  </div>
-  <div class="set-row">
-    <label class="set-check"><input id="set-foreground-observation" type="checkbox" ${s.foregroundObservationEnabled === true ? 'checked' : ''} /> 本地记录前台应用和窗口标题</label>
-  </div>
-  <p class="studio-hint">开启后进房会把你的桌宠形象（动作动画，不含人设文字）缓存到房间服务器，供房友桌面显示。关闭则房友只见你的缩略图。
-  前台应用记录默认关闭；开启后会把应用名、窗口标题、进程名/路径保存在本机感知日志中 7 天，可在「开发者工具」查看，不会同步到公共房间。
-  键盘监控只累计次数，哪个键从不离开本机、不联网、不落盘。
-  公共房间会实时同步状态、动作和当前牌面；手动文字、完成提示、会议状态、歌曲名与歌手可能被房友看到。牌面不写入房间记录；未显示在牌面上的会话正文、项目路径和人设不会同步。</p>
-</div>`;
+export async function onVisible(): Promise<void> {
+  if (root) syncFrom(root, await window.qbot.settings.get());
 }
 
-function attr(v: string | undefined): string {
-  return (v ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+function keyRow(id: string, label: string, value: string | undefined, hint: string): string {
+  return `<div class="setting-block">
+    <div class="setting-copy"><label for="${id}">${label}</label><p>${hint}</p></div>
+    <div class="key-control">
+      <span class="key-state ${value ? 'configured' : ''}">${value ? '已配置' : '未配置'}</span>
+      <input id="${id}" type="password" autocomplete="off" placeholder="${value ? '已保存，输入新值可替换' : '粘贴 API Key'}" value="${attr(value)}" />
+      <button class="btn quiet key-reveal" type="button" data-target="${id}">显示</button>
+      <button class="btn quiet key-clear" type="button" data-target="${id}">清除</button>
+    </div>
+  </div>`;
 }
 
-/** 外部改动回写控件（不回写 API key：避免把用户正在编辑的内容覆盖掉） */
-function syncFrom(host: HTMLElement, s: Settings): void {
-  const scale = host.querySelector<HTMLInputElement>('#set-scale');
-  if (scale && document.activeElement !== scale) {
-    scale.value = String(s.petScale ?? 1);
-    host.querySelector('#set-scale-value')!.textContent = `${Math.round((s.petScale ?? 1) * 100)}%`;
-  }
-  const enabled = host.querySelector<HTMLInputElement>('#set-voice-enabled');
-  if (enabled) enabled.checked = s.voiceEnabled ?? true;
-  const vol = host.querySelector<HTMLInputElement>('#set-voice-volume');
-  if (vol && document.activeElement !== vol) {
-    vol.value = String(s.voiceVolume ?? 70);
-    host.querySelector('#set-volume-value')!.textContent = String(s.voiceVolume ?? 70);
-  }
-  const freq = host.querySelector<HTMLSelectElement>('#set-talk-frequency');
-  if (freq) freq.value = s.talkFrequency ?? 'normal';
-  const showPet = host.querySelector<HTMLInputElement>('#set-show-pet');
-  if (showPet) showPet.checked = s.roomsShowMyPet !== false;
-  const freeMode = host.querySelector<HTMLInputElement>('#set-free-mode');
-  if (freeMode) freeMode.checked = !!s.freeMode;
+function template(settings: Settings): string {
+  const scale = settings.petScale ?? 1;
+  const volume = settings.voiceVolume ?? 70;
+  const nickname = settings.nickname ?? settings.marketNickname ?? '';
+  return `<div class="studio-body settings-body">
+    <div class="page-heading"><div><p class="eyebrow">系统偏好</p><h2>设置</h2><p class="page-summary">所有修改自动保存。敏感信息只写入本机配置。</p></div></div>
+
+    <section class="settings-section"><h3>身份</h3>
+      <div class="setting-block"><div class="setting-copy"><label for="set-nickname">公开昵称</label><p>装扮市场署名与公共房间身份使用同一个昵称。</p></div><input id="set-nickname" type="text" maxlength="24" placeholder="匿名" value="${attr(nickname)}" /></div>
+    </section>
+
+    <section class="settings-section"><h3>模型与 API</h3>
+      ${keyRow('set-ark-key', '火山方舟 Ark API Key', settings.arkApiKey, '用于 Seedream、动作生成和自由模式。')}
+      ${keyRow('set-gpt-key', 'GPT-Image-2 API Key', settings.gptImageApiKey, '仅在孵化时选择 gpt-image-2 后端才需要。')}
+    </section>
+
+    <section class="settings-section"><h3>桌宠</h3>
+      <div class="setting-block"><div class="setting-copy"><span class="setting-title">大小</span><p>拖动时实时调整桌宠窗口。</p></div><div class="range-control"><input id="set-scale" type="range" min="0.5" max="2" step="0.1" value="${scale}" /><b id="set-scale-value">${Math.round(scale * 100)}%</b></div></div>
+    </section>
+
+    <section class="settings-section"><h3>声音与陪伴</h3>
+      ${toggleRow('set-voice-enabled', '开启叽歪语音', '关闭后文字气泡仍然显示。', settings.voiceEnabled ?? true)}
+      <div class="setting-block"><div class="setting-copy"><span class="setting-title">音量</span></div><div class="range-control"><input id="set-voice-volume" type="range" min="0" max="100" step="5" value="${volume}" /><b id="set-volume-value">${volume}</b></div></div>
+      <div class="setting-block"><div class="setting-copy"><label for="set-talk-frequency">说话频率</label><p>控制角色随机自言自语的间隔。</p></div><select id="set-talk-frequency"><option value="quiet"${settings.talkFrequency === 'quiet' ? ' selected' : ''}>安静</option><option value="normal"${(settings.talkFrequency ?? 'normal') === 'normal' ? ' selected' : ''}>正常</option><option value="chatty"${settings.talkFrequency === 'chatty' ? ' selected' : ''}>话痨</option></select></div>
+    </section>
+
+    <section class="settings-section"><h3>行为模式</h3>
+      ${toggleRow('set-free-mode', '自由模式', '叠加 LLM 脑自主判断时机、说话和动作；需要方舟 Key。关闭时使用完全本地的陪伴模式。', !!settings.freeMode)}
+    </section>
+
+    <section class="settings-section"><h3>隐私与数据</h3>
+      ${toggleRow('set-show-pet', '在公共房间展示桌宠形象', '开启后上传动作资产供房友桌面显示；关闭后房友只看到缩略图。', settings.roomsShowMyPet !== false)}
+      ${toggleRow('set-foreground-observation', '记录前台应用和窗口标题', '默认关闭；只保存系统公开元数据，本地保留 7 天，不读取窗口正文。', settings.foregroundObservationEnabled === true)}
+      <div class="privacy-note">键盘监控只累计次数，不记录具体按键。公共房间可能同步状态、动作和当前牌面，但不会同步未展示的会话正文、项目路径或角色人设。</div>
+    </section>
+
+    <section class="settings-section"><h3>高级</h3>
+      ${toggleRow('set-developer-mode', '显示开发者工具', '开启后在侧栏显示规则引擎、感知日志和数值注水入口。', !!settings.developerMode)}
+    </section>
+  </div>`;
+}
+
+function toggleRow(id: string, title: string, description: string, checked: boolean): string {
+  return `<label class="setting-block toggle-block" for="${id}"><span class="setting-copy"><span class="setting-title">${title}</span><p>${description}</p></span><span class="switch"><input id="${id}" type="checkbox" ${checked ? 'checked' : ''}/><span></span></span></label>`;
+}
+
+function attr(value: string | undefined): string {
+  return (value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function syncFrom(host: HTMLElement, settings: Settings): void {
+  const setValue = (selector: string, value: string) => {
+    const input = host.querySelector<HTMLInputElement | HTMLSelectElement>(selector);
+    if (input && document.activeElement !== input) input.value = value;
+  };
+  const setChecked = (selector: string, value: boolean) => {
+    const input = host.querySelector<HTMLInputElement>(selector);
+    if (input) input.checked = value;
+  };
+  setValue('#set-nickname', settings.nickname ?? settings.marketNickname ?? '');
+  setValue('#set-scale', String(settings.petScale ?? 1));
+  setValue('#set-voice-volume', String(settings.voiceVolume ?? 70));
+  setValue('#set-talk-frequency', settings.talkFrequency ?? 'normal');
+  const scaleLabel = host.querySelector('#set-scale-value');
+  if (scaleLabel) scaleLabel.textContent = `${Math.round((settings.petScale ?? 1) * 100)}%`;
+  const volumeLabel = host.querySelector('#set-volume-value');
+  if (volumeLabel) volumeLabel.textContent = String(settings.voiceVolume ?? 70);
+  setChecked('#set-voice-enabled', settings.voiceEnabled ?? true);
+  setChecked('#set-show-pet', settings.roomsShowMyPet !== false);
+  setChecked('#set-foreground-observation', settings.foregroundObservationEnabled === true);
+  setChecked('#set-free-mode', !!settings.freeMode);
+  setChecked('#set-developer-mode', !!settings.developerMode);
 }
 
 function bind(host: HTMLElement): void {
-  const q = <T extends HTMLElement>(sel: string): T => host.querySelector<T>(sel)!;
-
-  // API key：change 而非 input —— 离开输入框/回车才写盘，不会每敲一字符存一次
-  q<HTMLInputElement>('#set-ark-key').addEventListener('change', (e) => {
-    void window.qbot.settings.set({ arkApiKey: (e.target as HTMLInputElement).value.trim() });
+  const q = <T extends HTMLElement>(selector: string): T => host.querySelector<T>(selector)!;
+  q<HTMLInputElement>('#set-nickname').addEventListener('change', (event) => {
+    const nickname = (event.target as HTMLInputElement).value.trim();
+    void window.qbot.settings.set({ nickname, marketNickname: nickname });
   });
-  q<HTMLInputElement>('#set-gpt-key').addEventListener('change', (e) => {
-    void window.qbot.settings.set({ gptImageApiKey: (e.target as HTMLInputElement).value.trim() });
-  });
-
-  // 拖滑块实时生效（窗口即画布，直接看到大小变化）
-  q<HTMLInputElement>('#set-scale').addEventListener('input', (e) => {
-    const v = parseFloat((e.target as HTMLInputElement).value);
-    q('#set-scale-value').textContent = `${Math.round(v * 100)}%`;
-    void window.qbot.settings.set({ petScale: v });
-  });
-
-  q<HTMLInputElement>('#set-voice-enabled').addEventListener('change', (e) => {
-    void window.qbot.settings.set({ voiceEnabled: (e.target as HTMLInputElement).checked });
-  });
-  q<HTMLInputElement>('#set-voice-volume').addEventListener('input', (e) => {
-    const v = parseInt((e.target as HTMLInputElement).value, 10);
-    q('#set-volume-value').textContent = String(v);
-    void window.qbot.settings.set({ voiceVolume: v });
-  });
-  q<HTMLSelectElement>('#set-talk-frequency').addEventListener('change', (e) => {
-    void window.qbot.settings.set({
-      talkFrequency: (e.target as HTMLSelectElement).value as 'quiet' | 'normal' | 'chatty',
+  const bindKey = (selector: string, key: 'arkApiKey' | 'gptImageApiKey') => {
+    q<HTMLInputElement>(selector).addEventListener('change', (event) => {
+      void window.qbot.settings.set({ [key]: (event.target as HTMLInputElement).value.trim() });
+      const state = (event.target as HTMLElement).closest('.setting-block')?.querySelector('.key-state');
+      if (state) {
+        const configured = !!(event.target as HTMLInputElement).value.trim();
+        state.textContent = configured ? '已配置' : '未配置';
+        state.classList.toggle('configured', configured);
+      }
+    });
+  };
+  bindKey('#set-ark-key', 'arkApiKey');
+  bindKey('#set-gpt-key', 'gptImageApiKey');
+  host.querySelectorAll<HTMLButtonElement>('.key-reveal').forEach((button) => {
+    button.addEventListener('click', () => {
+      const input = q<HTMLInputElement>(`#${button.dataset.target}`);
+      input.type = input.type === 'password' ? 'text' : 'password';
+      button.textContent = input.type === 'password' ? '显示' : '隐藏';
     });
   });
-  q<HTMLInputElement>('#set-show-pet').addEventListener('change', (e) => {
-    void window.qbot.settings.set({ roomsShowMyPet: (e.target as HTMLInputElement).checked });
+  host.querySelectorAll<HTMLButtonElement>('.key-clear').forEach((button) => {
+    button.addEventListener('click', () => {
+      const input = q<HTMLInputElement>(`#${button.dataset.target}`);
+      input.value = '';
+      input.dispatchEvent(new Event('change'));
+    });
   });
-  q<HTMLInputElement>('#set-foreground-observation').addEventListener('change', (e) => {
-    void window.qbot.settings.set({ foregroundObservationEnabled: (e.target as HTMLInputElement).checked });
+  q<HTMLInputElement>('#set-scale').addEventListener('input', (event) => {
+    const value = parseFloat((event.target as HTMLInputElement).value);
+    q('#set-scale-value').textContent = `${Math.round(value * 100)}%`;
+    void window.qbot.settings.set({ petScale: value });
   });
-  q<HTMLInputElement>('#set-free-mode').addEventListener('change', (e) => {
-    void window.qbot.settings.set({ freeMode: (e.target as HTMLInputElement).checked });
+  q<HTMLInputElement>('#set-voice-enabled').addEventListener('change', (event) => void window.qbot.settings.set({ voiceEnabled: (event.target as HTMLInputElement).checked }));
+  q<HTMLInputElement>('#set-voice-volume').addEventListener('input', (event) => {
+    const value = parseInt((event.target as HTMLInputElement).value, 10);
+    q('#set-volume-value').textContent = String(value);
+    void window.qbot.settings.set({ voiceVolume: value });
   });
+  q<HTMLSelectElement>('#set-talk-frequency').addEventListener('change', (event) => void window.qbot.settings.set({ talkFrequency: (event.target as HTMLSelectElement).value as 'quiet' | 'normal' | 'chatty' }));
+  q<HTMLInputElement>('#set-show-pet').addEventListener('change', (event) => void window.qbot.settings.set({ roomsShowMyPet: (event.target as HTMLInputElement).checked }));
+  q<HTMLInputElement>('#set-foreground-observation').addEventListener('change', (event) => void window.qbot.settings.set({ foregroundObservationEnabled: (event.target as HTMLInputElement).checked }));
+  q<HTMLInputElement>('#set-free-mode').addEventListener('change', (event) => void window.qbot.settings.set({ freeMode: (event.target as HTMLInputElement).checked }));
+  q<HTMLInputElement>('#set-developer-mode').addEventListener('change', (event) => void window.qbot.settings.set({ developerMode: (event.target as HTMLInputElement).checked }));
 }

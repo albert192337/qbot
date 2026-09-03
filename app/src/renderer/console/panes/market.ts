@@ -8,6 +8,8 @@
  * 旧窗 renderer/market/ 在阶段 8 前保持原样，两套并存可回退。
  */
 import type { MarketSkin } from '../../../shared/ipc-types';
+import { icon } from '../icons';
+import { confirmBox } from './_studio-shared';
 
 /** 上传昵称：改动即生效（沿用旧实现） */
 
@@ -19,6 +21,7 @@ export async function mount(root: HTMLElement): Promise<void> {
       <select id="market-upload-select" title="选择要上传的角色"></select>
       <button id="market-upload-btn" class="btn">上传</button>
       <button id="market-refresh-btn" class="btn ghost">刷新</button>
+      <button id="market-room-btn" class="btn ghost">公共房间</button>
     </div>
     <div id="market-status"></div>
     <div id="market-grid"></div>
@@ -30,6 +33,7 @@ export async function mount(root: HTMLElement): Promise<void> {
   const uploadSelect = root.querySelector<HTMLSelectElement>('#market-upload-select')!;
   const uploadBtn = root.querySelector<HTMLButtonElement>('#market-upload-btn')!;
   const refreshBtn = root.querySelector<HTMLButtonElement>('#market-refresh-btn')!;
+  const roomBtn = root.querySelector<HTMLButtonElement>('#market-room-btn')!;
 
   let busy = false;
 
@@ -50,9 +54,10 @@ export async function mount(root: HTMLElement): Promise<void> {
 
   // ── 昵称（本地设置） ────────────────────────────────────────
   const settings = await window.qbot.settings.get();
-  nickInput.value = settings.marketNickname ?? '';
+  nickInput.value = settings.nickname ?? settings.marketNickname ?? '';
   nickInput.addEventListener('change', () => {
-    void window.qbot.settings.set({ marketNickname: nickInput.value.trim() });
+    const nickname = nickInput.value.trim();
+    void window.qbot.settings.set({ nickname, marketNickname: nickname });
   });
 
   // ── 上传角色下拉（默认当前激活） ────────────────────────────
@@ -86,7 +91,7 @@ export async function mount(root: HTMLElement): Promise<void> {
     } else {
       const ph = document.createElement('div');
       ph.className = 'cover';
-      ph.textContent = '🐾';
+      ph.innerHTML = icon('characters');
       card.appendChild(ph);
     }
 
@@ -108,7 +113,7 @@ export async function mount(root: HTMLElement): Promise<void> {
     dlBtn.addEventListener('click', () => void run(async () => {
       setStatus(skin.installed ? `切换到「${skin.name}」…` : `下载「${skin.name}」…`);
       await window.qbot.market.download(skin.hash);
-      setStatus(`已换上「${skin.name}」🎉`);
+      setStatus(`已换上「${skin.name}」`);
       await refreshShelf();
     }));
     btns.appendChild(dlBtn);
@@ -118,7 +123,7 @@ export async function mount(root: HTMLElement): Promise<void> {
       rmBtn.className = 'btn danger';
       rmBtn.textContent = '下架';
       rmBtn.addEventListener('click', () => void run(async () => {
-        if (!confirm(`把「${skin.name}」从市场下架？`)) return;
+        if (!(await confirmBox(root, `把「${skin.name}」从市场下架？`))) return;
         await window.qbot.market.remove(skin.hash);
         setStatus(`已下架「${skin.name}」`);
         await refreshShelf();
@@ -170,6 +175,7 @@ export async function mount(root: HTMLElement): Promise<void> {
   }));
 
   refreshBtn.addEventListener('click', () => void run(refreshShelf));
+  roomBtn.addEventListener('click', () => window.qbot.rooms.open());
 
   // ── 启动 ────────────────────────────────────────────────────
   await run(async () => {
