@@ -55,6 +55,9 @@ export async function onVisible(): Promise<void> {
   if (reviewItems.length === 0) await refresh();
 }
 
+export function hasUnsavedChanges(): boolean { return reviewItems.length > 0; }
+export async function discardChanges(): Promise<void> { reviewItems = []; await refresh(); }
+
 async function refresh(): Promise<void> {
   const host = root;
   if (!host) return;
@@ -68,7 +71,7 @@ async function refresh(): Promise<void> {
   const spares = ctx.m.spareStickers ?? [];
 
   let html = '<div class="studio-body">';
-  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台 · 添加动作</p><h2>GIF 动作导入</h2><p class="page-summary">先分析、再复核；确认之前不会修改现有角色资产。</p></div></div>`;
+  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台 · 扩展动作</p><h2>导入动作</h2><p class="page-summary">从 GIF 表情包识别新动作，复核后再加入当前角色。</p></div></div>`;
   html += `<p class="studio-hint">导入一套 GIF 表情包，模型会自动分析每张贴纸的语义并映射到桌宠动作。
     一次最多 50 张，v1 只支持 .gif。</p>`;
 

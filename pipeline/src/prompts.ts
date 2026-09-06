@@ -1,5 +1,5 @@
 /**
- * 三套 prompt 模板 + 6 动作文案常量。
+ * 三套 prompt 模板 + 默认动作与可选预设动作的文案常量。
  * 模板文本逐字取自 DESIGN.md §3.3（实测有效），不要随意改写措辞。
  * 纯函数模块，无 IO。
  */
@@ -28,7 +28,7 @@ export const DEFAULT_CHARACTER_DESC: CharacterDesc = {
 };
 
 /**
- * 6 动作姿势/动作文案。
+ * 默认动作姿势/动作文案。
  * 每条都含防翻车显式排除（DESIGN.md §3.3 Prompt 经验）：
  * - 不描述"被拎住"之类会引出手的措辞，只描述姿势本身
  * - 睡觉显式排除床/枕头/被子（床是客户端垫的资产图层）
@@ -78,6 +78,20 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
       '角色朝画面右侧不耐烦地抱怨，嘴巴撇着动，偶尔翻白眼或扭头，耳朵向后压。角色不位移。',
     durationSec: 5,
   },
+  wave: {
+    poseDesc:
+      '角色正面朝向画面，一只手自然抬到肩膀附近准备挥手，另一只手自然下垂，表情友好。角色自身的手和双臂保持自然可见，手中不持任何物体，画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
+    motionDesc:
+      '角色面带微笑，抬起的手左右轻轻挥动两次，身体有轻微自然起伏，耳朵随动作轻轻摆动。角色不位移。',
+    durationSec: 5,
+  },
+  stretch: {
+    poseDesc:
+      '角色正面站立，双臂自然向上伸展，身体微微拉长，表情放松。角色自身的手和双臂保持自然可见，手中不持任何物体，画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
+    motionDesc:
+      '角色慢慢向上伸展身体和双臂，短暂停留后放松回到自然姿势，耳朵轻轻晃动。角色不位移。',
+    durationSec: 5,
+  },
 };
 
 /**
@@ -122,6 +136,16 @@ export const ABSTRACT_ACTIONS: Record<ActionId, ActionSpec> = {
       '角色朝画面右侧不耐烦地表达，整体急促地小幅晃动扭动，偶尔别开。角色不位移。',
     durationSec: 5,
   },
+  wave: {
+    poseDesc: '角色朝向画面，整体向一侧有节奏地轻轻摆动，姿态友好。没有其他任何人物或物体。',
+    motionDesc: '角色整体向一侧轻摆两次，像在主动打招呼，随后回到自然姿态。角色不位移。',
+    durationSec: 5,
+  },
+  stretch: {
+    poseDesc: '角色保持原本形态，整体向上舒展拉长，姿态放松。没有其他任何人物或物体。',
+    motionDesc: '角色整体缓慢向上舒展，短暂停留后柔和地恢复原本轮廓。角色不位移。',
+    durationSec: 5,
+  },
 };
 
 /**
@@ -164,13 +188,25 @@ export const FAITHFUL_ACTIONS: Record<ActionId, ActionSpec> = {
       '角色朝画面右侧不耐烦地抱怨，嘴巴撇着动，偶尔翻白眼或扭头。角色不位移。',
     durationSec: 5,
   },
+  wave: {
+    poseDesc: ACTIONS.wave.poseDesc,
+    motionDesc:
+      '角色面带微笑，抬起的手左右轻轻挥动两次，身体有轻微自然起伏，头发随动作轻轻摆动。角色不位移。',
+    durationSec: 5,
+  },
+  stretch: {
+    poseDesc: ACTIONS.stretch.poseDesc,
+    motionDesc:
+      '角色慢慢向上伸展身体和双臂，短暂停留后放松回到自然姿势，头发和衣角随动作轻轻摆动。角色不位移。',
+    durationSec: 5,
+  },
 };
 
-// ── M 档表现力动作（spec 2026-08-21-expression-action-tier §4）──────────────
+// ── 可选预设动作（沿用 expression 命名兼容既有资产）──────────────────────
 // 一次性表演动作（播完回落 idle），文案逐字取自 spec，不要随意改写措辞。
 // 人形 pose 三档共用；motion 分 chibi（耳朵）/ faithful（头发）；抽象档整套独立。
 
-/** M 档人形动作（chibi 默认；faithful 只换 motion，pose 共用此表） */
+/** 人形预设动作（chibi 默认；faithful 只换 motion，pose 共用此表） */
 export const EXPRESSION_ACTIONS: Record<ExpressionActionId, ActionSpec> = {
   smug: {
     poseDesc:
@@ -200,9 +236,33 @@ export const EXPRESSION_ACTIONS: Record<ExpressionActionId, ActionSpec> = {
       '角色举着双臂原地欢呼跳跃，双臂上下挥动，落地后再次跃起，笑容灿烂，耳朵随跳跃上下弹动。角色始终在原地上下跳动，左右不位移。',
     durationSec: 5,
   },
+  nod: {
+    poseDesc:
+      '角色正面朝向画面，身体自然站立，神情认真而友善，双臂自然放松。角色自身的手和双臂保持自然可见，手中不持任何物体，画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
+    motionDesc: '角色缓慢点头两次，眼神保持专注，耳朵随动作轻轻起伏。角色不位移。',
+    durationSec: 5,
+  },
+  curious: {
+    poseDesc:
+      '角色正面朝向画面，头微微歪向一侧，睁大眼睛，表情好奇又困惑，双臂自然放松。角色自身的手和双臂保持自然可见，手中不持任何物体，画面中不出现问号、文字、其他人物或物体。',
+    motionDesc: '角色先向一侧歪头观察，再缓慢换向另一侧，眨眼并轻轻抖动耳朵。角色不位移。',
+    durationSec: 5,
+  },
+  dance: {
+    poseDesc:
+      '角色正面朝向画面，双臂自然张开，身体略微侧倾，表情开心有活力。角色自身的手和双臂保持自然可见，手中不持任何物体，画面中不出现音乐符号、文字、其他人物或物体。',
+    motionDesc: '角色在原地随节奏左右摇摆，双臂轻快摆动，偶尔小幅踮脚，耳朵随节奏弹动。角色不位移。',
+    durationSec: 5,
+  },
+  comfort: {
+    poseDesc:
+      '角色正面朝向画面，身体微微前倾，双手在胸前自然张开，神情温柔关切。角色自身的手和双臂保持自然可见，手中不持任何物体，画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
+    motionDesc: '角色保持温柔表情，轻轻点头并缓慢张开双手，像在安慰和鼓励对方。角色不位移。',
+    durationSec: 5,
+  },
 };
 
-/** M 档高保真（faithful）motion：pose 同人形，只把耳朵换成头发 */
+/** 预设动作高保真 motion：pose 同人形，只把耳朵换成头发 */
 export const EXPRESSION_FAITHFUL_MOTION: Record<ExpressionActionId, string> = {
   smug: '角色眯眼坏笑，肩膀随着无声的窃笑一耸一耸，头微微左右晃动，偶尔挑一下眉，头发随之轻轻晃动。角色不位移。',
   point:
@@ -211,9 +271,13 @@ export const EXPRESSION_FAITHFUL_MOTION: Record<ExpressionActionId, string> = {
     '角色背对画面站着不动，只有肩膀随呼吸轻微起伏，中途头微微转向侧后方瞄一眼又立刻扭回去，头发随扭头轻轻甩动。角色不位移。',
   cheer:
     '角色举着双臂原地欢呼跳跃，双臂上下挥动，落地后再次跃起，笑容灿烂，头发随跳跃上下飞扬。角色始终在原地上下跳动，左右不位移。',
+  nod: '角色缓慢点头两次，眼神保持专注，头发随动作轻轻起伏。角色不位移。',
+  curious: '角色先向一侧歪头观察，再缓慢换向另一侧，眨眼，头发随动作自然晃动。角色不位移。',
+  dance: '角色在原地随节奏左右摇摆，双臂轻快摆动，偶尔小幅踮脚，头发和衣角随节奏摆动。角色不位移。',
+  comfort: '角色保持温柔表情，轻轻点头并缓慢张开双手，像在安慰和鼓励对方。角色不位移。',
 };
 
-/** M 档抽象形态（绝不出现部位词，血泪坑 10；情绪/姿态用整体轮廓表达） */
+/** 预设动作抽象形态（绝不出现部位词，血泪坑 10；情绪/姿态用整体轮廓表达） */
 export const EXPRESSION_ABSTRACT_ACTIONS: Record<ExpressionActionId, ActionSpec> = {
   smug: {
     poseDesc: '角色朝向画面右侧，整体微微后仰上扬，姿态透着得意。没有其他任何人物或物体。',
@@ -238,9 +302,29 @@ export const EXPRESSION_ABSTRACT_ACTIONS: Record<ExpressionActionId, ActionSpec>
       '角色在原地上下弹跳欢呼，每次落下后再次弹起，整体随之舒展收缩。角色始终在原地上下跳动，左右不位移。',
     durationSec: 5,
   },
+  nod: {
+    poseDesc: '角色保持原本形态，整体略微向前倾，姿态认真友善。没有其他任何人物或物体。',
+    motionDesc: '角色整体缓慢上下点动两次，随后平稳回到原本姿态。角色不位移。',
+    durationSec: 5,
+  },
+  curious: {
+    poseDesc: '角色保持原本形态，整体微微歪向一侧，姿态好奇。画面中不出现问号、文字或其他物体。',
+    motionDesc: '角色整体先向一侧倾斜观察，再缓慢换向另一侧，轮廓轻微弹动。角色不位移。',
+    durationSec: 5,
+  },
+  dance: {
+    poseDesc: '角色保持原本形态，整体略微侧倾，姿态轻快有活力。画面中不出现音乐符号、文字或其他物体。',
+    motionDesc: '角色整体在原地有节奏地左右摇摆并轻轻弹动，动作连贯轻快。角色不位移。',
+    durationSec: 5,
+  },
+  comfort: {
+    poseDesc: '角色保持原本形态，整体微微向前靠近，姿态温柔关切。没有其他任何人物或物体。',
+    motionDesc: '角色整体缓慢前倾并轻轻点动，像在安慰和鼓励对方，随后回到原本姿态。角色不位移。',
+    durationSec: 5,
+  },
 };
 
-/** 按形态/风格取 M 档动作文案（与 actionSpec 同构） */
+/** 按形态/风格取可选预设动作文案（与 actionSpec 同构） */
 export function expressionActionSpec(
   action: ExpressionActionId,
   form: CharacterForm = 'humanoid',

@@ -1,4 +1,4 @@
-/** 托盘：孵化新角色 / 切换角色 / Claude 联动 / 公共房间 / 设置 / 退出 */
+/** 托盘：创建角色 / 切换角色 / Claude 联动 / 联机空间 / 设置 / 退出 */
 import { Menu, Tray, app, nativeImage } from 'electron';
 import path from 'node:path';
 import { listCharacters } from './characters';
@@ -87,12 +87,12 @@ export async function characterSection(): Promise<Electron.MenuItemConstructorOp
   ];
 }
 
-/** 对外连接：公共房间 + Claude Code 联动 */
+/** 对外连接：联机空间 + Claude Code 联动 */
 export async function connectSection(): Promise<Electron.MenuItemConstructorOptions[]> {
   const settings = await getSettings();
   return [
     {
-      label: '公共房间…',
+      label: '联机空间…',
       click: () => createLoungeWindow(),
     },
     {

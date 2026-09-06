@@ -1,5 +1,6 @@
 /** room 渲染进程入口：内置房间背景 + 角色漫游驱动 + 点角色互动 + 语音 + 贴纸窗交互 + 装饰 */
 import type { ActionId } from '@qbot/pipeline';
+import type { RoomSizePreset } from '../../shared/ipc-types';
 import { Player } from '../pet/player';
 import { DEFAULT_VOICE_SETTINGS, Speaker, type VoiceSettings } from '../pet/voice/speak';
 import { depthZ, footprintsOf, sanitizePlacements, type Footprint } from './decor';
@@ -60,10 +61,14 @@ function toRoom(clientX: number, clientY: number): Point {
 // ── 状态机驱动 ───────────────────────────────────────────
 let state: RoamState = { kind: 'resting', pos: polygonCentroid(spec.floor) };
 let available: ActionId[] = [];
-/** 标准 6 动作（本地常量：renderer 不能 value-import pipeline，会把 node 依赖打进浏览器包） */
-const STD_ACTION_IDS: readonly string[] = ['idle', 'drag', 'sleep', 'tea', 'talk_happy', 'talk_annoyed'];
+/** 默认动作（本地常量：renderer 不能 value-import pipeline，会把 node 依赖打进浏览器包） */
+const STD_ACTION_IDS: readonly string[] = ['idle', 'drag', 'sleep', 'tea', 'talk_happy', 'talk_annoyed', 'wave', 'stretch'];
 let timer: ReturnType<typeof setTimeout> | null = null;
 let editing = false; // 编辑态：漫游/发言/互动/窗口拖动全部暂停
+let currentRoomSizePreset: RoomSizePreset = 'large';
+void window.qbot.room.getSizePreset().then((preset) => {
+  currentRoomSizePreset = preset;
+});
 /** 当前角色（取美术固有朝向用） */
 let currentCharacter: Awaited<ReturnType<typeof window.qbot.characters.getActive>> = null;
 /** 水平翻转系数：1 = 原朝向，-1 = 镜像（朝行进方向） */
@@ -357,6 +362,28 @@ document.addEventListener('contextmenu', (e) => {
   e.preventDefault();
   if (!inRoom || editing) return;
   menu.replaceChildren();
+  const sizeLabel = document.createElement('div');
+  sizeLabel.className = 'menu-label';
+  sizeLabel.textContent = '房间大小';
+  const sizeOptions = document.createElement('div');
+  sizeOptions.className = 'menu-options';
+  const sizeChoices: Array<[RoomSizePreset, string]> = [
+    ['small', '小'],
+    ['medium', '中'],
+    ['large', '大'],
+  ];
+  for (const [preset, label] of sizeChoices) {
+    const option = document.createElement('div');
+    option.className = `menu-option${preset === currentRoomSizePreset ? ' on' : ''}`;
+    option.textContent = label;
+    option.addEventListener('click', () => {
+      currentRoomSizePreset = preset;
+      hideMenu();
+      void window.qbot.room.setSizePreset(preset);
+    });
+    sizeOptions.appendChild(option);
+  }
+  menu.append(sizeLabel, sizeOptions);
   const decorate = document.createElement('div');
   decorate.className = 'menu-item';
   decorate.textContent = '布置房间';
@@ -382,9 +409,9 @@ document.addEventListener('contextmenu', (e) => {
   });
   menu.appendChild(close);
   menu.style.display = 'block';
-  const mw = 120;
-  menu.style.left = `${Math.min(e.clientX, window.innerWidth - mw - 4)}px`;
-  menu.style.top = `${Math.min(e.clientY, window.innerHeight - 108)}px`;
+  const bounds = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(4, Math.min(e.clientX, window.innerWidth - bounds.width - 4))}px`;
+  menu.style.top = `${Math.max(4, Math.min(e.clientY, window.innerHeight - bounds.height - 4))}px`;
 });
 document.addEventListener('click', (e) => {
   if (!menu.contains(e.target as Node)) hideMenu();

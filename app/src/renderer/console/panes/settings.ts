@@ -45,12 +45,12 @@ function template(settings: Settings): string {
     <div class="page-heading"><div><p class="eyebrow">系统偏好</p><h2>设置</h2><p class="page-summary">所有修改自动保存。敏感信息只写入本机配置。</p></div></div>
 
     <section class="settings-section"><h3>身份</h3>
-      <div class="setting-block"><div class="setting-copy"><label for="set-nickname">公开昵称</label><p>装扮市场署名与公共房间身份使用同一个昵称。</p></div><input id="set-nickname" type="text" maxlength="24" placeholder="匿名" value="${attr(nickname)}" /></div>
+      <div class="setting-block"><div class="setting-copy"><label for="set-nickname">公开昵称</label><p>装扮市场署名与联机空间身份使用同一个昵称。</p></div><input id="set-nickname" type="text" maxlength="24" placeholder="匿名" value="${attr(nickname)}" /></div>
     </section>
 
     <section class="settings-section"><h3>模型与 API</h3>
       ${keyRow('set-ark-key', '火山方舟 Ark API Key', settings.arkApiKey, '用于 Seedream、动作生成和自由模式。')}
-      ${keyRow('set-gpt-key', 'GPT-Image-2 API Key', settings.gptImageApiKey, '仅在孵化时选择 gpt-image-2 后端才需要。')}
+      ${keyRow('set-gpt-key', 'GPT-Image-2 API Key', settings.gptImageApiKey, '仅在创建角色时选择 GPT-Image-2 才需要。')}
     </section>
 
     <section class="settings-section"><h3>桌宠</h3>
@@ -68,9 +68,9 @@ function template(settings: Settings): string {
     </section>
 
     <section class="settings-section"><h3>隐私与数据</h3>
-      ${toggleRow('set-show-pet', '在公共房间展示桌宠形象', '开启后上传动作资产供房友桌面显示；关闭后房友只看到缩略图。', settings.roomsShowMyPet !== false)}
+      ${toggleRow('set-show-pet', '在联机空间展示桌宠形象', '开启后上传动作资产供房友显示；关闭后房友只看到缩略图。', settings.roomsShowMyPet !== false)}
       ${toggleRow('set-foreground-observation', '记录前台应用和窗口标题', '默认关闭；只保存系统公开元数据，本地保留 7 天，不读取窗口正文。', settings.foregroundObservationEnabled === true)}
-      <div class="privacy-note">键盘监控只累计次数，不记录具体按键。公共房间可能同步状态、动作和当前牌面，但不会同步未展示的会话正文、项目路径或角色人设。</div>
+      <div class="privacy-note">键盘监控只累计次数，不记录具体按键。联机空间可能同步状态、动作和当前牌面，但不会同步未展示的会话正文、项目路径或角色人设。</div>
     </section>
 
     <section class="settings-section"><h3>高级</h3>

@@ -1,19 +1,19 @@
 # QBot — AI 桌宠
 
-丢一张角色图 → 自动生成 6 动作动画角色（三视图 → 绿幕首帧 → 循环视频 → 抠像转码）→ macOS 桌面常驻透明窗桌宠。可联动 AI coding agent（Claude Code）：agent 干活时桌宠实时切状态。
+丢一张角色图 → 自动生成 8 个常用动作（三视图 → 绿幕首帧 → 循环视频 → 抠像转码）→ macOS 桌面常驻透明窗桌宠。可联动 AI coding agent（Claude Code）：agent 干活时桌宠实时切状态。
 
 ## 仓库结构（npm workspaces monorepo）
 
 | 路径 | 职责 |
 |---|---|
 | `pipeline/` | 生成管线，**纯 Node 零 Electron 依赖**，可独立 CLI 使用（`npx tsx pipeline/src/cli.ts`） |
-| `app/` | Electron 客户端（electron-vite；main / preload / 五 renderer：pet + room 小房间 + bubble 气泡 + console 控制台 + lounge 公共房间） |
+| `app/` | Electron 客户端（electron-vite；main / preload / 五 renderer：pet 桌面宠物 + room 联机房间场景 + bubble 气泡 + console 控制台 + lounge 联机空间） |
 | `app/src/main/pipeline-bridge.ts` | import `@qbot/pipeline` 的主入口（另一处是 sticker-importer，共用其 `buildConfig`） |
 | `app/src/main/agent-server.ts` | agent 联动：127.0.0.1 HTTP 收 hook 事件 → 会话合成 → 广播 pet 窗 |
 | `app/src/main/agent-message.ts` | agent 消息纯逻辑：markdown 展平、截断、来源标签、transcript 解析（可单测） |
 | `app/src/main/hooks/claude.ts` | Claude Code hooks 安装器（托盘显式同意，写 ~/.claude/settings.json） |
 | `app/src/main/music-monitor.ts` | 网易云音乐监控（Windows SMTC，常驻 PowerShell 进程） |
-| `app/src/main/rooms/` | 公共房间链路：`rooms.ts` 网络、`rooms-rules.ts` 纯逻辑、`room-pets.ts` 角色包分发状态机、`room-pet-display.ts` 宠上屏窗口编排。2026-08-24 起是唯一联机链路（原 1v1 已退役） |
+| `app/src/main/rooms/` | 联机空间链路：`rooms.ts` 网络、`rooms-rules.ts` 纯逻辑、`room-pets.ts` 角色包分发状态机、`room-pet-display.ts` 房间场景/透明桌面的本地展示编排。2026-08-24 起是唯一联机链路（原 1v1 已退役） |
 | `market/` `rooms/` | 两个独立服务端 workspace（单文件 + 最小依赖，可整目录 scp；禁止 import 仓库其他模块） |
 | `app/src/main/sticker-importer.ts` | 表情包导入：打标→复核→转码落盘→热重载（纯逻辑在 `sticker-rules.ts`） |
 | `app/src/renderer/console/` | **统一控制台**：左侧栏二级目录（角色/配置/社区/连接/系统），`panes/*.ts` 一 pane 一文件，懒挂载 |
@@ -42,13 +42,14 @@
 
 ## 统一控制台（原 Studio / 市场 / 孵化 / 设置 / 调试面板五合一）
 
-- **桌宠右键「控制台…」或托盘**打开单窗（880×640，renderer `console`），当前为四组十一项：
-  - 工作台：总览（当前角色、后台任务、连接状态、积累与公共房间快捷入口）
-  - 角色：角色库（切换/改名/删除）、新建与修复（drop→brewing→pick→progress→certificate 五屏）、人设与动作、场景绑定（Claude/听歌/开会）、GIF 动作导入、高级生成
+- **桌宠右键「控制台…」或托盘**打开单窗（880×640，renderer `console`），侧栏当前为四组八个产品入口：
+  - 工作台：总览（当前角色、后台任务、连接状态、积累与联机空间快捷入口）
+  - 角色：角色库（编辑/放到桌面/改名/删除）、创建角色（选择形象→确认角色→生成动作→完成上桌）、生成任务；角色库中的「编辑角色」进入工作台，按角色资料、动作库、场景联动、高级生成四个页签组织，导入 GIF 从动作库进入
   - 连接与社区：Claude Code、装扮市场
   - 系统：设置；开发者工具默认隐藏，在设置中开启开发者模式后显示
-- 控制台顶栏始终显示当前角色与后台任务数；角色级编辑页在切换页面/角色前检查未保存修改。
-- 公共房间与小房间保持独立窗口，不再作为控制台 pane；控制台只提供快捷入口与相关隐私设置。
+- 控制台顶栏区分桌面角色和正在编辑的角色，并显示待处理任务数。编辑角色不会激活桌宠；「放到桌面」是显式操作。切换页签保留草稿，切换编辑角色才检查所有工作台页的未保存修改。
+- 「联机空间」是唯一入口和连接状态源；进入房间后可在「房间场景 / 透明桌面」间切换，只改变本机展示，不退房、不重连。控制台只提供快捷入口与相关隐私设置。
+- 创建角色每次只生成 1 张三视图方案供确认；不满意可原地重新生成，确认后才生成 8 个常用动作（idle/drag/sleep/tea/talk_happy/talk_annoyed/wave/stretch）。角色工作台把动作统一分为「随角色生成 / 预设动作 / 自定义动作」，预设动作按需生成，不再暴露 S/M 档术语。
 - **pane 懒挂载常驻**：首次激活才 `mount()`，切走只隐藏 → 未保存输入不丢；再次可见调 `onVisible()`
   （孵化据此主动 `seedFromStatus`，兜底懒挂载错过的 `awaiting_pick` 事件）
 - **深链** `createConsoleWindow(pane)`：已开窗→直接发 `ui:showScreen`；新窗→`did-finish-load` once 后发
@@ -119,17 +120,18 @@
 - 核心文件：`pipeline/src/sticker-import.ts`（打标纯逻辑）+ `chroma.ts:gifToWebm` + `app/src/main/sticker-importer.ts`（IO/IPC）+ `sticker-rules.ts`（纯逻辑可单测）+ Studio「表情包导入」tab
 - spec：`docs/superpowers/specs/2026-08-21-sticker-pack-import-design.md`
 
-## 公共房间（联机唯一链路）
+## 联机空间（唯一联机链路）
 
-- **概念是「游戏联机房」**：开房（起名+选类型）→ 上公共列表 → 别人浏览筛选后加入 → 房内文字聊天 + **房友的宠上屏**。不是等距场景，是虚拟社交单元
+- **概念是「游戏联机房」**：开房（起名+选类型）→ 上公共列表 → 别人浏览筛选后加入 → 房内文字聊天 + **房友的宠上屏**。房间、成员、聊天和状态始终共用同一条连接。
 - 常驻房间（固定 8 位 roomId，关了再开还是同一间）、四类型（摸鱼/自习/夜猫/联机）、4~12 人、可收藏置顶、私密房不上架凭 roomId 进
 - **2026-08-24 起是唯一联机链路**：原 1v1 好友配对（`link/` + `relay/`）已退役，私密房顶替好友配对场景。原「替身窗只给 1v1」的限制已推翻——全员上屏
-- **宠上屏**：在线房友每人一只 200px 透明置顶窗，屏幕底部居中排开、超一行往上叠（`layoutRoomPets` 纯函数算位置，只 `setPosition` 永不 `setBounds`/resize，血泪坑 4/18）。成员进出整体重排，掉线 30s 宽限再关窗
+- **两种本地展示模式**：`透明桌面` 将在线房友按屏幕底部排列；`房间场景` 打开 room renderer，并把同一批房友窗口挂到场景窗内排列。切换模式不退房、不重连，自己分别由桌面宠窗或 room renderer 显示。
+- **宠上屏**：在线房友每人一只独立透明窗，桌面模式使用 200px；房间场景随小/中/大窗口档位缩放到 120~180px。房间可在右键菜单切换 640/800/960px 档位（按屏幕工作区钳制并持久化），布局分别由 `layoutRoomPets` / `layoutRoomScenePets` 计算。成员进出或房间改尺寸时整体重排，掉线 5 分钟宽限再关窗。
 - **角色包走服务端缓存分发**（`room-pets.ts` 状态机 + `rooms/server.mjs` 的 `packs/` 磁盘 LRU 2GB）：进房后 `pack:have` 探测→未缓存则分块 `pack:put` 上传→`pack:announce` 播报指纹→房友按需 `pack:get` 下载→本地 `.peer-<hash>/` 缓存。不做 P2P 盲转（12 人房发送方要为每个接收方重传 N-1 次）
 - 包格式复用 `app/src/main/asset-pack.ts`（sanitize manifest 剥离 persona + 动作 webm，sha256 前 16 位为 hash）；同角色 hash 撞车只传一次
 - **聊天最近 50 条**环形缓冲随房落盘，进房 `joined` 帧一次带回；服务端权威限流（3s 冷却、10 条/分钟、连发同内容拒、200 字截断），客户端 `rooms-rules.ts` 有份同规则预挡只为即时反馈
 - **隐私边界写成可执行断言**：出帧统一走 `buildPresenceFrame`/`buildChatFrame` 白名单函数。presence 允许状态枚举、动作名和桌宠当前实际牌面；未显示在牌面上的气泡正文/cwd/persona/transcript 仍禁止出网。角色包只含美术资产（persona 打包前剥离）
-- **公共房间透明同步牌面**：手动举牌、工作状态、会议提示和歌曲标题/艺术家会随 presence 实时广播；牌面不写入房间持久化数据，离线即消失
+- **联机空间透明同步牌面**：手动举牌、工作状态、会议提示和歌曲标题/艺术家会随 presence 实时广播；牌面不写入房间持久化数据，离线即消失
 - 生产地址按序尝试 `wss://albertbeta.cn/rooms`（主路，借道既有域名 nginx 反代）→ `ws://14.103.59.73:24252`（兜底，明文）。`isSecureTransport()` 按**实际连上的地址**判断，降级后入房弹窗自动补「当前未加密」
 - 举报只记计数 + 消息快照，**不自动删帖封人**（自部署服务无审核能力，误伤代价高于漏判）
 - **不给房间专属游戏化奖励**：会立刻制造「挂房刷箱子」最优策略，与社交在场的目标相反。房内在线照常计入现有挂机，合作产出留后续模块（绑互动不绑时长）
@@ -139,7 +141,7 @@
 
 - **长柄木牌**：牌子在上、杆在下，跟随角色显示在右侧
 - 拖拽时自动隐藏，松手后延时 1.5s 弹出（带 poof-in 特效）
-- 公共房间内同步当前实际牌面文字；远端显示优先级为离线 > 传输进度 > 聊天 > 同步牌面 > 昵称
+- 联机空间内同步当前实际牌面文字；远端显示优先级为离线 > 传输进度 > 聊天 > 同步牌面 > 昵称
 - 用途：听歌时显示曲目、agent 工作状态、会议提示、用户手动输入
 - 核心文件：`app/src/renderer/pet/signboard.ts` + `app/src/main/local-sign.ts`（本地记账）
 
@@ -269,7 +271,7 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
   （要真实 API，生图分/张 + 视频约 ¥1/条）；`saveCard` 截图在滚动容器里的取景也未验
 - Windows 打包已跑通并实测联动（见 `docs/windows-build-and-release.md`）；**mac 打包仍未验证成功**
 - 包未做代码签名 → Windows 首次运行撞 SmartScreen「未知发布者」
-- `DEFAULTS.concurrency` 定义了但没接限流（S 档就 6 个动作，恰好全开）
+- `DEFAULTS.concurrency` 定义了但没接限流；默认 8 个动作会同时推进，接真实 API 前需关注服务端并发限制
 
 ## 约定
 
@@ -277,3 +279,22 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 - prompt 模板文字实测有效，不要随意改写措辞（`prompts.ts`）
 - 改动作/管线参数后跑 `npm test -w pipeline`（80 测试，全 mock 不花钱）；抠像参数另有 `test/despill.test.ts` 的对照组守着（血泪坑 22）
 - 真实 API 烟测要花钱（生图分/张、视频约 ¥1/条），先问用户
+
+
+## 桌宠可见性恢复（2026-09-06）
+
+- `renderer/pet/player.ts`：新动作 `play()` 成功才原子切换可见视频，等待期间保留旧角色；异步回调按播放轮次隔离。动作缺失回退 idle/其他可播动作；播放拒绝、媒体错误或 12s 无进度重试一次，仍失败则隔离该动作直到角色重载。所有视频不可用时显示 `manifest.sourceImage` 原图。
+- 循环动作也有进度看护；非循环完成回调只触发一次。角色重载/访客离开释放旧视频、解码器与定时器。合并动作时只创建最终可用覆盖项的一个 video。
+- `main/pet-window-recovery.ts`：本地桌宠渲染进程崩溃/主页面加载失败退避重载，持续无响应 10s 后恢复；每 15s 检查意外隐藏/最小化/越界/置顶丢失，唤醒和屏幕变化时恢复工作区可见性。房间打开时保持有意隐藏，不抢焦点。本地桌宠关闭后台节流。
+- 回归测试：`app/test/player.test.ts`、`app/test/pet-window-recovery.test.ts`。模拟时间测试不代替真实会议、休眠唤醒和长时挂机验证。
+
+
+## 角色产品动线（2026-09-06）
+
+- `console/workspace.ts` 保存 renderer 内编辑对象；`loadStudioContext` 从编辑对象读取，和 settings.activeCharacter 分离。`console:navigate` 携带 pane/dirId/taskId，shell 串行处理导航，保留工作台草稿；旧 `ui:showScreen` 深链保持兼容。
+- `profile.ts` 管理名字与人设；`persona.ts` 只做动作库，合并默认/导入/预设/自定义来源，使用 manifest 实际 webm/gif 路径，按需播放预览。预设与自定义从「添加动作」渐进展开，生成描述统一进入高级生成页。
+- `tasks.ts` 收口创建、失败动作和扩展动作任务；查询快照只查看，继续生成是显式操作。`HatchStatus.running` 区分当前运行与落盘暂停。重新生成三视图跳转任务中心，防止占用新建表单。
+- hatch 只处理明确打开的任务，忽略其他任务事件；返回创建页时解除任务绑定，已选图片/设定仍保留。创建名字按任务 ID 暂存于 localStorage，产物就绪时保存到 manifest；生成结束可编辑角色或放到桌面。单动作重试只提交选中的动作。
+- 回归测试：`character-workspace.test.ts`、`hatch-navigation.test.ts`。浏览器本地 mock 检查编辑对象、草稿、任务详情和空状态；真实付费生成不在本次验证内。
+
+- 生成任务支持删除列表记录：`.task-dismissed` 独立标记持久化，保留角色、断点和动作，运行中生成继续（确认框说明）；主动续跑/重新生成/添加动作时清除标记。`taskCharacters` 统一过滤列表和任务数。测试 `task-deletion.test.ts` 覆盖持久移除、资产保留、恢复和非法路径。

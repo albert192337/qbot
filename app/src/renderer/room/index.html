@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>小房间</title>
+    <title>QBot 联机房间场景</title>
     <style>
       html,
       body {
@@ -133,6 +133,28 @@
         background: #7cc47f;
         color: white;
       }
+      .menu-label {
+        padding: 7px 14px 3px;
+        color: #8a8a8a;
+        font-size: 11px;
+      }
+      .menu-options {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 3px;
+        padding: 3px 4px 6px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        margin-bottom: 3px;
+      }
+      .menu-option {
+        padding: 6px 8px;
+        border-radius: 6px;
+        text-align: center;
+        color: #666;
+        cursor: pointer;
+      }
+      .menu-option:hover { background: #edf5ec; color: #315d33; }
+      .menu-option.on { background: #7cc47f; color: #fff; }
       /* ── 装饰系统 ── */
       /* display:contents —— 让 .decor-item 直接参与 #stage 的层叠上下文，
          这样家具的 z-index 才能和 #char 比较（否则 #decor 会把它们整体压在角色后面） */

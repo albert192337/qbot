@@ -1,6 +1,6 @@
 /**
  * 全流程集成测试（FakeArkClient + 合成 fixture，不花钱不联网）：
- * - create → auto-pick → 6 动作 → manifest 合法
+ * - create → auto-pick → 8 个默认动作 → manifest 合法
  * - 中断（模拟 kill）→ resume 续跑，videoTaskId 不重提
  * - chroma 输出回归：WebM/GIF 真实产出且抠像 alpha 生效
  */
@@ -49,9 +49,9 @@ describe('pipeline 全流程（fake 模式）', () => {
         },
       );
 
-      // 三视图候选 3 张 + 6 动作首帧 = 9 次图片调用
-      expect(fake.calls.images).toBe(3 + 6);
-      expect(fake.calls.tasks).toBe(6);
+      // 三视图候选 1 张 + 默认动作首帧
+      expect(fake.calls.images).toBe(1 + ACTION_IDS.length);
+      expect(fake.calls.tasks).toBe(ACTION_IDS.length);
 
       // 资产包完整性
       expect(existsSync(path.join(out, 'manifest.json'))).toBe(true);

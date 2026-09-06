@@ -33,7 +33,7 @@ export async function mount(host: HTMLElement): Promise<void> {
       <button class="btn ghost" data-dev="points">点数 +500</button>
       <button class="btn ghost" data-dev="furniture">家具 +1</button>
     </div>
-    <p class="studio-hint">开箱与合成在小房间的「我的家具」里（开完箱紧接着就要摆，动线不拆开）。</p>
+    <p class="studio-hint">开箱与合成在联机房间场景的「我的家具」里（开完箱紧接着就要摆，动线不拆开）。</p>
   </div>
 
   <div class="conn-card">
@@ -62,7 +62,7 @@ export async function mount(host: HTMLElement): Promise<void> {
 
   <div class="conn-card">
     <h3>前台应用记录</h3>
-    <p class="studio-hint">只在本机记录系统公开的应用名、窗口标题和进程元数据，不读取窗口正文，也不会同步到公共房间。原始记录随感知事件保留 7 天。</p>
+    <p class="studio-hint">只在本机记录系统公开的应用名、窗口标题和进程元数据，不读取窗口正文，也不会同步到联机空间。原始记录随感知事件保留 7 天。</p>
     <div id="dev-foreground-current" class="dev-stats">读取中…</div>
     <div id="dev-foreground-events" class="dev-foreground-events">读取中…</div>
   </div>

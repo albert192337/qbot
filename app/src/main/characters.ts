@@ -47,11 +47,12 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
     if (entry.name.startsWith('.')) continue;
     const charDir = path.join(dir, entry.name);
     const manifestPath = path.join(charDir, 'manifest.json');
+    const taskDismissed = existsSync(path.join(charDir, '.task-dismissed'));
     const hasUnfinishedJob =
       existsSync(path.join(charDir, '.job/state.json')) && !existsSync(manifestPath);
     if (!existsSync(manifestPath)) {
       if (hasUnfinishedJob) {
-        out.push({ dirId: entry.name, manifest: null as unknown as Manifest, hasUnfinishedJob });
+        out.push({ dirId: entry.name, manifest: null as unknown as Manifest, hasUnfinishedJob, taskDismissed });
       }
       continue;
     }
@@ -62,7 +63,7 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
         manifest.voice = assignVoice(manifest.id);
         await writeManifest(manifestPath, manifest);
       }
-      out.push({ dirId: entry.name, manifest, hasUnfinishedJob: false });
+      out.push({ dirId: entry.name, manifest, hasUnfinishedJob: false, taskDismissed });
     } catch {
       /* 损坏的包跳过 */
     }
@@ -95,4 +96,17 @@ export async function deleteCharacter(dirId: string): Promise<void> {
   const dir = path.join(charactersDir(), dirId);
   if (!existsSync(dir)) throw new Error(`character not found: ${dirId}`);
   await rm(dir, { recursive: true, force: true });
+}
+
+/** Task dismissal lives outside manifests so background asset writes cannot undo it. */
+function taskMarker(dirId: string): string {
+  if (!dirId || dirId.startsWith('.') || /[\\/]/.test(dirId)) throw new Error('无效的角色 ID');
+  return path.join(charactersDir(), dirId, '.task-dismissed');
+}
+export async function deleteGenerationTask(dirId: string): Promise<void> {
+  const marker = taskMarker(dirId);
+  await writeFile(marker, '1');
+}
+export async function restoreGenerationTask(dirId: string): Promise<void> {
+  await rm(taskMarker(dirId), { force: true });
 }

@@ -161,8 +161,17 @@ describe('prompts', () => {
     }
   });
 
-  it('M 档：四个动作的 prompt 三变体齐全且文案含核心动作语义', () => {
-    expect(EXPRESSION_ACTION_IDS).toEqual(['smug', 'point', 'turn_away', 'cheer']);
+  it('八个可选预设动作的 prompt 三变体齐全且文案含核心动作语义', () => {
+    expect(EXPRESSION_ACTION_IDS).toEqual([
+      'smug',
+      'point',
+      'turn_away',
+      'cheer',
+      'nod',
+      'curious',
+      'dance',
+      'comfort',
+    ]);
     for (const id of EXPRESSION_ACTION_IDS) {
       // 需要空手的动作必须逐项排除道具（spec §2：只写「空无一物」拦不住模型塞东西）。
       // turn_away 背身抱臂不适用此断言（spec 原文如此）
@@ -181,13 +190,13 @@ describe('prompts', () => {
     expect(EXPRESSION_ACTIONS.cheer.poseDesc).toContain('双臂高高举起');
   });
 
-  it('M 档抽象变体不含部位词（血泪坑 10 同款守卫）', () => {
+  it('预设动作的抽象变体不含部位词（血泪坑 10 同款守卫）', () => {
     const bodyParts = ['双臂', '双手', '手臂', '食指', '耳朵', '头发', '肩膀', '双腿', '嘴巴', '眉毛'];
     for (const id of EXPRESSION_ACTION_IDS) {
       const text =
         EXPRESSION_ABSTRACT_ACTIONS[id].poseDesc + EXPRESSION_ABSTRACT_ACTIONS[id].motionDesc;
       for (const kw of bodyParts) {
-        expect(text, `M 档抽象 ${id} 不应包含「${kw}」`).not.toContain(kw);
+        expect(text, `预设动作抽象变体 ${id} 不应包含「${kw}」`).not.toContain(kw);
       }
     }
   });
@@ -283,4 +292,3 @@ describe('prompt 全文覆盖', () => {
     expect(Number(m![1])).toBeGreaterThanOrEqual(5);
   });
 });
-

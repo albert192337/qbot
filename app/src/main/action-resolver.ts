@@ -6,7 +6,7 @@
  * 缺动作时逐级降级，最终 fallback 到 idle。
  *
  * 设计动机（spec §4.3）：
- *  - 不同角色的动作库不一样（有的 M 档动作没生成、有的有自定义动作）
+ *  - 不同角色的动作库不一样（有的预设动作没生成、有的有自定义动作）
  *  - 规则和模型不应该关心「这个角色到底有哪些动作」
  *  - 用户可以在控制台校正映射（个性化，不影响规则/模型）
  */
@@ -30,13 +30,15 @@ export interface ResolveResult {
  * 这个表是「通用常识」，用户校正覆盖在 settings.actionIntentMap 里。
  */
 const INTENT_MAP: Record<string, PlayableId[]> = {
-  // ── 精确匹配 S 档动作名（允许规则/模型直接用 action id 当 intent） ──
+  // ── 精确匹配已有动作名（允许规则/模型直接用 action id 当 intent） ──
   idle: ['idle'],
   sleep: ['sleep'],
   tea: ['tea'],
   talk_happy: ['talk_happy'],
   talk_annoyed: ['talk_annoyed'],
   drag: ['drag'],
+  wave: ['wave', 'talk_happy', 'tea', 'idle'],
+  stretch: ['stretch', 'sleep', 'idle'],
 
   // ── 常见情绪/状态意图 ──
   happy: ['talk_happy', 'tea', 'idle'],
@@ -49,7 +51,7 @@ const INTENT_MAP: Record<string, PlayableId[]> = {
   angry: ['talk_annoyed', 'tea', 'idle'],
   upset: ['talk_annoyed', 'tea', 'idle'],
   pout: ['talk_annoyed', 'tea', 'idle'],
-  // M 档表现力动作（生成后精确命中；没生成的角色沿链降级到 S 档）
+  // 可选预设动作（生成后精确命中；没生成时沿链降级到默认动作）
   smug: ['smug', 'talk_annoyed', 'tea', 'idle'],
   sassy: ['smug', 'talk_annoyed', 'tea', 'idle'],
 
@@ -64,10 +66,9 @@ const INTENT_MAP: Record<string, PlayableId[]> = {
   bored: ['sleep', 'tea', 'idle'],
   rest: ['sleep', 'idle'],
 
-  wave: ['talk_happy', 'tea', 'idle'], // 等 M 档 wave
-  greet: ['talk_happy', 'tea', 'idle'],
-  hello: ['talk_happy', 'tea', 'idle'],
-  bye: ['talk_happy', 'tea', 'idle'],
+  greet: ['wave', 'talk_happy', 'tea', 'idle'],
+  hello: ['wave', 'talk_happy', 'tea', 'idle'],
+  bye: ['wave', 'talk_happy', 'tea', 'idle'],
 
   eat: ['tea', 'idle'], // 喝茶当吃东西的降级
   drink: ['tea', 'idle'],
@@ -84,24 +85,25 @@ const INTENT_MAP: Record<string, PlayableId[]> = {
   睡觉: ['sleep', 'idle'],
   困: ['sleep', 'idle'],
   无聊: ['sleep', 'tea', 'idle'],
-  招手: ['talk_happy', 'tea', 'idle'],
-  你好: ['talk_happy', 'tea', 'idle'],
+  招手: ['wave', 'talk_happy', 'tea', 'idle'],
+  你好: ['wave', 'talk_happy', 'tea', 'idle'],
   得意: ['smug', 'talk_annoyed', 'tea', 'idle'],
   指认: ['point', 'talk_happy', 'tea', 'idle'],
   背过身: ['turn_away', 'talk_annoyed', 'tea', 'idle'],
   欢呼: ['cheer', 'talk_happy', 'tea', 'idle'],
 
-  // ── M 档动作意图（smug/point/turn_away/cheer 已在上方各链首位）──
+  // ── 预设动作意图（不可用时降级到最接近的默认动作）──
   point: ['point', 'talk_happy', 'tea', 'idle'],
   turn_away: ['turn_away', 'talk_annoyed', 'tea', 'idle'],
   cheer_up: ['cheer', 'talk_happy', 'tea', 'idle'],
   clap: ['cheer', 'talk_happy', 'tea', 'idle'],
   facepalm: ['talk_annoyed', 'tea', 'idle'],
-  dance: ['talk_happy', 'tea', 'idle'],
+  dance: ['dance', 'talk_happy', 'tea', 'idle'],
+  curious: ['curious', 'tea', 'idle'],
+  comfort: ['comfort', 'talk_happy', 'tea', 'idle'],
   shock: ['talk_annoyed', 'tea', 'idle'],
-  nod: ['tea', 'idle'],
+  nod: ['nod', 'tea', 'idle'],
   shake_head: ['talk_annoyed', 'tea', 'idle'],
-  stretch: ['sleep', 'idle'],
   yawn: ['sleep', 'idle'],
   salute: ['tea', 'idle'],
 };

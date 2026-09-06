@@ -258,7 +258,7 @@
       .status-pending { background: var(--warning); color: var(--neutral); }
       .status-failed { background: var(--error); color: var(--neutral); }
       .status-none { background: var(--border); color: var(--secondary); }
-      /* M 档表现力动作：卡片网格 */
+      /* 可选预设动作：卡片网格 */
       .expr-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -769,6 +769,49 @@
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
       }
+      #subnav:empty { display: none; }
+      #subnav {
+        min-height: 48px;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 0 22px;
+        border-bottom: 1px solid #e4e1d9;
+        background: #f4f3ef;
+      }
+      .subnav-title {
+        color: var(--secondary);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .subnav-tabs { display: flex; align-self: stretch; gap: 18px; overflow-x: auto; }
+      .subnav-tab {
+        position: relative;
+        border: 0;
+        background: transparent;
+        color: var(--secondary);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 650;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .subnav-tab:hover { color: var(--tertiary); }
+      .subnav-tab.active { color: var(--tertiary); }
+      .subnav-tab.active::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 3px;
+        border-radius: 3px 3px 0 0;
+        background: #769c00;
+      }
       .context-character { display: flex; align-items: center; gap: 10px; min-width: 0; }
       .context-character img, .context-placeholder {
         width: 38px;
@@ -929,6 +972,9 @@
       @media (max-width: 760px) {
         #sidebar { flex-basis: 168px; }
         #contextbar { padding-inline: 14px; }
+        #subnav { padding-inline: 14px; gap: 12px; }
+        .subnav-title { display: none; }
+        .subnav-tabs { gap: 14px; }
         .context-task span { display: none; }
         .home-grid { grid-template-columns: 1fr; }
         .home-hero { align-items: flex-start; }
@@ -947,6 +993,7 @@
       <nav id="sidebar"></nav>
       <div id="workspace">
         <header id="contextbar"></header>
+        <nav id="subnav" aria-label="角色工作台"></nav>
         <main id="content">
           <!-- panes: 由 main.ts 按 paneId 挂载 -->
         </main>

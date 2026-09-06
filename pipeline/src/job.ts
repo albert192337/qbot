@@ -96,6 +96,9 @@ export class Job extends EventEmitter {
   /** 校验状态宣称的产物是否真实存在，缺失则回退（防"state 说下载完了但文件被删"） */
   private reconcile(): void {
     const s = this.state;
+    for (const id of ACTION_IDS) {
+      s.actions[id] ??= initialActionState();
+    }
     // 三视图候选文件丢失 → 回到 turnaround 重新生成
     if (s.turnaround.candidates.length > 0) {
       const missing = s.turnaround.candidates.some(
@@ -154,7 +157,7 @@ export class Job extends EventEmitter {
     }
   }
 
-  /** save 串行化：6 个动作并发推进时避免 tmp 文件互相踩踏 */
+  /** save 串行化：多个动作并发推进时避免 tmp 文件互相踩踏 */
   private saveChain: Promise<void> = Promise.resolve();
   private saveSeq = 0;
 

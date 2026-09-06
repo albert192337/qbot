@@ -20,6 +20,9 @@ import {
   filterRooms,
   isRoomKind,
   layoutRoomPets,
+  layoutRoomScenePets,
+  normalizeRoomSizePreset,
+  resolveRoomSceneSize,
   mergeChat,
   normalizeCreateInput,
   precheckChat,
@@ -344,6 +347,37 @@ describe('宠上屏布局（layoutRoomPets）', () => {
   it('memberId 顺序保留（按进房顺序排，不重排）', () => {
     const slots = layoutRoomPets(['z', 'a', 'm'], 1000, 200, 20);
     expect(slots.map((s) => s.memberId)).toEqual(['z', 'a', 'm']);
+  });
+});
+
+describe('房间场景布局（layoutRoomScenePets）', () => {
+  it('把房友放在房间下半部并保持顺序', () => {
+    const slots = layoutRoomScenePets(['a', 'b', 'c'], 960, 960, 180, 12);
+    expect(slots.map((slot) => slot.memberId)).toEqual(['a', 'b', 'c']);
+    expect(slots.every((slot) => slot.y >= 0 && slot.y < 960)).toBe(true);
+    expect(slots[0].x).toBeLessThan(slots[1].x);
+  });
+
+  it('成员较多时向上换行但不进入负坐标', () => {
+    const slots = layoutRoomScenePets(Array.from({ length: 11 }, (_, i) => String(i)), 960, 960, 180, 12);
+    expect(slots).toHaveLength(11);
+    expect(Math.min(...slots.map((slot) => slot.y))).toBeGreaterThanOrEqual(0);
+    expect(new Set(slots.map((slot) => slot.y)).size).toBeGreaterThan(1);
+  });
+});
+
+describe('房间场景尺寸', () => {
+  it('支持小中大三档，并把非法值回退到大号', () => {
+    expect(normalizeRoomSizePreset('small')).toBe('small');
+    expect(normalizeRoomSizePreset('medium')).toBe('medium');
+    expect(normalizeRoomSizePreset('large')).toBe('large');
+    expect(normalizeRoomSizePreset('huge')).toBe('large');
+  });
+
+  it('按当前屏幕空间钳制房间边长', () => {
+    expect(resolveRoomSceneSize('small', 1440, 900)).toBe(640);
+    expect(resolveRoomSceneSize('medium', 1440, 900)).toBe(800);
+    expect(resolveRoomSceneSize('large', 1440, 900)).toBe(810);
   });
 });
 

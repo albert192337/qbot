@@ -110,4 +110,17 @@ describe('Job', () => {
     expect(reloaded.state.stage).toBe('turnaround');
     expect(reloaded.state.turnaround.candidates).toEqual([]);
   });
+
+  it('reconcile：旧任务缺少新增默认动作时自动补齐', async () => {
+    const out = path.join(tmpDir, 'char');
+    await mkdir(out, { recursive: true });
+    const job = await Job.create(out, { refImagePath: await makeRefImage() });
+    delete (job.state.actions as Partial<typeof job.state.actions>).wave;
+    delete (job.state.actions as Partial<typeof job.state.actions>).stretch;
+    await job.save();
+
+    const reloaded = await Job.load(out);
+    expect(reloaded.state.actions.wave.status).toBe('pending');
+    expect(reloaded.state.actions.stretch.status).toBe('pending');
+  });
 });

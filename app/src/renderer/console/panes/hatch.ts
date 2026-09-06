@@ -1,10 +1,8 @@
-/**
- * 孵化 pane：全新重设计版本
- * 遵循QBot设计系统规范，提供更专业的用户体验
- */
+/** 创建角色 pane：从参考图到可上桌角色的完整生成流程。 */
 import type { ActionId, ActionStatus, ImageProvider } from '@qbot/pipeline';
 import type { HatchProgress, HatchStatus } from '../../../shared/ipc-types';
 import { icon } from '../icons';
+import { navigate, type ConsoleRoute } from '../workspace';
 import { confirmBox } from './_studio-shared';
 
 /** 动作中文标签。口径与 _studio-shared 的 STD_LABELS 统一 */
@@ -15,6 +13,8 @@ const ACTION_LABELS: Record<ActionId, string> = {
   tea: '喝茶',
   talk_happy: '聊天·开心',
   talk_annoyed: '聊天·嫌弃',
+  wave: '挥手问候',
+  stretch: '伸懒腰',
 };
 
 const STATUS_LABELS: Record<ActionStatus, string> = {
@@ -56,6 +56,9 @@ const cellStates = new Map<ActionId, { status: ActionStatus; since: number }>();
 let packageDone = false;
 let timerHandle: number | null = null;
 let unsubProgress: (() => void) | null = null;
+let selectedSourceFile: File | null = null;
+let selectedSourceUrl: string | null = null;
+let pendingCharacterName = '';
 
 type ScreenName = 'drop' | 'brewing' | 'pick' | 'progress' | 'certificate';
 
@@ -81,11 +84,15 @@ export async function mount(host: HTMLElement): Promise<void> {
 
   // 加载历史任务
   await loadHistoricalTasks();
+
 }
 
 export function unmount(): void {
   unsubProgress?.();
   stopTimer();
+  if (selectedSourceUrl) URL.revokeObjectURL(selectedSourceUrl);
+  selectedSourceFile = null;
+  selectedSourceUrl = null;
   root = null;
 }
 
@@ -96,13 +103,22 @@ export async function onVisible(): Promise<void> {
     await seedFromStatus(currentDirId);
     return;
   }
+  await loadHistoricalTasks();
 
-  const characters = await window.qbot.characters.list();
-  const unfinished = characters.find((c) => c.hasUnfinishedJob);
+}
 
-  if (unfinished) {
-    currentDirId = unfinished.dirId;
-    await seedFromStatus(unfinished.dirId);
+export async function onNavigate(route: ConsoleRoute): Promise<void> {
+  showError(null);
+  if (route.taskId) {
+    currentDirId = route.taskId;
+    packageDone = false; cellStates.clear();
+    const name = $<HTMLInputElement>('#hatch-pet-name'); if (name) name.value = '';
+    pendingCharacterName = localStorage.getItem(`qbot:creation-name:${currentDirId}`) ?? '';
+    await seedFromStatus(currentDirId);
+  } else {
+    currentDirId = null; packageDone = false; cellStates.clear();
+    disableAllInputs(false); showScreen('drop');
+    const start = $<HTMLButtonElement>('#hatch-btn-start'); if (start) start.disabled = !selectedSourceFile;
   }
 }
 
@@ -116,7 +132,12 @@ async function startHatch(file: File): Promise<void> {
     const provider = getSelectedProvider();
     const form = getSelectedForm();
     const style = getSelectedStyle();
-    const name = ($<HTMLInputElement>('#hatch-pet-name')?.value.trim() || '未命名');
+    const name = $<HTMLInputElement>('#hatch-draft-name')?.value.trim() || '';
+    if (!name) {
+      showError('先给桌宠起个名字，再开始创建。');
+      $<HTMLInputElement>('#hatch-draft-name')?.focus();
+      return;
+    }
     const settings = await window.qbot.settings.get();
     const hasKey = provider === 'gpt-image-2' ? !!settings.gptImageApiKey : !!settings.arkApiKey;
     if (!hasKey) {
@@ -125,13 +146,14 @@ async function startHatch(file: File): Promise<void> {
     }
     const confirmed = await confirmBox(
       root!,
-      `开始孵化「${name}」？\n\n将生成 3 张三视图候选、6 张动作首帧和 6 条动作视频。\n` +
+      `开始创建「${name}」？\n\n将先生成 1 个角色方案；确认后，再生成 8 个常用动作。\n` +
         `模型：${provider === 'gpt-image-2' ? 'gpt-image-2' : 'Seedream'}\n` +
-        `预计时间：${provider === 'gpt-image-2' ? '约 40–70 分钟' : '约 30–50 分钟'}\n` +
-        '预计费用：约 ¥6–8。任务提交后，已发出的 API 请求无法撤回。',
+        `预计时间：${provider === 'gpt-image-2' ? '约 45–80 分钟' : '约 35–60 分钟'}\n` +
+        '预计消耗：1 张角色方案 + 8 个动作。任务提交后，已发出的 API 请求无法撤回。',
     );
     if (!confirmed) return;
 
+    pendingCharacterName = name;
     disableAllInputs(true);
 
     currentDirId = await window.qbot.hatch.start(
@@ -141,8 +163,10 @@ async function startHatch(file: File): Promise<void> {
       form === 'abstract' ? undefined : style === 'faithful' ? 'faithful' : 'chibi',
     );
 
+    localStorage.setItem(`qbot:creation-name:${currentDirId}`, name);
     currentProvider = provider === 'gpt-image-2' ? 'gpt-image-2' : 'seedream';
     showScreen('brewing');
+    await seedFromStatus(currentDirId);
 
   } catch (err) {
     showError(String(err instanceof Error ? err.message : err));
@@ -166,7 +190,9 @@ async function regenerateAction(actionId: ActionId): Promise<void> {
   if (!currentDirId) return;
 
   try {
-    await window.qbot.hatch.redo(currentDirId);
+    if (!(await confirmBox(root!, `重试「${ACTION_LABELS[actionId]}」？只重新生成这一个动作，会调用模型服务并产生费用。`))) return;
+    await window.qbot.studio.regenerateActions(currentDirId, [actionId]);
+    await seedFromStatus(currentDirId);
   } catch (err) {
     showError(String(err instanceof Error ? err.message : err));
   }
@@ -190,6 +216,10 @@ function showScreen(screen: ScreenName): void {
     target.classList.add('active');
   }
 
+  const title = root?.querySelector<HTMLElement>('.header-title h1');
+  if (title) title.textContent = screen === 'drop' ? '创建一个会动的桌宠' : screen === 'certificate' ? '角色已生成' : '角色生成进度';
+  const taskBack = $('#hatch-task-back'); if (taskBack) taskBack.hidden = screen === 'drop';
+  const taskResume = $('#hatch-task-resume'); if (taskResume && screen === 'drop') taskResume.hidden = true;
   updateStepNavigation(screen);
 }
 
@@ -203,8 +233,8 @@ function showBrewing(): void {
   if (hint) {
     hint.textContent =
       currentProvider === 'gpt-image-2'
-        ? '正在同时生成 3 张候选图。gpt-image-2 通常需要 5–10 分钟'
-        : '正在同时生成 3 张候选图，通常约 1 分钟';
+        ? '正在生成 1 个角色方案。gpt-image-2 通常需要 5–10 分钟'
+        : '正在生成 1 个角色方案，通常约 1 分钟';
   }
   const elapsed = $('#hatch-brewing-elapsed');
   if (elapsed) elapsed.textContent = '0:00';
@@ -241,11 +271,12 @@ function renderCandidates(urls: string[]): void {
 
   container.innerHTML = '';
   urls.forEach((url, index) => {
-    const card = createCandidateCard(url, index + 1);
+    const card = createCandidateCard(url, index);
     container.appendChild(card);
   });
 
   showScreen('pick');
+  root?.querySelectorAll<HTMLButtonElement>('.btn-select, #hatch-btn-regen').forEach((button) => { button.disabled = false; });
 }
 
 function createCandidateCard(url: string, index: number): HTMLElement {
@@ -253,12 +284,11 @@ function createCandidateCard(url: string, index: number): HTMLElement {
   card.className = 'candidate-card';
   card.innerHTML = `
     <div class="candidate-thumbnail">
-      <img src="${url}" alt="候选三视图 ${index}" loading="lazy" />
+      <img src="${url}" alt="角色三视图方案" loading="lazy" />
       <div class="candidate-overlay">
-        <button class="btn-select">选择这张</button>
+        <button class="btn-select">使用这个方案</button>
       </div>
     </div>
-    <div class="candidate-index">${index}</div>
   `;
 
   card.addEventListener('click', async () => {
@@ -268,7 +298,8 @@ function createCandidateCard(url: string, index: number): HTMLElement {
     if (!grid?.childElementCount) buildProgressGrid();
 
     showScreen('progress');
-    await window.qbot.hatch.pickTurnaround(currentDirId, index);
+    try { await window.qbot.hatch.pickTurnaround(currentDirId, index); }
+    catch (error) { showError(String(error)); showScreen('pick'); }
   });
 
   return card;
@@ -374,6 +405,9 @@ async function seedFromStatus(dirId: string): Promise<void> {
     return;
   }
 
+  if (dirId !== currentDirId) return;
+  const resume = $<HTMLButtonElement>('#hatch-task-resume');
+  if (resume) resume.hidden = !!st.running || st.stage === 'done';
   currentProvider = st.imageProvider ?? currentProvider;
 
   switch (st.stage) {
@@ -381,10 +415,16 @@ async function seedFromStatus(dirId: string): Promise<void> {
       showBrewing();
       break;
     case 'awaiting_pick':
-      if (st.candidateUrls?.length) renderCandidates(st.candidateUrls);
+      if (st.candidateUrls?.length) {
+        renderCandidates(st.candidateUrls);
+        if (!st.running) root?.querySelectorAll<HTMLButtonElement>('.btn-select, #hatch-btn-regen').forEach((button) => { button.disabled = true; });
+      }
       else showBrewing();
       break;
     case 'done':
+      buildProgressGrid();
+      seedCells(st);
+      packageDone = true;
       await showCertificate();
       break;
     default:
@@ -474,7 +514,19 @@ async function showCertificate(): Promise<void> {
   const container = $('#hatch-card-actions');
   if (!container || !currentDirId) return;
 
-  const meta = (await window.qbot.characters.list()).find((c) => c.dirId === currentDirId);
+  const requestedDirId = currentDirId;
+  const meta = (await window.qbot.characters.list()).find((c) => c.dirId === requestedDirId);
+  if (requestedDirId !== currentDirId) return;
+  const nameInput = $<HTMLInputElement>('#hatch-pet-name');
+  if (nameInput && !nameInput.value) {
+    nameInput.value = pendingCharacterName || meta?.manifest?.name || '';
+  }
+  if (pendingCharacterName && meta?.manifest && meta.manifest.name !== pendingCharacterName) {
+    await window.qbot.characters.rename(currentDirId, pendingCharacterName);
+  }
+  const failedCount = Object.values(meta?.manifest?.actions ?? {}).filter((action) => action.status === 'failed').length;
+  const heading = root?.querySelector<HTMLElement>('#hatch-screen-certificate h3');
+  if (heading) heading.textContent = failedCount ? `角色已生成，${failedCount} 个动作需要修复` : '你的桌宠准备好了';
   const figs: HTMLElement[] = [];
 
   for (const [id, action] of Object.entries(meta?.manifest?.actions ?? {})) {
@@ -494,7 +546,8 @@ async function showCertificate(): Promise<void> {
     video.play().catch(() => {
       const playBtn = document.createElement('button');
       playBtn.className = 'btn-play';
-      playBtn.textContent = '▶️';
+      playBtn.innerHTML = icon('actions');
+      playBtn.setAttribute('aria-label', '播放动作预览');
       playBtn.addEventListener('click', () => {
         video.play().then(() => playBtn.remove()).catch(console.error);
       });
@@ -534,13 +587,13 @@ async function activatePet(): Promise<void> {
   const name = $<HTMLInputElement>('#hatch-pet-name')?.value.trim();
   if (name) await window.qbot.characters.rename(currentDirId, name);
   await window.qbot.characters.activate(currentDirId);
+  localStorage.removeItem(`qbot:creation-name:${currentDirId}`);
+  navigate({ pane: 'profile', dirId: currentDirId });
 }
 
 function onProgress(ev: HatchProgress): void {
   if (!root) return;
-  if (currentDirId && ev.dirId !== currentDirId) return;
-
-  currentDirId = ev.dirId;
+  if (!currentDirId || ev.dirId !== currentDirId) return;
   switch (ev.stage) {
     case 'turnaround':
       showBrewing();
@@ -557,10 +610,10 @@ function onProgress(ev: HatchProgress): void {
     case 'done':
       packageDone = true;
       updateOverallProgress();
-      void showCertificate();
+      void showCertificate().catch((error) => showError(String(error)));
       break;
     case 'failed':
-      showError(`孵化失败：${ev.error ?? '未知错误'}（可从历史任务继续或重试）`);
+      showError(`创建失败：${ev.error ?? '未知错误'}（可从任务列表继续或重试）`);
       disableAllInputs(false);
       showScreen('drop');
       void loadHistoricalTasks();
@@ -598,7 +651,7 @@ function bindDropzone(): void {
       return;
     }
 
-    void startHatch(file);
+    selectSourceFile(file);
   });
 
   // 点击选择文件
@@ -606,22 +659,54 @@ function bindDropzone(): void {
   if (fileInput) {
     fileInput.addEventListener('change', (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) void startHatch(file);
+      if (file) selectSourceFile(file);
     });
   }
 
   $('#hatch-btn-browse')?.addEventListener('click', () => {
     $<HTMLInputElement>('#hatch-file-input')?.click();
   });
+
+  $('#hatch-btn-start')?.addEventListener('click', () => {
+    if (selectedSourceFile) void startHatch(selectedSourceFile);
+  });
+}
+
+function selectSourceFile(file: File): void {
+  if (!file.type.startsWith('image/')) {
+    showError('请选择 PNG、JPG 或 WebP 图片。');
+    return;
+  }
+  if (selectedSourceUrl) URL.revokeObjectURL(selectedSourceUrl);
+  selectedSourceFile = file;
+  selectedSourceUrl = URL.createObjectURL(file);
+  showError(null);
+
+  const preview = $<HTMLImageElement>('#hatch-source-preview');
+  if (preview) {
+    preview.src = selectedSourceUrl;
+    preview.hidden = false;
+  }
+  $('#hatch-drop-placeholder')?.setAttribute('hidden', '');
+  const name = $('#hatch-selected-file');
+  if (name) name.textContent = file.name;
+  const start = $<HTMLButtonElement>('#hatch-btn-start');
+  if (start) start.disabled = false;
+  $('#hatch-dropzone')?.classList.add('has-file');
 }
 
 function bindConfigOptions(): void {
   // 角色形态切换
-  document.querySelectorAll<HTMLInputElement>('input[name="character-form"]').forEach(radio => {
+  root?.querySelectorAll<HTMLInputElement>('input[name="character-form"]').forEach(radio => {
     radio.addEventListener('change', updateStyleOptions);
   });
 
+  root?.querySelectorAll<HTMLInputElement>('input[name="image-provider"]').forEach(radio => {
+    radio.addEventListener('change', updateProviderSummary);
+  });
+
   updateStyleOptions();
+  updateProviderSummary();
 }
 
 function bindActionButtons(): void {
@@ -630,31 +715,27 @@ function bindActionButtons(): void {
     if (!currentDirId) return;
     brewingSince = null;
     showBrewing();
-    await window.qbot.hatch.pickTurnaround(currentDirId, -1);
+    try { await window.qbot.hatch.pickTurnaround(currentDirId, -1); }
+    catch (error) { showError(String(error)); showScreen('pick'); }
   });
 
-  // 取消按钮
-  $('#hatch-btn-cancel')?.addEventListener('click', () => {
-    currentDirId = null;
-    disableAllInputs(false);
-    showScreen('drop');
-    void loadHistoricalTasks();
-  });
-
-  $('#hatch-btn-cancel-progress')?.addEventListener('click', () => {
-    currentDirId = null;
-    disableAllInputs(false);
-    showScreen('drop');
-  });
-
-  $('#hatch-btn-back')?.addEventListener('click', () => showScreen('drop'));
+  for (const id of ['#hatch-btn-cancel', '#hatch-btn-cancel-progress', '#hatch-btn-back', '#hatch-task-back']) {
+    $(id)?.addEventListener('click', () => navigate({ pane: 'tasks' }));
+  }
   $('#hatch-btn-back-progress')?.addEventListener('click', () => showScreen('progress'));
+  $('#hatch-btn-workspace')?.addEventListener('click', () => {
+    if (currentDirId) navigate({ pane: 'profile', dirId: currentDirId });
+  });
+  $('#hatch-btn-another')?.addEventListener('click', () => { void onNavigate({ pane: 'hatch', fresh: true }); });
+  $('#hatch-task-resume')?.addEventListener('click', () => {
+    if (currentDirId) void resumeHatch(currentDirId);
+  });
 
   // 保存卡片按钮
-  $('#hatch-btn-save')?.addEventListener('click', saveCertificateCard);
+  $('#hatch-btn-save')?.addEventListener('click', () => { void saveCertificateCard().catch((error) => showError(String(error))); });
 
   // 上桌按钮
-  $('#hatch-btn-activate')?.addEventListener('click', activatePet);
+  $('#hatch-btn-activate')?.addEventListener('click', () => { void activatePet().catch((error) => showError(String(error))); });
 }
 
 function updateStyleOptions(): void {
@@ -666,59 +747,17 @@ function updateStyleOptions(): void {
   }
 }
 
+function updateProviderSummary(): void {
+  const summary = $('#hatch-provider-summary');
+  if (!summary) return;
+  summary.textContent = getSelectedProvider() === 'gpt-image-2' ? 'GPT-Image-2 · 精细' : 'Seedream · 推荐';
+}
+
 async function loadHistoricalTasks(): Promise<void> {
-  const area = $('#hatch-history-tasks');
-  if (!area) return;
-
-  area.innerHTML = '';
-  const characters = await window.qbot.characters.list();
-
-  // 未完成任务
-  const unfinished = characters.filter((c) => c.hasUnfinishedJob);
-  if (unfinished.length > 0) {
-    const section = document.createElement('div');
-    section.className = 'history-section';
-    section.innerHTML = '<h4>进行中的任务</h4>';
-
-    unfinished.forEach(c => {
-      const btn = document.createElement('button');
-      btn.className = 'btn-history';
-      btn.textContent = `继续 ${c.dirId.slice(0, 8)}…`;
-      btn.addEventListener('click', () => resumeHatch(c.dirId));
-      section.appendChild(btn);
-    });
-
-    area.appendChild(section);
-  }
-
-  // 失败任务
-  const failed = characters.filter((c) => c.manifest && Object.values(c.manifest.actions).some(a => a.status === 'failed'));
-  if (failed.length > 0) {
-    const section = document.createElement('div');
-    section.className = 'history-section';
-    section.innerHTML = '<h4>需要修复的任务</h4>';
-
-    failed.forEach(c => {
-      const failedCount = Object.values(c.manifest!.actions).filter(a => a.status === 'failed').length;
-      const btn = document.createElement('button');
-      btn.className = 'btn-history';
-      btn.textContent = `修复 ${c.manifest!.name} 的 ${failedCount} 个失败动作`;
-      btn.addEventListener('click', async () => {
-        currentDirId = c.dirId;
-        buildProgressGrid();
-        showScreen('progress');
-        const st = await window.qbot.hatch.getStatus(c.dirId);
-        if (st) {
-          actionsSince = Date.now();
-          seedCells(st);
-        }
-        window.qbot.hatch.redo(c.dirId).catch(showError);
-      });
-      section.appendChild(btn);
-    });
-
-    area.appendChild(section);
-  }
+  const area = $('#hatch-history-tasks'); if (!area) return;
+  area.hidden = false;
+  area.innerHTML = '<p>已经开始的创建和修复任务，可以在生成任务中继续。</p><button class="btn-secondary" id="hatch-open-tasks">查看生成任务</button>';
+  $('#hatch-open-tasks')?.addEventListener('click', () => navigate({ pane: 'tasks' }));
 }
 
 // ───────────────────────── 工具函数 ─────────────────────────
@@ -793,33 +832,37 @@ function handleResize(): void {
 const TEMPLATE = `
 <div class="hatch-container">
   <!-- 头部区域 -->
+  <div class="btn-row"><button class="btn ghost no-disable" id="hatch-task-back">生成任务</button><button class="btn no-disable" id="hatch-task-resume" hidden>继续这个任务</button></div>
   <header class="hatch-header">
-    <div class="header-left">
-      <div class="app-icon">Q</div>
-      <div class="header-title">
-        <h1>角色孵化</h1>
-        <p>上传一张角色图片，AI 将自动生成完整动画角色</p>
-      </div>
+    <div class="header-title">
+      <p class="eyebrow">创建角色</p>
+      <h1>创建一个会动的桌宠</h1>
+      <p>从一张角色图开始，确认形象后生成 8 个常用动作，完成后可直接放到桌面。</p>
+    </div>
+    <div class="creation-outcome" aria-label="创建结果说明">
+      <span><b>8</b> 个常用动作</span>
+      <span><b>分步确认</b>形象与动作</span>
+      <span><b>可后台</b>继续运行</span>
     </div>
   </header>
 
   <!-- 步骤导航 -->
   <div class="hatch-steps">
     <div class="hatch-step" data-step="drop">
-      <span class="step-icon">${icon('create')}</span>
-      <span class="step-text">上传参考图</span>
+      <span class="step-number">1</span>
+      <span class="step-text">选择形象</span>
     </div>
     <div class="hatch-step" data-step="brewing">
-      <span class="step-icon">${icon('persona')}</span>
-      <span class="step-text">生成三视图</span>
+      <span class="step-number">2</span>
+      <span class="step-text">确认角色</span>
     </div>
     <div class="hatch-step" data-step="progress">
-      <span class="step-icon">${icon('actions')}</span>
-      <span class="step-text">动作生成</span>
+      <span class="step-number">3</span>
+      <span class="step-text">生成动作</span>
     </div>
     <div class="hatch-step" data-step="certificate">
-      <span class="step-icon">${icon('characters')}</span>
-      <span class="step-text">完成</span>
+      <span class="step-number">4</span>
+      <span class="step-text">完成上桌</span>
     </div>
   </div>
 
@@ -834,75 +877,98 @@ const TEMPLATE = `
     <!-- 步骤1: 上传参考图 -->
     <section id="hatch-screen-drop" class="hatch-screen active">
       <div class="drop-container">
-        <!-- 拖放区域 -->
-        <div id="hatch-dropzone" class="dropzone">
-          <div class="dropzone-icon">${icon('create')}</div>
-          <h3>拖放角色图片到这里</h3>
-          <p>支持 PNG/JPG 格式，正面全身效果最好</p>
-          <input type="file" id="hatch-file-input" accept="image/*" hidden />
-          <button class="btn-primary" id="hatch-btn-browse">选择文件</button>
-        </div>
-
-        <!-- 配置选项 -->
-        <div class="config-panel">
-          <h4>生成配置</h4>
-
-          <div class="config-group">
-            <label class="config-label">生图模型</label>
-            <div class="radio-group">
-              <label class="radio-option">
-                <input type="radio" name="image-provider" value="seedream" checked />
-                <span class="radio-custom"></span>
-                <span class="radio-text">Seedream（快，约1分钟）</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" name="image-provider" value="gpt-image-2" />
-                <span class="radio-custom"></span>
-                <span class="radio-text">gpt-image-2（慢，5-10分钟）</span>
-              </label>
+        <div class="creation-layout">
+          <div class="creation-source">
+            <div class="creation-section-heading">
+              <span class="creation-kicker">原图</span>
+              <div><h3>选择一张角色原图</h3><p>正面、全身、背景干净的图片效果最好。</p></div>
+            </div>
+            <div id="hatch-dropzone" class="dropzone">
+              <img id="hatch-source-preview" alt="已选择的角色原图" hidden />
+              <div id="hatch-drop-placeholder">
+                <div class="dropzone-icon">${icon('create')}</div>
+                <h3>把角色图片拖到这里</h3>
+                <p>支持 PNG、JPG、WebP</p>
+              </div>
+              <input type="file" id="hatch-file-input" accept="image/png,image/jpeg,image/webp" hidden />
+              <button class="btn-secondary" id="hatch-btn-browse">选择图片</button>
+              <span id="hatch-selected-file" class="selected-file">尚未选择图片</span>
+            </div>
+            <div class="source-guidance">
+              <span>建议：完整身体</span><span>建议：单一角色</span><span>避免：复杂背景</span>
             </div>
           </div>
 
-          <div class="config-group">
-            <label class="config-label">角色形态</label>
-            <div class="radio-group">
-              <label class="radio-option">
-                <input type="radio" name="character-form" value="humanoid" checked />
-                <span class="radio-custom"></span>
-                <span class="radio-text">人形</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" name="character-form" value="abstract" />
-                <span class="radio-custom"></span>
-                <span class="radio-text">抽象（无四肢）</span>
-              </label>
+          <aside class="config-panel">
+            <div class="creation-section-heading compact">
+              <span class="creation-kicker">设定</span>
+              <div><h3>确认桌宠设定</h3><p>这些信息会影响最终形象。</p></div>
             </div>
-          </div>
 
-          <div class="config-group" id="hatch-style-row">
-            <label class="config-label">生成风格</label>
-            <div class="radio-group">
-              <label class="radio-option">
-                <input type="radio" name="character-style" value="chibi" checked />
-                <span class="radio-custom"></span>
-                <span class="radio-text">Q版（2-3头身）</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" name="character-style" value="faithful" />
-                <span class="radio-custom"></span>
-                <span class="radio-text">忠于原图</span>
-              </label>
+            <div class="config-group">
+              <label class="config-label" for="hatch-draft-name">桌宠名字</label>
+              <input class="input-primary" id="hatch-draft-name" type="text" maxlength="24" placeholder="例如：小青" />
             </div>
-          </div>
+
+            <div class="config-group">
+              <span class="config-label">角色形态</span>
+              <div class="radio-group compact-options">
+                <label class="radio-option">
+                  <input type="radio" name="character-form" value="humanoid" checked />
+                  <span class="radio-custom"></span>
+                  <span class="radio-text"><b>有四肢</b><small>人物、动物和拟人角色</small></span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="character-form" value="abstract" />
+                  <span class="radio-custom"></span>
+                  <span class="radio-text"><b>无四肢</b><small>团子、物品和抽象形象</small></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="config-group" id="hatch-style-row">
+              <span class="config-label">形象风格</span>
+              <div class="radio-group compact-options">
+                <label class="radio-option">
+                  <input type="radio" name="character-style" value="chibi" checked />
+                  <span class="radio-custom"></span>
+                  <span class="radio-text"><b>桌宠化</b><small>转换为适合桌面的 Q 版比例</small></span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="character-style" value="faithful" />
+                  <span class="radio-custom"></span>
+                  <span class="radio-text"><b>保持原样</b><small>尽量保留原图比例和特征</small></span>
+                </label>
+              </div>
+            </div>
+
+            <details class="advanced-settings">
+              <summary>高级生成设置 <span id="hatch-provider-summary">Seedream · 推荐</span></summary>
+              <div class="config-group">
+                <span class="config-label">形象生成模型</span>
+                <div class="radio-group compact-options">
+                  <label class="radio-option">
+                    <input type="radio" name="image-provider" value="seedream" checked />
+                    <span class="radio-custom"></span>
+                    <span class="radio-text"><b>Seedream</b><small>速度更快，推荐</small></span>
+                  </label>
+                  <label class="radio-option">
+                    <input type="radio" name="image-provider" value="gpt-image-2" />
+                    <span class="radio-custom"></span>
+                    <span class="radio-text"><b>GPT-Image-2</b><small>更慢，细节更丰富</small></span>
+                  </label>
+                </div>
+              </div>
+            </details>
+
+            <div class="creation-submit">
+              <p>开始后先生成 1 个角色方案供你确认，不满意可重新生成，不会直接生成全部动作。</p>
+              <button class="btn-primary" id="hatch-btn-start" disabled>开始创建桌宠</button>
+            </div>
+          </aside>
         </div>
 
-        <!-- 历史任务 -->
-        <div class="history-panel" id="hatch-history-tasks">
-          <h4>历史任务</h4>
-          <div class="empty-history">
-            <p>暂无历史孵化任务</p>
-          </div>
-        </div>
+        <div class="history-panel" id="hatch-history-tasks" hidden></div>
       </div>
     </section>
 
@@ -912,9 +978,9 @@ const TEMPLATE = `
         <div class="loading-spinner">
           <div class="spinner"></div>
         </div>
-        <h3>正在生成三视图...</h3>
+        <h3>正在准备角色方案...</h3>
         <p id="hatch-brewing-hint" class="hint-text">
-          正在使用 <span id="hatch-provider-name">Seedream</span> 生成3张候选图
+          正在使用 <span id="hatch-provider-name">Seedream</span> 生成角色方案
         </p>
         <p class="hint-text">
           已用时 <span id="hatch-brewing-elapsed">0:00</span>
@@ -922,21 +988,21 @@ const TEMPLATE = `
         <div class="progress-bar">
           <div class="progress-indeterminate"></div>
         </div>
-        <button class="btn-secondary no-disable" id="hatch-btn-cancel">转到后台继续</button>
+        <button class="btn-secondary no-disable" id="hatch-btn-cancel">返回任务列表，后台继续</button>
       </div>
     </section>
 
     <!-- 步骤3: 选择三视图 -->
     <section id="hatch-screen-pick" class="hatch-screen hidden">
       <div class="pick-container">
-        <h3>选择一张三视图作为参考</h3>
-        <p class="hint-text">这将作为所有动作的生成基础</p>
+        <h3>确认角色方案</h3>
+        <p class="hint-text">满意就继续生成动作，不满意可重新生成一张。</p>
 
         <div id="hatch-candidates-container" class="candidates-grid"></div>
 
         <div class="action-bar">
-          <button class="btn-secondary no-disable" id="hatch-btn-back">返回上一步</button>
-          <button class="btn-primary no-disable" id="hatch-btn-regen">都不满意，重新生成</button>
+          <button class="btn-secondary no-disable" id="hatch-btn-back">返回任务列表</button>
+          <button class="btn-primary no-disable" id="hatch-btn-regen">重新生成</button>
         </div>
       </div>
     </section>
@@ -959,7 +1025,7 @@ const TEMPLATE = `
           <p class="hint-text">
             生成在后台运行，关闭窗口也不会中断
           </p>
-          <button class="btn-secondary no-disable" id="hatch-btn-cancel-progress">转到后台继续</button>
+          <button class="btn-secondary no-disable" id="hatch-btn-cancel-progress">返回任务列表，后台继续</button>
         </div>
       </div>
     </section>
@@ -967,7 +1033,7 @@ const TEMPLATE = `
     <!-- 步骤5: 完成 -->
     <section id="hatch-screen-certificate" class="hatch-screen hidden">
       <div class="certificate-container">
-        <h3>角色孵化完成！</h3>
+        <h3>你的桌宠准备好了</h3>
 
         <div class="certificate-card">
           <img id="hatch-card-source" alt="角色原图" class="certificate-source" />
@@ -975,7 +1041,7 @@ const TEMPLATE = `
         </div>
 
         <div class="certificate-form">
-          <label for="hatch-pet-name">给你的角色起个名字</label>
+          <label for="hatch-pet-name">角色名字</label>
           <input
             type="text"
             id="hatch-pet-name"
@@ -987,8 +1053,8 @@ const TEMPLATE = `
 
         <div class="certificate-actions">
           <button class="btn-secondary no-disable" id="hatch-btn-back-progress">返回查看</button>
-          <button class="btn-primary no-disable" id="hatch-btn-save">保存卡片</button>
-          <button class="btn-primary no-disable" id="hatch-btn-activate">上桌！</button>
+          <button class="btn-secondary no-disable" id="hatch-btn-save">保存卡片</button><button class="btn-secondary no-disable" id="hatch-btn-workspace">编辑角色</button><button class="btn-secondary no-disable" id="hatch-btn-another">再创建一只</button>
+          <button class="btn-primary no-disable" id="hatch-btn-activate">放到桌面</button>
         </div>
       </div>
     </section>
@@ -1788,6 +1854,67 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* 创建桌宠：面向任务的首屏与步骤层级 */
+.hatch-container { max-width: 1080px; padding: 30px 36px 56px; }
+.hatch-header { align-items: flex-end; gap: 28px; margin-bottom: 24px; padding-bottom: 22px; }
+.header-title { max-width: 650px; }
+.header-title h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.15; }
+.header-title > p:not(.eyebrow) { margin: 0; color: var(--text-secondary); line-height: 1.6; }
+.creation-outcome { display: flex; gap: 14px; margin-left: auto; color: var(--text-secondary); font-size: 11px; white-space: nowrap; }
+.creation-outcome span { display: flex; flex-direction: column; gap: 2px; padding-left: 14px; border-left: 1px solid var(--border); }
+.creation-outcome b { color: var(--text-primary); font-size: 14px; }
+.hatch-steps { position: relative; justify-content: stretch; gap: 0; padding: 0; margin-bottom: 26px; background: transparent; box-shadow: none; }
+.hatch-steps::before { content: ''; position: absolute; left: 11%; right: 11%; top: 17px; height: 1px; background: var(--border); }
+.hatch-step { position: relative; z-index: 1; flex: 1; flex-direction: row; justify-content: center; gap: 8px; padding: 8px; background: transparent; opacity: 1; cursor: default; }
+.hatch-step.active { background: transparent; color: var(--text-primary); }
+.hatch-step.completed { color: #587a00; }
+.hatch-step.disabled { opacity: .45; cursor: default; }
+.step-number { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; border: 1px solid #c9c6bd; background: #f9f8f5; color: var(--text-secondary); font-size: 11px; font-weight: 800; }
+.hatch-step.active .step-number { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+.hatch-step.completed .step-number { border-color: #759900; background: #ecf8d2; color: #496400; }
+.step-text { font-size: 12px; font-weight: 700; }
+.hatch-main { padding: 0; background: transparent; border-radius: 0; box-shadow: none; }
+.drop-container { max-width: none; }
+.creation-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, .75fr); gap: 18px; align-items: start; }
+.creation-source, .config-panel { border: 1px solid var(--border); border-radius: 16px; background: var(--card-background); }
+.creation-source { padding: 22px; }
+.config-panel { margin: 0; padding: 22px; }
+.creation-section-heading { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+.creation-section-heading.compact { margin-bottom: 22px; }
+.creation-section-heading h3 { margin: 0 0 4px; font-size: 17px; }
+.creation-section-heading p { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
+.creation-kicker { flex: none; padding: 4px 7px; border-radius: 6px; background: #eef8d7; color: #557400; font-size: 10px; font-weight: 800; }
+.dropzone { min-height: 330px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0; padding: 24px; border-color: #c8c5bc; background: #f7f6f2; overflow: hidden; }
+.dropzone:hover { border-color: #8d8a82; background: #f2f0ea; }
+.dropzone.dragover { border-color: #759900; background: #f3fbdc; }
+.dropzone.has-file { border-style: solid; background: #efeee9; }
+.dropzone-icon { width: 44px; height: 44px; display: grid; place-items: center; margin: 0 auto 12px; border-radius: 14px; background: white; color: #557400; }
+.dropzone-icon .ui-icon { width: 22px; height: 22px; }
+.dropzone h3 { margin-bottom: 5px; font-size: 17px; }
+.dropzone p { margin-bottom: 18px; }
+#hatch-source-preview { width: min(100%, 300px); height: 220px; object-fit: contain; margin-bottom: 14px; border-radius: 12px; background: white; }
+.selected-file { max-width: 100%; margin-top: 9px; overflow: hidden; color: var(--text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.source-guidance { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.source-guidance span { padding: 5px 8px; border-radius: 6px; background: #f0efea; color: var(--text-secondary); font-size: 10px; }
+.config-group { margin-bottom: 18px; }
+.config-label { margin-bottom: 8px; color: var(--text-primary); font-weight: 700; }
+.compact-options { gap: 7px; }
+.radio-option { align-items: flex-start; padding: 10px; background: white; }
+.radio-option:has(input:checked) { border-color: #789d00; background: #f4fbdc; }
+.radio-text { display: flex; flex-direction: column; gap: 2px; }
+.radio-text b { color: var(--text-primary); font-size: 12px; }
+.radio-text small { color: var(--text-muted); font-size: 10px; line-height: 1.35; }
+.advanced-settings { margin-top: 4px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.advanced-settings summary { display: flex; justify-content: space-between; gap: 12px; padding: 13px 0; color: var(--text-primary); font-size: 12px; font-weight: 700; cursor: pointer; }
+.advanced-settings summary span { color: var(--text-secondary); font-weight: 500; }
+.advanced-settings .config-group { padding-top: 4px; }
+.creation-submit { padding-top: 18px; }
+.creation-submit p { margin: 0 0 12px; color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.creation-submit .btn-primary { width: 100%; color: var(--on-primary); font-weight: 750; }
+.history-panel { margin-top: 18px; border: 1px solid var(--border); background: var(--card-background); }
+.history-panel[hidden] { display: none; }
+.history-section + .history-section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+
 /* 响应式适配 */
 @media (max-width: 768px) {
   .hatch-container {
@@ -1795,8 +1922,13 @@ button:disabled {
   }
 
   .hatch-main {
-    padding: 20px;
+    padding: 0;
   }
+
+  .hatch-header { align-items: flex-start; }
+  .creation-outcome { display: none; }
+  .creation-layout { grid-template-columns: 1fr; }
+  .dropzone { min-height: 260px; }
 
   .hatch-steps {
     flex-wrap: wrap;

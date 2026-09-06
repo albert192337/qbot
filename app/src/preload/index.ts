@@ -1,11 +1,12 @@
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { RoomChatMsg, RoomMember, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
+import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
   hatch: {
     start: (refImagePath, imageProvider, characterForm, characterStyle) =>
       ipcRenderer.invoke('hatch:start', refImagePath, imageProvider, characterForm, characterStyle),
+    deleteTask: (dirId) => ipcRenderer.invoke('hatch:deleteTask', dirId),
     resume: (dirId) => ipcRenderer.invoke('hatch:resume', dirId),
     redo: (dirId) => ipcRenderer.invoke('hatch:redo', dirId),
     pickTurnaround: (dirId, index) =>
@@ -47,6 +48,8 @@ const api: QBotApi = {
   room: {
     open: () => ipcRenderer.send('room:open'),
     move: (x, y) => ipcRenderer.send('room:move', x, y),
+    getSizePreset: () => ipcRenderer.invoke('room:getSizePreset'),
+    setSizePreset: (preset: RoomSizePreset) => ipcRenderer.invoke('room:setSizePreset', preset),
     setIgnoreMouse: (ignore) => ipcRenderer.send('room:setIgnoreMouse', ignore),
   },
   decor: {
@@ -94,6 +97,8 @@ const api: QBotApi = {
   },
   rooms: {
     open: () => ipcRenderer.send('rooms:open'),
+    getDisplayMode: () => ipcRenderer.invoke('rooms:getDisplayMode'),
+    setDisplayMode: (mode) => ipcRenderer.invoke('rooms:setDisplayMode', mode),
     list: (kind, q) => ipcRenderer.invoke('rooms:list', kind, q),
     create: (input) => ipcRenderer.invoke('rooms:create', input),
     join: (roomId) => ipcRenderer.invoke('rooms:join', roomId),
@@ -114,6 +119,11 @@ const api: QBotApi = {
       const listener = (_ev: unknown, s: RoomsStatus) => cb(s);
       ipcRenderer.on('rooms:status', listener);
       return () => ipcRenderer.removeListener('rooms:status', listener);
+    },
+    onDisplayModeChanged: (cb) => {
+      const listener = (_ev: unknown, mode: RoomsDisplayMode) => cb(mode);
+      ipcRenderer.on('rooms:displayMode', listener);
+      return () => ipcRenderer.removeListener('rooms:displayMode', listener);
     },
     onHistory: (cb) => {
       const listener = (_ev: unknown, chat: RoomChatMsg[]) => cb(chat);
@@ -183,7 +193,7 @@ const api: QBotApi = {
       ipcRenderer.invoke('studio:saveTurnaroundPrompt', dirId, prompt),
     regenerateActions: (dirId, actionIds) =>
       ipcRenderer.invoke('studio:regenerateActions', dirId, actionIds),
-    /** M 档表现力动作：官方 prompt 按需生成（幂等，已生成不重复花钱） */
+    /** 官方预设动作：按需生成（幂等，已生成不重复花钱） */
     generateExpressionAction: (dirId, action) =>
       ipcRenderer.invoke('studio:generateExpressionAction', dirId, action),
     regenerateTurnaround: (dirId) =>

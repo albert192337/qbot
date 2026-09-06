@@ -5,41 +5,41 @@
 import { describe, expect, it } from 'vitest';
 import { resolveAction, resolveFirstAvailable } from '../src/main/action-resolver';
 
-const S_TIER = ['idle', 'drag', 'sleep', 'tea', 'talk_happy', 'talk_annoyed'];
+const DEFAULT_ACTIONS = ['idle', 'drag', 'sleep', 'tea', 'talk_happy', 'talk_annoyed', 'wave', 'stretch'];
 
 describe('resolveAction', () => {
   it('精确匹配动作名', () => {
-    const r = resolveAction('tea', S_TIER);
+    const r = resolveAction('tea', DEFAULT_ACTIONS);
     expect(r.action).toBe('tea');
     expect(r.matchLevel).toBe('exact');
   });
 
   it('大小写不敏感', () => {
-    const r = resolveAction('Tea', S_TIER);
+    const r = resolveAction('Tea', DEFAULT_ACTIONS);
     expect(r.action).toBe('tea');
     expect(r.matchLevel).toBe('exact');
   });
 
   it('happy 意图 → talk_happy（同义词）', () => {
-    const r = resolveAction('happy', S_TIER);
+    const r = resolveAction('happy', DEFAULT_ACTIONS);
     expect(r.action).toBe('talk_happy');
     expect(r.matchLevel).toBe('synonym');
   });
 
   it('中文意图「开心」→ talk_happy', () => {
-    const r = resolveAction('开心', S_TIER);
+    const r = resolveAction('开心', DEFAULT_ACTIONS);
     expect(r.action).toBe('talk_happy');
     expect(r.matchLevel).toBe('synonym');
   });
 
   it('annoyed 意图 → talk_annoyed', () => {
-    const r = resolveAction('annoyed', S_TIER);
+    const r = resolveAction('annoyed', DEFAULT_ACTIONS);
     expect(r.action).toBe('talk_annoyed');
     expect(r.matchLevel).toBe('synonym');
   });
 
   it('sleepy → sleep', () => {
-    const r = resolveAction('sleepy', S_TIER);
+    const r = resolveAction('sleepy', DEFAULT_ACTIONS);
     expect(r.action).toBe('sleep');
     expect(r.matchLevel).toBe('synonym');
   });
@@ -61,7 +61,7 @@ describe('resolveAction', () => {
   });
 
   it('未知意图 → 靠关键词猜分类再降级', () => {
-    const r = resolveAction('super_angry_xxx', S_TIER);
+    const r = resolveAction('super_angry_xxx', DEFAULT_ACTIONS);
     expect(r.matchLevel).toBe('category');
     // 负向分类应该优先找 annoyed
     expect(r.action).toBe('talk_annoyed');
@@ -86,26 +86,26 @@ describe('resolveAction', () => {
 
   it('用户覆盖优先于内置映射', () => {
     const override = { happy: 'sleep' as const };
-    const r = resolveAction('happy', S_TIER, override);
+    const r = resolveAction('happy', DEFAULT_ACTIONS, override);
     expect(r.action).toBe('sleep');
     expect(r.matchLevel).toBe('exact');
   });
 
   it('用户覆盖的动作不存在时回退到内置映射', () => {
     const override = { happy: 'nonexistent' };
-    const r = resolveAction('happy', S_TIER, override);
+    const r = resolveAction('happy', DEFAULT_ACTIONS, override);
     expect(r.action).toBe('talk_happy');
     expect(r.matchLevel).not.toBe('exact');
   });
 
-  it('M 档动作名（smug）在 S 档下降级到 talk_annoyed', () => {
-    const r = resolveAction('smug', S_TIER);
-    // M 档的 smug 还没生成，应该降级到最接近的
+  it('预设动作 smug 未生成时降级到 talk_annoyed', () => {
+    const r = resolveAction('smug', DEFAULT_ACTIONS);
+    // 可选预设还没生成时，降级到最接近的默认动作
     expect(['talk_annoyed', 'tea', 'idle']).toContain(r.action);
   });
 
-  it('M 档动作可用时，point 能精确匹配', () => {
-    const avail = [...S_TIER, 'point'];
+  it('预设动作可用时，point 能精确匹配', () => {
+    const avail = [...DEFAULT_ACTIONS, 'point'];
     const r = resolveAction('point', avail);
     // 此时 point 不在 INTENT_MAP 的精确匹配第一候选里
     // 但 intent = 'point'，精确匹配应该命中（step 2 检查 intent 本身是否是可用动作）
@@ -113,22 +113,26 @@ describe('resolveAction', () => {
     expect(r.matchLevel).toBe('exact');
   });
 
-  it('M 档全套可用时，smug/turn_away/cheer 意图精确命中 M 档动作', () => {
-    const avail = [...S_TIER, 'smug', 'point', 'turn_away', 'cheer'];
+  it('预设动作可用时，相关意图精确命中', () => {
+    const avail = [...DEFAULT_ACTIONS, 'smug', 'point', 'turn_away', 'cheer', 'nod', 'curious', 'dance', 'comfort'];
     expect(resolveAction('smug', avail).action).toBe('smug');
     expect(resolveAction('turn_away', avail).action).toBe('turn_away');
     expect(resolveAction('cheer', avail).action).toBe('cheer');
     expect(resolveAction('celebrate', avail).action).toBe('cheer');
     expect(resolveAction('得意', avail).action).toBe('smug');
     expect(resolveAction('欢呼', avail).action).toBe('cheer');
+    expect(resolveAction('nod', avail).action).toBe('nod');
+    expect(resolveAction('curious', avail).action).toBe('curious');
+    expect(resolveAction('dance', avail).action).toBe('dance');
+    expect(resolveAction('comfort', avail).action).toBe('comfort');
   });
 
-  it('M 档不可用时沿链降级到 S 档（未生成 M 档的角色）', () => {
+  it('预设动作不可用时沿链降级到默认动作', () => {
     // smug → talk_annoyed；cheer → talk_happy；turn_away → talk_annoyed
-    expect(resolveAction('smug', S_TIER).action).toBe('talk_annoyed');
-    expect(resolveAction('cheer', S_TIER).action).toBe('talk_happy');
-    expect(resolveAction('turn_away', S_TIER).action).toBe('talk_annoyed');
-    expect(resolveAction('celebrate', S_TIER).action).toBe('talk_happy');
+    expect(resolveAction('smug', DEFAULT_ACTIONS).action).toBe('talk_annoyed');
+    expect(resolveAction('cheer', DEFAULT_ACTIONS).action).toBe('talk_happy');
+    expect(resolveAction('turn_away', DEFAULT_ACTIONS).action).toBe('talk_annoyed');
+    expect(resolveAction('celebrate', DEFAULT_ACTIONS).action).toBe('talk_happy');
   });
 });
 
@@ -149,7 +153,7 @@ describe('resolveFirstAvailable', () => {
   });
 
   it('空列表返回 null', () => {
-    const r = resolveFirstAvailable([], S_TIER);
+    const r = resolveFirstAvailable([], DEFAULT_ACTIONS);
     expect(r).toBeNull();
   });
 });

@@ -28,6 +28,7 @@ const SCENES: { key: string; label: string; hint: string }[] = [
 ];
 
 let paneRoot: HTMLElement | null = null;
+let boundDirId: string | null = null;
 
 export async function mount(root: HTMLElement): Promise<void> {
   paneRoot = root;
@@ -39,7 +40,7 @@ export function unmount(): void {
 }
 
 export async function onVisible(): Promise<void> {
-  await refresh();
+  if (!hasUnsavedChanges()) await refresh();
 }
 
 export function hasUnsavedChanges(): boolean {
@@ -47,14 +48,16 @@ export function hasUnsavedChanges(): boolean {
 }
 
 export async function discardChanges(): Promise<void> {
-  await refresh();
+  await refresh(true);
 }
 
-async function refresh(): Promise<void> {
+async function refresh(force = false): Promise<void> {
   const root = paneRoot;
   if (!root) return;
   const ctx = await loadStudioContext(root);
   if (!ctx) return;
+  if (!force && boundDirId === ctx.dirId && hasUnsavedChanges()) return;
+  boundDirId = ctx.dirId;
   const claudeConnected = await window.qbot.claude.getStatus();
 
   const ac = ctx.m.agentActions ?? ({} as AgentActionConfig);
@@ -75,7 +78,7 @@ async function refresh(): Promise<void> {
   };
 
   let html = '<div class="studio-body">';
-  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台</p><h2>场景绑定</h2><p class="page-summary">把已经生成好的动作绑定到工作、音乐与会议状态。</p></div></div>`;
+  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台</p><h2>场景联动</h2><p class="page-summary">让桌宠根据工作、音乐与会议状态自动切换动作。</p></div></div>`;
   html += `<p class="studio-hint">桌宠在各场景下播放的动作。只列已生成完成的动作——没生成完的选了也播不出来。</p>`;
   html += `<div class="integration-strip"><span class="status-chip ${claudeConnected ? 'success' : 'muted'}">Claude Code ${claudeConnected ? '已接入' : '未接入'}</span><span class="status-chip ${navigator.platform.toLowerCase().includes('win') ? 'success' : 'muted'}">网易云监听 ${navigator.platform.toLowerCase().includes('win') ? '可用' : '仅 Windows'}</span><button class="text-action" id="open-claude-settings">管理连接</button></div>`;
 

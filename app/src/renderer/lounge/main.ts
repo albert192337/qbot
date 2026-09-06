@@ -1,5 +1,5 @@
 /**
- * 公共房间窗（spec 2026-08-21）：房间市场列表 + 房内在场/聊天。
+ * 联机空间窗（spec 2026-08-21）：房间列表 + 房内在场/聊天 + 本地展示模式。
  *
  * 所有网络请求经主进程（同 market renderer 的分工）；这里只管渲染和交互。
  * 血泪坑 12：renderer 不 value import pipeline —— 房间类型常量在本地重声明。
@@ -10,6 +10,7 @@ import type {
   RoomKind,
   RoomMember,
   RoomSnapshot,
+  RoomsDisplayMode,
 } from '../../shared/ipc-types';
 
 // 本地重声明（不从主进程侧 rooms-rules 引：那是 main 的模块，会把 node 依赖拖进浏览器包）
@@ -43,6 +44,7 @@ const searchInput = $<HTMLInputElement>('search');
 const chatInput = $<HTMLInputElement>('chat-input');
 const roomTitle = $('room-title');
 const settingsBtn = $<HTMLButtonElement>('settings-btn');
+const displayModeButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-display-mode]')];
 const modal = $('modal');
 const sheet = $('sheet');
 
@@ -51,6 +53,8 @@ let favorites = new Set<string>();
 let filterKind: RoomKind | null = null;
 let myMemberId = '';
 let currentRoom: RoomSnapshot | null = null;
+let displayMode: RoomsDisplayMode = 'desktop';
+let displayModePending = false;
 let chatLog: RoomChatMsg[] = [];
 /** 本地发言时间戳（预挡限流用，与服务端同规则） */
 const sentAt: number[] = [];
@@ -78,6 +82,30 @@ function closeModal(): void {
   sheet.replaceChildren();
 }
 
+function renderDisplayMode(): void {
+  for (const button of displayModeButtons) {
+    const selected = button.dataset.displayMode === displayMode;
+    button.classList.toggle('on', selected);
+    button.setAttribute('aria-pressed', String(selected));
+    button.disabled = displayModePending;
+  }
+}
+
+async function selectDisplayMode(mode: RoomsDisplayMode): Promise<void> {
+  if (displayModePending || mode === displayMode) return;
+  displayModePending = true;
+  renderDisplayMode();
+  try {
+    displayMode = await window.qbot.rooms.setDisplayMode(mode);
+    setStatus(displayMode === 'room' ? '房友已进入房间场景' : '房友已回到透明桌面');
+  } catch (err) {
+    setStatus(errText(err), true);
+  } finally {
+    displayModePending = false;
+    renderDisplayMode();
+  }
+}
+
 modal.addEventListener('click', (e) => {
   if (e.target === modal) closeModal();
 });
@@ -102,7 +130,7 @@ function renderList(): void {
     const empty = document.createElement('div');
     empty.id = 'empty';
     empty.textContent = rooms.length === 0
-      ? '还没有公共房间\n开一个，等人来串门'
+      ? '还没有联机房间\n开一个，等人来串门'
       : '没有符合条件的房间';
     empty.style.whiteSpace = 'pre-line';
     listEl.appendChild(empty);
@@ -154,7 +182,7 @@ async function refreshList(): Promise<void> {
   setStatus('加载中…');
   try {
     rooms = await window.qbot.rooms.list();
-    setStatus(`${rooms.length} 个公共房间`);
+    setStatus(`${rooms.length} 个联机房间`);
   } catch (err) {
     setStatus(errText(err), true);
     rooms = [];
@@ -312,11 +340,11 @@ function askConsent(secure: boolean): Promise<boolean> {
   return new Promise((resolve) => {
     sheet.replaceChildren();
     const h = document.createElement('h2');
-    h.textContent = '进公共房间前';
+    h.textContent = '进入联机空间前';
     const p = document.createElement('div');
     p.className = 'hint';
     p.textContent =
-      '公共房间里，你的发言会发送到房间服务器，房内所有人都能看到，' +
+      '联机空间里，你的发言会发送到房间服务器，房内所有人都能看到，' +
       '并且会保留最近 50 条供后来的人查看。\n\n' +
       '桌宠状态（在思考/在敲代码/在开会/在听歌等）和桌宠当前实际举起的牌面文字也会实时同步给房友。' +
       '这意味着手动输入的牌子、工作完成提示，以及正在播放的歌曲名和歌手都可能被房友看到。' +
@@ -579,12 +607,15 @@ window.qbot.rooms.onKicked(() => {
 });
 
 window.qbot.rooms.onError((msg) => setStatus(msg, true));
+window.qbot.rooms.onDisplayModeChanged((mode) => {
+  displayMode = mode;
+  renderDisplayMode();
+});
 
 // ── 控件接线 ────────────────────────────────────────────────
 
 $('create-btn').addEventListener('click', openCreateSheet);
 $('refresh-btn').addEventListener('click', () => void refreshList());
-$('back-btn').addEventListener('click', () => { void window.qbot.rooms.leave(); showList(); });
 $('leave-btn').addEventListener('click', () => { void window.qbot.rooms.leave(); showList(); });
 settingsBtn.addEventListener('click', openSettingsSheet);
 $('send-btn').addEventListener('click', doSend);
@@ -592,6 +623,12 @@ chatInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') doSend();
 });
 searchInput.addEventListener('input', renderList);
+for (const button of displayModeButtons) {
+  button.addEventListener('click', () => {
+    const mode = button.dataset.displayMode as RoomsDisplayMode;
+    void selectDisplayMode(mode);
+  });
+}
 
 for (const tab of document.querySelectorAll<HTMLElement>('.tab')) {
   tab.addEventListener('click', () => {
@@ -615,6 +652,8 @@ void (async () => {
   const settings = await window.qbot.settings.get();
   nickInput.value = settings.nickname ?? settings.marketNickname ?? '';
   favorites = new Set(settings.roomsFavorites ?? []);
+  displayMode = await window.qbot.rooms.getDisplayMode();
+  renderDisplayMode();
 
   // 自取快照：窗口 did-finish-load 可能早于上面的监听注册（同 pet/remote 窗的竞态）
   const cache = await window.qbot.rooms.getCache();

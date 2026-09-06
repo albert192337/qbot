@@ -101,6 +101,7 @@ function applyVisitFacing(): void {
  *  注意：不隐藏 hostSignboard——牌子与串门无关，独立控制。 */
 function endVisit(): void {
   document.body.classList.remove('visit-mode', 'flip-host', 'flip-visitor');
+  visitorPlayer.dispose();
   visitorStage.replaceChildren();
   window.qbot.pet.setVisitMode(false);
   visitorCharacter = null;

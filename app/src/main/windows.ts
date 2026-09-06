@@ -1,14 +1,17 @@
 /** 窗口管理：桌宠透明置顶窗 + 孵化常规窗 + 小房间窗 + dock 显隐协调 */
 import { BrowserWindow, app, screen, shell } from 'electron';
 import path from 'node:path';
-import type { CharacterMeta } from '../shared/ipc-types';
-import { layoutRoomPets } from './rooms/rooms-rules';
+import type { CharacterMeta, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
+import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset, resolveRoomSceneSize } from './rooms/rooms-rules';
 import { clampPetScale, petTargetSize } from './pet-geometry';
+import { attachPetWindowRecovery } from './pet-window-recovery';
 
 const PET_SIZE = 360;
 /** 房间宠上屏窗：比本地宠小一档（房友是客人体量），固定尺寸永不 resize */
 const ROOM_PET_SIZE = 200;
 const ROOM_PET_GAP = 20;
+const ROOM_SCENE_PET_SIZE = 180;
+const ROOM_SCENE_PET_GAP = 12;
 /**
  * 小房间窗边长。素材是 1024x1024，560 时 fit~0.55 -- 房间只占屏幕一小块，
  * 家具缩到 ~120px，观感「又小又挤」。放大到 960 让素材接近 1:1。
@@ -34,6 +37,9 @@ let bubbleSide: 'above' | 'below' = 'above';
 let petScale = 1;
 /** 桌宠是否处于串门（双人宽）模式——权威尺寸的一部分，移动时要重申 */
 let petVisitMode = false;
+let roomWindowBoundsChanged: (() => void) | null = null;
+let roomWindowClosed: (() => void) | null = null;
+let roomSizePreset: RoomSizePreset = 'large';
 
 /**
  * 摆放固定尺寸的透明窗，**每次都重申权威尺寸**。
@@ -146,7 +152,7 @@ let activePlayables: string[] = [];
 
 export function broadcastCharacterActivated(meta: CharacterMeta): void {
   // 主进程侧同步一份可用动作（行为引擎的动作解析要用；与 player.load 同口径：
-  // 生成动作看 status，贴纸落盘即可用；M 档表现力动作也算生成动作看 status）
+  // 生成动作看 status，贴纸落盘即可用；可选预设动作也按 status 判断）
   const m = meta.manifest;
   const ids: string[] = [];
   for (const [id, a] of Object.entries(m.actions ?? {})) {
@@ -191,6 +197,7 @@ export function createPetWindow(): BrowserWindow {
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
+      backgroundThrottling: false,
       sandbox: false,
     },
   });
@@ -199,7 +206,9 @@ export function createPetWindow(): BrowserWindow {
   // 气泡窗跟随：move 覆盖拖拽与 OS 侧移动，resize 覆盖缩放
   petWindow.on('move', syncBubbleBounds);
   petWindow.on('resize', syncBubbleBounds);
-  petWindow.once('ready-to-show', () => petWindow?.show());
+  const win = petWindow;
+  attachPetWindowRecovery(win, () => !isRoomOpen());
+  win.once('ready-to-show', () => { if (!isRoomOpen()) win.showInactive(); });
   petWindow.on('closed', () => {
     petWindow = null;
     closeBubbleWindow();
@@ -294,6 +303,54 @@ export function layoutRoomPetWindows(orderedMemberIds: readonly string[]): void 
   }
 }
 
+/** 将房友宠窗挂在小房间窗口上，并按房间内部坐标排列。 */
+export function layoutRoomPetWindowsInRoom(orderedMemberIds: readonly string[]): void {
+  if (!roomWindow || roomWindow.isDestroyed()) return;
+  const roomBounds = roomWindow.getBounds();
+  const petSize = Math.max(120, Math.min(ROOM_SCENE_PET_SIZE, Math.round(roomBounds.width * 0.1875)));
+  const slots = layoutRoomScenePets(
+    orderedMemberIds,
+    roomBounds.width,
+    roomBounds.height,
+    petSize,
+    ROOM_SCENE_PET_GAP,
+  );
+  for (const slot of slots) {
+    const win = roomPetWindows.get(slot.memberId);
+    if (!win || win.isDestroyed()) continue;
+    moveFixedSize(
+      win,
+      roomBounds.x + slot.x,
+      roomBounds.y + slot.y,
+      { width: petSize, height: petSize },
+      true,
+    );
+  }
+}
+
+/** 房友宠窗在桌面/房间之间切换；角色内容和网络状态保持不变。 */
+export function setRoomPetWindowDisplayMode(memberId: string, mode: RoomsDisplayMode): void {
+  const win = roomPetWindows.get(memberId);
+  if (!win || win.isDestroyed()) return;
+  if (mode === 'room' && roomWindow && !roomWindow.isDestroyed()) {
+    win.setAlwaysOnTop(false);
+    win.setVisibleOnAllWorkspaces(false);
+    win.setParentWindow(roomWindow);
+    return;
+  }
+  win.setParentWindow(null);
+  win.setAlwaysOnTop(true, 'floating');
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+}
+
+export function onRoomWindowBoundsChanged(listener: () => void): void {
+  roomWindowBoundsChanged = listener;
+}
+
+export function onRoomWindowClosed(listener: () => void): void {
+  roomWindowClosed = listener;
+}
+
 /** 懒创建：桌宠 99% 时间没有 agent 消息，不预先吃一个 renderer 进程 */
 function createBubbleWindow(): BrowserWindow {
   if (bubbleWindow && !bubbleWindow.isDestroyed()) return bubbleWindow;
@@ -370,6 +427,7 @@ export function setPetVisitMode(enter: boolean): void {
 export function moveRoomWindow(x: number, y: number): void {
   const s = roomSize();
   moveFixedSize(roomWindow, x, y, { width: s, height: s });
+  roomWindowBoundsChanged?.();
 }
 
 /** 房间外沿透明区穿透：forward 让 mousemove 继续进 renderer 以便判定回归实体 */
@@ -385,10 +443,38 @@ export function setRoomIgnoreMouse(ignore: boolean): void {
  * 房间窗边长：取偏好值，但留出工作区边距并不超过素材原尺寸。
  * 小屏（笔记本 768p）会被夹到装得下的最大方形，避免窗口比屏幕还高。
  */
-function roomSize(): number {
-  const { workArea } = screen.getPrimaryDisplay();
-  const fits = Math.floor(Math.min(workArea.width, workArea.height) * 0.9);
-  return Math.max(480, Math.min(ROOM_SIZE_PREFERRED, ROOM_ART_SIZE, fits));
+function roomSize(display = screen.getPrimaryDisplay()): number {
+  const { workArea } = display;
+  return Math.min(ROOM_SIZE_PREFERRED, ROOM_ART_SIZE, resolveRoomSceneSize(roomSizePreset, workArea.width, workArea.height));
+}
+
+export function getRoomSizePreset(): RoomSizePreset {
+  return roomSizePreset;
+}
+
+export function setRoomSizePreset(preset: RoomSizePreset): RoomSizePreset {
+  roomSizePreset = normalizeRoomSizePreset(preset);
+  if (!roomWindow || roomWindow.isDestroyed()) return roomSizePreset;
+  const current = roomWindow.getBounds();
+  const display = screen.getDisplayMatching(current);
+  const size = roomSize(display);
+  const x = Math.max(
+    display.workArea.x,
+    Math.min(
+      Math.round(current.x + (current.width - size) / 2),
+      display.workArea.x + display.workArea.width - size,
+    ),
+  );
+  const y = Math.max(
+    display.workArea.y,
+    Math.min(
+      Math.round(current.y + (current.height - size) / 2),
+      display.workArea.y + display.workArea.height - size,
+    ),
+  );
+  moveFixedSize(roomWindow, x, y, { width: size, height: size }, true);
+  roomWindowBoundsChanged?.();
+  return roomSizePreset;
 }
 
 export function openRoomWindow(title: string): BrowserWindow {
@@ -399,8 +485,9 @@ export function openRoomWindow(title: string): BrowserWindow {
   petWindow?.hide();
   hideBubbleWindow(); // 角色进小房间：气泡跟着走
   if (process.platform === 'darwin') void app.dock?.show();
-  const size = roomSize();
-  const { workArea } = screen.getPrimaryDisplay();
+  const display = screen.getPrimaryDisplay();
+  const size = roomSize(display);
+  const { workArea } = display;
   roomWindow = new BrowserWindow({
     width: size,
     height: size,
@@ -424,14 +511,24 @@ export function openRoomWindow(title: string): BrowserWindow {
   roomWindow.on('closed', () => {
     roomWindow = null;
     petWindow?.show(); // 角色回桌面
+    roomWindowClosed?.();
     if (process.platform === 'darwin' && !consoleWindow) app.dock?.hide();
   });
+  roomWindow.on('move', () => roomWindowBoundsChanged?.());
   load(roomWindow, 'room');
   return roomWindow;
 }
 
+export function closeRoomWindow(): boolean {
+  if (!roomWindow || roomWindow.isDestroyed()) return false;
+  roomWindow.close();
+  return true;
+}
+
 /** 控制台侧栏 pane 标识（与 renderer/console/main.ts 的 PaneId 对应） */
 export type ConsolePane =
+  | 'profile'
+  | 'tasks'
   | 'home'
   | 'characters'
   | 'hatch'
@@ -514,7 +611,7 @@ export function createLoungeWindow(): BrowserWindow {
     height: 620,
     minWidth: 380,
     minHeight: 480,
-    title: 'QBot 公共房间',
+    title: 'QBot 联机空间',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

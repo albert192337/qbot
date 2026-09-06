@@ -5,7 +5,8 @@
  * 面板删掉后这里是唯一入口。
  */
 import type { CharacterMeta } from '../../../shared/ipc-types';
-import { confirmBox, esc, toast } from './_studio-shared';
+import { navigate } from '../workspace';
+import { collectActions, confirmBox, esc, guard, toast } from './_studio-shared';
 
 let root: HTMLElement | null = null;
 let unsubActivated: (() => void) | null = null;
@@ -37,19 +38,20 @@ async function refresh(): Promise<void> {
   ]);
   const ready = all.filter((c) => c.manifest);
 
-  let html = '<div class="studio-body"><div class="page-heading"><div><p class="eyebrow">角色资产</p><h2>角色库</h2><p class="page-summary">切换当前桌宠，查看动作完整度，或管理本地角色包。</p></div><button id="new-character" class="btn primary">新建角色</button></div>';
+  let html = '<div class="studio-body"><div class="page-heading"><div><p class="eyebrow">角色资产</p><h2>角色库</h2><p class="page-summary">切换当前桌宠，查看动作完整度，或管理本地角色包。</p></div><button id="new-character" class="btn primary">创建角色</button></div>';
   if (ready.length === 0) {
-    html += '<div class="pane-placeholder"><b>还没有角色</b><br/>准备一张正面角色图，生成你的第一只桌宠。<div class="btn-row" style="justify-content:center"><button id="empty-new-character" class="btn primary">开始孵化</button></div></div></div>';
+    html += '<div class="pane-placeholder"><b>还没有角色</b><br/>准备一张正面角色图，创建你的第一只桌宠。<div class="btn-row" style="justify-content:center"><button id="empty-new-character" class="btn primary">创建桌宠</button></div></div></div>';
     host.innerHTML = html;
+    bind(host);
     host.querySelector('#empty-new-character')?.addEventListener('click', () => window.qbot.ui.openConsole('hatch'));
     return;
   }
-  html += `<p class="studio-hint">点卡片切换当前上桌的角色。</p>`;
+  html += `<p class="studio-hint">编辑角色只打开工作台；点击「放到桌面」才会切换桌宠。</p>`;
   html += '<div class="char-grid">';
   for (const c of ready) {
     const isActive = c.dirId === active?.dirId;
     const name = c.manifest.name && c.manifest.name !== '未命名' ? c.manifest.name : '未命名';
-    const doneCount = Object.values(c.manifest.actions).filter((a) => a.status === 'done').length;
+    const doneCount = collectActions(c.manifest).filter((a) => a.status === 'done').length;
     const failed = Object.values(c.manifest.actions).filter((a) => a.status === 'failed').length;
     html += `<div class="char-card${isActive ? ' active' : ''}" data-dir="${esc(c.dirId)}">`;
     html += `<div class="char-thumb"><img src="qbot-asset://${esc(c.dirId)}/source.png" alt="" /></div>`;
@@ -58,7 +60,8 @@ async function refresh(): Promise<void> {
     if (c.hasUnfinishedJob) html += ` · <b>未完成</b>`;
     html += `</div>`;
     html += `<div class="char-btns">`;
-    if (!isActive) html += `<button class="btn use-char" data-dir="${esc(c.dirId)}">使用</button>`;
+    if (!isActive) html += `<button class="btn use-char" data-dir="${esc(c.dirId)}">放到桌面</button>`;
+    html += `<button class="btn primary edit-char" data-dir="${esc(c.dirId)}">编辑角色</button>`;
     html += `<button class="btn ghost rename-char" data-dir="${esc(c.dirId)}">改名</button>`;
     html += `<button class="btn danger del-char" data-dir="${esc(c.dirId)}" data-name="${esc(name)}">删除</button>`;
     html += `</div></div>`;
@@ -70,6 +73,7 @@ async function refresh(): Promise<void> {
 
 function bind(host: HTMLElement): void {
   host.querySelector('#new-character')?.addEventListener('click', () => window.qbot.ui.openConsole('hatch'));
+  host.querySelectorAll<HTMLButtonElement>('.edit-char').forEach((button) => button.addEventListener('click', () => navigate({ pane: 'profile', dirId: button.dataset.dir! })));
   host.querySelectorAll<HTMLButtonElement>('.use-char').forEach((btn) => {
     btn.addEventListener('click', async () => {
       await window.qbot.characters.activate(btn.dataset.dir!);
@@ -87,7 +91,10 @@ function bind(host: HTMLElement): void {
       input.className = 'rename-input';
       input.maxLength = 24;
       input.value = nameEl.textContent?.replace('使用中', '').trim() ?? '';
+      let finished = false;
       const commit = async (): Promise<void> => {
+        if (finished) return;
+        finished = true;
         const v = input.value.trim();
         input.remove();
         if (v) {
@@ -98,7 +105,7 @@ function bind(host: HTMLElement): void {
       };
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') void commit();
-        else if (e.key === 'Escape') input.remove();
+        else if (e.key === 'Escape') { finished = true; input.remove(); }
       });
       input.addEventListener('blur', () => void commit());
       nameEl.after(input);

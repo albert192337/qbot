@@ -21,7 +21,7 @@ export async function mount(root: HTMLElement): Promise<void> {
       <select id="market-upload-select" title="选择要上传的角色"></select>
       <button id="market-upload-btn" class="btn">上传</button>
       <button id="market-refresh-btn" class="btn ghost">刷新</button>
-      <button id="market-room-btn" class="btn ghost">公共房间</button>
+      <button id="market-room-btn" class="btn ghost">联机空间</button>
     </div>
     <div id="market-status"></div>
     <div id="market-grid"></div>

@@ -1,3 +1,4 @@
+import { navigate } from '../workspace';
 import type { AgentActivity, AgentStatus, CharacterMeta, Progress, Settings } from '../../../shared/ipc-types';
 import { icon } from '../icons';
 import { esc } from './_studio-shared';
@@ -84,27 +85,27 @@ function template(
   return `<div class="studio-body home-body">
     <div class="page-heading">
       <div><p class="eyebrow">QBot 工作台</p><h2>今天想和谁一起工作？</h2><p class="page-summary">管理角色、处理生成任务，并确认连接与隐私状态。</p></div>
-      <button class="btn primary" data-open="hatch">${icon('create')} 新建角色</button>
+      <button class="btn primary" data-open="hatch">${icon('create')} 创建角色</button>
     </div>
 
     <section class="home-hero ${active ? '' : 'is-empty'}">
       ${active ? `
         <div class="home-pet-preview"><img src="qbot-asset://${esc(active.dirId)}/source.png" alt="${esc(active.manifest.name || '当前角色')}" /></div>
-        <div class="home-hero-copy"><span class="status-dot success"></span><span class="eyebrow">当前在桌面</span><h3>${esc(active.manifest.name || '未命名')}</h3><p>${activeDone}/6 个基础动作可用${active.hasUnfinishedJob ? ' · 有生成任务进行中' : ''}</p>
-        <div class="btn-row"><button class="btn primary" data-open="persona">打开角色工作台</button><button class="btn secondary" data-open="characters">切换角色</button></div></div>
+        <div class="home-hero-copy"><span class="status-dot success"></span><span class="eyebrow">当前在桌面</span><h3>${esc(active.manifest.name || '未命名')}</h3><p>${activeDone} 个动作可用${active.hasUnfinishedJob ? ' · 有生成任务进行中' : ''}</p>
+        <div class="btn-row"><button class="btn primary" data-open="profile" data-dir="${esc(active.dirId)}">编辑角色资料</button><button class="btn secondary" data-open="characters">切换角色</button></div></div>
       ` : `
-        <div class="home-empty-mark">${icon('characters')}</div><div class="home-hero-copy"><span class="eyebrow">还没有角色</span><h3>先孵化第一只桌宠</h3><p>准备一张正面角色图，QBot 会生成三视图与基础动作。</p><button class="btn primary" data-open="hatch">开始孵化</button></div>
+        <div class="home-empty-mark">${icon('characters')}</div><div class="home-hero-copy"><span class="eyebrow">还没有角色</span><h3>创建第一只桌宠</h3><p>准备一张正面角色图，确认形象后生成一套基础动作。</p><button class="btn primary" data-open="hatch">创建桌宠</button></div>
       `}
     </section>
 
     <div class="home-grid">
       <section class="summary-section">
-        <div class="section-heading"><div>${icon('task')}<h3>后台任务</h3></div><button class="text-action" data-open="hatch">查看全部</button></div>
+        <div class="section-heading"><div>${icon('task')}<h3>后台任务</h3></div><button class="text-action" data-open="tasks">查看全部</button></div>
         ${unfinished.length === 0 && failed.length === 0
           ? '<p class="empty-copy">当前没有需要处理的生成任务。</p>'
           : `<div class="summary-list">
-              ${unfinished.map((character) => `<button class="summary-row" data-open="hatch"><span><b>${esc(character.manifest?.name || character.dirId.slice(0, 8))}</b><small>生成仍在后台运行</small></span><span class="status-chip running">进行中</span></button>`).join('')}
-              ${failed.map((character) => `<button class="summary-row" data-open="hatch"><span><b>${esc(character.manifest.name || '未命名')}</b><small>存在失败动作，可继续修复</small></span><span class="status-chip danger">需处理</span></button>`).join('')}
+              ${unfinished.map((character) => `<button class="summary-row" data-open="tasks"><span><b>${esc(character.manifest?.name || character.dirId.slice(0, 8))}</b><small>生成仍在后台运行</small></span><span class="status-chip running">进行中</span></button>`).join('')}
+              ${failed.map((character) => `<button class="summary-row" data-open="tasks"><span><b>${esc(character.manifest.name || '未命名')}</b><small>存在失败动作，可继续修复</small></span><span class="status-chip danger">需处理</span></button>`).join('')}
             </div>`}
       </section>
 
@@ -125,7 +126,7 @@ function template(
       <section class="summary-section">
         <div class="section-heading"><div>${icon('room')}<h3>陪伴与房间</h3></div></div>
         <div class="metric-strip"><div><b>${latestProgress?.points ?? 0}</b><span>点数</span></div><div><b>${latestProgress?.boxes ?? 0}</b><span>箱子</span></div><div><b>${furniture}</b><span>件家具</span></div></div>
-        <div class="btn-row"><button class="btn secondary" id="home-open-rooms">打开公共房间</button><button class="btn quiet" data-open="settings">隐私设置</button></div>
+        <div class="btn-row"><button class="btn secondary" id="home-open-rooms">打开联机空间</button><button class="btn quiet" data-open="settings">隐私设置</button></div>
       </section>
     </div>
   </div>`;
@@ -133,7 +134,7 @@ function template(
 
 function bind(host: HTMLElement): void {
   host.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((button) => {
-    button.addEventListener('click', () => window.qbot.ui.openConsole(button.dataset.open));
+    button.addEventListener('click', () => navigate({ pane: button.dataset.open!, dirId: button.dataset.dir }));
   });
   host.querySelector<HTMLButtonElement>('#home-open-rooms')?.addEventListener('click', () => {
     window.qbot.rooms.open();

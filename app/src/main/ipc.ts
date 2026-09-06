@@ -4,15 +4,16 @@ import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
-import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind } from '../shared/ipc-types';
-import { getCharacter, listCharacters, renameCharacter, deleteCharacter } from './characters';
+import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
+import { getCharacter, listCharacters, renameCharacter, deleteCharacter, deleteGenerationTask } from './characters';
 import { getSettings, setSettings } from './config';
-import { createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, openRoomWindow, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, getPetWindow, type ConsolePane } from './windows';
+import { createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, getPetWindow, getRoomSizePreset, setRoomSizePreset, type ConsolePane } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, isSecureTransport, reportChat, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms, pushLocalSign } from './rooms/rooms';
 import { getLocalSign, setLocalSign } from './local-sign';
 import { notifyRoomCharacterChanged } from './rooms/rooms';
 import { getMemberSnapshot } from './rooms/room-pets';
+import { getRoomDisplayMode, refreshRoomPetLayout, setRoomDisplayMode } from './rooms/room-pet-display';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround, generateExpressionAction } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import {
@@ -48,13 +49,6 @@ import { getExecutorState, stopAllBehaviors } from './behavior-executor';
 import { debugThink } from './brain-llm';
 
 export function registerIpc(): void {
-  // 开小房间：房间窗标题用激活角色名（右键菜单与 room:open 共用）
-  async function openRoomWindowSafe(): Promise<void> {
-    const { activeCharacter } = await getSettings();
-    const meta = activeCharacter ? await getCharacter(activeCharacter) : null;
-    const name = meta?.manifest?.name;
-    openRoomWindow(name && name !== '未命名' ? `${name}的家` : '小房间');
-  }
   // ── hatch ──────────────────────────────────────────────
   ipcMain.handle(
     'hatch:start',
@@ -71,6 +65,7 @@ export function registerIpc(): void {
   ipcMain.handle('hatch:pickTurnaround', (_ev, dirId: string, index: number) =>
     pickTurnaround(dirId, index),
   );
+  ipcMain.handle('hatch:deleteTask', (_ev, dirId: string) => deleteGenerationTask(dirId));
   ipcMain.handle('hatch:getStatus', (_ev, dirId: string) => getHatchStatus(dirId));
   ipcMain.handle(
     'hatch:saveCard',
@@ -129,8 +124,19 @@ export function registerIpc(): void {
   );
 
   // ── room ───────────────────────────────────────────────
-  ipcMain.on('room:open', () => void openRoomWindowSafe());
-  ipcMain.on('room:move', (_ev, x: number, y: number) => moveRoomWindow(x, y));
+  // 旧的小房间调用兼容到统一联机空间；房间场景由联机空间内的展示模式控制。
+  ipcMain.on('room:open', () => createLoungeWindow());
+  ipcMain.on('room:move', (_ev, x: number, y: number) => {
+    moveRoomWindow(x, y);
+    refreshRoomPetLayout();
+  });
+  ipcMain.handle('room:getSizePreset', () => getRoomSizePreset());
+  ipcMain.handle('room:setSizePreset', async (_ev, preset: RoomSizePreset) => {
+    const normalized = setRoomSizePreset(preset);
+    await setSettings({ roomSizePreset: normalized });
+    refreshRoomPetLayout();
+    return normalized;
+  });
   ipcMain.on('room:setIgnoreMouse', (_ev, ignore: boolean) => setRoomIgnoreMouse(ignore));
 
   // ── decor ──────────────────────────────────────────────
@@ -180,6 +186,8 @@ export function registerIpc(): void {
 
   // ── 公共房间（spec 2026-08-21）────────────────────────────
   ipcMain.on('rooms:open', () => createLoungeWindow());
+  ipcMain.handle('rooms:getDisplayMode', () => getRoomDisplayMode());
+  ipcMain.handle('rooms:setDisplayMode', (_ev, mode: RoomsDisplayMode) => setRoomDisplayMode(mode));
   ipcMain.handle('rooms:list', (_ev, kind?: RoomKind, q?: string) => listRooms(kind, q));
   ipcMain.handle('rooms:create', (_ev, input: CreateRoomInput) => createRoom(input));
   ipcMain.handle('rooms:join', (_ev, roomId: string) => joinRoom(roomId));
@@ -234,8 +242,7 @@ export function registerIpc(): void {
       ...(getLocalSign() ? [{ label: '收牌', click: () => send({ type: 'signClear' as const }) }] : []),
       { type: 'separator' },
       // ── 去处（角色能去的地方 + 控制台）──────────────────
-      { label: '小房间', click: () => void openRoomWindowSafe() },
-      { label: '公共房间', click: () => createLoungeWindow() },
+      { label: '联机空间…', click: () => createLoungeWindow() },
       { label: '控制台…', click: () => createConsoleWindow() },
     ]);
     menu.popup({ window: win });
@@ -249,7 +256,7 @@ export function registerIpc(): void {
   ipcMain.handle('studio:addCustomAction', async (_ev, dirId: string, name: string, poseDesc: string, motionDesc: string, durationSec: number) => {
     await addCustomAction(dirId, name, poseDesc, motionDesc, durationSec);
   });
-  // M 档表现力动作：官方 prompt 表按需生成（复用自定义动作管线，幂等不重复花钱）
+  // 官方预设动作按需生成（复用自定义动作管线，幂等不重复花钱）
   ipcMain.handle('studio:generateExpressionAction', async (_ev, dirId: string, action: string) => {
     await generateExpressionAction(dirId, action as any);
   });
@@ -278,7 +285,7 @@ export function registerIpc(): void {
   ipcMain.handle('studio:regenerateTurnaround', async (_ev, dirId: string) => {
     // 三视图要人工挑图：先把控制台切到孵化 pane 并置前，否则候选图出现在看不见的
     // 地方，管线会永久挂在 pickResolver 上等不到人挑（原实现开的是独立孵化窗）
-    createConsoleWindow('hatch');
+    createConsoleWindow('tasks');
     await regenerateTurnaround(dirId);
   });
 

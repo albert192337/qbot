@@ -1,25 +1,34 @@
 /**
- * 公共房间宠上屏的显示层：订阅 room-pets.ts 的事件，驱动 windows.ts 的键控多窗
- * + 把内容推进各窗渲染器（?roomPet=1，room-pet-main.ts）。
- *
- * 状态/网络在 room-pets.ts，窗口生命周期在 windows.ts，推送编排在这——三层分开
- * 是因为 room-pets 要能在无窗口环境下单测（纯状态机），windows.ts 只认 Electron。
+ * 联机空间的展示编排层：同一套房间成员状态可在「透明桌面」或「房间场景」中呈现。
+ * 房友仍复用独立透明宠窗；房间模式只改变这些窗口的父窗口与布局，不复制网络状态机。
  */
+import type { RoomsDisplayMode } from '../../shared/ipc-types';
+import { getSettings, setSettings } from '../config';
 import {
   closeAllRoomPetWindows,
   closeRoomPetWindow,
+  closeRoomWindow,
   ensureRoomPetWindow,
   getRoomPetWindow,
   layoutRoomPetWindows,
+  layoutRoomPetWindowsInRoom,
+  onRoomWindowBoundsChanged,
+  onRoomWindowClosed,
+  openRoomWindow,
+  pushToLounge,
+  setRoomSizePreset,
+  setRoomPetWindowDisplayMode,
 } from '../windows';
-import { onRoomPetEvent, type RoomPetEvent } from './room-pets';
-import { myMemberId, memberStates } from './room-pets';
+import { myMemberId, memberStates, onRoomPetEvent, type RoomPetEvent } from './room-pets';
 
 /** member:out 后的宽限：宽限内 member:in 复活同一窗，避免闪断重连时窗口一开一关 */
-const MEMBER_GONE_GRACE_MS = 5 * 60 * 1000; // 5分钟，避免频繁闪断
+const MEMBER_GONE_GRACE_MS = 5 * 60 * 1000;
 
-/** 在场成员顺序（用于布局；进房先后，退房不重排剩余成员顺序） */
+/** 在场房友顺序（不含自己；自己由桌面宠窗或房间本地角色负责显示） */
 let order: string[] = [];
+let displayMode: RoomsDisplayMode = 'desktop';
+let inRoom = false;
+let closingRoomForModeChange = false;
 const graceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function push(memberId: string, channel: string, payload: unknown): void {
@@ -27,100 +36,163 @@ function push(memberId: string, channel: string, payload: unknown): void {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+function pushSnapshot(memberId: string): void {
+  const state = memberStates.get(memberId);
+  if (!state) return;
+  push(memberId, 'roomPet:hello', { nickname: state.nickname });
+  if (state.character) push(memberId, 'roomPet:character', state.character);
+  push(memberId, 'roomPet:state', {
+    mode: state.mode,
+    action: state.action,
+    sign: state.sign,
+  });
+}
+
+function ensureVisible(memberId: string): void {
+  if (memberId === myMemberId) return;
+  ensureRoomPetWindow(memberId);
+  setRoomPetWindowDisplayMode(memberId, displayMode);
+  pushSnapshot(memberId);
+}
+
 function relayout(): void {
-  layoutRoomPetWindows(order);
+  if (displayMode === 'room') layoutRoomPetWindowsInRoom(order);
+  else layoutRoomPetWindows(order);
+}
+
+function closeRoomSceneForModeChange(): void {
+  closingRoomForModeChange = closeRoomWindow();
+}
+
+function applyDisplayMode(): void {
+  closeAllRoomPetWindows();
+  if (!inRoom) {
+    if (displayMode === 'room') closeRoomSceneForModeChange();
+    pushToLounge('rooms:displayMode', displayMode);
+    return;
+  }
+
+  if (displayMode === 'room') {
+    openRoomWindow('QBot 联机小屋');
+  } else {
+    closeRoomSceneForModeChange();
+  }
+
+  for (const memberId of order) ensureVisible(memberId);
+  relayout();
+  pushToLounge('rooms:displayMode', displayMode);
+}
+
+export function getRoomDisplayMode(): RoomsDisplayMode {
+  return displayMode;
+}
+
+export async function setRoomDisplayMode(mode: RoomsDisplayMode): Promise<RoomsDisplayMode> {
+  const nextMode: RoomsDisplayMode = mode === 'room' ? 'room' : 'desktop';
+  await setSettings({ roomsDisplayMode: nextMode });
+  displayMode = nextMode;
+  applyDisplayMode();
+  return displayMode;
+}
+
+export function refreshRoomPetLayout(): void {
+  relayout();
 }
 
 function clearGrace(memberId: string): void {
-  const t = graceTimers.get(memberId);
-  if (t) {
-    clearTimeout(t);
+  const timer = graceTimers.get(memberId);
+  if (timer) {
+    clearTimeout(timer);
     graceTimers.delete(memberId);
   }
 }
 
-function handle(e: RoomPetEvent): void {
-  switch (e.kind) {
+function handle(event: RoomPetEvent): void {
+  switch (event.kind) {
     case 'roomJoined':
+      inRoom = true;
       order = [];
-      // 确保本地用户自己也被添加到成员列表中
-      if (myMemberId && !order.includes(myMemberId)) {
-        order.push(myMemberId);
-      }
+      applyDisplayMode();
       break;
 
     case 'memberIn': {
-      clearGrace(e.member.memberId);
-      ensureRoomPetWindow(e.member.memberId); // 幂等：新成员开窗 / 宽限内复活复用
-      if (!order.includes(e.member.memberId)) {
-        order.push(e.member.memberId);
-        relayout();
-      }
-      push(e.member.memberId, 'roomPet:hello', { nickname: e.member.nickname });
-      if (e.member.mode) {
-        push(e.member.memberId, 'roomPet:state', {
-          mode: e.member.mode,
-          action: e.member.action,
-          sign: e.member.sign,
-        });
-      }
+      if (event.member.memberId === myMemberId) break;
+      clearGrace(event.member.memberId);
+      if (!order.includes(event.member.memberId)) order.push(event.member.memberId);
+      ensureVisible(event.member.memberId);
+      relayout();
       break;
     }
 
     case 'memberOut': {
-      push(e.memberId, 'roomPet:left', undefined);
-      // 宽限期内不关窗：可能只是短暂重连，闪断重连时窗口一开一关很扎眼
-      clearGrace(e.memberId);
+      if (event.memberId === myMemberId) break;
+      push(event.memberId, 'roomPet:left', undefined);
+      clearGrace(event.memberId);
       graceTimers.set(
-        e.memberId,
+        event.memberId,
         setTimeout(() => {
-          graceTimers.delete(e.memberId);
-          // 从成员列表中移除
-          order = order.filter((id) => id !== e.memberId);
-          // 关闭角色窗口
-          closeRoomPetWindow(e.memberId);
+          graceTimers.delete(event.memberId);
+          order = order.filter((id) => id !== event.memberId);
+          closeRoomPetWindow(event.memberId);
           relayout();
-          // 清理成员状态
-          memberStates?.delete(e.memberId);
+          memberStates.delete(event.memberId);
         }, MEMBER_GONE_GRACE_MS),
       );
       break;
     }
 
     case 'character':
-      push(e.memberId, 'roomPet:character', e.character);
+      push(event.memberId, 'roomPet:character', event.character);
       break;
 
     case 'progress':
-      push(e.memberId, 'roomPet:progress', { received: e.received, total: e.total });
+      push(event.memberId, 'roomPet:progress', { received: event.received, total: event.total });
       break;
 
     case 'presence':
-      push(e.memberId, 'roomPet:state', { mode: e.mode, action: e.action, sign: e.sign });
+      push(event.memberId, 'roomPet:state', { mode: event.mode, action: event.action, sign: event.sign });
       break;
 
     case 'chat':
-      push(e.memberId, 'roomPet:chat', { text: e.text });
+      push(event.memberId, 'roomPet:chat', { text: event.text });
       break;
 
     case 'packFailed':
-      push(e.memberId, 'roomPet:packFailed', undefined);
+      push(event.memberId, 'roomPet:packFailed', undefined);
       break;
 
     case 'roomLeft':
-      for (const t of graceTimers.values()) clearTimeout(t);
+      for (const timer of graceTimers.values()) clearTimeout(timer);
       graceTimers.clear();
+      inRoom = false;
       order = [];
       closeAllRoomPetWindows();
+      if (displayMode === 'room') {
+        closeRoomSceneForModeChange();
+      }
       break;
   }
 }
 
 let wired = false;
 
-/** index.ts 启动时调一次即可（幂等），把显示层挂到事件流上 */
+/** index.ts 启动时调一次即可（幂等），把显示层挂到事件流上。 */
 export function wireRoomPetDisplay(): void {
   if (wired) return;
   wired = true;
   onRoomPetEvent(handle);
+  onRoomWindowBoundsChanged(relayout);
+  onRoomWindowClosed(() => {
+    if (closingRoomForModeChange) {
+      closingRoomForModeChange = false;
+      return;
+    }
+    if (inRoom && displayMode === 'room') void setRoomDisplayMode('desktop');
+  });
+  void getSettings().then((settings) => {
+    setRoomSizePreset(settings.roomSizePreset ?? 'large');
+    displayMode = settings.roomsDisplayMode === 'room' ? 'room' : 'desktop';
+    if (inRoom) applyDisplayMode();
+    else pushToLounge('rooms:displayMode', displayMode);
+  });
 }

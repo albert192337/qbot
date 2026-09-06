@@ -45,7 +45,7 @@ import {
   type AgentActionConfig,
 } from '@qbot/pipeline';
 import type { HatchStatus } from '../shared/ipc-types';
-import { charactersDir, getCharacter } from './characters';
+import { charactersDir, getCharacter, restoreGenerationTask } from './characters';
 import { getSettings } from './config';
 import { broadcastCharacterActivated, getConsoleWindow } from './windows';
 import { rebuildTray } from './tray';
@@ -153,6 +153,7 @@ export async function startHatch(
   const outDir = path.join(charactersDir(), dirId);
   await mkdir(outDir, { recursive: true });
   const job = await Job.create(outDir, { refImagePath, imageProvider, characterForm, characterStyle });
+  await restoreGenerationTask(dirId);
   runJob(dirId, job);
   return dirId;
 }
@@ -162,6 +163,7 @@ export async function resumeHatch(dirId: string): Promise<void> {
   if (active.has(dirId)) return; // 已在跑
   const outDir = path.join(charactersDir(), dirId);
   const job = await Job.load(outDir);
+  await restoreGenerationTask(dirId);
   runJob(dirId, job);
 }
 
@@ -195,6 +197,7 @@ export async function getHatchStatus(dirId: string): Promise<HatchStatus | null>
   }
   return {
     stage: state.stage,
+    running: !!entry,
     imageProvider: state.imageProvider,
     candidateUrls:
       state.stage === 'awaiting_pick'
@@ -244,6 +247,7 @@ async function rerunActions(dirId: string, actionIds: ActionId[]): Promise<void>
     job.state.actions[id] = { status: 'pending', attempts: { frame: 0, video: 0 } };
   }
   await job.save();
+  await restoreGenerationTask(dirId);
 
   const entry: ActiveHatch = { dirId, job, pickResolver: null, lastCandidates: [] };
   active.set(dirId, entry);
@@ -274,7 +278,7 @@ async function rerunActions(dirId: string, actionIds: ActionId[]): Promise<void>
 }
 
 /**
- * 重新生成三视图（**花钱且连带**：三视图是所有动作的参考图，换了必须重生全部 6 个动作，
+ * 重新生成三视图（**花钱且连带**：三视图是所有动作的参考图，换了必须重生全部默认动作，
  * 约 6 条视频）。复用 runPipeline 的「候选 → awaiting_pick → 挑图」循环，
  * 挑图界面就是现有的孵化窗。
  */
@@ -288,6 +292,7 @@ export async function regenerateTurnaround(dirId: string): Promise<void> {
     job.state.actions[id] = { status: 'pending', attempts: { frame: 0, video: 0 } };
   }
   await job.save();
+  await restoreGenerationTask(dirId);
   runJob(dirId, job); // 内部已挂 pickCandidate hook + 进度广播
 }
 
@@ -333,7 +338,7 @@ export async function savePersona(dirId: string, persona: string): Promise<void>
 /** 动作名合法字符：字母数字下划线或中文（用作文件名，禁路径分隔符与保留字符） */
 const ACTION_NAME_RE = /^[\w一-鿿]+$/;
 
-/** 读角色的 characterForm（M 档按形态取 prompt 变体；state.json 缺失回落人形） */
+/** 读角色的 characterForm（预设动作按形态取 prompt 变体；state.json 缺失回落人形） */
 async function readCharacterForm(outDir: string): Promise<CharacterForm | undefined> {
   try {
     const raw = await readFile(path.join(outDir, '.job', 'state.json'), 'utf8');
@@ -344,7 +349,7 @@ async function readCharacterForm(outDir: string): Promise<CharacterForm | undefi
 }
 
 /**
- * 生成 M 档表现力动作（spec 2026-08-21-expression-action-tier §6）。
+ * 生成可选预设动作（底层沿用 expressionActions 字段以兼容既有资产包）。
  * 复用自定义动作管线（首帧→视频→抠像→webm/gif→回写 manifest→热重载），
  * prompt 取官方 EXPRESSION 表（非用户输入），落 manifest.expressionActions。
  * 幂等：已 done 的不重复生成（花钱）；pending/failed 视为可重试重生成。
@@ -353,8 +358,8 @@ async function readCharacterForm(outDir: string): Promise<CharacterForm | undefi
 /**
  * 生成新动作的参考图：优先三视图（turnaround.png），
  * 老角色/市场导入角色没存三视图，回退到 source.png（首帧单图，足以当参考）。
- * 之前硬读 turnaround.png —— 缺它时任意自定义/表现力动作都 ENOENT 失败，
- * 这正是「M 档动作生成失败、可用列表里永远没有它们」的物理根因。
+ * 之前硬读 turnaround.png —— 缺它时任意自定义/预设动作都 ENOENT 失败，
+ * 这正是「预设动作生成失败、可用列表里永远没有它们」的物理根因。
  */
 async function readReferenceImage(outDir: string): Promise<Buffer> {
   for (const rel of ['turnaround.png', 'source.png']) {
@@ -371,7 +376,7 @@ export async function generateExpressionAction(
   action: ExpressionActionId,
 ): Promise<void> {
   if (!EXPRESSION_ACTION_IDS.includes(action)) {
-    throw new Error(`未知的 M 档动作：${action}`);
+    throw new Error(`未知的预设动作：${action}`);
   }
   const outDir = path.join(charactersDir(), dirId);
   const manifestPath = path.join(outDir, 'manifest.json');
@@ -397,6 +402,7 @@ export async function generateExpressionAction(
     },
   };
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  await restoreGenerationTask(dirId);
   broadcastCustomAction(dirId, action, 'pending');
 
   // 后台生成（同 addCustomAction 的 detach 策略）
@@ -410,7 +416,7 @@ export async function generateExpressionAction(
   });
 }
 
-/** M 档生成流程：与 generateCustomAction 同一链路，只是回写 expressionActions */
+/** 预设动作生成流程：与 generateCustomAction 同一链路，只是回写 expressionActions */
 async function generateExpressionActionInner(a: {
   dirId: string;
   outDir: string;
@@ -484,7 +490,7 @@ async function generateExpressionActionInner(a: {
   }
 }
 
-/** 回写单个 M 档动作的状态（重读 manifest 避免覆盖并发改动，同 patchCustomActionStatus） */
+/** 回写单个预设动作的状态（重读 manifest 避免覆盖并发改动，同 patchCustomActionStatus） */
 async function patchExpressionActionStatus(
   manifestPath: string,
   action: string,
@@ -546,6 +552,7 @@ export async function addCustomAction(
     [name]: { webm: `actions/${name}.webm`, gif: `actions/${name}.gif`, durationSec, status: 'pending' },
   };
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  await restoreGenerationTask(dirId);
   broadcastCustomAction(dirId, name, 'pending');
 
   // 后台生成，不阻塞 IPC 返回

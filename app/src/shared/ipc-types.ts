@@ -13,6 +13,8 @@ import type {
 import type { FurnitureTier } from './furniture';
 
 export interface CharacterMeta {
+  /** User removed this character’s current generation record from the task list. */
+  taskDismissed?: boolean;
   /** 目录名（qbot-asset:// 的 host） */
   dirId: string;
   manifest: Manifest;
@@ -57,6 +59,10 @@ export interface Settings {
   roomsChatConsent?: boolean;
   /** 在公共房间展示我的桌宠（默认 true；关闭则不上传角色包、房友只见缩略图） */
   roomsShowMyPet?: boolean;
+  /** 联机空间的本地展示方式：房间场景或透明桌面（只影响本机，不改变房间连接） */
+  roomsDisplayMode?: RoomsDisplayMode;
+  /** 联机房间场景窗口大小（默认 large） */
+  roomSizePreset?: RoomSizePreset;
 
   /** 本地记录前台应用与窗口标题（默认 false；原始记录保留 7 天，不出本机） */
   foregroundObservationEnabled?: boolean;
@@ -85,6 +91,8 @@ export interface HatchProgress extends ProgressEvent {
 
 /** 孵化状态快照（进度屏进入时铺底，之后消费增量事件；见 hatch-progress-ux spec §四） */
 export interface HatchStatus {
+  /** Whether this job is running in the current application process. */
+  running?: boolean;
   stage: Stage;
   /** 三视图等待态文案需要区分后端（Seedream/gpt-image-2 时长差 10 倍） */
   imageProvider?: ImageProvider;
@@ -315,6 +323,10 @@ export interface RoomsStatus {
   error?: string;
 }
 
+/** 同一联机房间的两种本地呈现方式。 */
+export type RoomsDisplayMode = 'room' | 'desktop';
+export type RoomSizePreset = 'small' | 'medium' | 'large';
+
 /** 开房参数 */
 export interface CreateRoomInput {
   name: string;
@@ -389,6 +401,8 @@ export interface QBotApi {
     ): Promise<string>;
     /** 续跑一个未完成的孵化 */
     resume(dirId: string): Promise<void>;
+    /** Remove the list record; preserve assets and any running generation. */
+    deleteTask(dirId: string): Promise<void>;
     /** 重试已完成角色的失败动作 */
     redo(dirId: string): Promise<void>;
     pickTurnaround(dirId: string, index: number): Promise<void>;
@@ -480,6 +494,8 @@ export interface QBotApi {
   /** 公共房间（spec 2026-08-21）：联机唯一链路（原 1v1 已退役） */
   rooms: {
     open(): void;
+    getDisplayMode(): Promise<RoomsDisplayMode>;
+    setDisplayMode(mode: RoomsDisplayMode): Promise<RoomsDisplayMode>;
     list(kind?: RoomKind, q?: string): Promise<RoomBrief[]>;
     create(input: CreateRoomInput): Promise<string>;
     join(roomId: string): Promise<RoomSnapshot>;
@@ -504,6 +520,7 @@ export interface QBotApi {
     toggleFavorite(roomId: string): Promise<string[]>;
     disconnect(): Promise<void>;
     onStatus(cb: (s: RoomsStatus) => void): () => void;
+    onDisplayModeChanged(cb: (mode: RoomsDisplayMode) => void): () => void;
     /** 进房历史（换房/重进时整批替换，不是增量） */
     onHistory(cb: (chat: RoomChatMsg[]) => void): () => void;
     onChat(cb: (msg: RoomChatMsg) => void): () => void;
@@ -516,10 +533,12 @@ export interface QBotApi {
     onError(cb: (msg: string) => void): () => void;
   };
   room: {
-    /** 单击桌宠：角色走进小房间（pet 窗隐藏 → room 窗弹出） */
+    /** 兼容旧调用：打开统一联机空间 */
     open(): void;
     /** 贴纸窗拖拽移动（send，不走 invoke） */
     move(screenX: number, screenY: number): void;
+    getSizePreset(): Promise<RoomSizePreset>;
+    setSizePreset(preset: RoomSizePreset): Promise<RoomSizePreset>;
     /** 鼠标出入房间实体轮廓：透明区穿透开关 */
     setIgnoreMouse(ignore: boolean): void;
   };
@@ -603,7 +622,7 @@ export interface QBotApi {
     saveTurnaroundPrompt(dirId: string, prompt: string): Promise<void>;
     /** 按当前 prompt 重新生成指定动作（**花钱**，每动作约 ¥1） */
     regenerateActions(dirId: string, actionIds: string[]): Promise<void>;
-    /** M 档表现力动作（smug/point/turn_away/cheer）：官方 prompt 按需生成 */
+    /** 官方预设动作：按需生成 */
     generateExpressionAction(dirId: string, action: string): Promise<void>;
     /** 重新生成三视图并连带重生全部动作（**花钱**，约 6 条视频）；挑图走孵化窗 */
     regenerateTurnaround(dirId: string): Promise<void>;

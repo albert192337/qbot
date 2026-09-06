@@ -5,6 +5,7 @@
  * 不能从 @qbot/pipeline value-import（会把整个 index 拖进浏览器包，构建直接失败）。
  */
 import type { ActionId, Manifest, ManifestAction, PromptData } from '@qbot/pipeline';
+import { getEditingCharacter, navigate } from '../workspace';
 import type { CharacterMeta } from '../../../shared/ipc-types';
 
 /** 标准动作的中文标签（自定义动作直接用动作名）。
@@ -12,6 +13,7 @@ import type { CharacterMeta } from '../../../shared/ipc-types';
 export const STD_LABELS: Partial<Record<ActionId, string>> = {
   idle: '待机', drag: '拖拽', sleep: '睡觉', tea: '喝茶',
   talk_happy: '聊天·开心', talk_annoyed: '聊天·嫌弃',
+  wave: '挥手问候', stretch: '伸懒腰',
 };
 
 export interface ActionInfo {
@@ -22,7 +24,10 @@ export interface ActionInfo {
   motionDesc: string;
   durationSec: number;
   isCustom: boolean;
-  /** M 档表现力动作（官方预制一次性表演，未生成的可在此生成） */
+  isImported?: boolean;
+  webm?: string;
+  gif?: string;
+  /** 官方预设动作（按需生成） */
   isExpression?: boolean;
 }
 
@@ -70,15 +75,19 @@ export function hasDirtyControls(root: HTMLElement | null, selector = 'input:not
   );
 }
 
-/** M 档表现力动作的中文标签（本地重声明，坑 12：renderer 不能 value-import pipeline） */
+/** 可选预设动作的中文标签（本地重声明，坑 12：renderer 不能 value-import pipeline） */
 export const EXPRESSION_LABELS: Record<string, string> = {
   smug: '得意坏笑',
   point: '指认',
   turn_away: '背过身',
   cheer: '庆祝欢呼',
+  nod: '点头认可',
+  curious: '疑惑歪头',
+  dance: '开心摇摆',
+  comfort: '温柔安慰',
 };
 
-/** 汇总标准动作 + M 档表现力动作 + 自定义动作，供动作列表与联动下拉共用 */
+/** 汇总已生成的默认动作、预设动作和自定义动作，供动作列表与联动下拉共用。 */
 export function collectActions(m: Manifest, prompts?: PromptData): ActionInfo[] {
   const actions: ActionInfo[] = [];
   for (const [id, a] of Object.entries(m.actions) as [ActionId, ManifestAction][]) {
@@ -90,7 +99,31 @@ export function collectActions(m: Manifest, prompts?: PromptData): ActionInfo[] 
       poseDesc: pa?.poseDesc ?? '',
       motionDesc: pa?.motionDesc ?? '',
       durationSec: a.durationSec,
+      webm: a.webm,
+      gif: a.gif,
       isCustom: false,
+    });
+  }
+  for (const [id, a] of Object.entries(m.importedActions ?? {})) {
+    const prior = actions.findIndex((item) => item.id === id);
+    if (prior >= 0) actions.splice(prior, 1);
+    actions.push({ id, label: STD_LABELS[id as ActionId] ?? id, status: 'done',
+      poseDesc: '', motionDesc: '', durationSec: a.durationSec, webm: a.webm,
+      isCustom: false, isImported: true });
+  }
+  for (const [id, a] of Object.entries(m.expressionActions ?? {})) {
+    if (a.status !== 'done') continue;
+    actions.push({
+      id,
+      label: EXPRESSION_LABELS[id] ?? id,
+      status: a.status,
+      poseDesc: '',
+      motionDesc: '',
+      durationSec: a.durationSec,
+      webm: a.webm,
+      gif: a.gif,
+      isCustom: false,
+      isExpression: true,
     });
   }
   for (const [name, a] of Object.entries(m.customActions ?? {})) {
@@ -101,14 +134,16 @@ export function collectActions(m: Manifest, prompts?: PromptData): ActionInfo[] 
       poseDesc: '',
       motionDesc: '',
       durationSec: a.durationSec,
+      webm: a.webm,
+      gif: a.gif,
       isCustom: true,
     });
   }
-  return actions;
+  return [...new Map(actions.map((action) => [action.id, action])).values()];
 }
 
 /**
- * M 档表现力动作清单（含未生成的）：供「人设与动作」pane 的生成入口展示。
+ * 可选预设动作清单（含未生成的）：供「人设与动作」pane 的生成入口展示。
  * 已生成的从 manifest 读状态；未生成的合成 status = 'none' 条目。
  */
 export function collectExpressionActions(m: Manifest): ActionInfo[] {
@@ -117,6 +152,10 @@ export function collectExpressionActions(m: Manifest): ActionInfo[] {
     ['point', '指认'],
     ['turn_away', '背过身'],
     ['cheer', '庆祝欢呼'],
+    ['nod', '点头认可'],
+    ['curious', '疑惑歪头'],
+    ['dance', '开心摇摆'],
+    ['comfort', '温柔安慰'],
   ];
   return ALL.map(([id, label]) => {
     const a = m.expressionActions?.[id];
@@ -145,10 +184,11 @@ export interface StudioContext {
  * 守卫只影响本 pane 内容，绝不能 return 掉控制台侧栏（旧 studio 就是这么变成死页的）。
  */
 export async function loadStudioContext(root: HTMLElement): Promise<StudioContext | null> {
-  const meta = await window.qbot.characters.getActive();
+  const meta = await getEditingCharacter();
   if (!meta?.manifest) {
     root.innerHTML =
-      '<div class="pane-placeholder">还没有激活的角色。先在「我的角色」里选一只，或去「孵化新角色」造一只。</div>';
+      '<div class="pane-placeholder"><b>选择一只角色，开始编辑</b><p>你可以先创建角色，也可以从角色库选择已有角色。</p><div class="btn-row"><button class="btn primary" data-go="characters">打开角色库</button><button class="btn" data-go="hatch">创建角色</button></div></div>';
+    root.querySelectorAll<HTMLButtonElement>('[data-go]').forEach((button) => button.addEventListener('click', () => navigate({ pane: button.dataset.go! })));
     return null;
   }
   let prompts: PromptData | undefined;

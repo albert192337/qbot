@@ -4,7 +4,7 @@
  * 铁律：本模块（整个 pipeline/）不得 import 任何 Electron API。
  */
 
-/** S 档 6 个动作 ID（spec §0） */
+/** 新角色默认生成的 8 个动作 ID。 */
 export const ACTION_IDS = [
   'idle',
   'drag',
@@ -12,27 +12,31 @@ export const ACTION_IDS = [
   'tea',
   'talk_happy',
   'talk_annoyed',
+  'wave',
+  'stretch',
 ] as const;
 
 export type ActionId = (typeof ACTION_IDS)[number];
 
 /**
- * M 档表现力动作（spec 2026-08-21-expression-action-tier）：一次性表演动作，
- * 播完回落 idle（区别于 S 档的常驻状态循环）。**不进孵化流程**，按需增量生成。
- * 首批 4 个（agent 元层评论 + 沉默类 + done 态），后续扩到 12。
- * 顺序即解锁优先级：smug → point → turn_away → cheer。
+ * 可选预设动作：一次性表演，播完回落 idle。为了控制首次生成成本，
+ * 不进入默认孵化流程，可在角色工作台按需补充。
  */
 export const EXPRESSION_ACTION_IDS = [
   'smug', // 得意坏笑（损人设物理载体：吐槽/反成就/agent 嘴替）
   'point', // 指认（举证/做戏/元层）
   'turn_away', // 背过身（沉默类整族：闹别扭而非卡死）
   'cheer', // 庆祝欢呼（done 态/正向成就/伏笔兑现）
+  'nod', // 点头认可
+  'curious', // 疑惑歪头
+  'dance', // 开心摇摆
+  'comfort', // 温柔安慰
 ] as const;
 
 export type ExpressionActionId = (typeof EXPRESSION_ACTION_IDS)[number];
 
 /**
- * 可播放动作 id：6 个标准动作 **或** 用户自定义动作名（manifest.customActions 的 key）。
+ * 可播放动作 id：默认动作 **或** 用户自定义/预设动作名。
  * `string & {}` 的写法保留 ActionId 的编辑器自动补全，同时接受任意自定义名。
  */
 export type PlayableId = ActionId | (string & {});
@@ -171,9 +175,8 @@ export interface Manifest {
   /** 自定义动作（用户新增的额外动作，key 为 action name） */
   customActions?: Record<string, ManifestAction>;
   /**
-   * M 档表现力动作（官方预制的一次性表演动作，spec 2026-08-21-expression-action-tier）。
-   * key 为 ExpressionActionId（smug/point/turn_away/cheer…），按需增量生成、不进孵化流程。
-   * 与 customActions 分开存：官方动作 vs 用户自建，UI 分区、不误删、房间分发显式带上。
+   * 官方可选预设动作。沿用 expressionActions 字段以兼容既有资产包，
+   * 产品界面统一称为「预设动作」，与用户自建动作区分。
    */
   expressionActions?: Record<string, ManifestAction>;
   /**

@@ -32,7 +32,7 @@ import {
   type PipelineConfig,
 } from './types.js';
 
-const TURNAROUND_CANDIDATES = 3;
+const TURNAROUND_CANDIDATES = 1;
 const FRAME_MAX_ATTEMPTS = 2; // 帧 QC 不过自动重试 1 次
 const POLL_INTERVAL_MS = 5000;
 const POLL_TIMEOUT_MS = 15 * 60 * 1000;
@@ -54,7 +54,7 @@ export interface PipelineHooks {
 
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** Stage 1：生成三视图候选（同 prompt 并发 3 次独立请求） */
+/** Stage 1：每次生成一张三视图；不满意时由用户明确触发重新生成。 */
 export async function runTurnaround(job: Job, ark: ArkClient): Promise<string[]> {
   await job.setStage('turnaround');
   const refPng = await readFile(path.join(job.outDir, job.state.refImage));

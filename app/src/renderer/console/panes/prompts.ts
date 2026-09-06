@@ -8,6 +8,7 @@ import type { ActionId } from '@qbot/pipeline';
 import { STD_LABELS, confirmBox, esc, guard, hasDirtyControls, loadStudioContext, markControlsClean, trackDirtyControls, toast } from './_studio-shared';
 
 let paneRoot: HTMLElement | null = null;
+let boundDirId: string | null = null;
 
 export async function mount(root: HTMLElement): Promise<void> {
   paneRoot = root;
@@ -19,7 +20,7 @@ export function unmount(): void {
 }
 
 export async function onVisible(): Promise<void> {
-  await refresh();
+  if (!hasUnsavedChanges()) await refresh();
 }
 
 export function hasUnsavedChanges(): boolean {
@@ -27,14 +28,30 @@ export function hasUnsavedChanges(): boolean {
 }
 
 export async function discardChanges(): Promise<void> {
-  await refresh();
+  await refresh(true);
 }
 
-async function refresh(): Promise<void> {
+async function refreshPreservingDrafts(): Promise<void> {
+  if (!paneRoot) return;
+  const drafts = Array.from(paneRoot.querySelectorAll<HTMLTextAreaElement>('textarea'))
+    .filter((control) => control.dataset.initialValue !== control.value)
+    .map((control) => ({ id: control.id, action: control.closest<HTMLElement>('[data-action]')?.dataset.action,
+      className: control.className, value: control.value }));
+  await refresh(true);
+  for (const draft of drafts) {
+    const selector = draft.id ? `#${CSS.escape(draft.id)}` : `[data-action="${CSS.escape(draft.action ?? '')}"] .${CSS.escape(draft.className)}`;
+    const control = paneRoot.querySelector<HTMLTextAreaElement>(selector);
+    if (control) { control.value = draft.value; control.closest('details')?.setAttribute('open', ''); }
+  }
+}
+
+async function refresh(force = false): Promise<void> {
   const root = paneRoot;
   if (!root) return;
   const ctx = await loadStudioContext(root);
   if (!ctx) return;
+  if (!force && boundDirId === ctx.dirId && hasUnsavedChanges()) return;
+  boundDirId = ctx.dirId;
   if (!ctx.prompts) {
     root.innerHTML =
       '<div class="pane-placeholder">无法加载生成提示（.job/state.json 可能缺失，老角色或已清理）。</div>';
@@ -43,7 +60,7 @@ async function refresh(): Promise<void> {
   const prompts = ctx.prompts;
 
   let html = '<div class="studio-body">';
-  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台 · 高级</p><h2>高级生成</h2><p class="page-summary">只有需要精确控制生成结果时才修改完整 Prompt。</p></div></div>`;
+  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台 · 高级</p><h2>高级生成</h2><p class="page-summary">需要精确控制动作生成时，再调整完整 Prompt 与生成参数。</p></div></div>`;
 
   html += `<h3>生成参数</h3>`;
   html += `<div class="config-params">`;
@@ -59,7 +76,7 @@ async function refresh(): Promise<void> {
   html += `</div>`;
 
   // ── 三视图 prompt ──
-  html += `<details class="prompt-block" open>`;
+  html += `<details class="prompt-block">`;
   html += `<summary><span><b>三视图 Prompt</b><small>所有动作共用的角色参考图</small></span>${prompts.turnaroundCustomized ? '<span class="badge-custom">已自定义</span>' : ''}</summary>`;
   html += `<textarea id="turnaround-prompt" rows="6">${esc(prompts.turnaroundPrompt)}</textarea>`;
   html += `<div class="btn-row">`;
@@ -67,9 +84,8 @@ async function refresh(): Promise<void> {
   html += `<button id="reset-turnaround" class="btn ghost">恢复默认</button>`;
   html += `<button id="regen-turnaround" class="btn danger">保存并重生三视图（约 ¥6）</button>`;
   html += `</details>`;
-  html += `<p class="studio-hint">三视图是所有动作的参考图 —— 换了它必须连带重新生成全部 6 个动作，`;
-  html += `否则新旧风格对不上。挑图界面会切到「孵化新角色」。</p>`;
-  html += `</div>`;
+  html += `<p class="studio-hint">三视图是所有动作的参考图 —— 换了它必须连带重新生成全部 8 个动作，`;
+  html += `否则新旧风格对不上。生成后会切到「生成任务」确认新的角色方案。</p>`;
 
   // ── 每个动作的 prompt ──
   html += `<h3>动作 Prompt</h3>`;
@@ -78,6 +94,10 @@ async function refresh(): Promise<void> {
     const custom = p.framePromptCustomized || p.videoPromptCustomized;
     html += `<details class="prompt-block" data-action="${esc(id)}"${custom ? ' open' : ''}>`;
     html += `<summary><span><b>${esc(label)}</b><small>${esc(id)}</small></span>${custom ? '<span class="badge-custom">已自定义</span>' : ''}</summary>`;
+    html += `<label>起始姿势</label><textarea class="pose-desc" rows="2">${esc(p.poseDesc)}</textarea>`;
+    html += `<label>动作过程</label><textarea class="motion-desc" rows="2">${esc(p.motionDesc)}</textarea>`;
+    html += `<button class="save-description btn" data-id="${esc(id)}">保存动作描述</button>`;
+    html += `<p class="studio-hint">下方完整提示词是高级覆盖项；存在覆盖时，生成以完整提示词为准。</p>`;
     html += `<label>首帧 Prompt</label>`;
     html += `<textarea class="frame-prompt" rows="5">${esc(p.framePrompt)}</textarea>`;
     html += `<label>视频 Prompt</label>`;
@@ -89,7 +109,6 @@ async function refresh(): Promise<void> {
     html += `<button class="reset-full btn ghost" data-id="${esc(id)}">恢复默认</button>`;
     html += `<button class="regen-action btn danger" data-id="${esc(id)}">保存并重新生成（约 ¥1）</button>`;
     html += `</details>`;
-    html += `</div>`;
   }
   html += '</div>';
 
@@ -117,7 +136,8 @@ function bind(root: HTMLElement, dirId: string): void {
       if (!(await confirmBox(root, '恢复默认模板？你当前编辑的内容会丢失。'))) return;
       await guard(root, btn, '处理中…', async () => {
         await window.qbot.studio.saveTurnaroundPrompt(dirId, '');
-        await refresh();
+        markControlsClean(turnaroundTa());
+        await refreshPreservingDrafts();
       });
     })();
   });
@@ -127,18 +147,29 @@ function bind(root: HTMLElement, dirId: string): void {
     void (async () => {
       const ok = await confirmBox(
         root,
-        '这会重新生成三视图，并连带重新生成全部 6 个动作。\n\n' +
-          '预计费用：3 张三视图候选 + 6 张首帧 + 6 条视频（约 ¥6 以上）。\n' +
-          '过程中会切到「孵化新角色」让你挑三视图。\n\n确定继续？',
+        '这会重新生成一张三视图，并连带重新生成全部 8 个动作。\n\n' +
+          '预计消耗：1 张三视图 + 8 张首帧 + 8 条视频。\n' +
+          '过程中会切到「生成任务」让你确认新的角色方案。\n\n确定继续？',
       );
       if (!ok) return;
       await guard(root, btn, '已启动…', async () => {
         await window.qbot.studio.saveTurnaroundPrompt(dirId, turnaroundTa().value);
+        markControlsClean(turnaroundTa());
         await window.qbot.studio.regenerateTurnaround(dirId);
-        toast(root, '已开始重新生成，请到「孵化新角色」挑选三视图');
+        toast(root, '已开始重新生成，请到「生成任务」确认新的角色方案');
       });
     })();
   });
+
+  root.querySelectorAll<HTMLButtonElement>('.save-description').forEach((button) => button.addEventListener('click', () => {
+    const block = button.closest('.prompt-block')!;
+    const pose = block.querySelector<HTMLTextAreaElement>('.pose-desc')!;
+    const motion = block.querySelector<HTMLTextAreaElement>('.motion-desc')!;
+    void guard(root, button, '保存中…', async () => {
+      await window.qbot.studio.saveActionPrompt(dirId, button.dataset.id!, pose.value, motion.value);
+      markControlsClean(pose, motion); toast(root, '动作描述已保存，重新生成时生效。');
+    });
+  }));
 
   const readBlock = (id: string): { frame: string; video: string } => {
     const block = root.querySelector(`.prompt-block[data-action="${CSS.escape(id)}"]`)!;
@@ -171,7 +202,9 @@ function bind(root: HTMLElement, dirId: string): void {
         if (!(await confirmBox(root, `把「${id}」的 prompt 恢复成默认模板？`))) return;
         await guard(root, btn, '处理中…', async () => {
           await window.qbot.studio.saveFullPrompts(dirId, id, '', '');
-          await refresh();
+          const block = btn.closest('.prompt-block');
+          markControlsClean(block?.querySelector<HTMLTextAreaElement>('.frame-prompt'), block?.querySelector<HTMLTextAreaElement>('.video-prompt'));
+          await refreshPreservingDrafts();
         });
       })();
     });
@@ -192,7 +225,7 @@ function bind(root: HTMLElement, dirId: string): void {
           await window.qbot.studio.saveFullPrompts(dirId, id, frame, video);
           await window.qbot.studio.regenerateActions(dirId, [id]);
           toast(root, `「${id}」重新生成完成，桌宠已重新加载`);
-          await refresh();
+          await refreshPreservingDrafts();
         });
       })();
     });

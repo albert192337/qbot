@@ -8,13 +8,32 @@
  * 服务端 `rooms/server.mjs` 有一份同规则的权威实现。两边参数必须一致，
  * 改一处记得改另一处——服务端不信客户端，客户端也不该比服务端松。
  */
-import type { RoomBrief, RoomChatMsg, RoomKind } from '../../shared/ipc-types';
+import type { RoomBrief, RoomChatMsg, RoomKind, RoomSizePreset } from '../../shared/ipc-types';
 
 /** 协议版本：与 rooms/server.mjs 的 PROTO_VER 必须一致。v2 = 角色包分发（上屏） */
 export const PROTO_VER = 2;
 
 /** 角色包指纹格式（sha256 前 16 位十六进制，同服务端） */
 export const PACK_HASH_RE = /^[0-9a-f]{16}$/;
+
+export const ROOM_SIZE_BY_PRESET: Readonly<Record<RoomSizePreset, number>> = {
+  small: 640,
+  medium: 800,
+  large: 960,
+};
+
+export function normalizeRoomSizePreset(value: unknown): RoomSizePreset {
+  return value === 'small' || value === 'medium' ? value : 'large';
+}
+
+export function resolveRoomSceneSize(
+  preset: RoomSizePreset,
+  workAreaWidth: number,
+  workAreaHeight: number,
+): number {
+  const fits = Math.floor(Math.min(workAreaWidth, workAreaHeight) * 0.9);
+  return Math.max(480, Math.min(ROOM_SIZE_BY_PRESET[preset], 1024, fits));
+}
 
 /**
  * `.peer-` 缓存 LRU 淘汰：给定候选目录（已排除在用的）+ 保留上限，
@@ -62,6 +81,34 @@ export function layoutRoomPets(
       x: rowStartX + col * (petSize + gap),
       bottomOffset: (row + 1) * petSize + row * gap,
     };
+  });
+}
+
+/**
+ * 房间场景模式的宠物槽位：沿房间下半部排列，行间轻微上移，避免遮住屋顶区域。
+ * 返回窗口左上角相对房间窗口的坐标；远端宠窗仍使用固定尺寸，避免透明窗缩放回归。
+ */
+export function layoutRoomScenePets(
+  memberIds: readonly string[],
+  roomWidth: number,
+  roomHeight: number,
+  petSize: number,
+  gap: number,
+): Array<{ memberId: string; x: number; y: number }> {
+  if (memberIds.length === 0) return [];
+  const sidePadding = Math.max(24, Math.round(roomWidth * 0.08));
+  const usableWidth = Math.max(petSize, roomWidth - sidePadding * 2);
+  const perRow = Math.max(1, Math.floor((usableWidth + gap) / (petSize + gap)));
+  const rowStep = Math.round(petSize * 0.72);
+  const floorBottom = Math.round(roomHeight * 0.9);
+  return memberIds.map((memberId, index) => {
+    const row = Math.floor(index / perRow);
+    const rowStart = row * perRow;
+    const inRow = Math.min(perRow, memberIds.length - rowStart);
+    const rowWidth = inRow * petSize + (inRow - 1) * gap;
+    const x = (roomWidth - rowWidth) / 2 + (index - rowStart) * (petSize + gap);
+    const y = floorBottom - petSize - row * rowStep;
+    return { memberId, x, y };
   });
 }
 
