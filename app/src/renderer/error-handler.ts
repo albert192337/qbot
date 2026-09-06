@@ -47,10 +47,7 @@ window.addEventListener('abort', (event) => {
  * 报告错误到主进程
  */
 function reportErrorToService(type: string, data: Record<string, unknown>): void {
-  // 发送到主进程
-  if (window.qbot?.error) {
-    window.qbot.error.report({ type, ...data });
-  }
+  // 当前仅本地记录；preload 没有远端错误上报接口。
   // 同时打印到控制台
   console.log(`[error-report] ${type}:`, JSON.stringify(data, null, 2));
 }

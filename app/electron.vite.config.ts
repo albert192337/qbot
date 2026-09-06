@@ -19,6 +19,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          nursery: resolve(__dirname, 'src/renderer/nursery/index.html'),
           pet: resolve(__dirname, 'src/renderer/pet/index.html'),
           room: resolve(__dirname, 'src/renderer/room/index.html'),
           bubble: resolve(__dirname, 'src/renderer/bubble/index.html'),

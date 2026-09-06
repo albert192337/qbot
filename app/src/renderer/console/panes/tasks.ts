@@ -3,14 +3,15 @@ import { esc, guard, confirmBox } from './_studio-shared';
 let root: HTMLElement | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let revision = 0;
+let off:(()=>void)[]=[];
+export function unmount():void {off.forEach(fn=>fn());off=[];if(timer)clearTimeout(timer);timer=undefined;root=null;++revision;}
 export async function mount(host: HTMLElement): Promise<void> {
   root = host;
   const update = () => {
     if (timer) return;
     timer = setTimeout(() => { timer = undefined; if (root?.classList.contains('active')) void refresh(); }, 750);
   };
-  window.qbot.hatch.onProgress(update);
-  window.qbot.studio.onCustomAction(update);
+  off=[window.qbot.hatch.onProgress(update),window.qbot.hatch.onCloudStatus(update),window.qbot.studio.onCustomAction(update)];
   await refresh();
 }
 export async function onVisible(): Promise<void> { await refresh(); }
@@ -31,7 +32,7 @@ async function refresh(): Promise<void> {
     const actionStates = Object.values(status?.actions ?? {});
     const failed = actionStates.filter((a) => a.status === 'failed').length;
     const done = actionStates.filter((a) => a.status === 'done').length;
-    const label = !isCreation ? `${additions.filter((a) => a.status === 'pending').length} 个生成中 · ${additions.filter((a) => a.status === 'failed').length} 个需重试` : status?.stage === 'awaiting_pick' ? '等待确认形象' : failed ? `${failed} 个动作需要重试` : status?.running ? '正在生成' : status?.stage === 'done' ? '查看生成结果' : '已暂停，可继续';
+    const label = status?.error ? status.error : status?.cloudPhase === 'queued' ? `云端排队中（第 ${status.queuePosition || 1} 位）` : !isCreation ? `${additions.filter((a) => a.status === 'pending').length} 个生成中 · ${additions.filter((a) => a.status === 'failed').length} 个需重试` : status?.stage === 'awaiting_pick' ? '等待确认形象' : failed ? `${failed} 个动作需要重试` : status?.running ? '正在生成' : status?.stage === 'done' ? '查看生成结果' : '已暂停，可继续';
     const row = document.createElement('article'); row.className = 'task-row';
     row.innerHTML = `<div><h3>${esc(character.manifest?.name || '创建中的角色')}</h3><p>${esc(label)}${isCreation && actionStates.length ? ` · 已完成 ${done}/${actionStates.length}` : ''}</p></div><div class="btn-row"><button class="btn primary" data-view>${isCreation ? '查看任务' : '管理动作'}</button>${isCreation && !status?.running && status?.stage !== 'done' ? '<button class="btn" data-resume>继续生成</button>' : ''}<button class="btn danger" data-delete>删除</button></div>`;
     row.querySelector('[data-view]')!.addEventListener('click', () => navigate(isCreation ? { pane: 'hatch', taskId: character.dirId } : { pane: 'persona', dirId: character.dirId }));

@@ -1,3 +1,4 @@
+import { cloudAccount, acknowledgeCloudJob, forgetCloudJob } from './cloud-generation';
 /** IPC 注册：preload 契约的主进程实现 */
 import { BrowserWindow, Menu, dialog, ipcMain } from 'electron';
 import path from 'node:path';
@@ -7,7 +8,7 @@ import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipelin
 import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter, deleteGenerationTask } from './characters';
 import { getSettings, setSettings } from './config';
-import { createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, getPetWindow, getRoomSizePreset, setRoomSizePreset, type ConsolePane } from './windows';
+import { createNurseryWindow, closeRoomWindow, openRoomWindow, createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, getPetWindow, getRoomSizePreset, setRoomSizePreset, type ConsolePane } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, isSecureTransport, reportChat, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms, pushLocalSign } from './rooms/rooms';
 import { getLocalSign, setLocalSign } from './local-sign';
@@ -58,8 +59,10 @@ export function registerIpc(): void {
       imageProvider?: ImageProvider,
       characterForm?: CharacterForm,
       characterStyle?: CharacterStyle,
-    ) => startHatch(refImagePath, imageProvider, characterForm, characterStyle),
+      name?: string,
+    ) => startHatch(refImagePath, imageProvider, characterForm, characterStyle, name),
   );
+  ipcMain.handle('hatch:cloudAccount', (_ev, invite?: string) => cloudAccount(invite));
   ipcMain.handle('hatch:resume', (_ev, dirId: string) => resumeHatch(dirId));
   ipcMain.handle('hatch:redo', (_ev, dirId: string) => redoFailed(dirId));
   ipcMain.handle('hatch:pickTurnaround', (_ev, dirId: string, index: number) =>
@@ -88,6 +91,7 @@ export function registerIpc(): void {
   ipcMain.handle('characters:activate', async (_ev, dirId: string) => {
     const meta = await getCharacter(dirId);
     if (!meta || !meta.manifest) throw new Error(`character not found: ${dirId}`);
+    await acknowledgeCloudJob(dirId);
     await setSettings({ activeCharacter: dirId });
     broadcastCharacterActivated(meta);
     notifyRoomCharacterChanged(); // 公共房间：新形象重新播报给房友（上屏用）
@@ -102,6 +106,7 @@ export function registerIpc(): void {
     await rebuildTray();
   });
   ipcMain.handle('characters:delete', async (_ev, dirId: string) => {
+    await forgetCloudJob(dirId);
     await deleteCharacter(dirId);
     // 如果删的是当前激活角色，清空激活
     const settings = await getSettings();
@@ -126,6 +131,10 @@ export function registerIpc(): void {
   // ── room ───────────────────────────────────────────────
   // 旧的小房间调用兼容到统一联机空间；房间场景由联机空间内的展示模式控制。
   ipcMain.on('room:open', () => createLoungeWindow());
+  ipcMain.on('room:openHome', () => {
+    if (getRoomsStatus().phase === 'in-room') void setRoomDisplayMode('room');
+    else openRoomWindow('QBot 我的小屋');
+  });
   ipcMain.on('room:move', (_ev, x: number, y: number) => {
     moveRoomWindow(x, y);
     refreshRoomPetLayout();
@@ -142,11 +151,8 @@ export function registerIpc(): void {
   // ── decor ──────────────────────────────────────────────
   ipcMain.handle('decor:get', (_ev, roomName: string) => getDecor(roomName));
   ipcMain.handle('decor:set', async (_ev, roomName: string, placements) => {
-    try {
-      await setDecor(roomName, placements);
-    } catch (err) {
-      console.error('decor:set failed', err); // 写失败不阻塞 UI
-    }
+    await setDecor(roomName, placements);
+    sendToWindows('decor:changed',{roomName,placements});
   });
 
   // ── progress 游戏化积累 ────────────────────────────────
@@ -178,6 +184,12 @@ export function registerIpc(): void {
   // ── studio ──────────────────────────────────────────────
   // 统一控制台：右键/托盘/各处配置入口都走这里开窗并直达 pane
   // （原 studio:open / market:open 两条 IPC 是死代码，合并改造）
+  ipcMain.on('ui:openNursery', (_ev, create?: boolean) => createNurseryWindow(create === true));
+  ipcMain.handle('ui:returnToDesktop', async () => {
+    if (getRoomsStatus().phase === 'in-room') await setRoomDisplayMode('desktop');
+    else closeRoomWindow();
+    getPetWindow()?.showInactive();
+  });
   ipcMain.on('ui:openConsole', (_ev, pane?: ConsolePane) => createConsoleWindow(pane));
   ipcMain.handle('market:list', () => listSkins());
   ipcMain.handle('market:upload', (_ev, dirId: string) => uploadSkin(dirId));
@@ -243,7 +255,7 @@ export function registerIpc(): void {
       { type: 'separator' },
       // ── 去处（角色能去的地方 + 控制台）──────────────────
       { label: '联机空间…', click: () => createLoungeWindow() },
-      { label: '控制台…', click: () => createConsoleWindow() },
+      { label: '故事小屋…', click: () => createConsoleWindow() },
     ]);
     menu.popup({ window: win });
   });

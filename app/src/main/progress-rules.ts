@@ -65,6 +65,7 @@ export function sanitizeProgress(raw: unknown): Progress {
     }
   }
   return {
+    welcomeGrantVersion: num(r.welcomeGrantVersion, 0),
     points: num(r.points, base.points),
     boxes: num(r.boxes, base.boxes),
     idleMs: num(r.idleMs, base.idleMs),
@@ -206,4 +207,17 @@ export function applyCraft(
   for (const [id, n] of Object.entries(take)) inventory = withInventory(inventory, id, -n);
   inventory = withInventory(inventory, gainedId, 1);
   return { ...p, inventory, crafted: p.crafted + 1 };
+}
+
+
+/** Welcome migration also repairs old profiles that had boxes but no universal points source. */
+export function grantWelcome(p: Progress): Progress {
+  if ((p.welcomeGrantVersion ?? 0) >= 1) return p;
+  return { ...p, welcomeGrantVersion: 1, points: p.points + POINTS_PER_BOX, boxes: Math.max(1, p.boxes) };
+}
+
+/** Every earned companion box comes with enough points to open it, on every platform. */
+export function settleCompanion(p: Progress, deltaMs: number, maxBoxes: number): Progress {
+  const { idleMs, gained } = settleIdleCapped(p.idleMs, deltaMs, p.boxes, maxBoxes);
+  return { ...p, idleMs, boxes: p.boxes + gained, points: p.points + gained * POINTS_PER_BOX };
 }

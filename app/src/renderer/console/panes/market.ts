@@ -168,6 +168,7 @@ export async function mount(root: HTMLElement): Promise<void> {
     const dirId = uploadSelect.value;
     if (!dirId) return;
     const label = uploadSelect.selectedOptions[0]?.textContent ?? dirId;
+    if(!(await confirmBox(root,`把「${label}」放到公共集市？角色图片和动作会上传到服务器，其他人可以下载；角色人设不会分享。`)))return;
     setStatus(`打包上传「${label}」…（约 10MB，稍等）`);
     await window.qbot.market.upload(dirId);
     setStatus(`「${label}」已上架 ✓`);

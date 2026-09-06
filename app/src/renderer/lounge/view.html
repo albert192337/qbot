@@ -1,0 +1,71 @@
+<!-- 列表视图 -->
+<div
+  id="list-view"
+  style="flex: 1; display: flex; flex-direction: column; min-height: 0"
+>
+  <div id="topbar">
+    <h1>联机空间</h1>
+    <input
+      id="nickname"
+      aria-label="公开昵称"
+      placeholder="昵称"
+      maxlength="16"
+    />
+    <button id="create-btn">开房</button>
+  </div>
+  <div id="tabs">
+    <button type="button" class="tab on" data-kind="">全部</button>
+    <button type="button" class="tab" data-kind="idle">摸鱼</button>
+    <button type="button" class="tab" data-kind="study">自习</button>
+    <button type="button" class="tab" data-kind="night">夜猫</button>
+    <button type="button" class="tab" data-kind="coop">联机</button>
+    <input
+      id="search"
+      aria-label="搜索房间"
+      placeholder="搜房名 / 8 位房号"
+      maxlength="24"
+    />
+    <button id="join-id" class="ghost">按房号敲门</button
+    ><button id="refresh-btn" class="ghost">刷新</button>
+  </div>
+  <div id="list"></div>
+</div>
+
+<!-- 房内视图 -->
+<div id="room-view">
+  <div id="room-head">
+    <span id="room-title"></span>
+    <button id="settings-btn" class="ghost" style="display: none">设置</button>
+    <button id="leave-btn" class="ghost">退出房间</button>
+  </div>
+  <div id="display-mode-bar">
+    <div class="display-mode-copy">
+      <div class="display-mode-title">宠物显示位置</div>
+      <div id="display-mode-hint">只改变本机画面，不会退出或重连房间</div>
+    </div>
+    <div class="mode-switch" role="group" aria-label="联机空间展示模式">
+      <button type="button" data-display-mode="room" aria-pressed="false">
+        房间场景
+      </button>
+      <button type="button" data-display-mode="desktop" aria-pressed="false">
+        透明桌面
+      </button>
+    </div>
+  </div>
+  <div id="members"></div>
+  <div id="chat"></div>
+  <div id="composer">
+    <input
+      id="chat-input"
+      aria-label="聊天内容"
+      placeholder="说点什么…"
+      maxlength="200"
+    />
+    <button id="send-btn">发送</button>
+  </div>
+</div>
+
+<div id="status"></div>
+
+<!-- 弹层：开房 / 房间设置 / 发言须知 -->
+<div id="modal"><div class="sheet" id="sheet"></div></div>

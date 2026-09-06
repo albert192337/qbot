@@ -26,11 +26,13 @@ describe('hatch pane', () => {
       innerWidth: 880,
       qbot: {
         hatch: {
+          onCloudStatus: vi.fn(() => vi.fn()),
           onProgress: (callback: typeof progress) => {
             progress = callback;
             return vi.fn();
           },
         },
+        settings: {get:async()=>({})},
         characters: { list: vi.fn(async () => []) },
       },
     });

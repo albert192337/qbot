@@ -1,0 +1,20 @@
+[Unit]
+Description=QBot hosted character generation
+After=network-online.target
+[Service]
+Type=simple
+WorkingDirectory=/opt/qbot-generation
+ExecStart=/usr/bin/node /opt/qbot-generation/generation/server.mjs
+EnvironmentFile=/etc/qbot-generation.env
+Restart=on-failure
+RestartSec=5
+StateDirectory=qbot-generation
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/qbot-generation
+MemoryMax=3G
+CPUQuota=180%
+[Install]
+WantedBy=multi-user.target

@@ -98,7 +98,7 @@ async function refresh(force = false): Promise<void> {
     html += `</div>`;
     if (frameUrl) html += `<video src="${frameUrl}" poster="qbot-asset://${ctx.dirId}/${esc(a.gif ?? ctx.m.sourceImage)}" aria-label="${esc(a.label)}动作预览" muted controls loop playsinline preload="none"></video>`;
     html += `<p class="studio-hint">${a.isImported ? '导入 GIF' : a.isCustom ? '自定义动作' : a.isExpression ? '预设动作' : '随角色生成'}</p>`;
-    if (a.status === 'done') html += `<button class="preview-action btn ghost" data-id="${esc(a.id)}">在桌面播放</button>`;
+    if (a.status === 'done') html += `<button class="preview-action btn ghost" data-id="${esc(a.id)}">${root.closest('#house-book') ? '上台练习' : '在桌面播放'}</button>`;
     if (!a.isImported && !a.isCustom && !a.isExpression && a.status !== 'pending') html += `<button class="regenerate-action btn" data-id="${esc(a.id)}">${a.status === 'failed' ? '重试生成' : '重新生成'}</button>`;
     if (a.isCustom && a.status === 'failed') html += `<p class="studio-hint">删除失败项后，可在下方重新描述并创建。</p>`;
     html += `</div>`;
@@ -183,6 +183,7 @@ function bind(root: HTMLElement, dirId: string): void {
   root.querySelectorAll<HTMLButtonElement>('.preview-action').forEach((button) => {
     button.addEventListener('click', () => {
       void guard(root, button, '准备播放…', async () => {
+        if(root.closest('#house-book')){window.dispatchEvent(new CustomEvent('house:preview',{detail:{dirId,action:button.dataset.id!}}));return;}
         const active = await window.qbot.characters.getActive();
         if (active?.dirId !== dirId) {
           if (!(await confirmBox(root, '要在桌面播放，请先将正在编辑的角色放到桌面。现在切换？'))) return;

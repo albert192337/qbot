@@ -1,18 +1,20 @@
 {
   "name": "qbot",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "workspaces": [
     "pipeline",
     "app",
     "relay",
     "market",
-    "rooms"
+    "rooms",
+    "generation"
   ],
   "scripts": {
     "test": "npm run test -w pipeline",
     "dev": "npm run dev -w app",
-    "build": "npm run build -w pipeline && npm run build -w app"
+    "build": "npm run build -w pipeline && npm run build -w app",
+    "check": "npm run build -w pipeline && npm test -w pipeline && npm test -w app && npm test -w generation && npx tsc --noEmit -p app"
   },
   "devDependencies": {
     "typescript": "^5.5.0"

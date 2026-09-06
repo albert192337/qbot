@@ -362,6 +362,11 @@ document.addEventListener('contextmenu', (e) => {
   e.preventDefault();
   if (!inRoom || editing) return;
   menu.replaceChildren();
+  const nursery = document.createElement('button');
+  nursery.className = 'menu-item';
+  nursery.textContent = '去孵化小屋';
+  nursery.addEventListener('click', () => { hideMenu(); window.qbot.ui.openNursery(); });
+  menu.appendChild(nursery);
   const sizeLabel = document.createElement('div');
   sizeLabel.className = 'menu-label';
   sizeLabel.textContent = '房间大小';
@@ -389,7 +394,7 @@ document.addEventListener('contextmenu', (e) => {
   decorate.textContent = '布置房间';
   decorate.addEventListener('click', () => {
     hideMenu();
-    editor.enter(editor.placementsSnapshot());
+    window.qbot.ui.openConsole('furnish');
   });
   menu.appendChild(decorate);
   const bag = document.createElement('div');
@@ -397,7 +402,7 @@ document.addEventListener('contextmenu', (e) => {
   bag.textContent = '我的家具';
   bag.addEventListener('click', () => {
     hideMenu();
-    inventory.show();
+    window.qbot.ui.openConsole('rewards');
   });
   menu.appendChild(bag);
   const close = document.createElement('div');
@@ -416,3 +421,5 @@ document.addEventListener('contextmenu', (e) => {
 document.addEventListener('click', (e) => {
   if (!menu.contains(e.target as Node)) hideMenu();
 });
+
+window.qbot.decor.onChanged(({roomName,placements})=>{if(roomName===spec.name&&!editor.active)editor.setPlacements(sanitizePlacements(placements,new Set(DECOR_BY_ID.keys())));});

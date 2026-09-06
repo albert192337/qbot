@@ -56,6 +56,8 @@ const cellStates = new Map<ActionId, { status: ActionStatus; since: number }>();
 let packageDone = false;
 let timerHandle: number | null = null;
 let unsubProgress: (() => void) | null = null;
+let unsubCloud: (() => void) | null = null;
+let generationMode: 'cloud' | 'local' = 'cloud';
 let selectedSourceFile: File | null = null;
 let selectedSourceUrl: string | null = null;
 let pendingCharacterName = '';
@@ -79,6 +81,22 @@ export async function mount(host: HTMLElement): Promise<void> {
   unsubProgress?.();
   unsubProgress = window.qbot.hatch.onProgress(onProgress);
 
+  unsubCloud = window.qbot.hatch.onCloudStatus(({dirId,status}) => {
+    if (dirId === currentDirId) void renderStatus(dirId,status);
+  });
+  generationMode = (await window.qbot.settings.get()).generationMode ?? 'cloud';
+  const mode = $<HTMLSelectElement>('#hatch-mode'); if (mode) mode.value = generationMode;
+  $('#hatch-mode')?.addEventListener('change', async () => {
+    generationMode = $<HTMLSelectElement>('#hatch-mode')!.value === 'local' ? 'local' : 'cloud';
+    await window.qbot.settings.set({generationMode}); await refreshCloudAccount();
+  });
+  $('#hatch-connect')?.addEventListener('click', async () => {
+    const button = $<HTMLButtonElement>('#hatch-connect')!; button.disabled = true;
+    try { await window.qbot.hatch.cloudAccount($<HTMLInputElement>('#hatch-invite')!.value); $<HTMLInputElement>('#hatch-invite')!.value = ''; await refreshCloudAccount(); }
+    catch(e) { showError(e instanceof Error ? e.message : String(e)); }
+    finally { button.disabled = false; }
+  });
+  await refreshCloudAccount();
   // 启动计时器
   startTimer();
 
@@ -89,6 +107,7 @@ export async function mount(host: HTMLElement): Promise<void> {
 
 export function unmount(): void {
   unsubProgress?.();
+  unsubCloud?.();
   stopTimer();
   if (selectedSourceUrl) URL.revokeObjectURL(selectedSourceUrl);
   selectedSourceFile = null;
@@ -122,6 +141,15 @@ export async function onNavigate(route: ConsoleRoute): Promise<void> {
   }
 }
 
+async function refreshCloudAccount(): Promise<void> {
+  const panel = $('#hatch-cloud'); if (panel) panel.hidden = generationMode !== 'cloud';
+  const label = $('#hatch-cloud-account'); if (!label || generationMode !== 'cloud') return;
+  try {
+    const account = await window.qbot.hatch.cloudAccount();
+    label.textContent = account.connected ? `已连接 · 可创建 ${account.credits} 只角色；已有任务可继续` : '内测期间输入邀请码，无需配置模型 Key。';
+  } catch(e) { label.textContent = e instanceof Error ? e.message : '暂时无法连接'; }
+}
+
 // ───────────────────────── 核心功能 ─────────────────────────
 
 async function startHatch(file: File): Promise<void> {
@@ -139,7 +167,12 @@ async function startHatch(file: File): Promise<void> {
       return;
     }
     const settings = await window.qbot.settings.get();
-    const hasKey = provider === 'gpt-image-2' ? !!settings.gptImageApiKey : !!settings.arkApiKey;
+    const cloud = generationMode === 'cloud';
+    if (cloud) {
+      const account = await window.qbot.hatch.cloudAccount();
+      if (!account.connected || account.credits < 1) { showError(account.connected ? '创建额度已用完；已有任务请到生成任务继续。' : '请先输入邀请码并连接。'); return; }
+    }
+    const hasKey = cloud || (!!settings.arkApiKey && (provider !== 'gpt-image-2' || !!settings.gptImageApiKey));
     if (!hasKey) {
       showError(`尚未配置${provider === 'gpt-image-2' ? ' GPT-Image-2' : '火山方舟'} API Key，请先到「设置 → 模型与 API」完成配置。`);
       return;
@@ -149,7 +182,7 @@ async function startHatch(file: File): Promise<void> {
       `开始创建「${name}」？\n\n将先生成 1 个角色方案；确认后，再生成 8 个常用动作。\n` +
         `模型：${provider === 'gpt-image-2' ? 'gpt-image-2' : 'Seedream'}\n` +
         `预计时间：${provider === 'gpt-image-2' ? '约 45–80 分钟' : '约 35–60 分钟'}\n` +
-        '预计消耗：1 张角色方案 + 8 个动作。任务提交后，已发出的 API 请求无法撤回。',
+        (cloud ? '使用 1 次创建额度，含最多 3 次形象方案和 2 次失败重试。\n角色图片会上传至 QBot 服务器并交给模型服务生成；只上传所选图片、角色名字和形象选项。关闭客户端后任务仍会继续，完成后回来领取。' : '预计消耗：1 张角色方案 + 8 个动作。任务提交后，已发出的 API 请求无法撤回。'),
     );
     if (!confirmed) return;
 
@@ -161,6 +194,7 @@ async function startHatch(file: File): Promise<void> {
       provider === 'gpt-image-2' ? 'gpt-image-2' : undefined,
       form === 'abstract' ? 'abstract' : undefined,
       form === 'abstract' ? undefined : style === 'faithful' ? 'faithful' : 'chibi',
+      name,
     );
 
     localStorage.setItem(`qbot:creation-name:${currentDirId}`, name);
@@ -405,11 +439,22 @@ async function seedFromStatus(dirId: string): Promise<void> {
     return;
   }
 
+  await renderStatus(dirId,st);
+}
+
+async function renderStatus(dirId: string, st: HatchStatus): Promise<void> {
   if (dirId !== currentDirId) return;
   const resume = $<HTMLButtonElement>('#hatch-task-resume');
   if (resume) resume.hidden = !!st.running || st.stage === 'done';
   currentProvider = st.imageProvider ?? currentProvider;
+  showError(st.error ?? null);
+  const cloudHint = $('#hatch-cloud-task');
+  if (cloudHint) {
+    cloudHint.hidden = !st.cloud;
+    cloudHint.textContent = st.cloudPhase === 'queued' ? `正在云端排队（第 ${st.queuePosition || 1} 位），可离开此页面。` : '云端任务会在关闭客户端后继续；完成后返回本任务领取。';
+  }
 
+  if (st.stage !== 'done') packageDone = false;
   switch (st.stage) {
     case 'turnaround':
       showBrewing();
@@ -422,6 +467,7 @@ async function seedFromStatus(dirId: string): Promise<void> {
       else showBrewing();
       break;
     case 'done':
+      if (packageDone) break;
       buildProgressGrid();
       seedCells(st);
       packageDone = true;
@@ -429,7 +475,7 @@ async function seedFromStatus(dirId: string): Promise<void> {
       break;
     default:
       buildProgressGrid();
-      actionsSince = Date.now();
+      actionsSince ??= Date.now();
       seedCells(st);
       showScreen('progress');
   }
@@ -614,9 +660,8 @@ function onProgress(ev: HatchProgress): void {
       break;
     case 'failed':
       showError(`创建失败：${ev.error ?? '未知错误'}（可从任务列表继续或重试）`);
-      disableAllInputs(false);
-      showScreen('drop');
-      void loadHistoricalTasks();
+      showScreen('progress');
+      const resume = $<HTMLButtonElement>('#hatch-task-resume'); if (resume) resume.hidden = false;
       break;
   }
 }
@@ -832,6 +877,7 @@ function handleResize(): void {
 const TEMPLATE = `
 <div class="hatch-container">
   <!-- 头部区域 -->
+  <p id="hatch-cloud-task" hidden></p>
   <div class="btn-row"><button class="btn ghost no-disable" id="hatch-task-back">生成任务</button><button class="btn no-disable" id="hatch-task-resume" hidden>继续这个任务</button></div>
   <header class="hatch-header">
     <div class="header-title">
@@ -905,6 +951,12 @@ const TEMPLATE = `
               <div><h3>确认桌宠设定</h3><p>这些信息会影响最终形象。</p></div>
             </div>
 
+            <div class="config-group" id="hatch-cloud">
+              <p id="hatch-cloud-account">正在检查创建额度…</p>
+              <label class="config-label" for="hatch-invite">内测邀请码</label>
+              <input class="input-primary" id="hatch-invite" type="password" autocomplete="off" placeholder="输入邀请码" />
+              <button class="btn" id="hatch-connect">连接邀请码</button>
+            </div>
             <div class="config-group">
               <label class="config-label" for="hatch-draft-name">桌宠名字</label>
               <input class="input-primary" id="hatch-draft-name" type="text" maxlength="24" placeholder="例如：小青" />
@@ -945,6 +997,8 @@ const TEMPLATE = `
             <details class="advanced-settings">
               <summary>高级生成设置 <span id="hatch-provider-summary">Seedream · 推荐</span></summary>
               <div class="config-group">
+                <label class="config-label" for="hatch-mode">生成方式</label>
+                <select id="hatch-mode"><option value="cloud">云端创建 · 无需 Key</option><option value="local">本地高级生成 · 自备 Key</option></select>
                 <span class="config-label">形象生成模型</span>
                 <div class="radio-group compact-options">
                   <label class="radio-option">

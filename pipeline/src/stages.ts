@@ -26,6 +26,7 @@ import {
   ACTION_IDS,
   ArkApiError,
   IMAGE_SIZES,
+  DEFAULTS,
   type ActionId,
   type Manifest,
   type ManifestAction,
@@ -226,7 +227,11 @@ async function runAction(
           videoUrl = t.videoUrl;
           break;
         }
-        if (t.status === 'failed') throw new Error(`video task failed: ${t.error}`);
+        if (t.status === 'failed') {
+          a.videoTaskId = undefined; // Terminal failure; a later explicit retry may submit a new task.
+          await job.save();
+          throw new Error(`video task failed: ${t.error}`);
+        }
         if (Date.now() > deadline) throw new Error('video task poll timeout (15min)');
         await sleep(POLL_INTERVAL_MS);
       }
@@ -242,6 +247,10 @@ async function runAction(
     await keyActionVideo(job, action, ffmpegPath);
     await job.transition(action, 'done');
   } catch (err) {
+    if (err instanceof Error && err.message.startsWith('background drift ')) {
+      // Keep the raw file, but generate a replacement on the next explicit retry.
+      a.videoTaskId = undefined; a.videoPath = undefined;
+    }
     const msg = err instanceof ArkApiError ? `[${err.status}] ${err.message}` : String(err);
     await job.transition(action, 'failed', { error: msg });
   }
@@ -253,24 +262,32 @@ export async function runActions(
   ark: ArkClient,
   ffmpegPath: string,
   sleep: (ms: number) => Promise<void> = defaultSleep,
+  concurrency: number = DEFAULTS.concurrency,
+  selectedActions?: readonly ActionId[],
 ): Promise<void> {
   await job.setStage('actions');
   const pending = ACTION_IDS.filter(
-    (id) => job.state.actions[id].status !== 'done',
+    (id) => job.state.actions[id].status !== 'done' && (!selectedActions || selectedActions.includes(id)),
   );
   // failed 的动作在 resume 时重置重跑（用户主动续跑即视为要求重试）
   for (const id of pending) {
     if (job.state.actions[id].status === 'failed') {
-      job.state.actions[id] = {
-        status: 'pending',
-        attempts: { frame: 0, video: 0 },
-      };
+      const a = job.state.actions[id];
+      // Preserve paid upstream IDs and downloaded video; retry only the interrupted stage.
+      a.status = a.videoPath ? 'keying' : a.frameQcPass && a.framePath ? 'generating_video' : 'pending';
+      if (a.status === 'pending') a.attempts.frame = 0;
+      a.error = undefined;
     }
   }
   await job.save();
-  await Promise.allSettled(
-    pending.map((id) => runAction(job, ark, id, ffmpegPath, sleep)),
-  );
+  const limit = Number.isFinite(concurrency) ? Math.max(1, Math.min(8, Math.floor(concurrency))) : DEFAULTS.concurrency;
+  let cursor = 0;
+  await Promise.allSettled(Array.from({ length: Math.min(limit, pending.length) }, async () => {
+    while (cursor < pending.length) {
+      const id = pending[cursor++];
+      await runAction(job, ark, id, ffmpegPath, sleep);
+    }
+  }));
 }
 
 /** Stage 5：门槛校验 + 写 manifest */
@@ -287,9 +304,12 @@ export async function runPackage(job: Job): Promise<Manifest> {
     });
     throw new Error('package gate failed');
   }
+  let previous: Partial<Manifest> = {};
+  try { previous = JSON.parse(await readFile(path.join(job.outDir, 'manifest.json'), 'utf8')); } catch {}
   const manifest: Manifest = {
+    ...previous,
     id: s.jobId,
-    name: '未命名',
+    name: previous.name || '未命名',
     createdAt: s.createdAt,
     tier: s.tier,
     sourceImage: 'source.png',
@@ -298,6 +318,7 @@ export async function runPackage(job: Job): Promise<Manifest> {
       ACTION_IDS.map((id) => [
         id,
         {
+          ...previous.actions?.[id],
           webm: `actions/${id}.webm`,
           gif: `actions/${id}.gif`,
           durationSec: ACTIONS[id].durationSec,
@@ -355,6 +376,6 @@ export async function runPipeline(
     }
   }
 
-  await runActions(job, ark, ffmpegPath, sleep);
+  await runActions(job, ark, ffmpegPath, sleep, cfg.concurrency);
   return runPackage(job);
 }

@@ -22,7 +22,12 @@ export interface CharacterMeta {
   hasUnfinishedJob: boolean;
 }
 
+export interface CloudAccount { connected: boolean; credits: number; providers: ImageProvider[] }
+
 export interface Settings {
+  generationMode?: 'cloud' | 'local';
+  onboardingDismissed?: boolean;
+  onboardingSeen?: boolean;
   arkApiKey?: string;
   /** gpt-image-2 生图后端的 API key（选了该后端才需要） */
   gptImageApiKey?: string;
@@ -91,6 +96,10 @@ export interface HatchProgress extends ProgressEvent {
 
 /** 孵化状态快照（进度屏进入时铺底，之后消费增量事件；见 hatch-progress-ux spec §四） */
 export interface HatchStatus {
+  cloud?: boolean;
+  cloudPhase?: string;
+  error?: string;
+  queuePosition?: number;
   /** Whether this job is running in the current application process. */
   running?: boolean;
   stage: Stage;
@@ -359,6 +368,8 @@ export interface DecorPlacement {
  * 权威在主进程 `main/progress.ts`，renderer 只读 + 通过 IPC 请求变更。
  */
 export interface Progress {
+  /** One-time P0 welcome grant; persisted to prevent duplicate awards. */
+  welcomeGrantVersion?: number;
   /** 点数：敲键盘 +1 / Claude Code 跑完一轮 +10。开箱消耗 */
   points: number;
   /** 未开的箱子数：挂机 15 分钟攒一个 */
@@ -392,12 +403,15 @@ export type CraftResult =
 
 export interface QBotApi {
   hatch: {
+    cloudAccount(invite?: string): Promise<CloudAccount>;
+    onCloudStatus(cb: (event: { dirId: string; status: HatchStatus }) => void): () => void;
     /** 丢图开始孵化，返回角色目录 ID；imageProvider 缺省 = seedream，characterForm 缺省 = humanoid，characterStyle 缺省 = faithful（UI 默认传 chibi） */
     start(
       refImagePath: string,
       imageProvider?: ImageProvider,
       characterForm?: CharacterForm,
       characterStyle?: CharacterStyle,
+      name?: string,
     ): Promise<string>;
     /** 续跑一个未完成的孵化 */
     resume(dirId: string): Promise<void>;
@@ -533,6 +547,7 @@ export interface QBotApi {
     onError(cb: (msg: string) => void): () => void;
   };
   room: {
+    openHome(): void;
     /** 兼容旧调用：打开统一联机空间 */
     open(): void;
     /** 贴纸窗拖拽移动（send，不走 invoke） */
@@ -547,6 +562,7 @@ export interface QBotApi {
     get(roomName: string): Promise<DecorPlacement[]>;
     /** 覆盖写某房间的装饰摆放（退出编辑态时调用） */
     set(roomName: string, placements: DecorPlacement[]): Promise<void>;
+    onChanged(cb:(change:{roomName:string;placements:DecorPlacement[]})=>void):()=>void;
   };
   settings: {
     get(): Promise<Settings>;
@@ -577,6 +593,12 @@ export interface QBotApi {
     onAnchor(cb: (side: 'above' | 'below') => void): () => void;
   };
   ui: {
+    /** 打开游戏化孵化小屋；create=true 直接走到孵化台。 */
+    openNursery(create?: boolean): void;
+    /** 回到桌面展示；保留联机连接，恢复桌宠可见性。 */
+    returnToDesktop(): Promise<void>;
+    /** Native hide/minimize complements Chromium visibility for decoder/loop suspension. */
+    onNurseryVisibility(cb: (visible: boolean) => void): () => void;
     /** 主进程要求切屏（托盘「设置」→ settings 屏；控制台切 pane 同用） */
     onShowScreen(cb: (name: string) => void): () => void;
     /** 打开统一控制台窗并直达 pane（pane 名见 renderer/console/main.ts 的 PaneId） */

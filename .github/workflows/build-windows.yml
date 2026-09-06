@@ -25,6 +25,12 @@ jobs:
       - name: Run pipeline tests
         run: npm test -w pipeline
 
+      - name: Run app tests
+        run: npm test -w app
+
+      - name: Test generation service
+        run: npm test -w generation
+
       - name: Type check app
         run: npx tsc --noEmit -p app
 

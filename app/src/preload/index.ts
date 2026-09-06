@@ -4,8 +4,14 @@ import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsSt
 
 const api: QBotApi = {
   hatch: {
-    start: (refImagePath, imageProvider, characterForm, characterStyle) =>
-      ipcRenderer.invoke('hatch:start', refImagePath, imageProvider, characterForm, characterStyle),
+    cloudAccount: (invite) => ipcRenderer.invoke('hatch:cloudAccount', invite),
+    onCloudStatus: (cb) => {
+      const listener = (_ev: unknown, event: Parameters<typeof cb>[0]) => cb(event);
+      ipcRenderer.on('hatch:cloudStatus', listener);
+      return () => ipcRenderer.removeListener('hatch:cloudStatus', listener);
+    },
+    start: (refImagePath, imageProvider, characterForm, characterStyle, name) =>
+      ipcRenderer.invoke('hatch:start', refImagePath, imageProvider, characterForm, characterStyle, name),
     deleteTask: (dirId) => ipcRenderer.invoke('hatch:deleteTask', dirId),
     resume: (dirId) => ipcRenderer.invoke('hatch:resume', dirId),
     redo: (dirId) => ipcRenderer.invoke('hatch:redo', dirId),
@@ -46,6 +52,7 @@ const api: QBotApi = {
     },
   },
   room: {
+    openHome: () => ipcRenderer.send('room:openHome'),
     open: () => ipcRenderer.send('room:open'),
     move: (x, y) => ipcRenderer.send('room:move', x, y),
     getSizePreset: () => ipcRenderer.invoke('room:getSizePreset'),
@@ -54,6 +61,7 @@ const api: QBotApi = {
   },
   decor: {
     get: (roomName) => ipcRenderer.invoke('decor:get', roomName),
+    onChanged: (cb) => { const listener=(_ev:unknown,change:Parameters<typeof cb>[0])=>cb(change);ipcRenderer.on('decor:changed',listener);return ()=>ipcRenderer.removeListener('decor:changed',listener); },
     set: (roomName, placements) => ipcRenderer.invoke('decor:set', roomName, placements),
   },
   progress: {
@@ -81,6 +89,13 @@ const api: QBotApi = {
     },
   },
   ui: {
+    openNursery: (create) => ipcRenderer.send('ui:openNursery', create),
+    returnToDesktop: () => ipcRenderer.invoke('ui:returnToDesktop'),
+    onNurseryVisibility: (cb) => {
+      const listener = (_ev: unknown, visible: boolean) => cb(visible);
+      ipcRenderer.on('ui:nurseryVisibility', listener);
+      return () => ipcRenderer.removeListener('ui:nurseryVisibility', listener);
+    },
     onShowScreen: (cb) => {
       const listener = (_ev: unknown, name: string) => cb(name);
       ipcRenderer.on('ui:showScreen', listener);

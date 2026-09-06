@@ -3,7 +3,7 @@ import { Menu, Tray, app, nativeImage } from 'electron';
 import path from 'node:path';
 import { listCharacters } from './characters';
 import { getSettings, setSettings } from './config';
-import { createConsoleWindow, createLoungeWindow, broadcastCharacterActivated } from './windows';
+import { createNurseryWindow, createConsoleWindow, createLoungeWindow, broadcastCharacterActivated } from './windows';
 import { toggleClaudeHooks } from './hooks/claude';
 import { getCharacter } from './characters';
 import { notifyRoomCharacterChanged } from './rooms/rooms';
@@ -59,6 +59,7 @@ export async function characterSection(): Promise<Electron.MenuItemConstructorOp
   const characters = (await listCharacters()).filter((c) => c.manifest);
   const settings = await getSettings();
   return [
+    { label: '故事小屋…', click: () => createNurseryWindow() },
     {
       label: '切换角色',
       submenu: [
@@ -81,7 +82,7 @@ export async function characterSection(): Promise<Electron.MenuItemConstructorOp
             }))
           : [{ label: '（暂无角色）', enabled: false }]),
         { type: 'separator' as const },
-        { label: '孵化新角色…', click: () => createConsoleWindow('hatch') },
+        { label: '孵化新角色…', click: () => createNurseryWindow(true) },
       ],
     },
   ];
@@ -111,7 +112,7 @@ export async function connectSection(): Promise<Electron.MenuItemConstructorOpti
 export function systemSection(): Electron.MenuItemConstructorOptions[] {
   return [
     {
-      label: '控制台…',
+      label: '故事小屋…',
       click: () => createConsoleWindow(),
     },
     {

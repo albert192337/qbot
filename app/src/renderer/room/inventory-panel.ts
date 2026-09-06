@@ -105,7 +105,7 @@ export class InventoryPanel {
       `<span>✨ 点数 <b>${p.points}</b></span></div>` +
       `<div class="inv-idle">下一个箱子 ${mins}:${String(secs).padStart(2, '0')} / 15:00` +
       `<span class="inv-bar"><i style="width:${pct}%"></i></span></div>` +
-      `<div class="inv-hint">敲键盘 +1 点 · Claude Code 跑完一轮 +10 点 · 挂机 15 分钟 +1 箱</div>`;
+      `<div class="inv-hint">陪伴 15 分钟 +1 箱和 500 点（满仓暂停） · 键盘与工作联动提供额外点数</div>`;
 
     const enough = p.boxes >= 1 && p.points >= POINTS_PER_BOX;
     this.openBtn.disabled = this.busy || !enough;

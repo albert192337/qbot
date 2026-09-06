@@ -1,0 +1,54 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import { Job } from '../src/job';
+import { ACTION_IDS } from '../src/types';
+import type { ArkClient } from '../src/ark';
+import { runActions, runPackage } from '../src/stages';
+vi.mock('../src/chroma.js', () => ({
+  computeAlphaStats: async()=>null, normalizeFilter:()=>'', probeSize:async()=>({width:640,height:640}),
+  resolveFfmpegPath:async()=>'/mock',sampleBackgroundColors:async()=>[],sampleKeyColor:async()=>'00ff00',
+  toGif:async()=>{},toWebm:async()=>{},ALPHA_ERODE_PX:0,RIM_DESPILL_MIX:1,
+}));
+vi.mock('../src/qc.js',()=>({checkGreenFrame:async()=>({pass:true}),checkVideoDrift:async()=>({fail:false}),selectDualKeys:()=>['00ff00']}));
+let dir:string;
+afterEach(async()=>{if(dir)await rm(dir,{recursive:true,force:true});});
+async function setup(){
+ dir=await mkdtemp(path.join(os.tmpdir(),'qbot-retry-'));
+ const src=path.join(dir,'ref.png');await writeFile(src,'png');const job=await Job.create(dir,{refImagePath:src});
+ await writeFile(path.join(dir,'turnaround.png'),'png');job.state.turnaround.picked=0;
+ for(const id of ACTION_IDS){await writeFile(job.jobPath(`${id}_frame.png`),'png');Object.assign(job.state.actions[id],{status:'failed',framePath:`${id}_frame.png`,frameQcPass:true,videoTaskId:`paid-${id}`,error:'network'});}
+ return job;
+}
+describe('generation retry and concurrency',()=>{
+ it('caps in-flight actions and resumes paid video IDs after a temporary failure',async()=>{
+  const job=await setup();let active=0;let peak=0;
+  const ark={generateImage:vi.fn(),submitVideoTask:vi.fn(),getVideoTask:vi.fn(async()=>{active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,5));active--;return {status:'succeeded',videoUrl:'https://example.test/video'};}),downloadVideo:async(_u:string,d:string)=>{await writeFile(d,'mp4');}} as unknown as ArkClient;
+  await runActions(job,ark,'/mock',async()=>{},2);
+  expect(peak).toBe(2);expect(ark.generateImage).not.toHaveBeenCalled();expect(ark.submitVideoTask).not.toHaveBeenCalled();
+  expect(ACTION_IDS.every(id=>job.state.actions[id].status==='done')).toBe(true);
+ });
+ it('clears a terminally failed task ID and explicitly retries it with the existing good frame',async()=>{
+  const job=await setup();for(const id of ACTION_IDS.slice(1))job.state.actions[id].status='done';
+  const ark={generateImage:vi.fn(),submitVideoTask:vi.fn(async()=>'new-task'),getVideoTask:vi.fn().mockResolvedValueOnce({status:'failed',error:'upstream rejected'}).mockResolvedValue({status:'succeeded',videoUrl:'https://example.test/video'}),downloadVideo:async(_u:string,d:string)=>{await writeFile(d,'mp4');}} as unknown as ArkClient;
+  await runActions(job,ark,'/mock',async()=>{},1);
+  expect(job.state.actions.idle.status).toBe('failed');expect(job.state.actions.idle.videoTaskId).toBeUndefined();
+  await runActions(job,ark,'/mock',async()=>{},1);
+  expect(ark.submitVideoTask).toHaveBeenCalledTimes(1);expect(ark.generateImage).not.toHaveBeenCalled();expect(job.state.actions.idle.status).toBe('done');
+ });
+});
+
+it('repair packaging preserves the character name, persona and custom action metadata',async()=>{
+ const job=await setup();for(const id of ACTION_IDS)job.state.actions[id].status='done';
+ await writeFile(path.join(dir,'manifest.json'),JSON.stringify({name:'My pet',persona:'gentle',actions:{idle:{poseDesc:'custom pose'}},customActions:{dance:{status:'done'}}}));
+ await runPackage(job);const manifest=JSON.parse(await readFile(path.join(dir,'manifest.json'),'utf8'));
+ expect(manifest.name).toBe('My pet');expect(manifest.persona).toBe('gentle');expect(manifest.actions.idle.poseDesc).toBe('custom pose');expect(manifest.customActions.dance.status).toBe('done');
+});
+
+it('a single-action repair does not submit other failed actions',async()=>{
+ const job=await setup();
+ const ark={generateImage:vi.fn(),submitVideoTask:vi.fn(),getVideoTask:vi.fn(async()=>({status:'succeeded',videoUrl:'https://example.test/video'})),downloadVideo:async(_u:string,d:string)=>{await writeFile(d,'mp4');}} as unknown as ArkClient;
+ await runActions(job,ark,'/mock',async()=>{},2,['idle']);
+ expect(job.state.actions.idle.status).toBe('done');expect(job.state.actions.drag.status).toBe('failed');expect(ark.getVideoTask).toHaveBeenCalledTimes(1);
+});

@@ -1,3 +1,4 @@
+import { isCloudJob, startCloudHatch, cloudOperation, syncCloudJob } from './cloud-generation';
 /**
  * pipeline-bridge：唯一 import @qbot/pipeline 的地方。
  * hatch IPC ↔ Job 事件的桥；三视图挑选 hook 挂成 pending Promise 等 IPC 解析。
@@ -47,7 +48,7 @@ import {
 import type { HatchStatus } from '../shared/ipc-types';
 import { charactersDir, getCharacter, restoreGenerationTask } from './characters';
 import { getSettings } from './config';
-import { broadcastCharacterActivated, getConsoleWindow } from './windows';
+import { broadcastCharacterActivated, sendToWindows } from './windows';
 import { rebuildTray } from './tray';
 
 interface ActiveHatch {
@@ -145,7 +146,9 @@ export async function startHatch(
   imageProvider?: ImageProvider,
   characterForm?: CharacterForm,
   characterStyle?: CharacterStyle,
+  name?: string,
 ): Promise<string> {
+  if ((await getSettings()).generationMode !== 'local') return startCloudHatch(refImagePath, imageProvider, characterForm, characterStyle, name);
   if (imageProvider === 'gpt-image-2' && !(await getSettings()).gptImageApiKey) {
     throw new Error('未配置 gpt-image-2 API key（托盘 → 设置）');
   }
@@ -160,6 +163,7 @@ export async function startHatch(
 
 /** 续跑未完成的孵化（断点续跑） */
 export async function resumeHatch(dirId: string): Promise<void> {
+  if (isCloudJob(dirId)) return cloudOperation(dirId, 'resume');
   if (active.has(dirId)) return; // 已在跑
   const outDir = path.join(charactersDir(), dirId);
   const job = await Job.load(outDir);
@@ -168,7 +172,8 @@ export async function resumeHatch(dirId: string): Promise<void> {
 }
 
 /** 三视图挑选（index=-1 重新生成一轮） */
-export function pickTurnaround(dirId: string, index: number): void {
+export async function pickTurnaround(dirId: string, index: number): Promise<void> {
+  if (isCloudJob(dirId)) return cloudOperation(dirId, 'pick', index);
   const entry = active.get(dirId);
   if (!entry) throw new Error(`no active hatch for ${dirId}`);
   if (!entry.pickResolver) throw new Error('not awaiting pick');
@@ -180,6 +185,7 @@ export function pickTurnaround(dirId: string, index: number): void {
  * active 的读内存 state；不 active 的裸读 state.json（不走 Job.load，避免 reconcile 落盘副作用）。
  */
 export async function getHatchStatus(dirId: string): Promise<HatchStatus | null> {
+  if (isCloudJob(dirId)) return syncCloudJob(dirId);
   let state: JobState;
   const entry = active.get(dirId);
   if (entry) {
@@ -221,6 +227,7 @@ export async function getHatchStatus(dirId: string): Promise<HatchStatus | null>
 
 /** 重试失败动作：重置 failed → pending，走 runActions + runPackage（同 CLI redo） */
 export async function redoFailed(dirId: string): Promise<void> {
+  if (isCloudJob(dirId)) return cloudOperation(dirId, 'resume');
   const outDir = path.join(charactersDir(), dirId);
   const job = await Job.load(outDir);
   const failed = ACTION_IDS.filter((id) => job.state.actions[id]?.status === 'failed');
@@ -233,6 +240,11 @@ export async function redoFailed(dirId: string): Promise<void> {
  * 复用 runActions + runPackage，因此自动继承尺寸归一化与 manifest 回写。
  */
 export async function regenerateActions(dirId: string, actionIds: ActionId[]): Promise<void> {
+  if (isCloudJob(dirId)) {
+    const status = await syncCloudJob(dirId);
+    if (actionIds.some(id => status.actions[id]?.status !== 'failed')) throw new Error('内测托管额度仅支持修复失败动作；重新设计动作请使用本地高级生成');
+    return cloudOperation(dirId, 'resume', undefined, actionIds);
+  }
   const valid = actionIds.filter((id) => (ACTION_IDS as readonly string[]).includes(id));
   if (!valid.length) throw new Error('没有合法的动作 id');
   await rerunActions(dirId, valid);
@@ -244,7 +256,10 @@ async function rerunActions(dirId: string, actionIds: ActionId[]): Promise<void>
   const outDir = path.join(charactersDir(), dirId);
   const job = await Job.load(outDir);
   for (const id of actionIds) {
-    job.state.actions[id] = { status: 'pending', attempts: { frame: 0, video: 0 } };
+    // Failed actions resume paid upstream IDs; regenerating a successful action is explicitly fresh.
+    if (job.state.actions[id]?.status !== 'failed') {
+      job.state.actions[id] = { status: 'pending', attempts: { frame: 0, video: 0 } };
+    }
   }
   await job.save();
   await restoreGenerationTask(dirId);
@@ -257,7 +272,7 @@ async function rerunActions(dirId: string, actionIds: ActionId[]): Promise<void>
     // 沿用 job 创建时选定的生图后端
     if (job.state.imageProvider) cfg.imageProvider = job.state.imageProvider;
     const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
-    await runActions(job, createArkClient(cfg), ffmpegPath);
+    await runActions(job, createArkClient(cfg), ffmpegPath, undefined, cfg.concurrency, actionIds);
     await runPackage(job);
     broadcast(dirId, { jobId: job.state.jobId, stage: 'done' });
     await rebuildTray();
@@ -283,6 +298,7 @@ async function rerunActions(dirId: string, actionIds: ActionId[]): Promise<void>
  * 挑图界面就是现有的孵化窗。
  */
 export async function regenerateTurnaround(dirId: string): Promise<void> {
+  if (isCloudJob(dirId)) throw new Error('云端角色请在形象确认时更换方案；完整重建需要新建任务');
   if (active.has(dirId)) throw new Error('该角色已有生成任务在跑，请等它结束');
   const outDir = path.join(charactersDir(), dirId);
   const job = await Job.load(outDir);
@@ -515,11 +531,7 @@ function broadcastCustomAction(
   status: 'pending' | 'done' | 'failed',
   error?: string,
 ): void {
-  // 只发控制台窗（人设/动作 pane 据此刷新；旧 studio 独立窗阶段 4 后下线）
-  const win = getConsoleWindow();
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('studio:customAction', { dirId, name, status, error });
-  }
+  sendToWindows('studio:customAction', { dirId, name, status, error });
 }
 
 /**

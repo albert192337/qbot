@@ -1,7 +1,10 @@
 /** 控制台设置：身份、模型、桌宠、语音、行为、隐私与开发者入口。 */
+import { toast } from './_studio-shared';
 import type { Settings } from '../../../shared/ipc-types';
 
 let root: HTMLElement | null = null;
+let saving=Promise.resolve();
+function save(patch:Partial<Settings>):Promise<void>{saving=saving.then(()=>window.qbot.settings.set(patch)).catch(e=>{if(root)toast(root,`保存失败：${String(e)}`,'warn');});return saving;}
 let unsubSettings: (() => void) | null = null;
 
 export async function mount(host: HTMLElement): Promise<void> {
@@ -48,7 +51,7 @@ function template(settings: Settings): string {
       <div class="setting-block"><div class="setting-copy"><label for="set-nickname">公开昵称</label><p>装扮市场署名与联机空间身份使用同一个昵称。</p></div><input id="set-nickname" type="text" maxlength="24" placeholder="匿名" value="${attr(nickname)}" /></div>
     </section>
 
-    <section class="settings-section"><h3>模型与 API</h3>
+    <section class="settings-section"><h3>孵化方式</h3><div class="setting-block"><div class="setting-copy"><label for="set-generation-mode">使用哪座孵化台</label><p>云端使用账户额度；本地使用自己的 API Key，按模型服务计费。</p></div><select id="set-generation-mode"><option value="cloud"${settings.generationMode !== 'local' ? ' selected' : ''}>云端孵化</option><option value="local"${settings.generationMode === 'local' ? ' selected' : ''}>本地孵化</option></select></div></section><section class="settings-section"><h3>模型与 API</h3><p>云端创建无需填写这里；选择本地孵化时使用。</p>
       ${keyRow('set-ark-key', '火山方舟 Ark API Key', settings.arkApiKey, '用于 Seedream、动作生成和自由模式。')}
       ${keyRow('set-gpt-key', 'GPT-Image-2 API Key', settings.gptImageApiKey, '仅在创建角色时选择 GPT-Image-2 才需要。')}
     </section>
@@ -74,7 +77,7 @@ function template(settings: Settings): string {
     </section>
 
     <section class="settings-section"><h3>高级</h3>
-      ${toggleRow('set-developer-mode', '显示开发者工具', '开启后在侧栏显示规则引擎、感知日志和数值注水入口。', !!settings.developerMode)}
+      ${toggleRow('set-developer-mode', '显示开发者工具', '开启后可以翻开工具抽屉，查看规则引擎、感知日志和数值工具。', !!settings.developerMode)}
     </section>
   </div>`;
 }
@@ -96,6 +99,7 @@ function syncFrom(host: HTMLElement, settings: Settings): void {
     const input = host.querySelector<HTMLInputElement>(selector);
     if (input) input.checked = value;
   };
+  setValue('#set-generation-mode',settings.generationMode??'cloud');
   setValue('#set-nickname', settings.nickname ?? settings.marketNickname ?? '');
   setValue('#set-scale', String(settings.petScale ?? 1));
   setValue('#set-voice-volume', String(settings.voiceVolume ?? 70));
@@ -113,13 +117,14 @@ function syncFrom(host: HTMLElement, settings: Settings): void {
 
 function bind(host: HTMLElement): void {
   const q = <T extends HTMLElement>(selector: string): T => host.querySelector<T>(selector)!;
+  q<HTMLSelectElement>('#set-generation-mode').addEventListener('change',event=>void save({generationMode:(event.target as HTMLSelectElement).value as 'cloud'|'local'}));
   q<HTMLInputElement>('#set-nickname').addEventListener('change', (event) => {
     const nickname = (event.target as HTMLInputElement).value.trim();
-    void window.qbot.settings.set({ nickname, marketNickname: nickname });
+    void save({ nickname, marketNickname: nickname });
   });
   const bindKey = (selector: string, key: 'arkApiKey' | 'gptImageApiKey') => {
     q<HTMLInputElement>(selector).addEventListener('change', (event) => {
-      void window.qbot.settings.set({ [key]: (event.target as HTMLInputElement).value.trim() });
+      void save({ [key]: (event.target as HTMLInputElement).value.trim() });
       const state = (event.target as HTMLElement).closest('.setting-block')?.querySelector('.key-state');
       if (state) {
         const configured = !!(event.target as HTMLInputElement).value.trim();
@@ -147,17 +152,17 @@ function bind(host: HTMLElement): void {
   q<HTMLInputElement>('#set-scale').addEventListener('input', (event) => {
     const value = parseFloat((event.target as HTMLInputElement).value);
     q('#set-scale-value').textContent = `${Math.round(value * 100)}%`;
-    void window.qbot.settings.set({ petScale: value });
+    void save({ petScale: value });
   });
-  q<HTMLInputElement>('#set-voice-enabled').addEventListener('change', (event) => void window.qbot.settings.set({ voiceEnabled: (event.target as HTMLInputElement).checked }));
+  q<HTMLInputElement>('#set-voice-enabled').addEventListener('change', (event) => void save({ voiceEnabled: (event.target as HTMLInputElement).checked }));
   q<HTMLInputElement>('#set-voice-volume').addEventListener('input', (event) => {
     const value = parseInt((event.target as HTMLInputElement).value, 10);
     q('#set-volume-value').textContent = String(value);
-    void window.qbot.settings.set({ voiceVolume: value });
+    void save({ voiceVolume: value });
   });
-  q<HTMLSelectElement>('#set-talk-frequency').addEventListener('change', (event) => void window.qbot.settings.set({ talkFrequency: (event.target as HTMLSelectElement).value as 'quiet' | 'normal' | 'chatty' }));
-  q<HTMLInputElement>('#set-show-pet').addEventListener('change', (event) => void window.qbot.settings.set({ roomsShowMyPet: (event.target as HTMLInputElement).checked }));
-  q<HTMLInputElement>('#set-foreground-observation').addEventListener('change', (event) => void window.qbot.settings.set({ foregroundObservationEnabled: (event.target as HTMLInputElement).checked }));
-  q<HTMLInputElement>('#set-free-mode').addEventListener('change', (event) => void window.qbot.settings.set({ freeMode: (event.target as HTMLInputElement).checked }));
-  q<HTMLInputElement>('#set-developer-mode').addEventListener('change', (event) => void window.qbot.settings.set({ developerMode: (event.target as HTMLInputElement).checked }));
+  q<HTMLSelectElement>('#set-talk-frequency').addEventListener('change', (event) => void save({ talkFrequency: (event.target as HTMLSelectElement).value as 'quiet' | 'normal' | 'chatty' }));
+  q<HTMLInputElement>('#set-show-pet').addEventListener('change', (event) => void save({ roomsShowMyPet: (event.target as HTMLInputElement).checked }));
+  q<HTMLInputElement>('#set-foreground-observation').addEventListener('change', (event) => void save({ foregroundObservationEnabled: (event.target as HTMLInputElement).checked }));
+  q<HTMLInputElement>('#set-free-mode').addEventListener('change', (event) => void save({ freeMode: (event.target as HTMLInputElement).checked }));
+  q<HTMLInputElement>('#set-developer-mode').addEventListener('change', (event) => void save({ developerMode: (event.target as HTMLInputElement).checked }));
 }

@@ -1,6 +1,6 @@
 {
   "name": "@qbot/app",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "main": "out/main/index.js",
   "scripts": {
@@ -11,7 +11,8 @@
     "dist": "electron-vite build && electron-builder --config electron-builder.yml"
   },
   "dependencies": {
-    "ffmpeg-static": "^5.2.0"
+    "ffmpeg-static": "^5.2.0",
+    "phaser": "3.90.0"
   },
   "devDependencies": {
     "@qbot/pipeline": "*",

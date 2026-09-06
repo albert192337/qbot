@@ -1,3 +1,5 @@
+import { getSettings } from './config';
+import { clampMaxBoxes } from '../shared/furniture';
 /**
  * 游戏化积累持久化：userData/progress.json
  *
@@ -9,7 +11,7 @@
  * 这里每秒都有键盘加分，所以**内存缓存 + 防抖落盘 + 节流广播**，否则一分钟几十次写盘。
  */
 import { app } from 'electron';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { CraftResult, OpenBoxResult, Progress } from '../shared/ipc-types';
 import {
@@ -33,6 +35,8 @@ import {
   pickCraftSacrifice,
   sanitizeProgress,
   settleIdle,
+  settleCompanion,
+  grantWelcome,
 } from './progress-rules';
 import { sendToWindows } from './windows';
 
@@ -85,9 +89,13 @@ async function load(): Promise<Progress> {
       cache = sanitizeProgress(parsed);
     } catch {
       // 不存在或损坏 → 新档；不主动覆盖写，保留手改坏的现场（下次保存才重写）
-      cache = { ...emptyProgress(), boxes: STARTER_BOXES, inventory: await seedFromPlacements() };
+      try { cache = sanitizeProgress(JSON.parse(await readFile(`${progressPath()}.bak`, 'utf8'))); }
+      catch { cache = { ...emptyProgress(), boxes: STARTER_BOXES, inventory: await seedFromPlacements() }; }
       scheduleSave();
     }
+    const previous = cache;
+    cache = grantWelcome(cache);
+    if (cache !== previous) scheduleSave();
     return cache;
   })();
   const p = await loading;
@@ -104,18 +112,25 @@ function scheduleSave(): void {
 }
 
 /** 退出前调用，把防抖里没落的那笔写掉 */
+let saveChain: Promise<void> = Promise.resolve();
+
 export async function flushProgress(): Promise<void> {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
   if (!cache) return;
-  try {
+  const snapshot = JSON.stringify(cache, null, 2);
+  const save = async () => {
     await mkdir(path.dirname(progressPath()), { recursive: true });
-    await writeFile(progressPath(), JSON.stringify(cache, null, 2));
-  } catch (err) {
-    console.error('[progress] 写盘失败', err); // 写失败不阻塞玩法
-  }
+    const file = progressPath();
+    // Preserve only parseable snapshots; never replace a healthy backup with a corrupt file.
+    try { JSON.parse(await readFile(file, 'utf8')); await copyFile(file, `${file}.bak`); } catch {}
+    await writeFile(`${file}.tmp`, snapshot);
+    await rename(`${file}.tmp`, file);
+  };
+  saveChain = saveChain.then(save, save).catch(err => console.error('[progress] 写盘失败', err));
+  await saveChain;
 }
 
 function scheduleBroadcast(): void {
@@ -168,9 +183,9 @@ async function idleTick(): Promise<void> {
   lastIdleAt = now;
   if (delta <= 0) return;
   const p = await load();
-  const { idleMs, gained } = settleIdle(p.idleMs, delta, IDLE_DELTA_CAP_MS);
-  if (gained > 0) console.log(`[progress] 挂机结算 +${gained} 箱`);
-  commit({ ...p, idleMs, boxes: p.boxes + gained });
+  const maxBoxes = clampMaxBoxes((await getSettings()).maxBoxes);
+  // Reload after settings IO so concurrent box opening/keyboard rewards cannot be overwritten.
+  commit(settleCompanion(await load(), delta, maxBoxes));
 }
 
 export function startProgressTicker(): void {

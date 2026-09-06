@@ -142,6 +142,7 @@ async function refresh(force = false): Promise<void> {
         toast(root, '当前场景还没有可播放的动作', 'warn');
         return;
       }
+      if(root.closest('#house-book')){window.dispatchEvent(new CustomEvent('house:preview',{detail:{dirId:ctx.dirId,action:selectElement.value}}));return;}
       window.qbot.pet.previewAction(selectElement.value);
       toast(root, `正在桌面预览「${selectElement.selectedOptions[0]?.textContent ?? selectElement.value}」`);
     });

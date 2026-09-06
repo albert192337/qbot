@@ -12,7 +12,7 @@ it('only follows an explicitly opened job and ignores background jobs while crea
   vi.stubGlobal('requestAnimationFrame', (fn:FrameRequestCallback)=>{fn(0);return 1;});
   vi.stubGlobal('window', {
     addEventListener:vi.fn(),setInterval:vi.fn(()=>1),clearInterval:vi.fn(),innerWidth:880,
-    qbot:{hatch:{getStatus:status,onProgress:(fn:typeof progress)=>{progress=fn;return vi.fn();}},characters:{list:async()=>[]}},
+    qbot:{hatch:{onCloudStatus:vi.fn(()=>vi.fn()),getStatus:status,onProgress:(fn:typeof progress)=>{progress=fn;return vi.fn();}},settings:{get:async()=>({})},characters:{list:async()=>[]}},
   });
   const hatch = await import('../src/renderer/console/panes/hatch');
   await hatch.mount(host);

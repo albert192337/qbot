@@ -1,7 +1,7 @@
 import { navigate } from '../workspace';
 import type { AgentActivity, AgentStatus, CharacterMeta, Progress, Settings } from '../../../shared/ipc-types';
 import { icon } from '../icons';
-import { esc } from './_studio-shared';
+import { esc, toast } from './_studio-shared';
 
 const ACTIVITY_LABEL: Record<AgentActivity, string> = {
   idle: '空闲',
@@ -84,10 +84,20 @@ function template(
 
   return `<div class="studio-body home-body">
     <div class="page-heading">
-      <div><p class="eyebrow">QBot 工作台</p><h2>今天想和谁一起工作？</h2><p class="page-summary">管理角色、处理生成任务，并确认连接与隐私状态。</p></div>
+      <div><p class="eyebrow">QBot 工作台</p><h2>今天和桌宠一起做点什么？</h2><p class="page-summary">创建自己的角色，布置小屋，让它陪你度过今天。</p></div>
       <button class="btn primary" data-open="hatch">${icon('create')} 创建角色</button>
     </div>
 
+    ${!settings.onboardingDismissed ? `<section class="summary-section" aria-label="新手引导">
+      <div class="section-heading"><div><h3>第一次见面，先玩起来</h3></div><button class="text-action" id="home-dismiss-guide">收起引导</button></div>
+      <p>可以拖动桌宠换个位置，右键打开操作菜单。喜欢安静的话，在设置中关闭语音即可。</p>
+      <div class="summary-list">
+        <div class="summary-row"><span><b>① 打开见面礼</b><small>${(latestProgress?.boxesOpened ?? 0) > 0 ? '已完成！获得的家具可以摆进小屋。' : '已送你开箱所需的点数，打开就能获得一件家具。'}</small></span><button class="btn" id="home-first-box" ${(latestProgress?.boxesOpened ?? 0) > 0 ? 'disabled' : ''}>${(latestProgress?.boxesOpened ?? 0) > 0 ? '已领取' : '打开箱子'}</button></div>
+        <div class="summary-row"><span><b>② 布置自己的小屋</b><small>进入小屋后，右键打开「我的家具」，摆上刚得到的装饰。</small></span><button class="btn" id="home-guide-room">进入小屋</button></div>
+        <div class="summary-row"><span><b>③ 换成你的专属角色</b><small>上传一张形象图，用邀请码创建。等待时可以继续玩。</small></span><button class="btn" data-open="hatch">创建角色</button></div>
+      </div>
+      <p class="empty-copy">每陪伴 15 分钟获得 1 个箱子和 500 点，满仓暂停。无需接入工作软件或开启窗口感知。</p>
+    </section>` : ''}
     <section class="home-hero ${active ? '' : 'is-empty'}">
       ${active ? `
         <div class="home-pet-preview"><img src="qbot-asset://${esc(active.dirId)}/source.png" alt="${esc(active.manifest.name || '当前角色')}" /></div>
@@ -126,13 +136,26 @@ function template(
       <section class="summary-section">
         <div class="section-heading"><div>${icon('room')}<h3>陪伴与房间</h3></div></div>
         <div class="metric-strip"><div><b>${latestProgress?.points ?? 0}</b><span>点数</span></div><div><b>${latestProgress?.boxes ?? 0}</b><span>箱子</span></div><div><b>${furniture}</b><span>件家具</span></div></div>
-        <div class="btn-row"><button class="btn secondary" id="home-open-rooms">打开联机空间</button><button class="btn quiet" data-open="settings">隐私设置</button></div>
+        <div class="btn-row"><button class="btn primary" id="home-open-house">进入我的小屋</button><button class="btn secondary" id="home-open-rooms">打开联机空间</button><button class="btn quiet" data-open="settings">隐私设置</button></div>
       </section>
     </div>
   </div>`;
 }
 
 function bind(host: HTMLElement): void {
+  host.querySelector('#home-dismiss-guide')?.addEventListener('click', async () => {
+    await window.qbot.settings.set({onboardingDismissed:true}); await refresh();
+  });
+  for (const selector of ['#home-guide-room','#home-open-house']) host.querySelector(selector)?.addEventListener('click', () => window.qbot.room.openHome());
+  host.querySelector<HTMLButtonElement>('#home-first-box')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget as HTMLButtonElement; button.disabled = true;
+    try {
+      const result = await window.qbot.progress.openBox();
+      if (result.ok) { latestProgress = result.progress; await refresh(); toast(root!, '获得了一件家具！进入小屋，右键打开「我的家具」即可摆放。'); }
+      else toast(host, result.error);
+    } catch (e) { toast(host, e instanceof Error ? e.message : String(e)); }
+    finally { button.disabled = false; }
+  });
   host.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((button) => {
     button.addEventListener('click', () => navigate({ pane: button.dataset.open!, dirId: button.dataset.dir }));
   });

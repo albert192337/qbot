@@ -288,7 +288,7 @@ export function step(
     }
     default:
       // 处理未定义的事件类型
-      console.warn('state-machine: 收到未定义的事件类型', event.type);
+      console.warn('state-machine: 收到未定义的事件', event);
       return { state };
   }
 }

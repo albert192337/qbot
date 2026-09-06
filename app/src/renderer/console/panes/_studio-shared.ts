@@ -44,7 +44,7 @@ export function getAssetNonce(): number {
 }
 
 export function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 type DirtyControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
@@ -222,12 +222,14 @@ export function toast(root: HTMLElement, msg: string, kind: 'ok' | 'warn' = 'ok'
 /** 花钱操作的确认（pane 内非阻塞对话框，取代原生 confirm） */
 export function confirmBox(root: HTMLElement, message: string): Promise<boolean> {
   return new Promise((resolve) => {
+    const previousFocus=document.activeElement as HTMLElement|null;
     const mask = document.createElement('div');
     mask.className = 'studio-confirm-mask';
     const box = document.createElement('div');
     box.className = 'studio-confirm';
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', '确认这一步');
     const text = document.createElement('div');
     text.className = 'studio-confirm-text';
     text.textContent = message;
@@ -244,6 +246,7 @@ export function confirmBox(root: HTMLElement, message: string): Promise<boolean>
     const done = (v: boolean): void => {
       document.removeEventListener('keydown', onKeydown);
       mask.remove();
+      if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});
       resolve(v);
     };
     no.addEventListener('click', () => done(false));
@@ -252,7 +255,9 @@ export function confirmBox(root: HTMLElement, message: string): Promise<boolean>
       if (e.target === mask) done(false);
     });
     const onKeydown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return;
+      if(event.key==='Tab'){event.preventDefault();(document.activeElement===no?yes:no).focus();return;}
+      if (event.key !== 'Escape' || event.isComposing) return;
+      event.preventDefault();event.stopPropagation();
       document.removeEventListener('keydown', onKeydown);
       done(false);
     };
@@ -261,7 +266,7 @@ export function confirmBox(root: HTMLElement, message: string): Promise<boolean>
     box.append(text, row);
     mask.appendChild(box);
     root.appendChild(mask);
-    yes.focus();
+    no.focus();
   });
 }
 

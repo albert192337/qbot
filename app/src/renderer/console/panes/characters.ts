@@ -76,7 +76,7 @@ function bind(host: HTMLElement): void {
   host.querySelectorAll<HTMLButtonElement>('.edit-char').forEach((button) => button.addEventListener('click', () => navigate({ pane: 'profile', dirId: button.dataset.dir! })));
   host.querySelectorAll<HTMLButtonElement>('.use-char').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      await window.qbot.characters.activate(btn.dataset.dir!);
+      await guard(host,btn,'正在迎接…',async()=>{await window.qbot.characters.activate(btn.dataset.dir!);});
       await refresh();
     });
   });
@@ -97,13 +97,10 @@ function bind(host: HTMLElement): void {
         finished = true;
         const v = input.value.trim();
         input.remove();
-        if (v) {
-          await window.qbot.characters.rename(btn.dataset.dir!, v);
-          toast(host, `已改名为「${v}」`);
-        }
-        await refresh();
+        try{if(v){await window.qbot.characters.rename(btn.dataset.dir!,v);toast(host,`已改名为「${v}」`);}await refresh();}catch(e){toast(host,String(e),'warn');}
       };
       input.addEventListener('keydown', (e) => {
+        if(e.isComposing)return;
         if (e.key === 'Enter') void commit();
         else if (e.key === 'Escape') { finished = true; input.remove(); }
       });
@@ -123,8 +120,7 @@ function bind(host: HTMLElement): void {
           `删除角色「${name}」？\n\n资产包会从磁盘移除，此操作不可恢复。`,
         );
         if (!ok) return;
-        await window.qbot.characters.delete(btn.dataset.dir!);
-        toast(host, `已删除「${name}」`);
+        await guard(host,btn,'整理中…',async()=>{await window.qbot.characters.delete(btn.dataset.dir!);toast(host,`已删除「${name}」`);});
         await refresh();
       })();
     });

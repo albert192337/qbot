@@ -104,6 +104,11 @@ function buildSidebar(): void {
   brand.innerHTML = `<span class="brand-mark">Q</span><span><b>QBot</b><small>桌宠工坊</small></span>`;
   brand.addEventListener('click', () => void switchPane('home'));
   sidebar.appendChild(brand);
+  const nursery = document.createElement('button');
+  nursery.className = 'side-item';
+  nursery.innerHTML = `${icon('room')}<span>孵化小屋</span>`;
+  nursery.addEventListener('click', () => window.qbot.ui.openNursery());
+  sidebar.appendChild(nursery);
 
   for (const group of visibleGroups()) {
     const label = document.createElement('div');
@@ -200,6 +205,11 @@ function switchPane(id: PaneId, route: ConsoleRoute = { pane: id, fresh: id === 
 }
 async function performNavigation(id: PaneId, route: ConsoleRoute): Promise<void> {
   if (!ALL_DEFS.some((definition) => definition.id === id)) return;
+  if (id === 'hatch' && !route.taskId) {
+    window.qbot.ui.openNursery(true);
+    if (!activePane) await performNavigation('home', { pane: 'home' });
+    return;
+  }
   if (route.dirId && route.dirId !== getSelectedCharacterId()) {
     if (!(await askDiscardChanges())) return;
     selectCharacter(route.dirId);
@@ -300,6 +310,7 @@ const refreshTasks = () => {
   contextTimer = setTimeout(() => { contextTimer = undefined; void refreshContextBar(); }, 500);
 };
 window.qbot.hatch.onProgress(refreshTasks);
+window.qbot.hatch.onCloudStatus(refreshTasks);
 window.qbot.studio.onCustomAction(refreshTasks);
 
 window.qbot.settings.onChanged((settings) => {

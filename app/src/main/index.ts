@@ -1,3 +1,4 @@
+import { recoverCloudJobs } from './cloud-generation';
 /** 主进程入口：协议注册（必须在 ready 前）→ 预置角色 → 窗口/托盘/IPC */
 import { app, net, protocol, screen } from 'electron';
 import { existsSync } from 'node:fs';
@@ -10,7 +11,7 @@ import { getSettings, setSettings } from './config';
 import { registerIpc } from './ipc';
 import { wireRoomPetDisplay } from './rooms/room-pet-display';
 import { rebuildTray } from './tray';
-import { createPetWindow, getPetWindow, setPetScale, syncBubbleBounds, pushToLounge, broadcastCharacterActivated, getActivePlayables } from './windows';
+import { createNurseryWindow, createPetWindow, getPetWindow, setPetScale, syncBubbleBounds, pushToLounge, broadcastCharacterActivated, getActivePlayables } from './windows';
 import { startAgentServer } from './agent-server';
 import { startMusicMonitor, stopMusicMonitor } from './music-monitor';
 import { startMeetingMonitor, stopMeetingMonitor } from './meeting-monitor';
@@ -143,6 +144,7 @@ app.whenReady().then(async () => {
       .then((roomId) => console.log('[rooms] auto-created:', roomId))
       .catch((err) => console.error('[rooms] auto-create failed:', err));
   }
+  void recoverCloudJobs();
   await rebuildTray();
   void startAgentServer(); // agent 联动状态服务（失败不阻塞桌宠本体）
   startMusicMonitor(); // 网易云音乐播放监控（Windows only，失败不阻塞）
@@ -159,6 +161,10 @@ app.whenReady().then(async () => {
   wireBrain(); // 自由模式 LLM 脑（内部按 settings.freeMode + arkApiKey 自行门控）
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
+  if (!settings.onboardingSeen) {
+    createNurseryWindow();
+    await setSettings({ onboardingSeen: true });
+  }
   // 系统前台窗口不能靠 Electron 的 browser-window-focus 判断（它只覆盖本应用窗口）。
   // 标题敏感度高，遵循独立开关、默认关闭；macOS / Windows 分别走原生只读采集器。
   setForegroundObservationEnabled(settings.foregroundObservationEnabled === true);

@@ -48,6 +48,11 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
     const charDir = path.join(dir, entry.name);
     const manifestPath = path.join(charDir, 'manifest.json');
     const taskDismissed = existsSync(path.join(charDir, '.task-dismissed'));
+    let cloudPending = false;
+    try {
+      const cloud = JSON.parse(await readFile(path.join(charDir, '.cloud-job.json'), 'utf8'));
+      cloudPending = cloud.phase !== 'done' || !cloud.acknowledged;
+    } catch {}
     const hasUnfinishedJob =
       existsSync(path.join(charDir, '.job/state.json')) && !existsSync(manifestPath);
     if (!existsSync(manifestPath)) {
@@ -63,7 +68,7 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
         manifest.voice = assignVoice(manifest.id);
         await writeManifest(manifestPath, manifest);
       }
-      out.push({ dirId: entry.name, manifest, hasUnfinishedJob: false, taskDismissed });
+      out.push({ dirId: entry.name, manifest, hasUnfinishedJob: cloudPending, taskDismissed });
     } catch {
       /* 损坏的包跳过 */
     }

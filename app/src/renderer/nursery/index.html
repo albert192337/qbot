@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>QBot · 故事小屋</title>
+  </head>
+  <body>
+    <main id="world" aria-label="孵化小屋">
+      <div id="scene" aria-hidden="true"></div>
+      <header class="masthead">
+        <div>
+          <span class="eyebrow">QBOT · 一间会发生故事的小屋</span>
+          <h1>等一位新朋友。</h1>
+        </div>
+        <div class="house-actions">
+          <button id="settings" class="quiet">小屋手册</button
+          ><button id="leave-house" class="quiet">回桌面</button>
+        </div>
+      </header>
+      <nav id="area-map" aria-label="小屋地图"></nav>
+      <div id="portrait">
+        <img id="source" hidden alt="放在孵化台上的角色图片" />
+        <div id="actor"></div>
+      </div>
+      <nav id="places" aria-label="小屋里的物件">
+        <button class="place ledger-place" data-place="ledger">
+          <span>02</span>翻开手记<small>孵化记录 · 我的朋友</small>
+        </button>
+        <button class="place hatch-place" data-place="hatch">
+          <span>01</span>走近孵化台<small id="incubator-hint"
+            >放一张图片，让故事开始</small
+          >
+        </button>
+        <button class="place door-place" data-place="door">
+          <span>03</span>回到桌面<small>朋友会继续陪着你</small>
+        </button>
+      </nav>
+      <section id="paper" hidden aria-labelledby="paper-title">
+        <div class="paper-top">
+          <span id="paper-kicker" class="eyebrow">孵化手记</span
+          ><button id="back" class="quiet">回小屋</button>
+        </div>
+        <h2 id="paper-title"></h2>
+        <div id="paper-body"></div>
+      </section>
+      <div id="notice" role="status" aria-live="polite" hidden></div>
+      <footer>
+        <span id="narration"
+          >窗外的风很轻。桌上的孵化台，正等着一张属于你的图片。</span
+        ><span class="footer-mark">Q / 01</span>
+      </footer>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

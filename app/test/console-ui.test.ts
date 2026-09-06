@@ -64,7 +64,7 @@ describe('console UI invariants', () => {
 
   it('offers two presentation modes inside the same online room', () => {
     const html = read('../src/renderer/lounge/index.html');
-    const renderer = read('../src/renderer/lounge/main.ts');
+    const renderer = read('../src/renderer/lounge/view.ts');
     const preload = read('../src/preload/index.ts');
     expect(html).toContain('data-display-mode="room"');
     expect(html).toContain('data-display-mode="desktop"');

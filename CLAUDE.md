@@ -7,7 +7,7 @@
 | 路径 | 职责 |
 |---|---|
 | `pipeline/` | 生成管线，**纯 Node 零 Electron 依赖**，可独立 CLI 使用（`npx tsx pipeline/src/cli.ts`） |
-| `app/` | Electron 客户端（electron-vite；main / preload / 五 renderer：pet 桌面宠物 + room 联机房间场景 + bubble 气泡 + console 控制台 + lounge 联机空间） |
+| `app/` | Electron 客户端（electron-vite；main / preload / 六 renderer：pet 桌面宠物 + room 房间场景 + bubble 气泡 + nursery 故事小屋 + console/lounge 兼容源码） |
 | `app/src/main/pipeline-bridge.ts` | import `@qbot/pipeline` 的主入口（另一处是 sticker-importer，共用其 `buildConfig`） |
 | `app/src/main/agent-server.ts` | agent 联动：127.0.0.1 HTTP 收 hook 事件 → 会话合成 → 广播 pet 窗 |
 | `app/src/main/agent-message.ts` | agent 消息纯逻辑：markdown 展平、截断、来源标签、transcript 解析（可单测） |
@@ -16,7 +16,8 @@
 | `app/src/main/rooms/` | 联机空间链路：`rooms.ts` 网络、`rooms-rules.ts` 纯逻辑、`room-pets.ts` 角色包分发状态机、`room-pet-display.ts` 房间场景/透明桌面的本地展示编排。2026-08-24 起是唯一联机链路（原 1v1 已退役） |
 | `market/` `rooms/` | 两个独立服务端 workspace（单文件 + 最小依赖，可整目录 scp；禁止 import 仓库其他模块） |
 | `app/src/main/sticker-importer.ts` | 表情包导入：打标→复核→转码落盘→热重载（纯逻辑在 `sticker-rules.ts`） |
-| `app/src/renderer/console/` | **统一控制台**：左侧栏二级目录（角色/配置/社区/连接/系统），`panes/*.ts` 一 pane 一文件，懒挂载 |
+| `app/src/renderer/nursery/` | **故事小屋**：Phaser 四空间入口、孵化、功能手册、舞台预览、礼物与家具编辑 |
+| `app/src/renderer/console/` | 角色/任务/市场/设置等业务控制器，`panes/*.ts` 由故事小屋懒挂载复用 |
 | `assets/mascot/` | 官方预置角色源（同步于 `app/resources/presets/mascot/`） |
 | `docs/superpowers/specs/` | 已批准的设计 spec（权威）；`DESIGN.md` 是最初的产品/技术调研 |
 | `config.local.json` | **gitignored**，存 API keys（arkApiKey / gptImageApiKey） |
@@ -40,7 +41,7 @@
 - 来源标签 = `cwd` 的目录名（`cwd` 在 Stop 和 Notification 里都有；`gitBranch` 只有 transcript 里有故不用）；**同名来源并存时补 `#<session前4位>`**（worktree 场景必需）
 - 气泡窗是独立 renderer：固定 340×500 透明置顶穿透窗，`focusable:false`，创建后**只 setPosition 永不改尺寸**；跟随桌宠靠 `petWindow.on('move'|'resize')`
 
-## 统一控制台（原 Studio / 市场 / 孵化 / 设置 / 调试面板五合一）
+## 控制器历史结构（界面入口现已迁移到故事小屋，见文末）
 
 - **桌宠右键「控制台…」或托盘**打开单窗（880×640，renderer `console`），侧栏当前为四组八个产品入口：
   - 工作台：总览（当前角色、后台任务、连接状态、积累与联机空间快捷入口）
@@ -184,7 +185,7 @@ npx tsx pipeline/src/cli.ts rekey --job ~/Library/Application\ Support/@qbot/app
                              # --erode <px>    仅 --despill 0 时生效（两者互斥，见血泪坑 22）
                              # --action <id>   只重抠单个动作
 
-npm run dist -w app          # 打包当前平台（mac→dmg / win→nsis+zip；mac 从未验证成功过）
+npm run dist -w app          # 打包当前平台（mac→dmg / win→nsis+zip；mac arm64 已验证，Intel Mac 未验证）
                              # Windows 包必须在 Windows 上构建（ffmpeg-static 装机时按平台下载）
                              # → 完整流程/镜像/验证清单见 docs/windows-build-and-release.md
                              # → GitHub Actions build-windows.yml（手动触发或打 v* tag）
@@ -265,13 +266,11 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 
 ## 已知未解决
 
-- 出生证明画廊 `<video>` 全空白（文件本身验证正常，桌宠窗口同 URL 能播；重复渲染已修）。
-  搬进控制台孵化 pane 后渲染上下文变了，**未复验**是否仍存在
-- 控制台的孵化 pane 只验到「续跑入口出现 + 五屏骨架正常」，**完整孵化一只新角色未实机跑**
-  （要真实 API，生图分/张 + 视频约 ¥1/条）；`saveCard` 截图在滚动容器里的取景也未验
-- Windows 打包已跑通并实测联动（见 `docs/windows-build-and-release.md`）；**mac 打包仍未验证成功**
+- 2026-09-06 P0 云端生成验收已确认：Mac 打包版出生证明画廊 8 个视频均正常播放。
+- P0 已完成一只真实云端角色 8/8 动作生成、打包版同步与上桌；`saveCard` 滚动容器取景仍未验。
+- Windows 历史版本打包已跑通（见 `docs/windows-build-and-release.md`）；0.3.0 Windows 尚待实机验收。Mac 0.3.0 arm64 DMG 已构建并运行验证。
 - 包未做代码签名 → Windows 首次运行撞 SmartScreen「未知发布者」
-- `DEFAULTS.concurrency` 定义了但没接限流；默认 8 个动作会同时推进，接真实 API 前需关注服务端并发限制
+- P0 已接通 `runActions` 并发控制；托管服务单角色执行、动作并发 2。正式签名/公证证书尚未配置。
 
 ## 约定
 
@@ -298,3 +297,39 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 - 回归测试：`character-workspace.test.ts`、`hatch-navigation.test.ts`。浏览器本地 mock 检查编辑对象、草稿、任务详情和空状态；真实付费生成不在本次验证内。
 
 - 生成任务支持删除列表记录：`.task-dismissed` 独立标记持久化，保留角色、断点和动作，运行中生成继续（确认框说明）；主动续跑/重新生成/添加动作时清除标记。`taskCharacters` 统一过滤列表和任务数。测试 `task-deletion.test.ts` 覆盖持久移除、资产保留、恢复和非法路径。
+
+
+## P0 邀请内测（2026-09-06，0.3.0）
+
+- `generation/`：独立 Node 托管服务，复用已编译 `pipeline/`；不受 rooms/market 零跨包依赖约束。默认 API `https://albertbeta.cn/qbot-generation`，凭邀请码鉴权，模型凭据只在服务器环境文件中。
+- 原子持久化注册/额度、UUID 幂等创建、单角色队列、动作并发 2、形象确认释放执行槽、限次重试。服务重启续跑；完成文件按白名单和 SHA256 分发。`GET /jobs` 支持凭邀请码恢复任务。
+- `app/src/main/cloud-generation.ts`：主进程保存邀请码（0600、角色包之外），轮询并原子同步资产。默认云端模式；创建页高级设置可切回自备 Key 的本地模式。失败保持任务入口；完成待领取仍列任务，激活后确认领取。
+- 云端邀请码每次创建包含最多 3 次形象方案和 2 次额外失败重试；内测额度不等于付费充值。修复已失败动作复用合法首帧和已付费视频 ID；单动作修复只推进所选动作。终态失败或视频质检不合格才清理引用以重新提交，原始素材文件保留。
+- 首次引导在总览，可收起。`room.openHome()` 打开无需联机的本地小屋；原 `room.open()` 仍是联机空间。
+- `welcomeGrantVersion` 幂等发放首次开箱点数；新/旧档均可领取一次。每 15 分钟陪伴同时获得 1 箱和 500 点，按 maxBoxes 满仓暂停，休眠时间不额外奖励。存档原子写 + `.bak` 有效备份。
+- `npm run check`：管线构建、管线/App/生成服务测试、App 类型检查。发布与运维边界详见 `docs/p0-release-and-deployment.md`，不把邀请码、供应商凭据或 SSH 凭据提交到仓库。
+
+## 游戏化孵化小屋（2026-09-06）
+
+- `renderer/nursery/` 是新增的 Electron + Phaser 3.90 场景入口：孵化台、手记、桌面门；首启打开孵化小屋，桌宠右键/托盘与控制台均可进入。控制台的新建角色动线转入小屋，带 `taskId` 的旧任务深链继续兼容。
+- 第一阶段覆盖选图/命名 → 确认形象 → 后台学习动作 → 出生预览 → 领取上桌；手记可恢复旧任务、预览已有角色。后续全功能迁移见下节；桌宠播放器和资产格式保持兼容。
+- `nursery/controller.ts` 仅持有视图快照；读状态绝不续跑。请求代际隔离切换任务及迟到快照，提交锁防重复操作；本地 `failed` 事件先于落盘时保留事件错误。继续孵化走 `hatch.resume`，不会等待整个本地生成流程才解锁界面。
+- `nursery/scene.ts` 持有图形、交互区域与补间。打开 HTML 纸面时关闭 Phaser input，防止按钮点击穿到背后场景。中文输入/滚动/焦点由 HTML 承载，支持 Escape 返回和减少动态效果。
+- 角色预览复用 `pet/player.ts`。`ui:nurseryVisibility` 补充原生 hide/minimize/restore/show 信号（不能仅依赖 Chromium visibility），不可见时暂停游戏循环并释放预览解码器，恢复时重读快照。关闭小屋不会终止后台孵化。
+- `ui.returnToDesktop()` 保留联机连接，仅切换本机桌面展示；无联机时关闭原本地小屋并恢复桌宠。领取先完成 `characters.activate`，失败保留小屋和可重试入口。
+- 修复 `pipeline-bridge.pickTurnaround` 缺失的云端路由：云端确认形象及换方案使用已有任务的 `cloudOperation(id, 'pick', index)`。
+- 回归：`app/test/nursery.test.ts`、`app/test/hatch-cloud-routing.test.ts`。`scripts/test-nursery.cjs` 在独立 Electron userData 内，使用实际构建/preload/预置透明 WebM 和模拟生成 IPC，网络被禁用；检查完整动线、点击穿透、草稿、领取失败、显式重试、最小化恢复、小窗口、减少动态效果及上桌。需要 Playwright；可通过 `PLAYWRIGHT_MODULE` 指向已有安装。先 `npm run build -w app`，再 `node scripts/test-nursery.cjs`；截图在 `.superpowers/nursery-preview/`（gitignored）。
+- 验证范围：Mac 原生 Electron 窗口通过；真实付费生成、Windows 实机、长时 CPU/GPU 占用与安装包验收不由模拟 IPC 测试代替。
+
+
+## 故事小屋：全功能场景入口（2026-09-06）
+
+- `renderer/nursery/house.ts` 定义四个空间与物件：孵化间（新朋友/任务），起居室（相册/礼物/布置），练习室（动作/联动/练习手记），门廊（市场/联机/Claude Code）。`scene.ts` 用独立 Phaser Container 管理场景与命中区域，HTML 地图和物件按钮提供键盘入口。小屋手册放声音、行为、隐私、API 与云端/本地孵化模式；开发者工具受开关门控。
+- `createConsoleWindow(pane)`、`createLoungeWindow()` 兼容函数现在路由到同一个故事小屋；托盘和宠物菜单统一进入。`room.openHome()` 保留桌面等轴小屋展示，房间菜单的家具管理转到故事小屋。旧 console/lounge renderer 留作业务源码兼容，常规入口不再创建独立管理窗。
+- `nursery/book.ts` 懒加载并缓存原角色/动作/任务/市场/连接/设置控制器，纸面样式通过 `@scope (#book-pages)` 隔离。切换页面保留草稿；切换角色只检查角色工作台草稿，不丢弃全局家具草稿。导航有版本隔离；确认框使用非阻塞手册内对话框。首次开房和入房均有数据外发说明，取消不加入；中文输入法 Enter 不发消息。
+- 练习册的预览按钮在场景舞台复用 Player 播放，**不激活桌面角色**。预览缓存键包含标准、导入、预设和自定义动作；后台 `studio:customAction` 与角色激活事件也发到故事小屋。动作卡片默认静止，显式播放；隐藏手册暂停视频，隐藏窗口暂停 Phaser 并释放舞台 Player。
+- `nursery/rewards.ts` 从主进程读取点数/库存，只在显式点击后开箱或合成。单次操作锁覆盖确认与提交，结果按返回的家具展示；失败可重试，合成说明实际消耗。
+- `nursery/furnish.ts` 沿用 DEFAULT_ROOM 的 1024 坐标、素材、墙面仿射与层级；支持选择、拖动、方向键、缩放、收回和显式保存。写失败保留草稿。成功 `decor:changed` 广播更新桌面小屋；`decor:set` 不再吞掉存盘失败。
+- 原生 QA：先 `npm run build -w app`，再运行 `scripts/test-nursery.cjs` 和 `scripts/test-house.cjs`（设置 `PLAYWRIGHT_MODULE` 到 Playwright 安装路径）。每次使用临时 userData 和模拟 IPC，阻断 HTTP(S)，不使用真实账户或付费模型。家居保存、开箱和聊天测试只修改 fixture 数据。
+- 已验证：完整孵化、四个空间与全部功能册、草稿保留/切换取消、舞台预览不激活、设置模式与开发者门控、开箱防重复、家具保存失败重试与重读、联机同意取消/加入、展示模式不退房、缓存恢复、中文输入、聊天、退房，以及 840×570 小窗口。截图在 `.superpowers/house-preview/`。`npm run check`：pipeline 123、app 549、generation 2 项测试通过，含 TypeScript 检查；App 构建通过。
+- 验证限度：付费生成、真实服务器上的上传/社交操作、Windows 实机、长时性能和安装包验收尚未执行。当前是功能与交互迁移版本，场景美术使用确定性矢量绘制和现有资产。

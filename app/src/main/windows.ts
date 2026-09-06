@@ -31,6 +31,7 @@ let petWindow: BrowserWindow | null = null;
 const roomPetWindows = new Map<string, BrowserWindow>();
 let roomWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
+let nurseryWindow: BrowserWindow | null = null;
 let loungeWindow: BrowserWindow | null = null;
 let bubbleWindow: BrowserWindow | null = null;
 let bubbleSide: 'above' | 'below' = 'above';
@@ -91,7 +92,7 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds();
 }
 
-type RendererPage = 'pet' | 'room' | 'bubble' | 'console' | 'lounge';
+type RendererPage = 'pet' | 'room' | 'bubble' | 'console' | 'lounge' | 'nursery';
 
 function load(win: BrowserWindow, page: RendererPage, query?: Record<string, string>): void {
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -168,6 +169,8 @@ export function broadcastCharacterActivated(meta: CharacterMeta): void {
   activePlayables = ids;
   const pet = petWindow && !petWindow.isDestroyed() ? petWindow : createPetWindow();
   pet.webContents.send('characters:activated', meta);
+  if(nurseryWindow&&!nurseryWindow.isDestroyed())nurseryWindow.webContents.send('characters:activated',meta);
+  if(consoleWindow&&!consoleWindow.isDestroyed())consoleWindow.webContents.send('characters:activated',meta);
   if (roomWindow && !roomWindow.isDestroyed()) {
     roomWindow.webContents.send('characters:activated', meta);
   }
@@ -512,7 +515,7 @@ export function openRoomWindow(title: string): BrowserWindow {
     roomWindow = null;
     petWindow?.show(); // 角色回桌面
     roomWindowClosed?.();
-    if (process.platform === 'darwin' && !consoleWindow) app.dock?.hide();
+    if (process.platform === 'darwin' && !consoleWindow && !nurseryWindow && !loungeWindow) app.dock?.hide();
   });
   roomWindow.on('move', () => roomWindowBoundsChanged?.());
   load(roomWindow, 'room');
@@ -539,7 +542,7 @@ export type ConsolePane =
   | 'market'
   | 'claude'
   | 'settings'
-  | 'devtools';
+  | 'devtools' | 'rewards' | 'furnish';
 
 export function getConsoleWindow(): BrowserWindow | null {
   return consoleWindow;
@@ -551,6 +554,7 @@ export function getConsoleWindow(): BrowserWindow | null {
  * 新窗接入只改这一处。
  */
 export function sendToWindows(channel: string, payload: unknown): void {
+  if (nurseryWindow && !nurseryWindow.isDestroyed()) nurseryWindow.webContents.send(channel, payload);
   getPetWindow()?.webContents.send(channel, payload);
   const room = getRoomWindow();
   if (room && !room.isDestroyed()) room.webContents.send(channel, payload);
@@ -564,37 +568,7 @@ export function sendToWindows(channel: string, payload: unknown): void {
  * dock 协调：mac 上 dock 隐藏时常规窗聚焦行为异常，所以开窗前 show、关窗后按需 hide。
  */
 export function createConsoleWindow(pane?: ConsolePane): BrowserWindow {
-  if (consoleWindow && !consoleWindow.isDestroyed()) {
-    consoleWindow.focus();
-    if (pane) consoleWindow.webContents.send('ui:showScreen', pane);
-    return consoleWindow;
-  }
-  if (process.platform === 'darwin') void app.dock?.show();
-  consoleWindow = new BrowserWindow({
-    width: 880,
-    height: 640,
-    title: 'QBot 控制台',
-    webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      sandbox: false,
-    },
-  });
-  consoleWindow.on('closed', () => {
-    consoleWindow = null;
-    if (process.platform === 'darwin' && !roomWindow) app.dock?.hide();
-  });
-  consoleWindow.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
-    return { action: 'deny' };
-  });
-  if (pane) {
-    consoleWindow.webContents.once('did-finish-load', () => {
-      consoleWindow?.webContents.send('ui:showScreen', pane);
-    });
-  }
-  load(consoleWindow, 'console', pane ? { pane } : undefined);
-  return consoleWindow;
+  return createNurseryWindow(false, pane ?? 'home');
 }
 
 /**
@@ -602,30 +576,52 @@ export function createConsoleWindow(pane?: ConsolePane): BrowserWindow {
  * 要输入文字、要滚动、要长时间停留，透明窗那套约束（血泪坑 5/18）全是负担。
  */
 export function createLoungeWindow(): BrowserWindow {
-  if (loungeWindow && !loungeWindow.isDestroyed()) {
-    loungeWindow.focus();
-    return loungeWindow;
-  }
-  loungeWindow = new BrowserWindow({
-    width: 460,
-    height: 620,
-    minWidth: 380,
-    minHeight: 480,
-    title: 'QBot 联机空间',
-    webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      sandbox: false,
-    },
-  });
-  loungeWindow.on('closed', () => { loungeWindow = null; });
-  load(loungeWindow, 'lounge');
-  return loungeWindow;
+  return createNurseryWindow(false, 'lounge');
 }
 
 /** 房间事件推送口（rooms.ts 通过 setLoungePush 注入这个） */
 export function pushToLounge(channel: string, payload: unknown): void {
+  if(nurseryWindow && !nurseryWindow.isDestroyed()) nurseryWindow.webContents.send(channel,payload);
   if (loungeWindow && !loungeWindow.isDestroyed()) {
     loungeWindow.webContents.send(channel, payload);
   }
+}
+
+/** Game surface is a normal resizable window; the desktop pet keeps its existing renderer. */
+export function createNurseryWindow(create = false, pane?: string): BrowserWindow {
+  if (nurseryWindow && !nurseryWindow.isDestroyed()) {
+    if (nurseryWindow.isMinimized()) nurseryWindow.restore();
+    nurseryWindow.show();
+    nurseryWindow.focus();
+    if (create || pane) {
+      const target = create ? 'nursery:create' : pane!;
+      const win = nurseryWindow;
+      if (win.webContents.isLoadingMainFrame()) win.webContents.once('did-finish-load', () => win.webContents.send('ui:showScreen', target));
+      else win.webContents.send('ui:showScreen', target);
+    }
+    return nurseryWindow;
+  }
+  if (process.platform === 'darwin') void app.dock?.show();
+  const { workArea } = screen.getPrimaryDisplay();
+  nurseryWindow = new BrowserWindow({
+    width: Math.min(1120, workArea.width), height: Math.min(760, workArea.height),
+    minWidth: Math.min(840, workArea.width), minHeight: Math.min(570, workArea.height),
+    title: 'QBot · 故事小屋', backgroundColor: '#ded6c1', show: false,
+    webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false },
+  });
+  const win = nurseryWindow;
+  win.setMenuBarVisibility(false);
+  win.webContents.setWindowOpenHandler(({url})=>{if(/^https?:/.test(url))void shell.openExternal(url);return {action:'deny'};});
+  const pushVisibility = () => win.webContents.send('ui:nurseryVisibility', win.isVisible() && !win.isMinimized());
+  win.on('show', pushVisibility);
+  win.on('hide', pushVisibility);
+  win.on('minimize', pushVisibility);
+  win.on('restore', pushVisibility);
+  win.once('ready-to-show', () => win.show());
+  win.on('closed', () => {
+    nurseryWindow = null;
+    if (process.platform === 'darwin' && !consoleWindow && !roomWindow && !loungeWindow) app.dock?.hide();
+  });
+  load(win, 'nursery', create ? { create: '1' } : pane ? { pane } : undefined);
+  return win;
 }
