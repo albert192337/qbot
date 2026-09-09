@@ -161,7 +161,7 @@ export class CreationForm {
       if (this.mode === 'cloud') {
         const account = await this.api.hatch.cloudAccount();
         this.accountLabel.textContent = account.connected
-          ? `孵化资格 · 还可以迎接 ${account.credits} 位朋友`
+          ? '孵化资格已连接 · 不限次数迎接新朋友'
           : '连接邀请码，就可以开始孵化。';
         providers = account.providers.length ? account.providers : ['seedream'];
       }
@@ -179,11 +179,11 @@ export class CreationForm {
         this.provider.value = previous;
       this.note.textContent =
         this.mode === 'cloud'
-          ? '开始后使用 1 次创建额度，含最多 3 次形象方案和 2 次失败重试。所选图片、名字和形象选项会上传至 QBot 及模型服务。确认形象后生成 8 个动作；关闭小屋或客户端仍会继续。'
+          ? '有效邀请码可不限次数孵化、换方案和失败重试。所选图片、名字和形象选项会上传至 QBot 及模型服务。确认形象后生成 8 个动作；关闭小屋或客户端仍会继续。'
           : '当前使用自己的模型 Key。先生成 1 个形象，确认后生成 8 个动作；提交的模型请求会产生费用。可以离开小屋，退出客户端会暂停本地任务。';
       this.submit.textContent =
         this.mode === 'cloud'
-          ? '开始孵化 · 1 次额度'
+          ? '开始孵化 · 不限次数'
           : '开始孵化 · 使用模型 API';
     } catch (e) {
       this.showError(errorMessage(e));
@@ -222,12 +222,7 @@ export class CreationForm {
       }
       if (this.mode === 'cloud') {
         const account = await this.api.hatch.cloudAccount();
-        if (!account.connected || account.credits < 1)
-          throw new Error(
-            account.connected
-              ? '孵化额度已用完，已有朋友可以到手记里继续领取。'
-              : '请先连接邀请码。',
-          );
+        if (!account.connected) throw new Error('请先连接邀请码。');
       } else if (
         !settings.arkApiKey ||
         (this.provider.value === 'gpt-image-2' && !settings.gptImageApiKey)

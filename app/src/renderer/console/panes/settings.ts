@@ -51,7 +51,7 @@ function template(settings: Settings): string {
       <div class="setting-block"><div class="setting-copy"><label for="set-nickname">公开昵称</label><p>装扮市场署名与联机空间身份使用同一个昵称。</p></div><input id="set-nickname" type="text" maxlength="24" placeholder="匿名" value="${attr(nickname)}" /></div>
     </section>
 
-    <section class="settings-section"><h3>孵化方式</h3><div class="setting-block"><div class="setting-copy"><label for="set-generation-mode">使用哪座孵化台</label><p>云端使用账户额度；本地使用自己的 API Key，按模型服务计费。</p></div><select id="set-generation-mode"><option value="cloud"${settings.generationMode !== 'local' ? ' selected' : ''}>云端孵化</option><option value="local"${settings.generationMode === 'local' ? ' selected' : ''}>本地孵化</option></select></div></section><section class="settings-section"><h3>模型与 API</h3><p>云端创建无需填写这里；选择本地孵化时使用。</p>
+    <section class="settings-section"><h3>孵化方式</h3><div class="setting-block"><div class="setting-copy"><label for="set-generation-mode">使用哪座孵化台</label><p>云端凭有效邀请码不限次数使用；本地使用自己的 API Key，按模型服务计费。</p></div><select id="set-generation-mode"><option value="cloud"${settings.generationMode !== 'local' ? ' selected' : ''}>云端孵化</option><option value="local"${settings.generationMode === 'local' ? ' selected' : ''}>本地孵化</option></select></div></section><section class="settings-section"><h3>模型与 API</h3><p>云端创建无需填写这里；选择本地孵化时使用。</p>
       ${keyRow('set-ark-key', '火山方舟 Ark API Key', settings.arkApiKey, '用于 Seedream、动作生成和自由模式。')}
       ${keyRow('set-gpt-key', 'GPT-Image-2 API Key', settings.gptImageApiKey, '仅在创建角色时选择 GPT-Image-2 才需要。')}
     </section>

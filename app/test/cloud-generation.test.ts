@@ -15,7 +15,7 @@ beforeEach(async()=>{
  vi.stubGlobal('fetch',vi.fn(async(input:string,init:RequestInit)=>{
   expect((init.headers as Record<string,string>).Authorization).toBe(`Bearer ${token}`);
   const url=new URL(input);const route=url.pathname.replace('/qbot-generation','');
-  if(route==='/account')return Response.json({credits:1,providers:['seedream']});
+  if(route==='/account')return Response.json({unlimited:true,credits:Number.MAX_SAFE_INTEGER,providers:['seedream']});
   if(route==='/jobs' && init.method==='GET')return Response.json({jobs:remoteId?[{id:remoteId,name:'恢复的小龙'}]:[]});
   if(route==='/jobs'){submissions++;remoteId=JSON.parse(init.body as string).id;if(loseReply){loseReply=false;throw new Error('fetch failed');}return Response.json({id:remoteId});}
   if(route.includes('/files/'))return new Response(new Uint8Array(files[route.split('/files/')[1]]));
@@ -29,13 +29,14 @@ async function start(){await api.cloudAccount(token);const src=path.join(env.dir
 describe('hosted desktop recovery',()=>{
  it('keeps bearer token outside character files and renders queued jobs without keys',async()=>{
   const id=await start();const status=await api.syncCloudJob(id);
+  expect((await api.cloudAccount()).unlimited).toBe(true);
   expect(status.cloudPhase).toBe('queued');expect(status.queuePosition).toBe(1);
   const marker=await readFile(path.join(env.dir,'characters',id,'.cloud-job.json'),'utf8');expect(marker).not.toContain(token);
   if(process.platform!=='win32')expect((await stat(path.join(env.dir,'cloud-accounts.json'))).mode&0o777).toBe(0o600);
  });
- it('lost create response reconciles the same task without spending a second credit',async()=>{
+ it('lost create response reconciles the same task without creating a duplicate task',async()=>{
   loseReply=true;const id=await start();await api.cloudOperation(id,'resume');
-  expect(submissions).toBe(2); // Same UUID is re-submitted; service idempotency prevents a second debit.
+  expect(submissions).toBe(2); // Same UUID is re-submitted; service idempotency prevents duplicate generation.
   expect(remoteId).toBe(id);expect((await api.syncCloudJob(id)).running).toBe(true);
  });
  it('downloads and verifies assets before delivering the named character; repeat polls preserve edits',async()=>{

@@ -48,7 +48,7 @@ app.whenReady().then(async () => {
     'rooms:toggleFavorite':()=>['12345678'],
 
     'settings:get':()=>qa.settings,
-    'hatch:cloudAccount':()=>({connected:true,credits:3,providers:['seedream']}),
+    'hatch:cloudAccount':()=>({connected:true,unlimited:true,credits:0,providers:['seedream']}),
     'hatch:start':(_e,...args)=>{qa.calls.push(['start',...args]);qa.status={stage:'turnaround',cloud:true,running:true,actions:{}};return 'new-friend';},
     'hatch:getStatus':()=>qa.status,
     'hatch:pickTurnaround':(_e,id,index)=>{qa.calls.push(['pick',id,index]);qa.status={...qa.status,stage:'actions',actions:{idle:{status:'done'},drag:{status:'generating_video'}}};},

@@ -21,6 +21,7 @@ const root = path.resolve(__dirname, '..');
     await shot('home');
     await page.getByRole('button',{name:/走近孵化台/}).focus();await page.keyboard.press('Enter');
     await label('从一张图片开始。');
+    await page.getByText('孵化资格已连接 · 不限次数迎接新朋友',{exact:true}).waitFor();
     await page.getByRole('button',{name:/开始孵化/}).click();
     await page.getByText('先把一张角色图片放上孵化台。',{exact:true}).waitFor();
     assert.equal(await app.evaluate(()=>global.qa.calls.filter(c=>c[0]==='start').length),0);

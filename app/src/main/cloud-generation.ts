@@ -50,7 +50,7 @@ export async function cloudAccount(invite?: string): Promise<CloudAccount> {
     await atomic(path.join(app.getPath('userData'), 'cloud-accounts.json'), saved);
     await discoverCloudJobs(saved.active, token);
   }
-  return { connected: true, credits: info.credits, providers: info.providers };
+  return { connected: true, unlimited: info.unlimited, credits: info.credits, providers: info.providers };
 }
 export function isCloudJob(id: string): boolean { return VALID_ID.test(id) && existsSync(markerPath(id)); }
 async function marker(id: string): Promise<Marker> { return JSON.parse(await readFile(markerPath(id), 'utf8')); }

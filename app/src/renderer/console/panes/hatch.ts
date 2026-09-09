@@ -146,7 +146,7 @@ async function refreshCloudAccount(): Promise<void> {
   const label = $('#hatch-cloud-account'); if (!label || generationMode !== 'cloud') return;
   try {
     const account = await window.qbot.hatch.cloudAccount();
-    label.textContent = account.connected ? `已连接 · 可创建 ${account.credits} 只角色；已有任务可继续` : '内测期间输入邀请码，无需配置模型 Key。';
+    label.textContent = account.connected ? '已连接 · 不限次数创建角色、换方案和失败重试' : '内测期间输入邀请码，无需配置模型 Key。';
   } catch(e) { label.textContent = e instanceof Error ? e.message : '暂时无法连接'; }
 }
 
@@ -170,7 +170,7 @@ async function startHatch(file: File): Promise<void> {
     const cloud = generationMode === 'cloud';
     if (cloud) {
       const account = await window.qbot.hatch.cloudAccount();
-      if (!account.connected || account.credits < 1) { showError(account.connected ? '创建额度已用完；已有任务请到生成任务继续。' : '请先输入邀请码并连接。'); return; }
+      if (!account.connected) { showError('请先输入邀请码并连接。'); return; }
     }
     const hasKey = cloud || (!!settings.arkApiKey && (provider !== 'gpt-image-2' || !!settings.gptImageApiKey));
     if (!hasKey) {
@@ -182,7 +182,7 @@ async function startHatch(file: File): Promise<void> {
       `开始创建「${name}」？\n\n将先生成 1 个角色方案；确认后，再生成 8 个常用动作。\n` +
         `模型：${provider === 'gpt-image-2' ? 'gpt-image-2' : 'Seedream'}\n` +
         `预计时间：${provider === 'gpt-image-2' ? '约 45–80 分钟' : '约 35–60 分钟'}\n` +
-        (cloud ? '使用 1 次创建额度，含最多 3 次形象方案和 2 次失败重试。\n角色图片会上传至 QBot 服务器并交给模型服务生成；只上传所选图片、角色名字和形象选项。关闭客户端后任务仍会继续，完成后回来领取。' : '预计消耗：1 张角色方案 + 8 个动作。任务提交后，已发出的 API 请求无法撤回。'),
+        (cloud ? '有效邀请码可不限次数创建、换方案和失败重试。\n角色图片会上传至 QBot 服务器并交给模型服务生成；只上传所选图片、角色名字和形象选项。关闭客户端后任务仍会继续，完成后回来领取。' : '预计消耗：1 张角色方案 + 8 个动作。任务提交后，已发出的 API 请求无法撤回。'),
     );
     if (!confirmed) return;
 
@@ -952,7 +952,7 @@ const TEMPLATE = `
             </div>
 
             <div class="config-group" id="hatch-cloud">
-              <p id="hatch-cloud-account">正在检查创建额度…</p>
+              <p id="hatch-cloud-account">正在验证邀请码…</p>
               <label class="config-label" for="hatch-invite">内测邀请码</label>
               <input class="input-primary" id="hatch-invite" type="password" autocomplete="off" placeholder="输入邀请码" />
               <button class="btn" id="hatch-connect">连接邀请码</button>

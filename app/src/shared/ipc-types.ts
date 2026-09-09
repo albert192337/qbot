@@ -22,7 +22,7 @@ export interface CharacterMeta {
   hasUnfinishedJob: boolean;
 }
 
-export interface CloudAccount { connected: boolean; credits: number; providers: ImageProvider[] }
+export interface CloudAccount { connected: boolean; unlimited?: boolean; credits: number; providers: ImageProvider[] }
 
 export interface Settings {
   generationMode?: 'cloud' | 'local';

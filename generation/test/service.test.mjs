@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createGenerationService } from '../service.mjs';
-import { atomicJson } from '../store.mjs';
+import { atomicJson, digest } from '../store.mjs';
 
 const token = 'test-invite-abcdefghijklmnopqrstuvwxyz';
 const other = 'test-other-abcdefghijklmnopqrstuvwxyz';
@@ -29,10 +29,11 @@ function fakePipeline() {
   };
 }
 async function until(fn) {for(let n=0;n<100;n++){if(await fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('timeout');}
-test('authenticated, idempotent creation; bounded credits; restart and ownership; candidate and asset delivery',async()=>{
+test('authenticated, idempotent creation; unlimited invites including exhausted legacy accounts; restart and ownership; candidate and asset delivery',async()=>{
  const dir=await mkdtemp(path.join(os.tmpdir(),'qbot-cloud-'));let app;
  try{
-  const launch=async()=>{app=await createGenerationService({dataDir:dir,pipeline:fakePipeline(),config:{apiKey:'secret'},invites:[{token,credits:1},{token:other,credits:1}]});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));return `http://127.0.0.1:${app.server.address().port}`;};
+  await atomicJson(path.join(dir,'registry.json'), {accounts:{[digest(token)]:{credits:0}},jobs:Object.fromEntries(Array.from({length:100},()=>{const id=randomUUID();return [id,{id,owner:digest(other),phase:'done'}];}))});
+  const launch=async()=>{app=await createGenerationService({dataDir:dir,pipeline:fakePipeline(),config:{apiKey:'secret'},invites:[{token,credits:0},{token:other,credits:1}]});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));return `http://127.0.0.1:${app.server.address().port}`;};
   let base=await launch();
   const request=(p,method='GET',data,t=token)=>fetch(base+p,{method,headers:{Authorization:`Bearer ${t}`,'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined});
   assert.equal((await request('/account','GET',null,'bad')).status,401);
@@ -40,15 +41,20 @@ test('authenticated, idempotent creation; bounded credits; restart and ownership
   const input={id,image:png.toString('base64'),characterForm:'humanoid',characterStyle:'chibi'};
   const responses=await Promise.all([request('/jobs','POST',input),request('/jobs','POST',input)]);
   assert.deepEqual(responses.map(r=>r.status),[202,202]);
-  assert.equal((await(await request('/account')).json()).credits,0);
-  assert.equal((await request('/jobs','POST',{...input,id:randomUUID()})).status,402);
+  assert.equal((await(await request('/account')).json()).unlimited,true);
+  assert.ok((await(await request('/account')).json()).credits > 0);
+  assert.equal((await request('/jobs','POST',{...input,id:randomUUID()})).status,202);
+  const persisted=JSON.parse(await readFile(path.join(dir,'registry.json'),'utf8'));
+  assert.equal(Object.keys(persisted.jobs).length,102);
+  assert.equal(persisted.accounts[digest(token)].credits,0);
   assert.equal((await request(`/jobs/${id}`,'GET',null,other)).status,404);
   await until(async()=> (await(await request(`/jobs/${id}`)).json()).phase==='awaiting_pick');
   const snapshot=await(await request(`/jobs/${id}`)).json();assert.ok(!JSON.stringify(snapshot).includes('secret'));
   assert.equal((await request(`/jobs/${id}/files/registry.json`)).status,404);
   assert.equal((await request(`/jobs/${id}/pick`,'POST',{index:3})).status,400);
   app.stop();base=await launch();
-  assert.equal((await(await request('/account')).json()).credits,0);
+  assert.equal((await(await request('/account')).json()).unlimited,true);
+  assert.ok((await(await request('/account')).json()).credits > 0);
   assert.equal((await request(`/jobs/${id}/pick`,'POST',{index:0})).status,202);
   await until(async()=> (await(await request(`/jobs/${id}`)).json()).phase==='done');
   assert.equal(await(await request(`/jobs/${id}/files/actions/idle.webm`)).text(),'video');
@@ -57,7 +63,7 @@ test('authenticated, idempotent creation; bounded credits; restart and ownership
  }finally{app?.stop();await rm(dir,{recursive:true,force:true});}
 });
 
-test('candidate retries and failure retries are bounded; responses redact upstream secrets', async()=>{
+test('candidate retries and failure retries exceed former limits; responses redact upstream secrets', async()=>{
  const dir=await mkdtemp(path.join(os.tmpdir(),'qbot-budget-'));let app;
  try{
   const pipeline=fakePipeline();pipeline.runActions=async()=>{throw new Error('API key secret-key-token rejected 401');};
@@ -69,11 +75,9 @@ test('candidate retries and failure retries are bounded; responses redact upstre
   await request('/jobs','POST',{id,image:png.toString('base64'),characterForm:'humanoid',characterStyle:'chibi'});
   const phase=async expected=>until(async()=> (await(await request(`/jobs/${id}`)).json()).phase===expected);
   await phase('awaiting_pick');
-  for(let i=0;i<2;i++){assert.equal((await request(`/jobs/${id}/pick`,'POST',{index:-1})).status,202);await phase('awaiting_pick');}
-  assert.equal((await request(`/jobs/${id}/pick`,'POST',{index:-1})).status,402);
+  for(let i=0;i<5;i++){assert.equal((await request(`/jobs/${id}/pick`,'POST',{index:-1})).status,202);await phase('awaiting_pick');}
   await request(`/jobs/${id}/pick`,'POST',{index:0});await phase('failed');
   assert.ok(!(await(await request(`/jobs/${id}`)).text()).includes('secret-key-token'));
-  for(let i=0;i<2;i++){assert.equal((await request(`/jobs/${id}/resume`,'POST',{})).status,202);await phase('failed');}
-  assert.equal((await request(`/jobs/${id}/resume`,'POST',{})).status,402);
+  for(let i=0;i<5;i++){assert.equal((await request(`/jobs/${id}/resume`,'POST',{})).status,202);await phase('failed');}
  }finally{app?.stop();await rm(dir,{recursive:true,force:true});}
 });

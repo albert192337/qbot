@@ -34,13 +34,13 @@ async function body(req) {
 }
 
 /** Durable single-job worker. No browser state or API credentials enter registry snapshots. */
-export async function createGenerationService({ dataDir, pipeline, config, invites = [], maxJobs = 100 }) {
+export async function createGenerationService({ dataDir, pipeline, config, invites = [] }) {
   await mkdir(dataDir, { recursive: true });
   const store = await openStore(dataDir);
   await store.transaction(data => {
-    for (const { token, credits = 1 } of invites) {
+    for (const { token } of invites) {
       if (typeof token !== 'string' || token.length < 24) throw new Error('Invite must contain at least 24 characters');
-      data.accounts[digest(token)] ??= { credits, createdAt: Date.now() };
+      data.accounts[digest(token)] ??= { createdAt: Date.now() };
     }
     // Crashed workers resume saved upstream task IDs. Candidate confirmation never blocks a worker.
     for (const job of Object.values(data.jobs)) if (job.phase === 'running') job.phase = 'queued';
@@ -122,7 +122,9 @@ export async function createGenerationService({ dataDir, pipeline, config, invit
       const rate = rates.get(owner);
       if (!rate || now - rate.at > 60000) rates.set(owner, { at: now, n: 1 });
       else if (++rate.n > 180) throw fail(429, '操作太频繁，请稍后重试。');
-      if (url.pathname === '/account' && req.method === 'GET') return json(res, 200, { credits: account.credits, providers: ['seedream', ...(config.gptImageApiKey ? ['gpt-image-2'] : [])], maxAttempts: 3 });
+      // Keep old clients usable: their numeric credits gate needs a positive value.
+      // This compatibility field is never debited; unlimited is the current contract.
+      if (url.pathname === '/account' && req.method === 'GET') return json(res, 200, { unlimited: true, credits: Number.MAX_SAFE_INTEGER, providers: ['seedream', ...(config.gptImageApiKey ? ['gpt-image-2'] : [])], maxAttempts: null });
       if (url.pathname === '/jobs' && req.method === 'GET') {
         const jobs = [];
         for (const meta of Object.values(store.data.jobs).filter(j => j.owner === owner)) {
@@ -146,15 +148,12 @@ export async function createGenerationService({ dataDir, pipeline, config, invit
             if (d.jobs[id].owner !== owner || d.jobs[id].fingerprint !== fingerprint) throw fail(409, '任务 ID 已使用，请重新创建');
             return;
           }
-          if (d.accounts[owner].credits < 1) throw fail(402, '创建额度已用完；已有任务仍可继续。');
-          if (Object.keys(d.jobs).length >= maxJobs) throw fail(503, '内测任务已满，请稍后联系管理员');
           const fs = await statfs(dataDir);
           if (fs.bavail * fs.bsize < 2*1024**3) throw fail(503, '服务存储暂不足，请稍后再试');
           await mkdir(dirFor(id), { recursive: true });
           const source = path.join(dirFor(id), 'upload.png');
           await writeFile(source, png, { mode: 0o600 });
           await pipeline.Job.create(dirFor(id), { refImagePath: source, imageProvider: provider, characterForm: input.characterForm, characterStyle: input.characterStyle });
-          d.accounts[owner].credits--;
           d.jobs[id] = { id, owner, name: typeof input.name === 'string' ? input.name.trim().slice(0,24) : undefined, fingerprint, phase: 'queued', attempts: 1, candidateAttempts: 1, createdAt: Date.now() };
         });
         schedule();
@@ -185,7 +184,6 @@ export async function createGenerationService({ dataDir, pipeline, config, invit
             if (input.index !== 0 && input.index !== -1) throw fail(400, '无效的方案');
             const job = await pipeline.Job.load(dirFor(id));
             if (input.index === -1) {
-              if (m.candidateAttempts >= 3) throw fail(402, '本次创建的 3 次形象方案已用完，请选择现有方案');
               m.candidateAttempts++;
               job.state.turnaround = { candidates: [], picked: null };
               await job.save();
@@ -195,7 +193,6 @@ export async function createGenerationService({ dataDir, pipeline, config, invit
             const job = await pipeline.Job.load(dirFor(id));
             const failed = ACTIONS.filter(a => job.state.actions[a]?.status === 'failed');
             if (m.phase === 'done' && !failed.length) return;
-            if (m.attempts >= 3) throw fail(402, '本次创建的重试次数已用完，请联系管理员恢复额度');
             if (input.actions !== undefined) {
               if (!Array.isArray(input.actions) || !input.actions.length || input.actions.some(a => !failed.includes(a))) throw fail(400, '仅能选择失败的动作进行修复');
               m.actions = [...new Set(input.actions)];
