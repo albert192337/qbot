@@ -585,12 +585,17 @@ export interface QBotApi {
     onMessage(cb: (msg: AgentMessage) => void): () => void;
   };
   bubble: {
+    openChat(): void;
+    closeChat(): void;
+    sendChat(text: string): Promise<{ ok: boolean; error?: string }>;
+    say(text: string, durationMs: number): void;
+    getIdleSeconds(): Promise<number>;
     /** 气泡全部消散 → 主进程隐藏气泡窗 */
     reportEmpty(): void;
     /** 主进程要求清空（角色进小房间等） */
     onClear(cb: () => void): () => void;
     /** 气泡栈贴桌宠上方还是下方（桌宠贴屏幕顶部时翻转） */
-    onAnchor(cb: (side: 'above' | 'below') => void): () => void;
+    onAnchor(cb: (side: 'above' | 'below', contentHeight?: number) => void): () => void;
   };
   ui: {
     /** 打开游戏化孵化小屋；create=true 直接走到孵化台。 */
@@ -701,6 +706,8 @@ export interface QBotApi {
    * 正式用户不需要——规则自动触发。
    */
   behavior: {
+    getBrainLog(): Promise<import('./brain-log').BrainLogSnapshot>;
+    reportTrace(id: string, stage: string): void;
     /** 获取所有规则列表 */
     getRules(): Promise<Array<{ id: string; name: string; weight: number; enabled: boolean }>>;
     /** 手动触发某条规则（绕过条件检查，调试用） */
@@ -720,12 +727,12 @@ export interface QBotApi {
 
   /** 行为引擎 → pet 窗：播指定动作（state-machine 的 PLAY_ACTION 入口） */
   behaviorAction: {
-    onPlay(cb: (payload: { action: string; loops: number }) => void): () => void;
+    onPlay(cb: (payload: { action: string; loops: number; preview?: boolean; traceId?: string }) => void): () => void;
   };
 
   /** 行为引擎 → bubble 窗：说话气泡 */
   behaviorSay: {
-    onSay(cb: (payload: { text: string; durationMs: number }) => void): () => void;
+    onSay(cb: (payload: { text: string; durationMs: number; source?: string; traceId?: string }) => void): () => void;
   };
 }
 

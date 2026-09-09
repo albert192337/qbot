@@ -33,19 +33,20 @@
       .bubble {
         max-width: 100%;
         box-sizing: border-box;
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 12px;
-        padding: 6px 12px 8px;
-        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
-        font-family: -apple-system, 'PingFang SC', sans-serif;
-        border-left: 3px solid #7cc47f;
+        background: #fff9ef;
+        border-radius: 16px 13px 15px 12px;
+        padding: 9px 15px;
+        box-shadow: 0 2px 0 rgba(63, 42, 30, 0.2);
+        font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+        border: 2px solid #594235;
         opacity: 0;
         transform: translateY(4px);
         transition: opacity 180ms, transform 180ms;
       }
       .bubble.attention {
-        border-left-color: #e0a33e;
+        border: 2px solid #594235;
       }
+      .bubble.pet-speech .src { display: none; }
       .bubble.show {
         opacity: 1;
         transform: none;
@@ -66,14 +67,16 @@
         color: #d08a2c;
       }
       .text {
-        font-size: 13px;
-        line-height: 1.4;
-        color: #3a3a3a;
+        font-size: 15px;
+        font-weight: 650;
+        line-height: 1.55;
+        text-align: center;
+        color: #4b352b;
         word-break: break-word;
         /* 字符截断管不了中英混排的像素高度，line-clamp 才是几何硬约束 */
         display: -webkit-box;
         -webkit-box-orient: vertical;
-        -webkit-line-clamp: 7;
+        -webkit-line-clamp: 5;
         overflow: hidden;
       }
     </style>

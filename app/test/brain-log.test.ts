@@ -1,0 +1,25 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+const config = vi.hoisted(() => ({ dir: '' }));
+vi.mock('electron', () => ({ app: { getPath: () => config.dir } }));
+let folder = '';
+afterEach(async () => { if (folder) await rm(folder, { recursive: true, force: true }); });
+it('完整输入输出落盘，重新加载后保留完整思考与执行事件', async () => {
+  folder = await mkdtemp(path.join(os.tmpdir(), 'qbot-brain-log-'));
+  config.dir = folder;
+  vi.resetModules();
+  const log = await import('../src/main/brain-log');
+  const id = await log.beginBrainCall('debug');
+  const raw = '模型输出'.repeat(1000);
+  await log.updateBrainCall(id, '输出', { input: { messages: [{ role: 'user', content: '输入'.repeat(2000) }] }, raw, decision: { thought: '测试', do: true, action: 'cheer', say: '你好' } });
+  await log.updateBrainCall(id, '气泡已渲染');
+  await log.flushBrainLog();
+  vi.resetModules();
+  const reloaded = await import('../src/main/brain-log');
+  const snapshot = await reloaded.getBrainLog();
+  expect(snapshot.calls[0].raw).toBe(raw);
+  expect(snapshot.calls[0].events.at(-1)?.stage).toBe('气泡已渲染');
+  expect(snapshot.calls[0].decision).toMatchObject({ thought: '测试', say: '你好' });
+});

@@ -262,9 +262,20 @@ export async function sampleBackgroundColors(
   return colors;
 }
 
+/** 灰绿幕的 UV 离中性色太近：固定 0.1+0.07 会连白肚皮一起抠空。
+ * 高色度绿幕沿用标定值；低色度幕缩窄作用范围，保住角色的中性/橄榄色。
+ */
+export function chromaKeyParams(hex: string): { similarity: number; blend: number } {
+  const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+  const u = -0.148223 * r - 0.290993 * g + 0.439216 * b;
+  const v = 0.439216 * r - 0.367788 * g - 0.071427 * b;
+  const chroma = Math.hypot(u, v) / (255 * Math.SQRT2);
+  if (chroma >= 0.18) return { similarity: CHROMAKEY_SIMILARITY, blend: CHROMAKEY_BLEND };
+  return { similarity: Math.max(0.01, Math.min(0.05, chroma * 0.4)), blend: Math.max(0.005, Math.min(0.015, chroma * 0.12)) };
+}
 function keyFilters(keys: string[]): string {
   return keys
-    .map((k) => `chromakey=0x${k}:${CHROMAKEY_SIMILARITY}:${CHROMAKEY_BLEND}`)
+    .map((k) => { const p = chromaKeyParams(k); return `chromakey=0x${k}:${p.similarity}:${p.blend}`; })
     .join(',');
 }
 

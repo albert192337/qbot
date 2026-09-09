@@ -451,7 +451,7 @@ export const BUILTIN_RULES: BehaviorRule[] = [
     ],
     "weight": 3,
     "priority": 30,
-    "cooldownMs": 5000,
+    "cooldownMs": 60000,
     "dailyLimit": 100,
     "source": "built-in",
     "conditions": [

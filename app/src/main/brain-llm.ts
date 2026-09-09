@@ -13,6 +13,9 @@
  */
 import { getSettings } from './config';
 import { getCharacter } from './characters';
+import { brainActions } from './brain-actions';
+import { beginBrainCall, updateBrainCall, brainGate } from './brain-log';
+import { BRAIN_MODEL, ARK_BASE_URL } from './llm-client';
 import { chatCompleteWithRetry, LlmError } from './llm-client';
 import {
   agentActivityLabel,
@@ -31,24 +34,6 @@ import type { PerceptionEvent } from '../shared/perception';
 
 /** 最短思考间隔（LLM 慢且花钱） */
 const MIN_THINK_INTERVAL_MS = 15 * 60_000;
-/** 给模型选的动作意图词白名单（精选情绪/表现意图；解析层还会再降级到实际可用动作） */
-const BRAIN_INTENTS = [
-  'happy',
-  'smug',
-  'point',
-  'turn_away',
-  'cheer',
-  'sleepy',
-  'thinking',
-  'annoyed',
-  'wave',
-  'celebrate',
-  'shock',
-  'nod',
-  'stretch',
-  'dance',
-  'relaxed',
-];
 
 let wired = false;
 let lastThinkAt: number | null = null;
@@ -93,24 +78,31 @@ function shouldThinkForEvent(ev: PerceptionEvent): boolean {
 /** 一次思考：节流 → 检查开关/key → 构造上下文 → 调模型 → 解析 → 执行或降级 */
 async function think(trigger: string): Promise<void> {
   const now = Date.now();
-  if (!shouldThink(now, lastThinkAt, MIN_THINK_INTERVAL_MS)) return;
-  if (inFlight) return;
+  if (!shouldThink(now, lastThinkAt, MIN_THINK_INTERVAL_MS)) { brainGate('冷却中，未调用', (lastThinkAt ?? now) + MIN_THINK_INTERVAL_MS); return; }
+  if (inFlight) { brainGate('已有请求进行中，未重复调用'); return; }
 
   const settings = await getSettings();
   // 自由模式开关 + 有 key 才思考（陪伴模式纯规则脑）
-  if (!settings.freeMode || !settings.arkApiKey) return;
+  if (!settings.freeMode || !settings.arkApiKey) { brainGate(!settings.freeMode ? '自由模式未开启' : '尚未配置 API Key'); return; }
+  if (inFlight) return;
 
   inFlight = true;
   lastThinkAt = now; // 占用冷却（哪怕这次失败也不立刻重试，避免坏 key 刷请求）
+  const callId = await beginBrainCall(trigger);
+  brainGate('正在调用 LLM');
   try {
     const input = await buildInput();
     const messages = buildBrainMessages(input);
+    await updateBrainCall(callId, '已请求', { input: { endpoint: `${ARK_BASE_URL}/chat/completions`, model: BRAIN_MODEL, temperature: 0.8, messages, context: input } });
     let raw: string;
     try {
-      raw = await chatCompleteWithRetry({ apiKey: settings.arkApiKey, messages });
+      raw = await chatCompleteWithRetry({ apiKey: settings.arkApiKey, messages,
+        onTrace: (stage, detail) => { void updateBrainCall(callId, stage, {}, detail); },
+      });
     } catch (err) {
       // 网络/限流/鉴权失败：静默降级，记一条决策日志供调试
       const reason = err instanceof LlmError ? err.message : String(err);
+      await updateBrainCall(callId, '请求失败', {}, reason);
       void recordDecision({
         at: now,
         trigger: `llm:${trigger}`,
@@ -122,7 +114,9 @@ async function think(trigger: string): Promise<void> {
       return;
     }
 
-    const decision = parseBrainResponse(raw, BRAIN_INTENTS);
+    await updateBrainCall(callId, '收到原始输出', { raw });
+    const decision = parseBrainResponse(raw, input.availableIntents);
+    await updateBrainCall(callId, decision ? (decision.do ? '模型选择行动' : '模型选择不行动') : '输出解析失败', { decision });
     if (!decision) {
       void recordDecision({
         at: now,
@@ -151,7 +145,11 @@ async function think(trigger: string): Promise<void> {
     }
 
     // 组装行为脚本（模型只给扁平字段，主进程拼 DSL + 校验）
+    // 请求期间可能切换角色或删除动作，执行前再次核对，不把旧动作发给新角色。
+    const latest = await buildInput();
+    if (decision.action && !latest.availableIntents.includes(decision.action)) decision.action = undefined;
     const script = buildScript(decision);
+    await updateBrainCall(callId, '执行前决策', { decision: { ...decision, script } });
     if (!script) {
       void recordDecision({
         at: now,
@@ -183,9 +181,14 @@ async function think(trigger: string): Promise<void> {
       candidates: [{ id: 'llm-brain', score: 1, reason: decision.thought }],
       selected: { action: 'llm-brain', text: decision.say ?? decision.action },
     });
+    script.meta.traceId = callId;
+    await updateBrainCall(callId, executeCallback ? '提交执行器' : '执行器未就绪');
     executeCallback?.(script);
+  } catch (e) {
+    await updateBrainCall(callId, '处理失败', {}, String(e));
   } finally {
     inFlight = false;
+    brainGate('等待下一次触发', now + MIN_THINK_INTERVAL_MS);
   }
 }
 
@@ -208,7 +211,7 @@ function buildScript(d: { action?: string; say?: string }): BehaviorScript | nul
 }
 
 /** 从当前全局状态构造喂给模型的上下文 */
-async function buildInput(): Promise<BrainInput> {
+export async function buildInput(): Promise<BrainInput> {
   const settings = await getSettings();
   const focus = currentFocus();
   const agent = getAgentStatus();
@@ -219,12 +222,14 @@ async function buildInput(): Promise<BrainInput> {
   // 人设：激活角色的名字 + persona
   let personaName = '桌宠';
   let personaTraits: string | undefined;
+  let actionDescriptions: ReturnType<typeof brainActions> = [];
   try {
     if (settings.activeCharacter) {
       const meta = await getCharacter(settings.activeCharacter);
       if (meta?.manifest) {
         personaName = meta.manifest.name || personaName;
         personaTraits = meta.manifest.persona || undefined;
+        actionDescriptions = brainActions(meta.manifest);
       }
     }
   } catch {
@@ -258,7 +263,8 @@ async function buildInput(): Promise<BrainInput> {
     inMeeting: !!meeting.inMeeting,
     musicPlaying: !!music.playing,
     recentLines,
-    availableIntents: BRAIN_INTENTS,
+    availableIntents: actionDescriptions.map((a) => a.id),
+    actionDescriptions,
   };
 }
 

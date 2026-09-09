@@ -12,6 +12,17 @@ import {
 import { ACTION_IDS, EXPRESSION_ACTION_IDS } from '../src/types.js';
 
 describe('prompts', () => {
+  it('通用动作不驱动兽耳，首帧和循环末帧都锁定比例', () => {
+    for (const spec of [...Object.values(ACTIONS), ...Object.values(EXPRESSION_ACTIONS)]) {
+      expect(spec.motionDesc).not.toMatch(/耳朵|拉长/);
+    }
+    for (const id of ACTION_IDS) {
+      expect(framePrompt(id)).toContain('手掌与脚的大小');
+      expect(videoPrompt(id)).toContain('最后几帧也不放大、拉长或弹性变形');
+    }
+    expect(turnaroundPrompt(undefined, 'humanoid', 'chibi')).toContain('四肢短小圆润');
+    expect(ACTIONS.drag.poseDesc).toContain('保持参考图的原有长度');
+  });
   it('三视图模板含三视角与白底约束', () => {
     const p = turnaroundPrompt();
     expect(p).toContain('正面、正侧面、正背面');

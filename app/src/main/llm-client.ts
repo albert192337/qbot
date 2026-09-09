@@ -27,6 +27,7 @@ export interface ChatOpts {
   model?: string;
   /** 测试注入 */
   fetchImpl?: typeof fetch;
+  onTrace?: (stage: string, detail: string) => void;
 }
 
 export class LlmError extends Error {
@@ -56,6 +57,7 @@ export async function chatComplete(opts: ChatOpts): Promise<string> {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
+    opts.onTrace?.('HTTP 请求', JSON.stringify({ model, messages, temperature }));
     res = await fetchImpl(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -71,13 +73,14 @@ export async function chatComplete(opts: ChatOpts): Promise<string> {
     clearTimeout(timer);
   }
 
+  const body = await res.text();
+  opts.onTrace?.(`HTTP 响应 ${res.status}`, body);
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
     const retryable = res.status === 429 || res.status >= 500;
     throw new LlmError(`HTTP ${res.status}: ${body.slice(0, 300)}`, retryable);
   }
 
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const json = JSON.parse(body) as { choices?: Array<{ message?: { content?: string } }> };
   const text = json.choices?.[0]?.message?.content;
   if (typeof text !== 'string' || !text.trim()) {
     throw new LlmError('response missing message content', false);

@@ -7,13 +7,13 @@ import type { AgentMessage } from '../../shared/ipc-types';
 /** 同时最多挂几枚（按 BUBBLE_H 的几何算出来的硬上限，不是随手定的） */
 export const MAX_BUBBLES = 3;
 /** 可见时长，到点开始淡出 */
-export const BUBBLE_TTL_MS = 10_000;
+export const BUBBLE_TTL_MS = 20_000;
 /** 淡出动画时长，与 CSS 保持一致 */
 export const FADE_MS = 260;
 /** 轮询周期：用单个 tick + 纯 expire()，不给每枚气泡起 setTimeout */
 export const TICK_MS = 250;
 
-export type BubbleItem = AgentMessage;
+export type BubbleItem = AgentMessage & { durationMs?: number };
 
 export interface StackResult {
   items: BubbleItem[];
@@ -30,7 +30,7 @@ export interface StackResult {
  */
 export function upsert(
   items: BubbleItem[],
-  msg: AgentMessage,
+  msg: BubbleItem,
   max = MAX_BUBBLES,
 ): StackResult {
   const idx = items.findIndex((i) => i.sessionKey === msg.sessionKey);
@@ -45,7 +45,10 @@ export function upsert(
   }
   const next = items.concat(msg);
   const removed: string[] = [];
-  while (next.length > max) removed.push(next.shift()!.sessionKey);
+  while (next.length > max) {
+    const index = next.findIndex((item) => item.sessionKey !== 'llm' && !item.sessionKey.startsWith('chat:'));
+    removed.push(next.splice(index < 0 ? 0 : index, 1)[0].sessionKey);
+  }
   return { items: next, removed };
 }
 
@@ -54,7 +57,7 @@ export function expire(items: BubbleItem[], now: number): StackResult {
   const keep: BubbleItem[] = [];
   const removed: string[] = [];
   for (const it of items) {
-    if (now - it.at >= BUBBLE_TTL_MS) removed.push(it.sessionKey);
+    if (now - it.at >= (it.durationMs ?? BUBBLE_TTL_MS)) removed.push(it.sessionKey);
     else keep.push(it);
   }
   return { items: removed.length ? keep : items, removed };

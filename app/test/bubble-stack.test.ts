@@ -25,6 +25,12 @@ const msg = (
 });
 
 describe('气泡栈增改', () => {
+  it('普通台词不能替换或挤走 LLM 气泡', () => {
+    let items = upsert([], msg('llm', { text: '模型台词' })).items;
+    for (const key of ['behavior', 'agent-a', 'agent-b', 'behavior']) items = upsert(items, msg(key)).items;
+    expect(items.find(item => item.sessionKey === 'llm')?.text).toBe('模型台词');
+    expect(items.length).toBe(3);
+  });
   it('新消息追加到末尾（最新在最下，离桌宠最近）', () => {
     const r = upsert(upsert([], msg('a')).items, msg('b'));
     expect(r.items.map((i) => i.sessionKey)).toEqual(['a', 'b']);
@@ -68,8 +74,17 @@ describe('气泡栈增改', () => {
 });
 
 describe('到点淡出', () => {
-  it('用户定的 10 秒', () => {
-    expect(BUBBLE_TTL_MS).toBe(10_000);
+  it('默认留出 20 秒阅读', () => {
+    expect(BUBBLE_TTL_MS).toBe(20_000);
+  });
+
+  it('行为气泡使用明确时长，重复试播从本次收到消息重新计时', () => {
+    const first = msg('behavior', { durationMs: 25_000 });
+    expect(expire([first], T0 + 24_999).removed).toEqual([]);
+    expect(expire([first], T0 + 25_000).removed).toEqual(['behavior']);
+    const again = upsert([first], { ...first, at: T0 + 10_000 }).items;
+    expect(expire(again, T0 + 25_000).removed).toEqual([]);
+    expect(expire(again, T0 + 35_000).removed).toEqual(['behavior']);
   });
 
   it('不到点不动，到点摘掉', () => {

@@ -26,6 +26,7 @@ export type BehaviorStep =
 
 /** 行为元数据（仲裁/防重复/冷却用） */
 export interface BehaviorMeta {
+  traceId?: string;
   /** 行为唯一 id（规则名或模型生成的行为类别） */
   id: string;
   /** 优先级：数值越大越优先；0 最低。决定是否打断正在运行的行为 */

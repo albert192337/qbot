@@ -1,5 +1,28 @@
 # QBot — AI 桌宠
 
+## 2026-09-09：通用动作与行为调试修复
+
+- 积分左侧聊天按钮打开独立可输入透明窗（固定 380×130，跟随桌宠，底部不足时将桌宠上移留空间）。Enter 发送、Shift+Enter 换行、IME 确认不发送；失败保留文本。主动聊天不受自由模式开关/自动脑冷却影响，有 API Key 即可；最近 10 轮对话按角色在内存隔离，重启清空。请求与结构化回复进入 LLM 日志，当前动作白名单及执行前角色/动作检查保留。
+- 主动聊天返回 1～3 条短台词，立即一起冒泡并播放所选动作；统一奶白底/深棕描边/微软雅黑 15px，最多 3 枚，普通台词不能挤掉聊天。`scripts/test-pet-chat-ui.cjs` 检查真实 preload/UI 的 IME、重复发送、错误保留、气泡数量和样式；pet-interaction 支持 QBOT_QA_VERIFY_SLEEP 验证视频 alpha。
+- 阿呱 sleep 的灰绿幕使用旧固定 chromakey 范围时，白肚皮和绿色身体均被误抠。低色度 key 现在缩小 similarity/blend，高色度保持既有标定。`chroma-weak-key` 用真实 VP9 alpha 回归白/橄榄/深色不透明与背景透明；配合 normalize/despill 共 18 项通过。本机睡觉 WebM/GIF 已从保留的 RGB 重新抠像归一化，原件备份在 `.superpowers/frog/original-sleep.*`；服务端 pipeline 仍需发布才能改变后续云端产物。
+
+- 桌宠右键新增「工具抽屉（日志）…」直达入口。抽屉独立 LLM 日志区每 2 秒刷新，展开完整请求、原始响应、模型返回的思考/决策/动作/台词和执行时间线；区分未请求、决定不行动、排队、发送气泡与渲染回执。新调用持久化到 userData/brain-calls.jsonl，不记录认证头，历史未记录的完整请求无法补回。
+- LLM 台词使用独立气泡槽，普通自言自语不能替换或挤掉它，仍用统一白色样式。回归 brain-log、llm-client、brain-llm-integration、behavior-executor、bubble-stack（28 项）；`scripts/test-brain-log-ui.cjs` 检查日志全文展示、转义和刷新保留展开状态。
+
+- 本地 Speaker 通过 `bubble:say` 复用统一气泡窗，桌宠台词无彩色边条/来源标题；旧内嵌气泡只作为其他调用方兼容。单击不自动回应，双击/右键可主动说话；自动 click-response 不排队，冷却一分钟，显式规则试播仍立即响应。
+- 普通窗口移动改用 setPosition；无串门状态时不再调用窗口尺寸切换。拖动阈值用屏幕坐标，取消/捕获丢失/失焦清理拖拽与未决单击。`scripts/test-pet-interaction.cjs` 用真实 Electron 指针事件和视频检查；支持 QBOT_QA_ASSET_DIR 只读验证当前角色素材，不修改真实角色数据。
+
+- 单条规则试播不再发伪造的 `interact/click`，避免额外触发「嗯？/戳我干啥」并抢播。规则试播不调用 LLM；`do=false` 的 thought 仅写日志，不说出口。
+- 气泡统一头顶显示，取消空间不足翻到脚下；窗口保持固定尺寸，内容高度贴到头顶，贴屏幕顶部时必要时与角色顶部重叠。回归 `bubble-layout`、`behavior-debug` 及原生 `test-bubble.cjs`。
+
+- 气泡现在按系统键鼠空闲状态保留：无输入 15 秒或锁屏时暂停消散，恢复输入/休眠唤醒后重新给完整阅读时长。每秒仅查询空闲秒数，不记录输入内容；仍是穿透窗，最多三枚，同来源保留最新一条，历史台词可在调试记录查看。
+- LLM 脑每次请求读取当前角色 manifest 的已完成标准/导入/预设/自定义动作及说明，传递实际 ID，保持大小写；不再使用固定意图词表。回复后再次核对动作是否仍存在。新增测试 `brain-actions`、`brain-llm-integration`、`bubble-reading`，模型调用全部 mock。
+
+- 通用 Q 版动作不再指令耳朵竖起、后压或弹动；三视图补充短四肢/小手脚约束，首帧与视频保持参考比例，拖拽和伸展不拉长肢体，循环末帧不变形。显式全文 prompt 覆盖仍优先；已有视频需重新生成。云端生成需同步发布服务端 pipeline 才能采用新模板。
+- 单条规则「试」立即重播，绕过自动行为排队和听歌等动作让位；自动规则冷却保留。执行中断会解除步骤等待，旧异步回调不能覆盖新执行。
+- 气泡默认显示 20 秒，行为长句最多 30 秒；每条气泡使用独立时长。决策日志与气泡发送记录分开显示；修复首次加载/重新显示时上下锚点未同步。
+- 回归：`app/test/behavior-executor.test.ts`、`app/test/bubble-stack.test.ts`、`pipeline/test/prompts.test.ts`。原生显示验证先构建 App，再以 Electron 运行 `scripts/test-bubble.cjs`；隔离数据和截图在 `.superpowers/`，不调用生成 API。
+
 丢一张角色图 → 自动生成 8 个常用动作（三视图 → 绿幕首帧 → 循环视频 → 抠像转码）→ macOS 桌面常驻透明窗桌宠。可联动 AI coding agent（Claude Code）：agent 干活时桌宠实时切状态。
 
 ## 仓库结构（npm workspaces monorepo）

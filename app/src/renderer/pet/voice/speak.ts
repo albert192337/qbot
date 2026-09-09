@@ -38,6 +38,8 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
 export interface SpeakerHooks {
   /** 气泡 DOM（pet/index.html 的 #bubble） */
   bubble: HTMLElement;
+  /** 桌宠使用统一气泡窗，保留 DOM 作为旧调用方兼容。 */
+  showBubble?(text: string, durationMs: number): void;
   /** 仅 idle 时允许自言自语 */
   canSpeak(): boolean;
   /** mood 联动：请求状态机播放 talk 动作 */
@@ -155,6 +157,10 @@ export class Speaker {
   }
 
   private showBubble(text: string, visibleMs: number): void {
+    if (this.hooks.showBubble) {
+      this.hooks.showBubble(text, Math.max(20_000, visibleMs));
+      return;
+    }
     this.clearBubbleTimers();
     const el = this.hooks.bubble;
     el.textContent = text;

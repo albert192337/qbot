@@ -21,7 +21,6 @@ import {
 import { BUILTIN_RULES } from './rules/builtin-rules';
 import {
   currentFocus,
-  emitEvent,
   getSnapshot,
   onPerceptionChanged,
   recordDecision,
@@ -387,6 +386,6 @@ export function debugTrigger(ruleId: string): void {
   if (script) {
     script.meta.source = 'debug';
     executeCallback?.(script);
-    void emitEvent({ type: 'interact', at: Date.now(), kind: 'click' }); // 让面板刷得到
+    // 试播不是点击桌宠，不能发 interact/click，否则 click-response 会抢播。
   }
 }

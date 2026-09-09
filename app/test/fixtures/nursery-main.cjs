@@ -19,7 +19,7 @@ app.whenReady().then(async () => {
       return new Response(bytes,{headers:{'Content-Type':type,'Cache-Control':'no-store'}});
     }catch{return new Response(null,{status:404});}
   });
-  qa.settings={generationMode:'cloud',developerMode:false};qa.progress={points:2000,boxes:2,idleMs:300000,inventory:{painting:10,plant:1},lastTickAt:Date.now()};qa.decor=[];
+  qa.settings={generationMode:'cloud',developerMode:process.env.QBOT_QA_LOGS==='1'};qa.progress={points:2000,boxes:2,idleMs:300000,inventory:{painting:10,plant:1},lastTickAt:Date.now()};qa.decor=[];
   qa.rooms={status:{phase:'online',memberId:'me'},room:null,chat:[]};
   const handlers={
     'settings:set':(_e,patch)=>{qa.settings={...qa.settings,...patch};qa.calls.push(['settings',patch]);qa.win.webContents.send('settings:changed',qa.settings);},
@@ -35,8 +35,9 @@ app.whenReady().then(async () => {
     'claude:getStatus':()=>false,
     'agent:getStatus':()=>({activity:'idle',sessions:0}),
     'behavior:getRules':()=>[],
+    'behavior:brainLog':()=>({ gate:{at:Date.now(),reason:'测试调用已完成'},calls:[{id:'fixture-call',at:Date.now(),trigger:'debug',input:{messages:[{role:'system',content:'完整输入 <script>window.injected=true</script>'},{role:'user',content:'当前角色可播放 cheer'}]},raw:'{"thought":"想庆祝一下","do":true,"action":"cheer","say":"辛苦啦"}',decision:{thought:'想庆祝一下',do:true,action:'cheer',say:'辛苦啦'},events:[{at:Date.now(),stage:'气泡已渲染'}]}]}),
     'behavior:getExecutorState':()=>({current:null,queue:[]}),
-    'perception:get':()=>({foregroundMonitor:{status:'disabled',platform:'darwin'},events:[],ledger:{apps:{},totalSwitches:0,eventCount:0},decisions:[]}),
+    'perception:get':()=>({foregroundMonitor:{status:'disabled',platform:'darwin'},foreground:null,events:[],behaviors:[],ledger:{apps:{},totalSwitches:0,eventCount:0},decisions:[]}),
     'rooms:getDisplayMode':()=>qa.mode??'desktop',
     'rooms:setDisplayMode':(_e,mode)=>{qa.mode=mode;qa.calls.push(['mode',mode]);return mode;},
     'rooms:getCache':()=>qa.rooms,

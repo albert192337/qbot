@@ -233,6 +233,9 @@
         user-select: none;
       }
       .hud-mark { opacity: 0.7; }
+      .hud-chat { pointer-events: auto; width: clamp(22px, 7vh, 34px); height: clamp(22px, 7vh, 34px); border: 0; padding: 2px; background: transparent; cursor: pointer; }
+      .hud-chat:hover { transform: translateY(-2px); }
+      .hud-chat:focus-visible { outline: 2px solid #fff8eb; border-radius: 7px; }
       .hud-num { font-weight: 600; letter-spacing: 0.5px; }
       .hud-chest {
         pointer-events: auto;

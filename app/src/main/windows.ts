@@ -5,6 +5,7 @@ import type { CharacterMeta, RoomSizePreset, RoomsDisplayMode } from '../shared/
 import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset, resolveRoomSceneSize } from './rooms/rooms-rules';
 import { clampPetScale, petTargetSize } from './pet-geometry';
 import { attachPetWindowRecovery } from './pet-window-recovery';
+import { aboveBubbleLayout } from './bubble-layout';
 
 const PET_SIZE = 360;
 /** 房间宠上屏窗：比本地宠小一档（房友是客人体量），固定尺寸永不 resize */
@@ -73,7 +74,7 @@ function moveFixedSize(
     height: size.height,
   };
   if (!changesSize) {
-    win.setBounds(bounds);
+    win.setPosition(bounds.x, bounds.y);
     return;
   }
   win.setResizable(true);
@@ -92,7 +93,36 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds();
 }
 
-type RendererPage = 'pet' | 'room' | 'bubble' | 'console' | 'lounge' | 'nursery';
+type RendererPage = 'pet' | 'room' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat';
+
+let chatWindow: BrowserWindow | null = null;
+function syncChatBounds(): void {
+  if (!chatWindow || chatWindow.isDestroyed() || !petWindow) return;
+  const pet = petWindow.getBounds();
+  const wa = screen.getDisplayMatching(pet).workArea;
+  const x = Math.max(wa.x, Math.min(pet.x + pet.width / 2 - 190, wa.x + wa.width - 380));
+  const y = Math.max(wa.y, Math.min(pet.y + pet.height + 6, wa.y + wa.height - 130));
+  chatWindow.setPosition(Math.round(x), Math.round(y));
+}
+export function closePetChat(): void { chatWindow?.hide(); }
+export function openPetChat(): void {
+  if (petWindow) {
+    const pet = petWindow.getBounds();
+    const wa = screen.getDisplayMatching(pet).workArea;
+    if (pet.y + pet.height + 136 > wa.y + wa.height) {
+      petWindow.setPosition(pet.x, Math.max(wa.y, wa.y + wa.height - pet.height - 136));
+    }
+  }
+  if (!chatWindow || chatWindow.isDestroyed()) {
+    chatWindow = new BrowserWindow({ width: 380, height: 130, frame: false, transparent: true,
+      resizable: false, hasShadow: false, skipTaskbar: true, show: false,
+      webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
+    chatWindow.setAlwaysOnTop(true, 'floating');
+    chatWindow.on('closed', () => { chatWindow = null; });
+    chatWindow.once('ready-to-show', () => { syncChatBounds(); chatWindow?.show(); });
+    load(chatWindow, 'chat');
+  } else { syncChatBounds(); chatWindow.show(); chatWindow.focus(); }
+}
 
 function load(win: BrowserWindow, page: RendererPage, query?: Record<string, string>): void {
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -123,28 +153,21 @@ export function isRoomOpen(): boolean {
   return !!roomWindow && !roomWindow.isDestroyed();
 }
 
-/** 气泡栈的锚定位置：默认贴桌宠头顶，顶部放不下就翻到脚下 */
-function bubbleAnchor(pet: Electron.Rectangle): { x: number; y: number; side: 'above' | 'below' } {
+/** 始终在头顶；顶部空间不足时内容贴顶，不翻到脚下。 */
+function bubbleAnchor(pet: Electron.Rectangle) {
   const wa = screen.getDisplayMatching(pet).workArea;
-  const x = Math.round(
-    Math.min(Math.max(pet.x + pet.width / 2 - BUBBLE_W / 2, wa.x), wa.x + wa.width - BUBBLE_W),
-  );
-  const above = pet.y - BUBBLE_H + BUBBLE_OVERLAP;
-  if (above >= wa.y) return { x, y: Math.round(above), side: 'above' };
-  const below = Math.min(pet.y + pet.height - BUBBLE_OVERLAP, wa.y + wa.height - BUBBLE_H);
-  return { x, y: Math.round(Math.max(below, wa.y)), side: 'below' };
+  return aboveBubbleLayout(pet, wa, BUBBLE_W, BUBBLE_H, BUBBLE_OVERLAP);
 }
 
 export function syncBubbleBounds(): void {
+  syncChatBounds();
   const b = bubbleWindow;
   if (!b || b.isDestroyed() || !b.isVisible()) return; // 隐藏时不做功（常态）
   if (!petWindow || petWindow.isDestroyed()) return;
-  const { x, y, side } = bubbleAnchor(petWindow.getBounds());
+  const { x, y, side, contentHeight } = bubbleAnchor(petWindow.getBounds());
   moveFixedSize(b, x, y, { width: BUBBLE_W, height: BUBBLE_H });
-  if (side !== bubbleSide) {
-    bubbleSide = side;
-    b.webContents.send('bubble:anchor', side);
-  }
+  bubbleSide = side;
+  b.webContents.send('bubble:anchor', side, contentHeight);
 }
 
 /** 激活角色变化：广播给 pet 窗（必要时创建）和 room 窗（存在时） */
@@ -213,6 +236,7 @@ export function createPetWindow(): BrowserWindow {
   attachPetWindowRecovery(win, () => !isRoomOpen());
   win.once('ready-to-show', () => { if (!isRoomOpen()) win.showInactive(); });
   petWindow.on('closed', () => {
+    chatWindow?.close();
     petWindow = null;
     closeBubbleWindow();
   });
@@ -378,6 +402,9 @@ function createBubbleWindow(): BrowserWindow {
   bubbleWindow.setAlwaysOnTop(true, 'floating');
   bubbleWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   bubbleWindow.on('closed', () => (bubbleWindow = null));
+  bubbleWindow.webContents.on('did-finish-load', () => {
+    syncBubbleBounds();
+  });
   load(bubbleWindow, 'bubble');
   return bubbleWindow;
 }
@@ -387,9 +414,10 @@ export function showBubbleWindow(): BrowserWindow {
   const win = createBubbleWindow();
   if (!win.isVisible()) {
     if (petWindow && !petWindow.isDestroyed()) {
-      const { x, y, side } = bubbleAnchor(petWindow.getBounds());
+      const { x, y, side, contentHeight } = bubbleAnchor(petWindow.getBounds());
       moveFixedSize(win, x, y, { width: BUBBLE_W, height: BUBBLE_H });
       bubbleSide = side;
+      win.webContents.send('bubble:anchor', side, contentHeight);
     }
     win.showInactive(); // 不抢焦点
   }
@@ -421,6 +449,7 @@ export function movePetWindow(x: number, y: number): void {
 
 /** 进入串门模式：窗口拓宽为双人宽；离开时恢复单人尺寸 */
 export function setPetVisitMode(enter: boolean): void {
+  if (petVisitMode === enter) return;
   petVisitMode = enter;
   if (!petWindow || petWindow.isDestroyed()) return;
   const [x, y] = petWindow.getPosition();

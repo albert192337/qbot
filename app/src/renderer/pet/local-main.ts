@@ -40,6 +40,7 @@ const visitorSignboard = new Signboard('visitor-stage');
 
 const speaker = new Speaker({
   bubble: document.getElementById('bubble')!,
+  showBubble: (text, durationMs) => window.qbot.bubble.say(text, durationMs),
   canSpeak: () => state.kind === 'idle',
   playAction: (action) => dispatch({ type: 'PLAY_ACTION', action }),
   hasAction: (action) => available.includes(action),
@@ -100,6 +101,7 @@ function applyVisitFacing(): void {
 /** 清理串门状态：移除 visit-mode + flip 类 + visitor stage + 恢复 host idle。
  *  注意：不隐藏 hostSignboard——牌子与串门无关，独立控制。 */
 function endVisit(): void {
+  if (!document.body.classList.contains('visit-mode')) return;
   document.body.classList.remove('visit-mode', 'flip-host', 'flip-visitor');
   visitorPlayer.dispose();
   visitorStage.replaceChildren();
@@ -244,23 +246,28 @@ void window.qbot.music.getStatus().then(onMusicStatus);
 function behaviorCanPlay(): boolean {
   return state.kind !== 'agent' && state.kind !== 'meeting' && state.kind !== 'music';
 }
-window.qbot.behaviorAction.onPlay(({ action, loops }) => {
+let behaviorReplayTimers: ReturnType<typeof setTimeout>[] = [];
+window.qbot.behaviorAction.onPlay(({ action, loops, preview, traceId }) => {
+  const trace = (stage: string) => { if (traceId) window.qbot.behavior.reportTrace(traceId, stage); };
+  behaviorReplayTimers.forEach(clearTimeout);
+  behaviorReplayTimers = [];
   // 动作不可用（角色没这个动作）时静默忽略——执行器的语义解析已尽量给可用的，
   // 这里是最后一道闸
-  if (available.length === 0 || !available.includes(action as PlayableId)) return;
-  if (!behaviorCanPlay()) return; // agent/meeting/music 粘性态：动作让位
+  if (available.length === 0 || !available.includes(action as PlayableId)) { trace(`动作跳过：不可用 ${action}`); return; }
+  if ((!preview && !behaviorCanPlay()) || state.kind === 'drag' || state.kind === 'visit') { trace(`动作让位：当前 ${state.kind}`); return; }
+  trace(`请求播放动作：${action}`);
   dispatch({ type: 'PLAY_ACTION', action: action as PlayableId });
   // loops > 1：state-machine 的 PLAY_ACTION 固定播 1 遍，多遍靠重发（等一动画时长）
   if (loops > 1) {
     const dur =
       (currentCharacter?.manifest.customActions?.[action]?.durationSec ?? 3) * 1000;
     for (let i = 1; i < loops; i++) {
-      setTimeout(() => {
+      behaviorReplayTimers.push(setTimeout(() => {
         // 重播时也要确认还在可演状态（这期间可能进了 agent/meeting）
-        if (available.includes(action as PlayableId) && behaviorCanPlay()) {
+        if (available.includes(action as PlayableId) && (preview || behaviorCanPlay())) {
           dispatch({ type: 'PLAY_ACTION', action: action as PlayableId });
         }
-      }, dur * i);
+      }, dur * i));
     }
   }
 });
@@ -443,8 +450,9 @@ const DBLCLICK_MS = 250;
 
 let pointerDown = false;
 let dragStarted = false;
-let downClientX = 0;
-let downClientY = 0;
+let downScreenX = 0;
+let downScreenY = 0;
+let activePointer: number | null = null;
 let offsetX = 0;
 let offsetY = 0;
 let rafPending = false;
@@ -453,23 +461,25 @@ let lastScreenY = 0;
 let clickTimer: ReturnType<typeof setTimeout> | null = null;
 
 stage.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || !e.isPrimary || pointerDown) return;
+  activePointer = e.pointerId;
   pointerDown = true;
   dragStarted = false;
-  downClientX = e.clientX;
-  downClientY = e.clientY;
+  downScreenX = e.screenX;
+  downScreenY = e.screenY;
   offsetX = e.clientX;
   offsetY = e.clientY;
   stage.setPointerCapture(e.pointerId);
   hideSignPrompt(); // 点宠身上：收起举牌输入框
 });
 stage.addEventListener('pointermove', (e) => {
-  if (!pointerDown) return;
+  if (!pointerDown || e.pointerId !== activePointer) return;
   if (!dragStarted) {
-    const dx = e.clientX - downClientX;
-    const dy = e.clientY - downClientY;
+    const dx = e.screenX - downScreenX;
+    const dy = e.screenY - downScreenY;
     if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD) return;
     dragStarted = true;
+    if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
     speaker.interrupt();
     // 拖拽开始就结束串门
     visitOrchestrator.cancelVisit();
@@ -494,9 +504,10 @@ stage.addEventListener('pointermove', (e) => {
 });
 
 stage.addEventListener('pointerup', (e) => {
-  if (e.button !== 0 || !pointerDown) return;
+  if (e.button !== 0 || !pointerDown || e.pointerId !== activePointer) return;
   pointerDown = false;
-  stage.releasePointerCapture(e.pointerId);
+  activePointer = null;
+  if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
   if (dragStarted) {
     dragStarted = false;
     dispatch({ type: 'POINTER_UP' });
@@ -506,7 +517,6 @@ stage.addEventListener('pointerup', (e) => {
     return;
   }
   // 双击 = 立即说一句；单击不做任何事（房间入口在右键菜单）
-  window.qbot.perception.report('click');
   if (clickTimer) {
     clearTimeout(clickTimer);
     clickTimer = null;
@@ -514,9 +524,27 @@ stage.addEventListener('pointerup', (e) => {
   } else {
     clickTimer = setTimeout(() => {
       clickTimer = null;
+      // 单击只选中/准备拖拽，不自动接一句；双击和右键才主动说话。
     }, DBLCLICK_MS);
   }
 });
+
+function cancelPointer(): void {
+  if (!pointerDown) return;
+  pointerDown = false;
+  activePointer = null;
+  if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+  if (dragStarted) {
+    dragStarted = false;
+    dispatch({ type: 'POINTER_UP' });
+    hostSignboard.onDragEnd();
+    hud.onDragEnd();
+    window.qbot.perception.report('drag_end');
+  }
+}
+stage.addEventListener('pointercancel', cancelPointer);
+stage.addEventListener('lostpointercapture', cancelPointer);
+window.addEventListener('blur', cancelPointer);
 
 // ── 右键菜单 ───────────────────────────
 const ACTION_LABELS: Record<string, string | undefined> = {

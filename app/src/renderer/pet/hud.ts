@@ -64,6 +64,14 @@ export class ProgressHud {
     this.toastEl = document.createElement('div');
     this.toastEl.className = 'hud-toast';
 
+    const chat = document.createElement('button');
+    chat.className = 'hud-chat';
+    chat.title = '和它聊聊';
+    chat.setAttribute('aria-label', '和桌宠聊天');
+    chat.innerHTML = '<svg viewBox="0 0 32 32" fill="none"><path d="M7 5h18a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H14l-7 5v-5a4 4 0 0 1-4-4V9a4 4 0 0 1 4-4Z" fill="#fff8eb" stroke="#594235" stroke-width="2"/><circle cx="10" cy="15" r="1.5" fill="#594235"/><circle cx="16" cy="15" r="1.5" fill="#594235"/><circle cx="22" cy="15" r="1.5" fill="#594235"/></svg>';
+    chat.addEventListener('pointerdown', e => e.stopPropagation());
+    chat.addEventListener('click', e => { e.stopPropagation(); window.qbot.bubble.openChat(); });
+    this.root.appendChild(chat);
     this.root.appendChild(this.pill);
     this.root.appendChild(this.chestBtn);
     this.root.appendChild(this.floatEl);

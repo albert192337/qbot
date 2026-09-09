@@ -1,9 +1,11 @@
 import { cloudAccount, acknowledgeCloudJob, forgetCloudJob } from './cloud-generation';
 /** IPC 注册：preload 契约的主进程实现 */
-import { BrowserWindow, Menu, dialog, ipcMain } from 'electron';
+import { BrowserWindow, Menu, dialog, ipcMain, powerMonitor } from 'electron';
 import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
+import { showBubbleWindow } from './windows';
+import { getBrainLog, updateBrainCall } from './brain-log';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
 import { getCharacter, listCharacters, renameCharacter, deleteCharacter, deleteGenerationTask } from './characters';
@@ -48,8 +50,13 @@ import {
 import { getAllRules, debugTrigger, triggerRules } from './behavior-rules';
 import { getExecutorState, stopAllBehaviors } from './behavior-executor';
 import { debugThink } from './brain-llm';
+import { sendPetChat } from './pet-chat';
+import { openPetChat, closePetChat } from './windows';
 
 export function registerIpc(): void {
+  ipcMain.on('petChat:open', () => openPetChat());
+  ipcMain.on('petChat:close', () => closePetChat());
+  ipcMain.handle('petChat:send', (_ev, text: unknown) => sendPetChat(text));
   // ── hatch ──────────────────────────────────────────────
   ipcMain.handle(
     'hatch:start',
@@ -256,6 +263,10 @@ export function registerIpc(): void {
       // ── 去处（角色能去的地方 + 控制台）──────────────────
       { label: '联机空间…', click: () => createLoungeWindow() },
       { label: '故事小屋…', click: () => createConsoleWindow() },
+      { label: '工具抽屉（日志）…', click: async () => {
+        await setSettings({ developerMode: true });
+        createConsoleWindow('devtools');
+      } },
     ]);
     menu.popup({ window: win });
   });
@@ -346,6 +357,19 @@ export function registerIpc(): void {
   ipcMain.handle('meeting:getStatus', () => getMeetingStatus());
   // ── bubble ─────────────────────────────────────────────
   ipcMain.on('bubble:empty', () => hideBubbleWindow());
+  ipcMain.on('bubble:say', (ev, payload: { text?: unknown; durationMs?: unknown }) => {
+    if (ev.sender !== getPetWindow()?.webContents || typeof payload?.text !== 'string') return;
+    const text = payload.text.trim().slice(0, 500);
+    if (!text) return;
+    const win = showBubbleWindow();
+    const msg = { text, durationMs: 20_000 };
+    if (win.webContents.isLoading()) win.webContents.once('did-finish-load', () => {
+      if (!win.isDestroyed()) win.webContents.send('behavior:say', msg);
+    });
+    else win.webContents.send('behavior:say', msg);
+  });
+  ipcMain.handle('bubble:idleSeconds', () =>
+    powerMonitor.getSystemIdleState(15) === 'locked' ? 15 : powerMonitor.getSystemIdleTime());
 
   // ── perception 感知层（阶段 A：事件流/账本/行为史/决策日志）──
   ipcMain.handle('perception:get', () => getSnapshot());
@@ -379,6 +403,10 @@ export function registerIpc(): void {
   ipcMain.handle('behavior:getRules', () =>
     getAllRules().map((r) => ({ id: r.id, name: r.name, weight: r.weight, enabled: true })),
   );
+  ipcMain.handle('behavior:brainLog', () => getBrainLog());
+  ipcMain.on('behavior:trace', (_ev, id: string, stage: string) => {
+    if (typeof id === 'string' && typeof stage === 'string') void updateBrainCall(id, stage.slice(0, 200));
+  });
   ipcMain.handle('behavior:debugTrigger', (_ev, ruleId: string) => {
     debugTrigger(ruleId);
   });

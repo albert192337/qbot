@@ -238,6 +238,11 @@ const api: QBotApi = {
     },
   },
   bubble: {
+    openChat: () => ipcRenderer.send('petChat:open'),
+    closeChat: () => ipcRenderer.send('petChat:close'),
+    sendChat: (text) => ipcRenderer.invoke('petChat:send', text),
+    say: (text, durationMs) => ipcRenderer.send('bubble:say', { text, durationMs }),
+    getIdleSeconds: () => ipcRenderer.invoke('bubble:idleSeconds'),
     reportEmpty: () => ipcRenderer.send('bubble:empty'),
     onClear: (cb) => {
       const listener = () => cb();
@@ -245,7 +250,7 @@ const api: QBotApi = {
       return () => ipcRenderer.removeListener('bubble:clear', listener);
     },
     onAnchor: (cb) => {
-      const listener = (_ev: unknown, side: 'above' | 'below') => cb(side);
+      const listener = (_ev: unknown, side: 'above' | 'below', contentHeight?: number) => cb(side, contentHeight);
       ipcRenderer.on('bubble:anchor', listener);
       return () => ipcRenderer.removeListener('bubble:anchor', listener);
     },
@@ -338,6 +343,8 @@ const api: QBotApi = {
     },
   },
   behavior: {
+    getBrainLog: () => ipcRenderer.invoke('behavior:brainLog'),
+    reportTrace: (id, stage) => ipcRenderer.send('behavior:trace', id, stage),
     getRules: () => ipcRenderer.invoke('behavior:getRules'),
     debugTrigger: (ruleId) => ipcRenderer.invoke('behavior:debugTrigger', ruleId),
     getExecutorState: () => ipcRenderer.invoke('behavior:getExecutorState'),
