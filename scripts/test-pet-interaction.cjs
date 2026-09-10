@@ -18,6 +18,7 @@ app.whenReady().then(async () => {
       return new Response(await fs.readFile(file), { headers: { 'Content-Type': file.endsWith('.webm') ? 'video/webm' : 'image/png' } });
     });
     const handlers = {
+      'garden:get': () => ({ plots: [{readyAt:Date.now()-1000}] }),
       'settings:get': () => ({ voiceEnabled: false, talkFrequency: 'quiet' }),
       'progress:get': () => ({ points: 0, boxes: 0, inventory: {}, idleMs: 0, lastTickAt: Date.now() }),
       'characters:getActive': () => ({ dirId: 'mascot', manifest }),
@@ -39,6 +40,15 @@ app.whenReady().then(async () => {
     const read = () => win.webContents.executeJavaScript(`(() => {const v=[...document.querySelectorAll('#stage video')].find(v=>v.style.visibility==='visible');return {src:v?.src,time:v?.currentTime};})()`);
     for (let i = 0; i < 100 && !(await read()).src; i++) await wait(100);
     assert.ok((await read()).src?.includes('idle.webm'));
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.hud-garden').classList.contains('garden-ready')`), true);
+    assert.equal(await win.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.hud-garden'),'::after').content`), '"✦"');
+    win.webContents.send('garden:performance', 'talk_happy');
+    for (let i=0;i<80 && !(await read()).src?.includes('talk_happy.webm');i++) await wait(100);
+    assert.ok((await read()).src?.includes('talk_happy.webm'), 'garden performance plays an available action');
+    assert.equal(await win.webContents.executeJavaScript(`document.body.classList.contains('garden-performing')`),true);
+    const gardenTime=(await read()).time; await wait(300); assert.notEqual((await read()).time,gardenTime);
+    win.webContents.send('garden:performance',null);await wait(300);
+    assert.equal(await win.webContents.executeJavaScript(`document.body.classList.contains('garden-performing')`),false);
     await win.webContents.executeJavaScript(`document.querySelector('.hud-chat').click()`);
     await wait(50);
     assert.equal(chatOpens, 1, '积分左侧聊天按钮打开输入框');

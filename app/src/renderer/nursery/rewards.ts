@@ -114,6 +114,10 @@ async function mutate(tier?: FurnitureTier): Promise<void> {
       return;
     }
     progress = r.progress;
+    if ('gardenReward' in r && r.gardenReward) {
+      result.replaceChildren(el('h3', `收到了「${r.gardenReward}」`), el('p', '已放入花园背包。'), button('打开花园背包', () => window.qbot.garden.open('bag'), 'primary'));
+      return;
+    }
     const item = DECOR_BY_ID.get(r.stickerId);
     result.replaceChildren();
     if (item) result.append(image(item.image, item.name));

@@ -6,6 +6,7 @@ import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset, resolveRo
 import { clampPetScale, petTargetSize } from './pet-geometry';
 import { attachPetWindowRecovery } from './pet-window-recovery';
 import { aboveBubbleLayout } from './bubble-layout';
+import { attachGarden } from './garden/windows';
 
 const PET_SIZE = 360;
 /** 房间宠上屏窗：比本地宠小一档（房友是客人体量），固定尺寸永不 resize */
@@ -233,6 +234,7 @@ export function createPetWindow(): BrowserWindow {
   petWindow.on('move', syncBubbleBounds);
   petWindow.on('resize', syncBubbleBounds);
   const win = petWindow;
+  attachGarden(win);
   attachPetWindowRecovery(win, () => !isRoomOpen());
   win.once('ready-to-show', () => { if (!isRoomOpen()) win.showInactive(); });
   petWindow.on('closed', () => {

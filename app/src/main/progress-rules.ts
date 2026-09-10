@@ -66,6 +66,7 @@ export function sanitizeProgress(raw: unknown): Progress {
   }
   return {
     welcomeGrantVersion: num(r.welcomeGrantVersion, 0),
+    ...(Array.isArray(r.gardenTransactions) ? { gardenTransactions: r.gardenTransactions.filter((x): x is string => typeof x === 'string') } : {}),
     points: num(r.points, base.points),
     boxes: num(r.boxes, base.boxes),
     idleMs: num(r.idleMs, base.idleMs),

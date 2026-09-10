@@ -235,6 +235,18 @@
       .hud-mark { opacity: 0.7; }
       .hud-chat { pointer-events: auto; width: clamp(22px, 7vh, 34px); height: clamp(22px, 7vh, 34px); border: 0; padding: 2px; background: transparent; cursor: pointer; }
       .hud-chat:hover { transform: translateY(-2px); }
+      .garden-performing #pet-hud { visibility: hidden; }
+      .hud-garden { position: relative; }
+      .hud-garden.garden-ready::after { content: '✦'; position: absolute; right: -4px; top: -5px; color: #ffe19b; font-size: 15px; text-shadow: 0 1px 2px #72542d, 0 0 5px #fff0b4; animation: garden-star 3s ease-in-out infinite; pointer-events: none; }
+      .hud-garden.garden-ready svg { animation: garden-ready-glow 3s ease-in-out infinite; transform-origin: 50% 90%; }
+      @keyframes garden-star { 0%,100% { opacity:.55; transform:scale(.8); } 50% { opacity:1; transform:scale(1.1); } }
+      @keyframes garden-ready-glow {
+        0%, 100% { filter: drop-shadow(0 0 2px #ffe09988); transform:rotate(-4deg); }
+        50% { filter: drop-shadow(0 0 5px #ffe099cc); transform:rotate(4deg); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .hud-garden.garden-ready svg, .hud-garden.garden-ready::after { animation: none; filter: drop-shadow(0 0 3px #ffe099aa); }
+      }
       .hud-chat:focus-visible { outline: 2px solid #fff8eb; border-radius: 7px; }
       .hud-num { font-weight: 600; letter-spacing: 0.5px; }
       .hud-chest {

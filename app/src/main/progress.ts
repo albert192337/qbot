@@ -29,8 +29,6 @@ import {
   POINTS_PER_AGENT_RUN,
   POINTS_PER_KEY,
   applyCraft,
-  applyOpenBox,
-  canOpenBox,
   emptyProgress,
   pickCraftSacrifice,
   sanitizeProgress,
@@ -114,7 +112,7 @@ function scheduleSave(): void {
 /** 退出前调用，把防抖里没落的那笔写掉 */
 let saveChain: Promise<void> = Promise.resolve();
 
-export async function flushProgress(): Promise<void> {
+export async function flushProgress(strict = false): Promise<void> {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
@@ -129,8 +127,9 @@ export async function flushProgress(): Promise<void> {
     await writeFile(`${file}.tmp`, snapshot);
     await rename(`${file}.tmp`, file);
   };
-  saveChain = saveChain.then(save, save).catch(err => console.error('[progress] 写盘失败', err));
-  await saveChain;
+  const pending = saveChain.then(save, save);
+  saveChain = pending.catch(err => console.error('[progress] 写盘失败', err));
+  await (strict ? pending : saveChain);
 }
 
 function scheduleBroadcast(): void {
@@ -203,12 +202,20 @@ export function stopProgressTicker(): void {
 
 /** 开箱：扣 1 箱 + POINTS_PER_BOX 点，随机得一件家具 */
 export async function openBox(): Promise<OpenBoxResult> {
+  const { gardenAction } = await import('./garden/service');
+  const result = await gardenAction({ type: 'box' });
+  if (!result.ok) return result;
+  return { ok: true, stickerId: 'garden-supply', tier: 'common', progress: await load(), gardenReward: result.reveal?.message ?? '花园补给' };
+}
+
+/** Garden's durable transaction journal retries this receipt after an interrupted save. */
+export async function applyGardenTransaction(id: string, points: number, boxes = 0): Promise<boolean> {
   const p = await load();
-  const check = canOpenBox(p);
-  if (!check.ok) return { ok: false, error: check.reason ?? '开不了' };
-  const stickerId = rollFurniture(Math.random);
-  const next = commit(applyOpenBox(p, stickerId));
-  return { ok: true, stickerId, tier: tierOf(stickerId), progress: next };
+  if (p.gardenTransactions?.includes(id)) { await flushProgress(true); return true; }
+  if (p.points + points < 0 || p.boxes + boxes < 0) return false;
+  commit({ ...p, points: p.points + points, boxes: p.boxes + boxes,
+    boxesOpened: p.boxesOpened + Math.max(0, -boxes), gardenTransactions: [...(p.gardenTransactions ?? []), id] });
+  await flushProgress(true); return true;
 }
 
 /** 合成：同档任意 CRAFT_COST 件 → 上一档随机 1 件 */

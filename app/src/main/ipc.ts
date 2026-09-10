@@ -52,8 +52,10 @@ import { getExecutorState, stopAllBehaviors } from './behavior-executor';
 import { debugThink } from './brain-llm';
 import { sendPetChat } from './pet-chat';
 import { openPetChat, closePetChat } from './windows';
+import { registerGardenIpc } from './garden/windows';
 
 export function registerIpc(): void {
+  registerGardenIpc();
   ipcMain.on('petChat:open', () => openPetChat());
   ipcMain.on('petChat:close', () => closePetChat());
   ipcMain.handle('petChat:send', (_ev, text: unknown) => sendPetChat(text));

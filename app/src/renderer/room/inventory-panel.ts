@@ -192,7 +192,7 @@ export class InventoryPanel {
         this.toast(r.error, false);
         return;
       }
-      const name = DECOR_BY_ID.get(r.stickerId)?.name ?? r.stickerId;
+      const name = r.gardenReward ?? DECOR_BY_ID.get(r.stickerId)?.name ?? r.stickerId;
       this.progress = r.progress;
       this.toast(`开出了「${name}」（${TIER_LABEL[r.tier]}）！去「布置房间」摆上吧`, true, r.tier);
     } finally {

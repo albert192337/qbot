@@ -6,6 +6,7 @@
 import type { Progress } from '../../shared/ipc-types';
 import { POINTS_PER_BOX, canAffordBox, shouldShowChest } from '../../shared/furniture';
 import { formatPoints, shouldTweenPoints, spendLabel } from './hud-format';
+import { attachGardenHint } from './garden-hint';
 
 /** 宝箱内联 SVG —— 梯形箱体 + 弧形盖 + 金色锁扣 */
 const CHEST_SVG = `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -74,6 +75,14 @@ export class ProgressHud {
     this.root.appendChild(chat);
     this.root.appendChild(this.pill);
     this.root.appendChild(this.chestBtn);
+    const garden = document.createElement('button');
+    garden.className = 'hud-chat hud-garden'; garden.title = '展开 / 收起花园'; garden.setAttribute('aria-label', '展开或收起花园');
+    garden.innerHTML = '<svg viewBox="0 0 32 32" fill="none"><path d="M16 28V13M16 19C3 18 4 6 5 5c10 0 12 8 11 14ZM16 15C15 5 24 3 28 4c0 8-4 12-12 11Z" fill="#83b589" stroke="#302d27" stroke-width="2.4" stroke-linejoin="round"/><path d="M7 28h19" stroke="#302d27" stroke-width="2.4" stroke-linecap="round"/></svg>';
+    garden.addEventListener('pointerdown', e => e.stopPropagation());
+    garden.addEventListener('click', e => { e.stopPropagation(); window.qbot.garden.toggle(); });
+    this.root.appendChild(garden);
+    const stopGardenHint = attachGardenHint(garden, window.qbot.garden);
+    window.addEventListener('pagehide', stopGardenHint, { once: true });
     this.root.appendChild(this.floatEl);
     this.root.appendChild(this.toastEl);
     document.body.appendChild(this.root);

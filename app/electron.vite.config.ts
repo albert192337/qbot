@@ -19,6 +19,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          garden: resolve(__dirname, 'src/renderer/garden/index.html'),
           chat: resolve(__dirname, 'src/renderer/chat/index.html'),
           nursery: resolve(__dirname, 'src/renderer/nursery/index.html'),
           pet: resolve(__dirname, 'src/renderer/pet/index.html'),

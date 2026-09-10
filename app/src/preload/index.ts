@@ -3,6 +3,18 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
+  garden: {
+    onPerformance: cb => { const fn = (_ev: unknown, action: string | null) => cb(action); ipcRenderer.on('garden:performance', fn); return () => ipcRenderer.removeListener('garden:performance', fn); },
+    cancelPerformance: restore => ipcRenderer.send('garden:cancelPerformance', restore),
+    get: () => ipcRenderer.invoke('garden:get'),
+    act: command => ipcRenderer.invoke('garden:act', command),
+    toggle: () => ipcRenderer.send('garden:toggle'),
+    open: page => ipcRenderer.send('garden:open', page),
+    ignoreMouse: ignore => ipcRenderer.send('garden:ignore', ignore),
+    onAnchor: cb => { const fn = (_ev: unknown, anchor: Parameters<typeof cb>[0]) => cb(anchor); ipcRenderer.on('garden:anchor', fn); return () => ipcRenderer.removeListener('garden:anchor', fn); },
+    onChanged: cb => { const fn = () => cb(); ipcRenderer.on('garden:changed', fn); return () => ipcRenderer.removeListener('garden:changed', fn); },
+    onPage: cb => { const fn = (_ev: unknown, page: string) => cb(page); ipcRenderer.on('garden:page', fn); return () => ipcRenderer.removeListener('garden:page', fn); },
+  },
   hatch: {
     cloudAccount: (invite) => ipcRenderer.invoke('hatch:cloudAccount', invite),
     onCloudStatus: (cb) => {

@@ -368,6 +368,7 @@ export interface DecorPlacement {
  * 权威在主进程 `main/progress.ts`，renderer 只读 + 通过 IPC 请求变更。
  */
 export interface Progress {
+  gardenTransactions?: string[];
   /** One-time P0 welcome grant; persisted to prevent duplicate awards. */
   welcomeGrantVersion?: number;
   /** 点数：敲键盘 +1 / Claude Code 跑完一轮 +10。开箱消耗 */
@@ -387,7 +388,7 @@ export interface Progress {
 
 /** 开箱结果。失败走 ok:false 而不抛异常——「点数不够」是正常分支不是错误 */
 export type OpenBoxResult =
-  | { ok: true; stickerId: string; tier: FurnitureTier; progress: Progress }
+  | { ok: true; stickerId: string; tier: FurnitureTier; progress: Progress; gardenReward?: string }
   | { ok: false; error: string };
 
 /** 合成结果。consumed = 实际烧掉的 stickerId → 件数，UI 要报给用户 */
@@ -402,6 +403,7 @@ export type CraftResult =
   | { ok: false; error: string };
 
 export interface QBotApi {
+  garden: import('./garden').GardenApi;
   hatch: {
     cloudAccount(invite?: string): Promise<CloudAccount>;
     onCloudStatus(cb: (event: { dirId: string; status: HatchStatus }) => void): () => void;

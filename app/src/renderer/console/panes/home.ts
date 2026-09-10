@@ -151,7 +151,7 @@ function bind(host: HTMLElement): void {
     const button = event.currentTarget as HTMLButtonElement; button.disabled = true;
     try {
       const result = await window.qbot.progress.openBox();
-      if (result.ok) { latestProgress = result.progress; await refresh(); toast(root!, '获得了一件家具！进入小屋，右键打开「我的家具」即可摆放。'); }
+      if (result.ok) { latestProgress = result.progress; await refresh(); toast(root!, `获得了${result.gardenReward ?? '礼物'}！可在花园背包查看。`); }
       else toast(host, result.error);
     } catch (e) { toast(host, e instanceof Error ? e.message : String(e)); }
     finally { button.disabled = false; }

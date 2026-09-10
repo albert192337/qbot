@@ -64,12 +64,14 @@ async function doOpenBox(): Promise<void> {
       lastProgress = r.progress;
       hud.setProgress(r.progress);
       const decor = DECOR_BY_ID.get(r.stickerId);
-      const name = decor?.name ?? r.stickerId;
+      const name = r.gardenReward ?? decor?.name ?? r.stickerId;
       showAndSyncSign(`开出了「${name}」`);
       setTimeout(() => refreshSignboard(), 5000);
     } else {
       hud.toast(r.error);
     }
+  } catch (e) {
+    hud.toast(e instanceof Error ? e.message : String(e));
   } finally {
     hudBusy = false;
   }
@@ -350,6 +352,14 @@ function clearTimer(): void {
   }
 }
 
+let gardenPerforming = false;
+window.qbot.garden.onPerformance(action => {
+  stopDesktopWalk();
+  gardenPerforming = !!action;
+  document.body.classList.toggle('garden-performing', gardenPerforming);
+  if (action && available.includes(action as PlayableId)) player.play(action as PlayableId);
+  else dispatch({ type: 'PLAY_ACTION', action: 'idle' });
+});
 function dispatch(event: Parameters<typeof step>[1]): void {
   stepCtx.available = available;
   const result = step(state, event, stepCtx);
@@ -363,7 +373,7 @@ function dispatch(event: Parameters<typeof step>[1]): void {
     scheduleTimer();
   }
 
-  if (result.play) {
+  if (result.play && !gardenPerforming) {
     player.play(result.play);
     if (result.play === WALK_ACTION) startDesktopWalk();
     else stopDesktopWalk();
@@ -390,6 +400,7 @@ function dispatch(event: Parameters<typeof step>[1]): void {
 // ── 角色加载 ─────────────────────────────────────────────
 function activateCharacter(meta: CharacterMeta): void {
   if (!meta?.manifest) return;
+  if (gardenPerforming) window.qbot.garden.cancelPerformance();
   currentCharacter = meta;
   available = player.load(meta.dirId, meta.manifest);
   stepCtx = {
@@ -462,6 +473,7 @@ let clickTimer: ReturnType<typeof setTimeout> | null = null;
 
 stage.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 || !e.isPrimary || pointerDown) return;
+  if (gardenPerforming) window.qbot.garden.cancelPerformance(false);
   activePointer = e.pointerId;
   pointerDown = true;
   dragStarted = false;
