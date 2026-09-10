@@ -11,6 +11,8 @@ export interface Utterance {
   mood: Mood;
   scenes: string[];
   weight: number;
+  /** 本地小时区间 [起始, 结束)，支持跨午夜。 */
+  hours?: [number, number];
 }
 
 export interface PickerRng {
@@ -23,8 +25,10 @@ export function pickUtterance(
   scene: string,
   rng: PickerRng,
   lastId?: string,
+  hour = new Date().getHours(),
 ): Utterance | null {
-  let pool = all.filter((u) => u.scenes.includes(scene));
+  let pool = all.filter((u) => u.scenes.includes(scene) && (!u.hours ||
+    (u.hours[0] < u.hours[1] ? hour >= u.hours[0] && hour < u.hours[1] : hour >= u.hours[0] || hour < u.hours[1])));
   if (pool.length > 1 && lastId) pool = pool.filter((u) => u.id !== lastId);
   if (pool.length === 0) return null;
   const total = pool.reduce((sum, u) => sum + Math.max(0, u.weight || 1), 0);

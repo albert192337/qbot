@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { initialGarden, transition, validateGarden, refreshShop, REFRESH_MS } from '../src/main/garden/rules';
+import { initialGarden, transition, validateGarden, refreshShop, REFRESH_MS, rollTraits } from '../src/main/garden/rules';
 import { type GardenState, type GardenCommand, level } from '../src/shared/garden';
 let n = 0;
 const rng = (value = .8) => ({ random: () => value, id: () => `test-${n++}` });
@@ -7,6 +7,27 @@ const now = 100000;
 function run(s: GardenState, cmd: GardenCommand, time = now, r = rng()) { return transition(s, cmd, time, r).state; }
 function planted(random = .8) { const s = initialGarden(now, rng()); return run(s, { type: 'plant', plot: 0, seed: s.seeds[0].id }, now, rng(random)); }
 describe('garden rules', () => {
+    it('五种配饰基础概率一致，音乐只提升朋克和古典', () => {
+        const s = initialGarden(now, rng());
+        for (const music of [false, true]) {
+            const counts: Record<string, number> = {};
+            for (let i = 0; i < 1000; i++) for (const t of rollTraits(s, 'lotus', rng(i / 1000), 1, music)) counts[t] = (counts[t] ?? 0) + 1;
+            for (const t of ['shiny', 'firefly', 'petals']) expect(counts[t]).toBe(80);
+            for (const t of ['punk', 'classical']) expect(counts[t]).toBe(music ? 240 : 80);
+        }
+    });
+    it('playing music boosts only musical accessories during sowing and mutation', () => {
+        const s = initialGarden(now, rng());
+        const cmd = { type: 'plant' as const, plot: 0, seed: s.seeds[0].id };
+        const quiet = transition(s, cmd, now, rng(.1)).state;
+        const music = transition(s, cmd, now, rng(.1), { musicPlaying: true }).state;
+        expect(quiet.plots[0]!.traits).not.toContain('punk');
+        expect(music.plots[0]!.traits).toEqual(expect.arrayContaining(['punk', 'classical']));
+        expect(music.plots[0]!.traits.filter(t => !['punk', 'classical'].includes(t))).toEqual(quiet.plots[0]!.traits);
+        const changed = transition(quiet, { type: 'fertilize', plot: 0, fertilizer: 'mutation' }, now, rng(.2), { musicPlaying: true }).state;
+        expect(changed.plots[0]!.traits).toContain('classical');
+        expect(validateGarden(changed)).toEqual(changed);
+    });
     it('consumes one seed, keeps input immutable, rejects occupied/invalid plots', () => {
         const s = initialGarden(now, rng()), p = run(s, { type: 'plant', plot: 0, seed: s.seeds[0].id });
         expect(s.seeds).toHaveLength(6);
@@ -92,7 +113,7 @@ describe('garden rules', () => {
         let s = run(planted(0), { type: 'mature' });
         s = run(s, { type: 'harvest', plot: 0 });
         const result = transition(s, { type: 'claim' }, now, rng());
-        expect(result.points).toBe(100);
+        expect(result.points).toBe(220); // 原生 + 十种 Lv.1 词条，各 20 分。
         expect(level(result.state.xp.lotus)).toBe(3);
         expect(() => run(result.state, { type: 'claim' })).toThrow();
         const advanced = run(result.state, { type: 'plant', plot: 0, seed: result.state.seeds[0].id }, now, rng(0));
@@ -102,7 +123,9 @@ describe('garden rules', () => {
         const s = initialGarden(now, rng());
         const r = transition(s, { type: 'box' }, now, rng());
         expect(r.points).toBe(-500);
-        expect(r.boxes).toBe(-1);
+          expect(r.boxes).toBe(-1);
+          expect(r.reveal?.items).toHaveLength(2);
+          expect(r.reveal?.items?.map(item=>item.kind)).toEqual(['seed','fertilizer']);
         expect(r.state.seeds.length).toBe(s.seeds.length + 1);
         expect(Object.values(r.state.fertilizers).reduce((a, b) => a + b)).toBe(7);
     });

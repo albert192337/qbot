@@ -72,7 +72,7 @@ export interface Settings {
   /** 本地记录前台应用与窗口标题（默认 false；原始记录保留 7 天，不出本机） */
   foregroundObservationEnabled?: boolean;
 
-  /** 未开箱子的堆叠上限（默认 DEFAULT_MAX_BOXES=3，满了停止挂机结算） */
+  /** 旧设置兼容字段；运行时宝箱固定最多 3 个。 */
   maxBoxes?: number;
 
   /**
@@ -81,6 +81,8 @@ export interface Settings {
    * 关闭/无 key 时纯规则脑，行为完全本地、零 API 花费。
    */
   freeMode?: boolean;
+  /** 主动行为节奏，与 LLM 脑开关独立；默认沿用陪伴节奏。 */
+  behaviorMode?: 'companion' | 'free';
   /** 显示控制台中的开发者工具入口（默认 false） */
   developerMode?: boolean;
 }
@@ -388,7 +390,7 @@ export interface Progress {
 
 /** 开箱结果。失败走 ok:false 而不抛异常——「点数不够」是正常分支不是错误 */
 export type OpenBoxResult =
-  | { ok: true; stickerId: string; tier: FurnitureTier; progress: Progress; gardenReward?: string }
+  | { ok: true; stickerId: string; tier: FurnitureTier; progress: Progress; gardenReward?: string; gardenItems?: import('./garden').GardenRewardItem[] }
   | { ok: false; error: string };
 
 /** 合成结果。consumed = 实际烧掉的 stickerId → 件数，UI 要报给用户 */
@@ -587,6 +589,9 @@ export interface QBotApi {
     onMessage(cb: (msg: AgentMessage) => void): () => void;
   };
   bubble: {
+    reportBounds(bounds: { left: number; right: number; top: number; bottom: number } | null): void;
+    ignoreMouse(ignore: boolean): void;
+    onReward(cb: (items: import('./garden').GardenRewardItem[]) => void): () => void;
     openChat(): void;
     closeChat(): void;
     sendChat(text: string): Promise<{ ok: boolean; error?: string }>;
@@ -725,6 +730,7 @@ export interface QBotApi {
     trigger(trigger: string): Promise<void>;
     /** 自由模式：手动触发一次 LLM 思考（绕过节流，仍受开关+key 门控） */
     debugThink(): Promise<void>;
+    requestThink(force: boolean): Promise<void>;
   };
 
   /** 行为引擎 → pet 窗：播指定动作（state-machine 的 PLAY_ACTION 入口） */

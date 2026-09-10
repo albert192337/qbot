@@ -29,6 +29,11 @@ import {
 } from '../src/main/progress-rules';
 
 describe('settleIdle', () => {
+  it('旧库存归到三箱，旧配置也不能突破三箱', () => {
+    expect(sanitizeProgress({ boxes: 99 }).boxes).toBe(3);
+    expect(settleIdleCapped(0, IDLE_MS_PER_BOX * 10, 2, 99, Infinity).gained).toBe(1);
+    expect(settleIdleCapped(0, IDLE_MS_PER_BOX, 3, 99, Infinity).gained).toBe(0);
+  });
   it('不满一箱只累加余量', () => {
     expect(settleIdle(0, 60_000)).toEqual({ idleMs: 60_000, gained: 0 });
   });

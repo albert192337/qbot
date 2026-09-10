@@ -1,6 +1,9 @@
 import './style.css';
 import { groupSeeds } from './inventory';
 import { gardenIcon } from './icons';
+import { quickLayout } from './quick-layout';
+import { gardenLane } from '../../shared/garden-layout';
+import { supplyArt } from './supply-art';
 import { SPECIES, TRAITS, FERTILIZERS, TIER_NAMES, tier, level, growth, type Species, type Trait, type Plant, type Produce, type GardenState, type GardenCommand, type GardenReveal, type Seed } from '../../shared/garden';
 const assets = {
     lotus: new URL('./assets/lotus.png', import.meta.url).href,
@@ -15,8 +18,13 @@ let page = new URLSearchParams(location.search).get('view') ?? 'bag';
 let state: GardenState | undefined, busy = false, fetching = false, signature = '', parentId: string | null = null;
 let selectedSpecies: Species = 'lotus';
 let quickPlot: number | null = null;
+let petBounds = { left: 370, right: 730, top: 180, bottom: 540 };
+let gardenDirection: 'left' | 'right' = 'left';
+let speechBounds: {left:number;right:number;top:number;bottom:number} | null = null;
+api.onSpeechBounds(bounds => { speechBounds = bounds; positionQuick(); });
 let quickResult: GardenReveal | null = null;
 let harvestedParent: string | null = null;
+const harvestedByPlot = new Map<number, string>();
 document.body.classList.toggle('strip', strip);
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, cls?: string): HTMLElementTagNameMap[K] {
     const e = document.createElement(tag);
@@ -38,8 +46,14 @@ function tags(ts: Trait[]): HTMLElement {
     const row = el('div', undefined, 'tags');
     if (!ts.length)
         row.append(el('span', '原生', 'tag normal'));
-    for (const t of ts)
-        row.append(el('span', TRAITS[t].name, `tag ${TRAITS[t].tier}`));
+    for (const category of ['body', 'accessory'] as const) {
+        const group = ts.filter(t => TRAITS[t].category === category);
+        if (!group.length) continue;
+        const line = el('div', undefined, 'trait-group');
+        line.append(el('small', category === 'body' ? '本体' : '配饰', 'trait-label'));
+        for (const t of group) line.append(el('span', TRAITS[t].name, `tag ${TRAITS[t].tier}`));
+        row.append(line);
+    }
     return row;
 }
 function art(sp: Species, ts: Trait[] = [], ratio = 1): HTMLElement {
@@ -50,12 +64,22 @@ function art(sp: Species, ts: Trait[] = [], ratio = 1): HTMLElement {
     img.alt = SPECIES[sp].name;
     img.draggable = false;
     box.append(img);
+    for (const t of shown.filter(t => ['punk', 'classical', 'firefly', 'petals'].includes(t))) {
+        const layer = el('div', undefined, `accessory-layer fx-${t}`);
+        layer.setAttribute('aria-hidden', 'true');
+        const symbols = t === 'punk' ? ['ϟ', '♪', 'ϟ', '♫'] : t === 'classical' ? ['♬', '♪', '♫', '♩'] : t === 'petals' ? ['❀', '✿', '❀', '✿'] : ['•', '•', '•', '•'];
+        symbols.forEach((symbol, i) => {
+            const particle = el('span', symbol);
+            particle.style.setProperty('--i', String(i)); layer.append(particle);
+        });
+        box.append(layer);
+    }
     if (shown.includes('twin')) {
         const other = img.cloneNode() as HTMLImageElement;
         other.className = 'twin-copy';
         box.append(other);
     }
-    if (shown.includes('shiny') || (ratio >= .8 && shown.length))
+    if (shown.includes('shiny'))
         box.append(el('span', '✦', 'spark s1'), el('span', '✧', 'spark s2'), el('span', '✦', 'spark s3'));
     return box;
 }
@@ -79,9 +103,10 @@ async function act(command: GardenCommand): Promise<void> {
             parentId = null;
         if (strip && command.type === 'harvest' && r.reveal?.produce) {
             harvestedParent = r.reveal.produce.id;
+            harvestedByPlot.set(command.plot, r.reveal.produce.id);
             quickPlot = command.plot;
         }
-        if (strip && command.type === 'plant') harvestedParent = null;
+        if (strip && command.type === 'plant') { harvestedParent = null; harvestedByPlot.delete(command.plot); }
         if (command.type === 'sell')
             notice('已出售，花园币已到账');
         if (command.type === 'buy')
@@ -122,10 +147,10 @@ async function refresh(force = false): Promise<void> {
     }
 }
 function renderStrip(): void {
-    const sides = [el('section', undefined, 'soil-side left'), el('section', undefined, 'soil-side right')];
+    const sides = [el('section', undefined, 'soil-side single')];
     state!.plots.forEach((p, i) => {
         const b = button('', () => {
-            quickPlot = i; parentId = null; quickResult = null; harvestedParent = null;
+            quickPlot = i; parentId = null; quickResult = null; harvestedParent = harvestedByPlot.get(i) ?? null;
             render();
         }, 'plot');
         b.setAttribute('aria-label', `${i + 1}号土地${p ? ` ${SPECIES[p.species].name}` : ' 种植'}`);
@@ -147,7 +172,7 @@ function renderStrip(): void {
         const mark = el('span', undefined, 'plot-mark');
         mark.innerHTML = gardenIcon('ready'); mark.setAttribute('aria-hidden', 'true');
         b.append(el('span', undefined, 'soil'), mark);
-        sides[i < 3 ? 0 : 1].append(b);
+        sides[0].append(b);
     });
     const tools = el('nav', undefined, 'garden-tools');
     for (const [name, label] of [['bag', '背包'], ['shop', '商店'], ['book', '图鉴'], ['close', '收起花园']] as const) {
@@ -185,9 +210,8 @@ function renderQuickMenu(): void {
     const list = el('div', undefined, 'quick-list');
     if (quickResult) {
         resultContents(list, quickResult);
-        list.append(button('收好', () => { quickResult = null; render(); }, 'primary'));
+        list.append(button('收好', closeQuick, 'primary'));
     } else if (parentId) {
-        list.append(el('small', '选另一株亲本 · 双方各繁育一次'));
         const candidates = allParents().filter(x => x.id !== parentId);
         for (const candidate of candidates) {
             const where = state.produce.some(x => x.id === candidate.id) ? '背包' : '土地';
@@ -199,14 +223,12 @@ function renderQuickMenu(): void {
         list.append(button('返回', () => { parentId = null; render(); }));
     } else if (harvestedParent) {
         const item = state.produce.find(x => x.id === harvestedParent);
-        list.append(el('small', '已收进背包，土地可以重新播种。'));
-        if (item) list.append(button(item.bred ? '已经繁育过' : '用刚收获的植物繁育 ♡', () => { parentId = item.id; render(); }, '', item.bred));
-        list.append(button('播种下一粒', () => { harvestedParent = null; render(); }, 'primary'));
+        if (item) list.append(button(item.bred ? '已繁育' : '繁育 ♡', () => { parentId = item.id; render(); }, 'quick-row', item.bred));
+        list.append(button('播种', () => { harvestedParent = null; render(); }, 'primary'));
     } else if (!p) {
-        list.append(el('small', '选择种子 · 点击即播种'));
         for (const { seed, count } of groupSeeds(state.seeds)) {
             const row = button('', () => void act({ type: 'plant', plot: index, seed: seed.id }), 'quick-row');
-            row.append(el('strong', `${SPECIES[seed.species].name}${seed.bred ? ' · 繁育种子' : ''} ×${count}`), el('small', `${SPECIES[seed.species].minutes} 分钟`));
+            row.append(supplyArt('seed', seed.species), el('strong', `${SPECIES[seed.species].name} ×${count}`));
             if (seed.bred) row.append(tags(seed.genes));
             list.append(row);
         }
@@ -218,7 +240,8 @@ function renderQuickMenu(): void {
         for (const f of Object.keys(FERTILIZERS) as (keyof typeof FERTILIZERS)[]) {
             const used = p.fertilizers.includes(f);
             const row = button('', () => void act({ type: 'fertilize', plot: index, fertilizer: f }), 'quick-row', used || !state.fertilizers[f]);
-            row.append(el('strong', `${FERTILIZERS[f].name} ×${state.fertilizers[f]}${used ? ' · 已施' : ''}`), el('small', FERTILIZERS[f].description));
+            row.append(supplyArt('fertilizer', f), el('strong', `${FERTILIZERS[f].name.replace('肥料','')} ×${state.fertilizers[f]}`), ...(used ? [el('small','✓')] : []));
+            row.title = FERTILIZERS[f].description;
             list.append(row);
         }
         list.append(button('测试：立即成熟', () => void act({ type: 'mature' }), 'test-button'));
@@ -231,11 +254,18 @@ function positionQuick(): void {
     const plot = root.querySelector<HTMLElement>(`[data-plot="${quickPlot}"]`);
     if (!menu || !plot) return;
     const soil = plot.getBoundingClientRect(), side = plot.parentElement!.getBoundingClientRect();
-    const width = Math.min(280, Math.max(220, side.width));
+    const width = quickResult ? 230 : 220;
     menu.style.width = `${width}px`;
-    menu.style.left = `${Math.max(8, Math.min(soil.x + soil.width / 2 - width / 2, innerWidth - width - 8))}px`;
-    const top = Math.max(8, soil.y - menu.offsetHeight - 16);
-    menu.style.top = `${top}px`;
+    menu.style.maxHeight = '350px';
+    const plants = [...root.querySelectorAll<HTMLElement>('.plot .art')].map(plant => {
+        const r = plant.getBoundingClientRect();
+        // 生长有高度过渡，提前避开目标高度，不能等动画长大后才挪菜单。
+        return {left:r.left,right:r.right,bottom:r.bottom,top:Math.min(r.top,r.bottom-(parseFloat(plant.style.height)||r.height))-10};
+    });
+    const layout = quickLayout(innerWidth, innerHeight, width, menu.offsetHeight, soil.x + soil.width / 2, [petBounds, ...plants, ...(speechBounds ? [speechBounds] : [])]);
+    menu.style.maxHeight = `${layout.maxHeight}px`;
+    menu.style.left = `${layout.left}px`;
+    menu.style.top = `${layout.top}px`;
 }
 function render(): void {
     if (!state) {
@@ -404,7 +434,7 @@ function renderBook(host: HTMLElement): void {
         const card = el('article', undefined, `factor ${unlocked ? 'unlocked' : ''}`);
         card.append(art(sp, t === 'base' ? [] : [t]), el('strong', t === 'base' ? '原生' : TRAITS[t].name), el('span', unlocked ? (state!.claimed.includes(key) ? '✓ 已领取' : '+20 待领取') : lv < required ? `Lv.${required} 开放` : '尚未发现'));
         if (t !== 'base')
-            card.append(el('small', TIER_NAMES[TRAITS[t].tier]));
+            card.append(el('small', `${TRAITS[t].category === 'body' ? '本体' : '配饰'} · ${TIER_NAMES[TRAITS[t].tier]}`));
         grid.append(card);
     }
     const count = state!.discovered.filter(k => !state!.claimed.includes(k)).length;
@@ -480,13 +510,21 @@ function tick(allowRender = true): void {
     document.querySelectorAll<HTMLProgressElement>('[data-growth]').forEach(e => { const p = state!.plots.find(p => p?.id === e.dataset.growth); if (p)
         e.value = growth(p); });
     const clock = document.querySelector('#refresh-clock');
+    if (strip) positionQuick();
     if (clock)
         clock.textContent = `下一批 ${time(state.shop.refreshAt - now)}`;
 }
-api.onAnchor(({ left, right, bottom }) => {
+api.onAnchor(({ left, right, bottom, top, side }) => {
+    gardenDirection = side ?? (left >= innerWidth - right ? 'left' : 'right');
+    petBounds = { left, right, top: top ?? bottom + 25 - (right - left), bottom: bottom + 25 };
     document.documentElement.style.setProperty('--pet-left', `${left}px`);
     document.documentElement.style.setProperty('--pet-right', `${right}px`);
     document.documentElement.style.setProperty('--baseline', `${bottom}px`);
+    const lane = gardenLane(left, right, innerWidth, gardenDirection);
+    document.documentElement.style.setProperty('--garden-left', `${lane.left}px`);
+    document.documentElement.style.setProperty('--garden-width', `${lane.width}px`);
+    document.documentElement.style.setProperty('--tools-left', `${lane.toolsLeft}px`);
+    tick(false);
     positionQuick();
 });
 api.onChanged(() => void refresh());

@@ -1,5 +1,4 @@
-import { getSettings } from './config';
-import { clampMaxBoxes } from '../shared/furniture';
+import { DEFAULT_MAX_BOXES } from '../shared/furniture';
 /**
  * 游戏化积累持久化：userData/progress.json
  *
@@ -85,6 +84,7 @@ async function load(): Promise<Progress> {
     try {
       const parsed = JSON.parse(await readFile(progressPath(), 'utf8'));
       cache = sanitizeProgress(parsed);
+      if (cache.boxes !== parsed.boxes) scheduleSave();
     } catch {
       // 不存在或损坏 → 新档；不主动覆盖写，保留手改坏的现场（下次保存才重写）
       try { cache = sanitizeProgress(JSON.parse(await readFile(`${progressPath()}.bak`, 'utf8'))); }
@@ -144,10 +144,10 @@ function scheduleBroadcast(): void {
 
 /** 改完统一走这里：落盘 + 广播都是防抖/节流的 */
 function commit(next: Progress): Progress {
-  cache = next;
+  cache = { ...next, boxes: Math.min(DEFAULT_MAX_BOXES, next.boxes) };
   scheduleSave();
   scheduleBroadcast();
-  return next;
+  return cache;
 }
 
 export async function getProgress(): Promise<Progress> {
@@ -182,9 +182,7 @@ async function idleTick(): Promise<void> {
   lastIdleAt = now;
   if (delta <= 0) return;
   const p = await load();
-  const maxBoxes = clampMaxBoxes((await getSettings()).maxBoxes);
-  // Reload after settings IO so concurrent box opening/keyboard rewards cannot be overwritten.
-  commit(settleCompanion(await load(), delta, maxBoxes));
+  commit(settleCompanion(p, delta, DEFAULT_MAX_BOXES));
 }
 
 export function startProgressTicker(): void {
@@ -205,7 +203,7 @@ export async function openBox(): Promise<OpenBoxResult> {
   const { gardenAction } = await import('./garden/service');
   const result = await gardenAction({ type: 'box' });
   if (!result.ok) return result;
-  return { ok: true, stickerId: 'garden-supply', tier: 'common', progress: await load(), gardenReward: result.reveal?.message ?? '花园补给' };
+  return { ok: true, stickerId: 'garden-supply', tier: 'common', progress: await load(), gardenReward: result.reveal?.message ?? '花园补给', gardenItems: result.reveal?.items };
 }
 
 /** Garden's durable transaction journal retries this receipt after an interrupted save. */

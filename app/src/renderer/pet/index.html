@@ -262,6 +262,18 @@
         transition: opacity 0.2s;
       }
       .hud-chest[hidden] { display: none; }
+      .hud-chest { position: relative; }
+      .chest-art { display: block; width: 100%; height: 100%; }
+      .chest-dots { position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); display: flex; gap: 3px; }
+      .chest-dots i { width: 4px; height: 4px; border-radius: 50%; background: #746044; box-shadow: 0 0 1px #30251b; }
+      .chest-dots .unopened { background: #e4b65f; }
+      .chest-dots .opened { background: #fffdf3; }
+      .chest-dots .empty { opacity: .25; }
+      .hud-chest.opening { animation: none; opacity: 1; }
+      .hud-chest.opening .chest-art { animation: chest-open .45s ease-out; }
+      .hud-chest.opening::after { content: '✦'; position: absolute; left: 4px; top: -12px; color: #fff3b8; font-size: 26px; pointer-events: none; animation: chest-flash .65s ease-out both; text-shadow: 13px 5px 3px #ffdb73, -9px 10px 4px #fff0c1; }
+      @keyframes chest-open { 0% { transform: scale(.8) rotate(-8deg); } 50% { transform: scale(1.17) rotate(4deg); } 100% { transform: scale(1); } }
+      @keyframes chest-flash { 0% { opacity: 0; transform: scale(.2); } 25% { opacity: 1; } 100% { opacity: 0; transform: translateY(-12px) scale(1.5); } }
       .hud-chest.pop {
         animation: hud-chest-pop 0.45s ease-out, hud-breathe 1.9s ease-in-out 0.45s infinite;
       }

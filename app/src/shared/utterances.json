@@ -25,7 +25,7 @@
     { "id": "idle-203", "text": "眯一会儿，就一会儿。", "mood": "sleepy", "scenes": ["idle"], "weight": 1 },
     { "id": "idle-204", "text": "梦里有好多小鱼干。", "mood": "sleepy", "scenes": ["idle"], "weight": 1 },
     { "id": "idle-205", "text": "枕头呢，我的枕头呢。", "mood": "sleepy", "scenes": ["idle"], "weight": 1 },
-    { "id": "idle-206", "text": "晚安要早点说哦。", "mood": "sleepy", "scenes": ["idle"], "weight": 1 },
+    { "id": "idle-206", "text": "晚安要早点说哦。", "mood": "sleepy", "scenes": ["idle"], "weight": 1, "hours": [21, 5] },
 
     { "id": "idle-301", "text": "你在忙什么呀？", "mood": "curious", "scenes": ["idle"], "weight": 1 },
     { "id": "idle-302", "text": "那个是什么呀？", "mood": "curious", "scenes": ["idle"], "weight": 1 },

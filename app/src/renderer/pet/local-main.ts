@@ -38,7 +38,13 @@ const visitorPlayer = new Player(visitorStage, () => {});
 const hostSignboard = new Signboard('stage');
 const visitorSignboard = new Signboard('visitor-stage');
 
+let llmSpeech = true; // 设置加载完成前不抢发规则台词。
 const speaker = new Speaker({
+  generateSpeech: force => {
+    if (!llmSpeech) return false;
+    void window.qbot.behavior.requestThink(force).catch(() => {});
+    return true;
+  },
   bubble: document.getElementById('bubble')!,
   showBubble: (text, durationMs) => window.qbot.bubble.say(text, durationMs),
   canSpeak: () => state.kind === 'idle',
@@ -57,16 +63,16 @@ async function doOpenBox(): Promise<void> {
   if (hudBusy) return;
   hudBusy = true;
   hud.chestBtn.disabled = true;
-  hud.floatSpend(POINTS_PER_BOX);
   try {
     const r = await window.qbot.progress.openBox();
     if (r.ok) {
+      hud.playOpen();
+      hud.floatSpend(POINTS_PER_BOX);
       lastProgress = r.progress;
       hud.setProgress(r.progress);
       const decor = DECOR_BY_ID.get(r.stickerId);
       const name = r.gardenReward ?? decor?.name ?? r.stickerId;
-      showAndSyncSign(`开出了「${name}」`);
-      setTimeout(() => refreshSignboard(), 5000);
+      if (!r.gardenItems?.length) window.qbot.bubble.say(`开出了「${name}」`, 20000);
     } else {
       hud.toast(r.error);
     }
@@ -74,6 +80,7 @@ async function doOpenBox(): Promise<void> {
     hud.toast(e instanceof Error ? e.message : String(e));
   } finally {
     hudBusy = false;
+    if (lastProgress) hud.setProgress(lastProgress);
   }
 }
 
@@ -150,8 +157,13 @@ function voiceSettings(s: {
   };
 }
 
-void window.qbot.settings.get().then((s) => speaker.setSettings(voiceSettings(s)));
-window.qbot.settings.onChanged((s) => speaker.setSettings(voiceSettings(s)));
+function applySpeechSettings(s: import('../../shared/ipc-types').Settings): void {
+  llmSpeech = !!s.freeMode;
+  if (llmSpeech) speaker.interrupt();
+  speaker.setSettings(voiceSettings(s));
+}
+void window.qbot.settings.get().then(applySpeechSettings);
+window.qbot.settings.onChanged(applySpeechSettings);
 
 // ── 举牌文字：单一来源，优先级 手动举牌 > 一次性 > agent > meeting > music；最终牌面同步到房间 ─
 /** 一次性文字（如「工作完成！」），显示后由下一次 refresh 清掉 */

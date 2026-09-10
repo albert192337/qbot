@@ -27,6 +27,11 @@ app.whenReady().then(async () => {
       'music:getStatus': () => ({ playing: false }),
     };
     for (const [key, value] of Object.entries(handlers)) ipcMain.handle(key, value);
+    let boxProgress={points:10000,boxes:3,boxesOpened:0,inventory:{},idleMs:0};
+    ipcMain.handle('progress:openBox',()=>{
+      boxProgress={...boxProgress,points:boxProgress.points-500,boxes:boxProgress.boxes-1,boxesOpened:boxProgress.boxesOpened+1};
+      return {ok:true,stickerId:'garden-supply',tier:'common',progress:boxProgress,gardenItems:[{kind:'seed',id:'strawberry',name:'草莓',count:1}]};
+    });
     const events = [], speech = [], moves = [], visits = [];
     let chatOpens = 0;
     ipcMain.on('petChat:open', () => chatOpens++);
@@ -52,6 +57,18 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript(`document.querySelector('.hud-chat').click()`);
     await wait(50);
     assert.equal(chatOpens, 1, '积分左侧聊天按钮打开输入框');
+    win.webContents.send('progress:changed',boxProgress);await wait(100);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.chest-dots .unopened').length`),3);
+    await win.webContents.executeJavaScript(`document.querySelector('.hud-chest').click()`);await wait(100);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.hud-chest').classList.contains('opening')`),true);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.chest-dots .opened').length`),1);
+    for(let i=0;i<2;i++){await win.webContents.executeJavaScript(`document.querySelector('.hud-chest').click()`);await wait(100);}
+    await wait(900);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('.hud-chest').hidden`),true);
+    win.webContents.send('progress:changed',{...boxProgress,boxes:1,points:boxProgress.points+500});await wait(100);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.chest-dots i').length`),0);
+    win.webContents.send('progress:changed',boxProgress);await wait(100);
+    assert.equal(await win.webContents.executeJavaScript(`(()=>{const p=document.querySelector('.hud-pill').getBoundingClientRect(),g=document.querySelector('.hud-garden').getBoundingClientRect();return g.left>p.right&&g.left-p.right<30})()`),true);
     const mouse = (type, x, y) => win.webContents.sendInputEvent({ type, x, y, globalX: x + 100, globalY: y + 100, button: 'left', clickCount: 1 });
     mouse('mouseDown', 180, 180); mouse('mouseUp', 180, 180);
     await wait(350);
@@ -88,6 +105,13 @@ app.whenReady().then(async () => {
       assert.notEqual((await read()).time, before);
       console.log('PASS: repaired sleep video plays in Chromium with opaque body', ratio);
     }
+    let generatedRequests=0;
+    ipcMain.handle('behavior:requestThink',(_ev,force)=>{assert.equal(force,true);generatedRequests++;});
+    win.webContents.send('settings:changed',{freeMode:true,voiceEnabled:false,talkFrequency:'quiet'});await wait(100);
+    const oldSpeech=speech.length;
+    mouse('mouseDown',180,180);mouse('mouseUp',180,180);await wait(80);
+    mouse('mouseDown',180,180);mouse('mouseUp',180,180);await wait(200);
+    assert.equal(generatedRequests,1);assert.equal(speech.length,oldSpeech,'自由模式不发内置台词');
     app.exit(0);
   } catch (e) { console.error(e); app.exit(1); }
 });

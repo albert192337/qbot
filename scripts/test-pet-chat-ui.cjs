@@ -21,6 +21,8 @@ app.whenReady().then(async () => {
       return { ok: true };
     });
     await chat.loadFile(path.join(root, 'app/out/renderer/chat/index.html'));
+    assert.equal(await chat.webContents.executeJavaScript(`document.querySelector('footer,#close')`),null);
+    assert.equal(await chat.webContents.executeJavaScript(`getComputedStyle(document.querySelector('#status')).display`),'none');
     await bubbles.loadFile(path.join(root, 'app/out/renderer/bubble/index.html'));
     chat.showInactive(); bubbles.showInactive();
     const key = event => chat.webContents.executeJavaScript(`document.querySelector('#message').dispatchEvent(new KeyboardEvent('keydown', ${JSON.stringify(event)}))`);

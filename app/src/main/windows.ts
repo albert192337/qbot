@@ -25,8 +25,8 @@ const ROOM_ART_SIZE = 1024;
 /** 气泡窗：固定尺寸，创建后只 setPosition 永不改大小（绕开透明窗 resize 渲染 bug） */
 const BUBBLE_W = 340;
 const BUBBLE_H = 500;
-/** 气泡栈底边压进桌宠窗顶边的像素（桌宠窗顶部本就是 contain 留白） */
-const BUBBLE_OVERLAP = 24;
+/** 利用角色素材顶部留白，使台词更贴近头顶；花园卡按气泡实测边界避让。 */
+const BUBBLE_OVERLAP = 42;
 
 let petWindow: BrowserWindow | null = null;
 /** 公共房间宠上屏：键控多窗（memberId -> 窗），全员在线上限即窗口数上限 */
@@ -102,20 +102,21 @@ function syncChatBounds(): void {
   const pet = petWindow.getBounds();
   const wa = screen.getDisplayMatching(pet).workArea;
   const x = Math.max(wa.x, Math.min(pet.x + pet.width / 2 - 190, wa.x + wa.width - 380));
-  const y = Math.max(wa.y, Math.min(pet.y + pet.height + 6, wa.y + wa.height - 130));
+  const y = Math.max(wa.y, Math.min(pet.y + pet.height + 6, wa.y + wa.height - 110));
   chatWindow.setPosition(Math.round(x), Math.round(y));
 }
 export function closePetChat(): void { chatWindow?.hide(); }
 export function openPetChat(): void {
+  if (chatWindow?.isVisible()) { closePetChat(); return; }
   if (petWindow) {
     const pet = petWindow.getBounds();
     const wa = screen.getDisplayMatching(pet).workArea;
-    if (pet.y + pet.height + 136 > wa.y + wa.height) {
-      petWindow.setPosition(pet.x, Math.max(wa.y, wa.y + wa.height - pet.height - 136));
+    if (pet.y + pet.height + 116 > wa.y + wa.height) {
+      petWindow.setPosition(pet.x, Math.max(wa.y, wa.y + wa.height - pet.height - 116));
     }
   }
   if (!chatWindow || chatWindow.isDestroyed()) {
-    chatWindow = new BrowserWindow({ width: 380, height: 130, frame: false, transparent: true,
+    chatWindow = new BrowserWindow({ width: 380, height: 110, frame: false, transparent: true,
       resizable: false, hasShadow: false, skipTaskbar: true, show: false,
       webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
     chatWindow.setAlwaysOnTop(true, 'floating');
@@ -400,7 +401,7 @@ function createBubbleWindow(): BrowserWindow {
       sandbox: false,
     },
   });
-  bubbleWindow.setIgnoreMouseEvents(true); // 全穿透：不吃桌面点击
+  bubbleWindow.setIgnoreMouseEvents(true, { forward: true }); // 转发移动以命中奖励卡关闭按钮。
   bubbleWindow.setAlwaysOnTop(true, 'floating');
   bubbleWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   bubbleWindow.on('closed', () => (bubbleWindow = null));

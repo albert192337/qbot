@@ -36,13 +36,19 @@ function baseInput(overrides: Partial<BrainInput> = {}): BrainInput {
 }
 
 describe('buildBrainMessages', () => {
+  it('自由模式按人设主动行动，不要求多数不行动', () => {
+    const prompt = buildBrainMessages(baseInput({ behaviorMode: 'free' })).map(m => m.content).join('\n');
+    expect(prompt).toContain('无需等用户呼唤');
+    expect(prompt).not.toContain('大部分时候');
+    expect(prompt).not.toContain('频繁打扰');
+  });
   it('system 含人设名、性格、铁律、意图词、JSON 格式', () => {
     const msgs = buildBrainMessages(baseInput());
     expect(msgs[0].role).toBe('system');
     const sys = msgs[0].content;
     expect(sys).toContain('小绿');
     expect(sys).toContain('毒舌但心软');
-    expect(sys).toContain('不行动');
+    expect(sys).not.toContain('大部分时候');
     expect(sys).toContain('happy');
     expect(sys).toContain('JSON');
   });

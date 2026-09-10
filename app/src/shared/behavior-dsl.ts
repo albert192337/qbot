@@ -26,6 +26,8 @@ export type BehaviorStep =
 
 /** 行为元数据（仲裁/防重复/冷却用） */
 export interface BehaviorMeta {
+  characterId?: string;
+  conversationAt?: number;
   traceId?: string;
   /** 行为唯一 id（规则名或模型生成的行为类别） */
   id: string;

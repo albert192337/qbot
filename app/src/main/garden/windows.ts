@@ -4,8 +4,18 @@ import { getGarden, gardenAction } from './service';
 import { getSettings } from '../config';
 import { getCharacter } from '../characters';
 import { plotPetPosition } from './interaction';
+import { gardenSide } from '../../shared/garden-layout';
 let strip: BrowserWindow | null = null, panel: BrowserWindow | null = null, pet: BrowserWindow | null = null;
 let expanded = false;
+let speechBounds: { left: number; right: number; top: number; bottom: number } | null = null;
+export function setGardenSpeechBounds(bounds: typeof speechBounds): void {
+    speechBounds = bounds; syncSpeechBounds();
+}
+function syncSpeechBounds(): void {
+    if (!strip || strip.isDestroyed()) return;
+    const b = strip.getBounds(), s = speechBounds;
+    strip.webContents.send('garden:speechBounds', s ? { left:s.left-b.x, right:s.right-b.x, top:s.top-b.y, bottom:s.bottom-b.y } : null);
+}
 let home: {x:number;y:number} | null = null;
 let performanceTimer: ReturnType<typeof setTimeout> | undefined;
 let performanceVersion = 0;
@@ -42,14 +52,21 @@ function load(win: BrowserWindow, page: string): void {
         void win.loadFile(path.join(__dirname, '../renderer/garden/index.html'), { query: { view: page } });
 }
 function anchor(): void {
-    if (home) return;
     if (!strip || strip.isDestroyed() || !pet || pet.isDestroyed())
         return;
     const p = pet.getBounds(), wa = screen.getDisplayMatching(p).workArea, b = strip.getBounds();
-    const x = Math.max(wa.x, Math.min(p.x + p.width / 2 - b.width / 2, wa.x + wa.width - b.width));
+    if (home) {
+        syncSpeechBounds();
+        strip.webContents.send('garden:anchor', { left: home.x - b.x, right: home.x + p.width - b.x,
+            side: gardenSide({x:home.x,width:p.width},wa), top: Math.min(home.y, p.y) - b.y, bottom: Math.min(b.height - 10, home.y + p.height - b.y - 25) });
+        return;
+    }
+    const side = gardenSide(p, wa);
+    const x = Math.max(wa.x, Math.min(side === 'left' ? p.x + p.width - b.width : p.x, wa.x + wa.width - b.width));
     const y = Math.max(wa.y, Math.min(p.y + p.height - b.height, wa.y + wa.height - b.height));
     strip.setPosition(Math.round(x), Math.round(y));
-    strip.webContents.send('garden:anchor', { left: p.x - x, right: p.x + p.width - x, bottom: Math.min(b.height - 10, p.y + p.height - y - 25) });
+    syncSpeechBounds();
+    strip.webContents.send('garden:anchor', { side, left: p.x - x, right: p.x + p.width - x, top: p.y - y, bottom: Math.min(b.height - 10, p.y + p.height - y - 25) });
 }
 export function attachGarden(p: BrowserWindow): void {
     pet = p;
@@ -73,7 +90,7 @@ function toggle(): void {
     }
     const wa = screen.getDisplayMatching(pet.getBounds()).workArea;
     if (!strip || strip.isDestroyed()) {
-        strip = new BrowserWindow({ width: Math.min(1100, wa.width), height: Math.min(580, wa.height), frame: false, transparent: true, hasShadow: false, resizable: false, skipTaskbar: true, show: false,
+        strip = new BrowserWindow({ width: Math.min(1100, wa.width), height: wa.height, frame: false, transparent: true, hasShadow: false, resizable: false, skipTaskbar: true, show: false,
             webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
         strip.setAlwaysOnTop(true, 'floating');
         strip.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -87,9 +104,7 @@ function toggle(): void {
         anchor();
         strip.showInactive();
     }
-    // Ensure space on both sides without resizing the pet's transparent player.
-    const b = pet.getBounds(), margin = Math.max(0, (Math.min(1100, wa.width) - b.width) / 2);
-    pet.setPosition(Math.round(Math.max(wa.x + margin, Math.min(b.x, wa.x + wa.width - b.width - margin))), b.y);
+    // 展开方向由左右剩余空间决定，不再强制把桌宠挪到屏幕中间。
     anchor();
 }
 export function openGardenPanel(page: string): void {

@@ -4,6 +4,7 @@ import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsSt
 
 const api: QBotApi = {
   garden: {
+    onSpeechBounds: cb => { const fn = (_ev: unknown, bounds: Parameters<typeof cb>[0]) => cb(bounds); ipcRenderer.on('garden:speechBounds', fn); return () => ipcRenderer.removeListener('garden:speechBounds', fn); },
     onPerformance: cb => { const fn = (_ev: unknown, action: string | null) => cb(action); ipcRenderer.on('garden:performance', fn); return () => ipcRenderer.removeListener('garden:performance', fn); },
     cancelPerformance: restore => ipcRenderer.send('garden:cancelPerformance', restore),
     get: () => ipcRenderer.invoke('garden:get'),
@@ -250,6 +251,9 @@ const api: QBotApi = {
     },
   },
   bubble: {
+    reportBounds: bounds => ipcRenderer.send('bubble:bounds', bounds),
+    ignoreMouse: ignore => ipcRenderer.send('bubble:ignoreMouse', ignore),
+    onReward: cb => { const fn = (_ev: unknown, items: import('../shared/garden').GardenRewardItem[]) => cb(items); ipcRenderer.on('bubble:reward', fn); return () => ipcRenderer.removeListener('bubble:reward', fn); },
     openChat: () => ipcRenderer.send('petChat:open'),
     closeChat: () => ipcRenderer.send('petChat:close'),
     sendChat: (text) => ipcRenderer.invoke('petChat:send', text),
@@ -363,6 +367,7 @@ const api: QBotApi = {
     stopAll: () => ipcRenderer.invoke('behavior:stopAll'),
     trigger: (trigger) => ipcRenderer.invoke('behavior:trigger', trigger),
     debugThink: () => ipcRenderer.invoke('behavior:debugThink'),
+    requestThink: force => ipcRenderer.invoke('behavior:requestThink', force),
   },
 };
 

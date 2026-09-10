@@ -17,12 +17,14 @@
  *  - 拖拽中全停：drag 状态下什么行为都不做（由入口层判断）
  */
 import { sendToWindows } from './windows';
+import { getSettings } from './config';
 import { setLocalSign } from './local-sign';
 import { recordBehavior } from './perception';
 import { showBubbleWindow } from './windows';
 import { validateScript, type BehaviorScript, type BehaviorStep } from '../shared/behavior-dsl';
 import { setBehaviorExecutor } from './behavior-rules';
 import { updateBrainCall } from './brain-log';
+import { rememberConversation, shouldPauseAutomatic, lastUserAt } from './conversation-memory';
 
 /** 当前正在执行的行为（null = 空闲） */
 let current: {
@@ -108,6 +110,11 @@ function interruptCurrent(): void {
 
 /** 运行整个脚本 */
 async function runScript(script: BehaviorScript): Promise<void> {
+  if (script.meta.id === 'llm-brain' && script.meta.characterId && (shouldPauseAutomatic(script.meta.characterId) || lastUserAt(script.meta.characterId) !== script.meta.conversationAt)) {
+    void updateBrainCall(script.meta.traceId, '取消排队的主动回应：用户正在聊天');
+    runNextFromQueue();
+    return;
+  }
   current = {
     script,
     stepIndex: 0,
@@ -149,7 +156,12 @@ function runNextFromQueue(): void {
 }
 
 /** 执行单步（原子操作，可在步间中断） */
-function executeStep(step: BehaviorStep): Promise<void> {
+async function executeStep(step: BehaviorStep): Promise<void> {
+  const origin = current;
+  if (step.op === 'say' && origin?.script.meta.source !== 'llm') {
+    if ((await getSettings()).freeMode) return;
+    if (current !== origin || origin?.interrupted) return;
+  }
   return new Promise((done) => {
     const run = current;
     const resolve = () => {
@@ -198,7 +210,15 @@ function executeStep(step: BehaviorStep): Promise<void> {
         };
         const deliver = () => {
           if (current !== run || run!.interrupted || run!.finishStep !== resolve || win.isDestroyed()) return;
+          const meta = run!.script.meta;
+          if (meta.id === 'llm-brain' && meta.characterId && (shouldPauseAutomatic(meta.characterId) || lastUserAt(meta.characterId) !== meta.conversationAt)) {
+            void updateBrainCall(meta.traceId, '取消过时台词：用户已开始新的对话');
+            resolve(); return;
+          }
           win.webContents.send('behavior:say', msg);
+          if (run!.script.meta.source === 'llm' && run!.script.meta.characterId) {
+            rememberConversation(run!.script.meta.characterId, { at: Date.now(), role: 'assistant', source: run!.script.meta.id === 'llm-chat' ? 'chat' : 'auto', text: step.text });
+          }
           void updateBrainCall(run!.script.meta.traceId, '气泡已发送', {}, step.text);
           void recordBehavior({ at: Date.now(), kind: 'say', detail: step.text });
           wait(run!.script.meta.id === 'llm-chat' ? 0 : msg.durationMs);

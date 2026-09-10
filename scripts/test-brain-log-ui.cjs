@@ -21,6 +21,11 @@ app.whenReady().then(async () => {
       if(await win.webContents.executeJavaScript(`!!document.querySelector('#dev-brain-log details')`))break;
     }
     const content=await win.webContents.executeJavaScript(`(() => {const d=document.querySelector('#dev-brain-log details');if(!d)throw Error('日志未挂载');d.open=true;return d.textContent;})()`);
+    await win.webContents.executeJavaScript(`document.querySelector('[data-pet-mode="free"]').click()`);await wait(200);
+    assert.equal(global.qa.settings.behaviorMode,'free');assert.equal(global.qa.settings.freeMode,true);
+    assert.equal(await win.webContents.executeJavaScript(`document.querySelector('[data-pet-mode="free"]').getAttribute('aria-pressed')`),'true');
+    await win.webContents.executeJavaScript(`document.querySelector('[data-pet-mode="companion"]').click()`);await wait(200);
+    assert.equal(global.qa.settings.behaviorMode,'companion');assert.equal(global.qa.settings.freeMode,true);
     for(const text of ['完整输入','原始输出','想庆祝一下','cheer','辛苦啦','气泡已渲染'])assert.ok(content.includes(text),text);
     assert.equal(await win.webContents.executeJavaScript('window.injected'),undefined);
     await wait(2200);

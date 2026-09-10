@@ -6,6 +6,7 @@
  */
 import {
   CRAFT_COST,
+  DEFAULT_MAX_BOXES,
   IDLE_MS_PER_BOX,
   POINTS_PER_BOX,
   idsOfTier,
@@ -68,7 +69,7 @@ export function sanitizeProgress(raw: unknown): Progress {
     welcomeGrantVersion: num(r.welcomeGrantVersion, 0),
     ...(Array.isArray(r.gardenTransactions) ? { gardenTransactions: r.gardenTransactions.filter((x): x is string => typeof x === 'string') } : {}),
     points: num(r.points, base.points),
-    boxes: num(r.boxes, base.boxes),
+    boxes: Math.min(DEFAULT_MAX_BOXES, num(r.boxes, base.boxes)),
     idleMs: num(r.idleMs, base.idleMs),
     inventory,
     keysCounted: num(r.keysCounted, base.keysCounted),
@@ -107,7 +108,7 @@ export function settleIdleCapped(
   maxBoxes: number,
   capMs: number = IDLE_DELTA_CAP_MS,
 ): { idleMs: number; gained: number } {
-  const max = Math.max(0, Math.floor(maxBoxes));
+  const max = Math.max(0, Math.min(DEFAULT_MAX_BOXES, Math.floor(maxBoxes)));
   const have = Math.max(0, Math.floor(boxes));
   if (have >= max) return { idleMs, gained: 0 };
   const { idleMs: rest, gained: raw } = settleIdle(idleMs, deltaMs, capMs);

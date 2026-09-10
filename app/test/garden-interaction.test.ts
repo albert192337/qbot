@@ -19,10 +19,10 @@ vi.mock('../src/main/config',()=>({getSettings:async()=>({activeCharacter:'frog'
 vi.mock('../src/main/characters',()=>({getCharacter:async()=>({manifest:{actions:{idle:{status:'done'}},customActions:{garden_sow:{status:'done',durationSec:5},garden_harvest:{status:'done',durationSec:5}}}})}));
 afterEach(()=>{vi.useRealTimers();vi.resetModules();mocks.windows=[];mocks.handlers.clear();mocks.events.clear();mocks.ok=true});
 describe('garden pet interaction',()=>{
- it('positions each plot on its own side and clamps negative-origin monitors',()=>{
+ it('positions all six plots on the available side and clamps negative-origin monitors',()=>{
   const pet={x:600,y:500,width:360,height:360}, strip={x:230,y:280,width:1100}, area={x:0,y:0,width:1600,height:1000};
   const points=Array.from({length:6},(_,i)=>plotPetPosition(i,pet,strip,area));
-  expect(new Set(points.map(p=>p.x)).size).toBe(6);expect(points[0].x).toBeLessThan(pet.x);expect(points[5].x).toBeGreaterThan(pet.x);
+  expect(new Set(points.map(p=>p.x)).size).toBe(6);expect(points.every(p=>p.x>pet.x)).toBe(true);
   expect(plotPetPosition(0,{...pet,x:-1800},{...strip,x:-1920},{...area,x:-1920}).x).toBeGreaterThanOrEqual(-1920);
  });
  it('freezes soil anchor, restores home, ignores failed actions and cancels on drag',async()=>{
@@ -35,7 +35,10 @@ describe('garden pet interaction',()=>{
   const home={...pet.getBounds()}, soil={...strip.getBounds()};strip.webContents.send.mockClear();
   await mocks.handlers.get('garden:act')!({}, {type:'plant',plot:0});await vi.advanceTimersByTimeAsync(0);
   expect(pet.getBounds().x).not.toBe(home.x);expect(strip.getBounds()).toEqual(soil);
-  expect(strip.webContents.send).not.toHaveBeenCalledWith('garden:anchor',expect.anything());
+  expect(strip.webContents.send).toHaveBeenCalledWith('garden:anchor',expect.objectContaining({
+    left:home.x-soil.x, right:home.x+home.width-soil.x,
+    top:Math.min(home.y,pet.getBounds().y)-soil.y,
+  })); // 土地锚点不动，仅更新弹层必须避开的角色顶部。
   expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance','garden_sow');
   await vi.advanceTimersByTimeAsync(5600);expect(pet.getBounds().x).toBe(home.x);
   mocks.ok=false;await mocks.handlers.get('garden:act')!({}, {type:'harvest',plot:4});await vi.advanceTimersByTimeAsync(0);expect(pet.getBounds().x).toBe(home.x);

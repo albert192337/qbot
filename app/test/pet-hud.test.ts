@@ -132,7 +132,7 @@ describe('clampMaxBoxes', () => {
   it('正常值原样返回', () => {
     expect(clampMaxBoxes(3)).toBe(3);
     expect(clampMaxBoxes(1)).toBe(1);
-    expect(clampMaxBoxes(10)).toBe(10);
+    expect(clampMaxBoxes(10)).toBe(3);
   });
   it('undefined / 脏值回落默认', () => {
     expect(clampMaxBoxes(undefined)).toBe(DEFAULT_MAX_BOXES);
@@ -143,8 +143,8 @@ describe('clampMaxBoxes', () => {
     expect(clampMaxBoxes(0)).toBe(1);
     expect(clampMaxBoxes(-5)).toBe(1);
   });
-  it('上界夹到 99', () => {
-    expect(clampMaxBoxes(1000)).toBe(99);
+  it('上界夹到 3', () => {
+    expect(clampMaxBoxes(1000)).toBe(3);
   });
   it('小数向下取整', () => {
     expect(clampMaxBoxes(3.9)).toBe(3);

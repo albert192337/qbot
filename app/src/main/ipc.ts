@@ -4,7 +4,7 @@ import { BrowserWindow, Menu, dialog, ipcMain, powerMonitor } from 'electron';
 import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
-import { showBubbleWindow } from './windows';
+import { showBubbleWindow, getBubbleWindow } from './windows';
 import { getBrainLog, updateBrainCall } from './brain-log';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
@@ -49,7 +49,8 @@ import {
 } from './perception';
 import { getAllRules, debugTrigger, triggerRules } from './behavior-rules';
 import { getExecutorState, stopAllBehaviors } from './behavior-executor';
-import { debugThink } from './brain-llm';
+import { debugThink, requestThink } from './brain-llm';
+import { setGardenSpeechBounds } from './garden/windows';
 import { sendPetChat } from './pet-chat';
 import { openPetChat, closePetChat } from './windows';
 import { registerGardenIpc } from './garden/windows';
@@ -168,7 +169,15 @@ export function registerIpc(): void {
   // 一次性结果（开箱/合成得到什么）走 invoke 返回值，幂等状态走 progress:changed
   // 广播 —— 两者混用会被节流的广播吞掉一次性事件（见本文件 AgentStatus 处的同类注释）
   ipcMain.handle('progress:get', () => getProgress());
-  ipcMain.handle('progress:openBox', () => openBox());
+  ipcMain.handle('progress:openBox', async () => {
+    const result = await openBox();
+    if (result.ok && result.gardenItems?.length) {
+      const win = showBubbleWindow();
+      const send = () => { if (!win.isDestroyed()) win.webContents.send('bubble:reward', result.gardenItems); };
+      if (win.webContents.isLoading()) win.webContents.once('did-finish-load', send); else send();
+    }
+    return result;
+  });
   ipcMain.handle('progress:craft', (_ev, tier) => craft(tier));
   ipcMain.handle('progress:debugAddIdleMs', (_ev, ms: number) => debugAddIdleMs(ms));
   ipcMain.handle('progress:debugGrantBoxes', (_ev, n: number) => debugGrantBoxes(n));
@@ -359,6 +368,19 @@ export function registerIpc(): void {
   ipcMain.handle('meeting:getStatus', () => getMeetingStatus());
   // ── bubble ─────────────────────────────────────────────
   ipcMain.on('bubble:empty', () => hideBubbleWindow());
+  ipcMain.on('bubble:bounds', (ev, bounds) => {
+    const win = getBubbleWindow();
+    if (!win || win.isDestroyed() || ev.sender !== win.webContents) return;
+    if (bounds === null) { setGardenSpeechBounds(null); return; }
+    if (!bounds || !['left','right','top','bottom'].every(k => typeof bounds[k] === 'number' && Number.isFinite(bounds[k]))) return;
+    const b = win.getBounds();
+    setGardenSpeechBounds({left:b.x+bounds.left,right:b.x+bounds.right,top:b.y+bounds.top,bottom:b.y+bounds.bottom});
+  });
+  ipcMain.on('bubble:ignoreMouse', (ev, ignore: boolean) => {
+    const win = getBubbleWindow();
+    if (win && !win.isDestroyed() && ev.sender === win.webContents && typeof ignore === 'boolean')
+      win.setIgnoreMouseEvents(ignore, { forward: true });
+  });
   ipcMain.on('bubble:say', (ev, payload: { text?: unknown; durationMs?: unknown }) => {
     if (ev.sender !== getPetWindow()?.webContents || typeof payload?.text !== 'string') return;
     const text = payload.text.trim().slice(0, 500);
@@ -422,5 +444,8 @@ export function registerIpc(): void {
   // 自由模式 LLM 脑：手动触发一次思考（绕过节流，仍受 freeMode 开关 + key 门控）
   ipcMain.handle('behavior:debugThink', async () => {
     await debugThink();
+  });
+  ipcMain.handle('behavior:requestThink', async (ev, force) => {
+    if (ev.sender === getPetWindow()?.webContents) await requestThink(force === true);
   });
 }

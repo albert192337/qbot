@@ -4,6 +4,7 @@
  */
 import type { AgentMessage } from '../../shared/ipc-types';
 import { advanceReading } from './reading';
+import { supplyArt } from '../garden/supply-art';
 import {
   displayLabels,
   FADE_MS,
@@ -17,6 +18,8 @@ function syncHeight(): void {
   const nodes = [...stackEl.children] as HTMLElement[];
   const needed = nodes.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0) + Math.max(0, nodes.length - 1) * 8;
   stackEl.style.height = `${Math.min(500, Math.max(anchorHeight, needed))}px`;
+  const visible = nodes.filter(el => !el.classList.contains('fade-out')).map(el => el.getBoundingClientRect());
+  window.qbot.bubble.reportBounds(visible.length ? {left:Math.min(...visible.map(r=>r.left)),right:Math.max(...visible.map(r=>r.right)),top:Math.min(...visible.map(r=>r.top)),bottom:Math.max(...visible.map(r=>r.bottom))} : null);
 }
 
 let items: BubbleItem[] = [];
@@ -29,7 +32,7 @@ let lastPoll: number | null = null;
 let away = false;
 let polling = false;
 
-function buildNode(msg: AgentMessage): HTMLElement {
+function buildNode(msg: BubbleItem): HTMLElement {
   const el = document.createElement('div');
   el.className = `bubble ${msg.kind}`;
   el.classList.toggle('pet-speech', msg.source === '桌宠');
@@ -39,6 +42,25 @@ function buildNode(msg: AgentMessage): HTMLElement {
   text.className = 'text';
   text.textContent = msg.text; // textContent 而非 innerHTML：agent 正文不可信
   el.append(src, text);
+  if (msg.rewards) {
+    el.classList.add('reward-card');
+    const close = document.createElement('button');
+    close.className = 'reward-close'; close.textContent = '×'; close.setAttribute('aria-label', '关闭开箱结果');
+    close.onclick = () => {
+      items = items.filter(item => item.sessionKey !== msg.sessionKey);
+      dropNode(msg.sessionKey, true); syncDom(); reportIfEmpty();
+      window.qbot.bubble.ignoreMouse(true);
+    };
+    el.append(close);
+    const grid = document.createElement('div'); grid.className = 'reward-grid';
+    for (const item of msg.rewards) {
+      const tile = document.createElement('div'); tile.className = 'reward-tile';
+      const label = document.createElement('div'); label.textContent = item.name;
+      const count = document.createElement('b'); count.textContent = `×${item.count}`;
+      tile.append(supplyArt(item.kind, item.id), label, count); grid.append(tile);
+    }
+    el.append(grid);
+  }
   return el;
 }
 
@@ -116,9 +138,16 @@ function onMessage(msg: BubbleItem): void {
   stackEl.querySelectorAll('.fade-out').forEach(el => el.remove());
 
   let el = nodes.get(msg.sessionKey);
+  if (el && msg.rewards) {
+    const replacement = buildNode(msg);
+    el.replaceWith(replacement);
+    el = replacement;
+    nodes.set(msg.sessionKey, el);
+    el.classList.add('show');
+  }
   if (el) {
     // 同会话就地更新
-    el.className = `bubble ${msg.kind} show`;
+    if (!msg.rewards) el.className = `bubble ${msg.kind} show`;
     el.classList.toggle('pet-speech', msg.source === '桌宠');
     const text = el.querySelector('.text');
     if (text) text.textContent = msg.text;
@@ -133,6 +162,7 @@ function onMessage(msg: BubbleItem): void {
 }
 
 function clearAll(): void {
+  window.qbot.bubble.reportBounds(null);
   stopTick();
   items = [];
   nodes.clear();
@@ -142,6 +172,12 @@ function clearAll(): void {
 }
 
 window.qbot.agent.onMessage(onMessage);
+document.addEventListener('mousemove', e => {
+  const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest('.reward-close');
+  window.qbot.bubble.ignoreMouse(!hit);
+});
+document.addEventListener('mouseleave', () => window.qbot.bubble.ignoreMouse(true));
+window.qbot.bubble.onReward(rewards => onMessage({ sessionKey: 'chat:reward', source:'桌宠', sessionShort:'', kind:'done', text:'开箱啦！', at:Date.now(), durationMs:20000, rewards }));
 window.qbot.bubble.onClear(clearAll);
 window.qbot.bubble.onAnchor((_side, contentHeight = 500) => {
   document.body.classList.remove('below');

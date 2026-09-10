@@ -1,0 +1,28 @@
+const {app,BrowserWindow,ipcMain}=require('electron');
+const path=require('node:path'),fs=require('node:fs/promises'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');
+app.setPath('userData',path.join(root,'.superpowers/reward-ui-data'));
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+app.whenReady().then(async()=>{try{
+ ipcMain.handle('bubble:idleSeconds',()=>0);
+ const win=new BrowserWindow({width:340,height:500,frame:false,show:false,webPreferences:{preload:path.join(root,'app/out/preload/index.js'),backgroundThrottling:false}});
+ await win.loadFile(path.join(root,'app/out/renderer/bubble/index.html'));win.showInactive();
+ win.webContents.send('bubble:anchor','above',350);
+ win.webContents.send('bubble:reward',[{kind:'seed',id:'strawberry',name:'草莓种子',count:1},{kind:'fertilizer',id:'speed',name:'加速肥料',count:1}]);
+ await wait(500);
+ const result=await win.webContents.executeJavaScript(`(()=>{const c=document.querySelector('.reward-card');return {tiles:c.querySelectorAll('.reward-tile').length,images:c.querySelectorAll('img').length,icons:c.querySelectorAll('svg').length,bottom:c.getBoundingClientRect().bottom,text:c.textContent}})()`);
+ assert.equal(result.tiles,2);assert.equal(result.images,1);assert.equal(result.icons,1);assert.ok(result.bottom<=350);assert.ok(result.text.includes('草莓种子'));
+ for(let i=0;i<3;i++) win.webContents.send('bubble:reward',[{kind:'fertilizer',id:'weight',name:'增重肥料',count:i+1}]);
+ await wait(300);
+ const latest=await win.webContents.executeJavaScript(`({count:document.querySelectorAll('.reward-card').length,text:document.querySelector('.reward-card').textContent,tiles:document.querySelectorAll('.reward-tile').length})`);
+ assert.equal(latest.count,1);assert.equal(latest.tiles,1);assert.ok(latest.text.includes('增重肥料'));assert.ok(latest.text.includes('3'));assert.ok(!latest.text.includes('草莓'));
+ await fs.mkdir(path.join(root,'.superpowers/reward-preview'),{recursive:true});
+ await fs.writeFile(path.join(root,'.superpowers/reward-preview/box.png'),(await win.webContents.capturePage()).toPNG());
+ assert.ok(await win.webContents.executeJavaScript(`document.querySelector('.reward-card').getBoundingClientRect().width<=210`));
+ const closeAt=await win.webContents.executeJavaScript(`(()=>{const r=document.querySelector('.reward-close').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`);
+ win.webContents.sendInputEvent({type:'mouseMove',...closeAt});
+ win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...closeAt});
+ win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...closeAt});await wait(100);
+ assert.equal(await win.webContents.executeJavaScript(`document.querySelectorAll('.reward-card').length`),0);
+ console.log('PASS: structured seed/fertilizer icons and amounts shown in head bubble region.');app.exit(0);
+}catch(e){console.error(e);app.exit(1)}});

@@ -4,7 +4,7 @@
  * 设计约定（PLAN.md §2）：pointer-events:none 容器，只有药丸和宝箱可点。
  */
 import type { Progress } from '../../shared/ipc-types';
-import { POINTS_PER_BOX, canAffordBox, shouldShowChest } from '../../shared/furniture';
+import { DEFAULT_MAX_BOXES, POINTS_PER_BOX, canAffordBox, shouldShowChest } from '../../shared/furniture';
 import { formatPoints, shouldTweenPoints, spendLabel } from './hud-format';
 import { attachGardenHint } from './garden-hint';
 
@@ -16,6 +16,7 @@ const CHEST_SVG = `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org
   <circle cx="16" cy="13" r="1.2" fill="#6b4423"/>
   <line x1="5" y1="14" x2="27" y2="14" stroke="#6b4423" stroke-width="0.8"/>
 </svg>`;
+const OPEN_CHEST_SVG = `<svg viewBox="0 0 32 32" fill="none"><path d="M5 12 7 3Q16 0 25 3L27 12Z" fill="#ba8244" stroke="#6b4423" stroke-width="1.5"/><path d="M7 10 8 5Q16 3 24 5L25 10Z" fill="#f7db86"/><ellipse cx="16" cy="17" rx="11" ry="5" fill="#fff1ad"/><path d="M5 16V28H27V16Q16 23 5 16Z" fill="#a06830" stroke="#6b4423" stroke-width="1.5"/><rect x="13" y="20" width="6" height="5" rx="1" fill="#e0b354"/></svg>`;
 
 export class ProgressHud {
   readonly root: HTMLElement;
@@ -27,6 +28,12 @@ export class ProgressHud {
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private lastPoints = 0;
   private tweenRaf: ReturnType<typeof requestAnimationFrame> | null = null;
+  private dots: HTMLElement;
+  private chestArt: HTMLElement;
+  private opened = 0;
+  private previousBoxes: number | null = null;
+  private openingTimer: ReturnType<typeof setTimeout> | null = null;
+  private progress: Progress | null = null;
 
   onChestClick: () => void = () => {};
 
@@ -49,7 +56,13 @@ export class ProgressHud {
     // 宝箱按钮
     this.chestBtn = document.createElement('button');
     this.chestBtn.className = 'hud-chest';
-    this.chestBtn.innerHTML = CHEST_SVG;
+    this.chestArt = document.createElement('span');
+    this.chestArt.className = 'chest-art';
+    this.chestArt.innerHTML = CHEST_SVG;
+    this.dots = document.createElement('span');
+    this.dots.className = 'chest-dots';
+    this.dots.setAttribute('aria-hidden', 'true');
+    this.chestBtn.append(this.chestArt, this.dots);
     this.chestBtn.title = '开箱';
     this.chestBtn.hidden = true;
     this.chestBtn.addEventListener('click', (e) => {
@@ -90,9 +103,20 @@ export class ProgressHud {
 
   /** 幂等更新：走 shouldTween 门控，防回弹 */
   setProgress(p: Progress): void {
+    this.progress = p;
     const pts = p.points ?? 0;
-    const boxes = p.boxes ?? 0;
-    const show = shouldShowChest(boxes);
+    const boxes = Math.min(DEFAULT_MAX_BOXES, p.boxes ?? 0);
+    if (this.previousBoxes !== null) {
+      this.opened = boxes > this.previousBoxes ? 0 : Math.min(DEFAULT_MAX_BOXES - boxes, this.opened + this.previousBoxes - boxes);
+    }
+    this.previousBoxes = boxes;
+    const dotCount = Math.min(DEFAULT_MAX_BOXES, boxes + this.opened);
+    this.dots.replaceChildren(...Array.from({ length: dotCount > 1 ? dotCount : 0 }, (_, i) => {
+      const dot = document.createElement('i');
+      dot.className = i < boxes ? 'unopened' : i < boxes + this.opened ? 'opened' : 'empty';
+      return dot;
+    }));
+    const show = shouldShowChest(boxes) || this.openingTimer !== null;
     this.chestBtn.hidden = !show;
     if (show) {
       const affordable = canAffordBox(pts, boxes);
@@ -101,8 +125,9 @@ export class ProgressHud {
         const need = POINTS_PER_BOX - pts;
         this.chestBtn.title = `还差 ${need} 点开箱`;
       } else {
-        this.chestBtn.title = '开箱';
+        this.chestBtn.title = `开箱 · 剩余 ${boxes} / ${DEFAULT_MAX_BOXES}`;
       }
+      this.chestBtn.setAttribute('aria-label', this.chestBtn.title);
     }
     if (shouldTweenPoints(this.lastPoints, pts)) {
       this.tweenPoints(this.lastPoints, pts);
@@ -110,6 +135,21 @@ export class ProgressHud {
       this.numEl.textContent = formatPoints(pts);
     }
     this.lastPoints = pts;
+  }
+
+  playOpen(): void {
+    if (this.openingTimer) clearTimeout(this.openingTimer);
+    this.chestArt.innerHTML = OPEN_CHEST_SVG;
+    this.chestBtn.classList.remove('opening');
+    void this.chestBtn.offsetWidth;
+    this.chestBtn.classList.add('opening');
+    this.chestBtn.hidden = false;
+    this.openingTimer = setTimeout(() => {
+      this.openingTimer = null;
+      this.chestArt.innerHTML = CHEST_SVG;
+      this.chestBtn.classList.remove('opening');
+      if (this.progress) this.setProgress(this.progress);
+    }, 850);
   }
 
   /** 开箱飘字 −500 ↑ */

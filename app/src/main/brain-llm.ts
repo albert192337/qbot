@@ -12,6 +12,7 @@
  *  - 克制：prompt 强约束「大部分时候不行动」，模型自己也会经常返回 do=false
  */
 import { getSettings } from './config';
+import { conversationFor, lastUserAt, shouldPauseAutomatic } from './conversation-memory';
 import { getCharacter } from './characters';
 import { brainActions } from './brain-actions';
 import { beginBrainCall, updateBrainCall, brainGate } from './brain-log';
@@ -34,10 +35,12 @@ import type { PerceptionEvent } from '../shared/perception';
 
 /** 最短思考间隔（LLM 慢且花钱） */
 const MIN_THINK_INTERVAL_MS = 15 * 60_000;
+export function brainInterval(mode?: string): number { return mode === 'free' ? 90_000 : MIN_THINK_INTERVAL_MS; }
 
 let wired = false;
 let lastThinkAt: number | null = null;
 let inFlight = false;
+let lastHarvestReactionAt: number | null = null;
 /** 行为执行回调（由执行器注册；与规则脑共用一个） */
 let executeCallback: ((script: BehaviorScript) => void) | null = null;
 
@@ -49,6 +52,10 @@ export function setBrainExecutor(cb: (script: BehaviorScript) => void): void {
 export function wireBrain(): void {
   if (wired) return;
   wired = true;
+  // 自由模式即使用户没有切换应用，也有自己的活动节奏。
+  setInterval(() => { void getSettings().then(s => {
+    if (s.freeMode && s.behaviorMode === 'free') return think('free_tick');
+  }).catch(() => {}); }, 30_000).unref();
 
   onPerceptionChanged((ev) => {
     // 只在「有意义的边沿」思考：切应用 / agent 跑完 / 离会 / 放歌 / 启动。
@@ -63,6 +70,7 @@ function shouldThinkForEvent(ev: PerceptionEvent): boolean {
   switch (ev.type) {
     case 'app_focus':
     case 'startup':
+    case 'garden_highlight':
       return true;
     case 'agent':
       return ev.activity === 'done';
@@ -78,20 +86,27 @@ function shouldThinkForEvent(ev: PerceptionEvent): boolean {
 /** 一次思考：节流 → 检查开关/key → 构造上下文 → 调模型 → 解析 → 执行或降级 */
 async function think(trigger: string): Promise<void> {
   const now = Date.now();
-  if (!shouldThink(now, lastThinkAt, MIN_THINK_INTERVAL_MS)) { brainGate('冷却中，未调用', (lastThinkAt ?? now) + MIN_THINK_INTERVAL_MS); return; }
+  const settings = await getSettings();
+  const interval = brainInterval(settings.behaviorMode);
+  const harvest = trigger === 'garden_highlight';
+  if (!shouldThink(now, harvest ? lastHarvestReactionAt : lastThinkAt, harvest ? 120000 : interval)) { brainGate('冷却中，未调用', (harvest ? lastHarvestReactionAt ?? now : lastThinkAt ?? now) + (harvest ? 120000 : interval)); return; }
   if (inFlight) { brainGate('已有请求进行中，未重复调用'); return; }
 
-  const settings = await getSettings();
+  const characterId = settings.activeCharacter ?? 'default';
+  if (trigger !== 'debug' && shouldPauseAutomatic(characterId)) { brainGate('正在聊天或刚聊完，暂不主动打扰'); return; }
+  const userAtRequest = lastUserAt(characterId);
   // 自由模式开关 + 有 key 才思考（陪伴模式纯规则脑）
   if (!settings.freeMode || !settings.arkApiKey) { brainGate(!settings.freeMode ? '自由模式未开启' : '尚未配置 API Key'); return; }
   if (inFlight) return;
 
   inFlight = true;
+  if (harvest) lastHarvestReactionAt = now;
   lastThinkAt = now; // 占用冷却（哪怕这次失败也不立刻重试，避免坏 key 刷请求）
   const callId = await beginBrainCall(trigger);
   brainGate('正在调用 LLM');
   try {
     const input = await buildInput();
+    input.reactingToHarvest = harvest;
     const messages = buildBrainMessages(input);
     await updateBrainCall(callId, '已请求', { input: { endpoint: `${ARK_BASE_URL}/chat/completions`, model: BRAIN_MODEL, temperature: 0.8, messages, context: input } });
     let raw: string;
@@ -147,6 +162,10 @@ async function think(trigger: string): Promise<void> {
     // 组装行为脚本（模型只给扁平字段，主进程拼 DSL + 校验）
     // 请求期间可能切换角色或删除动作，执行前再次核对，不把旧动作发给新角色。
     const latest = await buildInput();
+    if (latest.characterId !== characterId || lastUserAt(characterId) !== userAtRequest) {
+      await updateBrainCall(callId, '已取消过时的主动回应：角色切换或用户开始聊天');
+      return;
+    }
     if (decision.action && !latest.availableIntents.includes(decision.action)) decision.action = undefined;
     const script = buildScript(decision);
     await updateBrainCall(callId, '执行前决策', { decision: { ...decision, script } });
@@ -182,13 +201,15 @@ async function think(trigger: string): Promise<void> {
       selected: { action: 'llm-brain', text: decision.say ?? decision.action },
     });
     script.meta.traceId = callId;
+    script.meta.characterId = characterId;
+    script.meta.conversationAt = userAtRequest;
     await updateBrainCall(callId, executeCallback ? '提交执行器' : '执行器未就绪');
     executeCallback?.(script);
   } catch (e) {
     await updateBrainCall(callId, '处理失败', {}, String(e));
   } finally {
     inFlight = false;
-    brainGate('等待下一次触发', now + MIN_THINK_INTERVAL_MS);
+    brainGate('等待下一次触发', now + interval);
   }
 }
 
@@ -252,10 +273,17 @@ export async function buildInput(): Promise<BrainInput> {
     .slice(0, 5);
 
   return {
+    behaviorMode: settings.behaviorMode ?? 'companion',
+    gardenHighlights: (snap.events ?? []).filter((e): e is Extract<PerceptionEvent, { type: 'garden_highlight' }> => e.type === 'garden_highlight' && Date.now() - e.at < 2 * 3600000).slice(0, 5).map(e => ({ at: e.at, summary: e.summary })),
     personaName,
+    characterId: settings.activeCharacter ?? 'default',
+    now: Date.now(),
+    windowTitle: snap.foreground?.windowTitle,
+    foregroundAt: snap.foreground?.at,
+    conversation: conversationFor(settings.activeCharacter ?? 'default'),
     personaTraits,
     timeLabel: timeLabel(new Date()),
-    currentApp: focus.app,
+    currentApp: snap.foreground?.app ?? focus.app,
     todaySwitches: snap.ledger.totalSwitches,
     activeMinutes,
     topApps: apps,
@@ -272,4 +300,9 @@ export async function buildInput(): Promise<BrainInput> {
 export async function debugThink(): Promise<void> {
   lastThinkAt = null;
   await think('debug');
+}
+/** 定时闲聊保持自动冷却，用户主动说一句可立即请求。 */
+export async function requestThink(force = false): Promise<void> {
+  if (force) await debugThink();
+  else await think('idle');
 }

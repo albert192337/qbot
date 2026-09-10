@@ -13,7 +13,7 @@ export const FADE_MS = 260;
 /** 轮询周期：用单个 tick + 纯 expire()，不给每枚气泡起 setTimeout */
 export const TICK_MS = 250;
 
-export type BubbleItem = AgentMessage & { durationMs?: number };
+export type BubbleItem = AgentMessage & { durationMs?: number; rewards?: import('../../shared/garden').GardenRewardItem[] };
 
 export interface StackResult {
   items: BubbleItem[];

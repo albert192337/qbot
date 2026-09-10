@@ -48,6 +48,7 @@ export interface ForegroundMonitorState {
 
 /** 感知到的原始事件（统一进事件流） */
 export type PerceptionEvent =
+  | { type: 'garden_highlight'; at: number; summary: string }
   | ({ type: 'app_focus' } & ForegroundAppSnapshot)
   | ({ type: 'foreground_change' } & ForegroundAppSnapshot)
   | { type: 'agent'; at: number; activity: string; sessions: number }

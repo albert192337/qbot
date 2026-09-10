@@ -21,6 +21,7 @@ function ev(type: PerceptionEvent['type'], at: number, extra?: Record<string, un
   if (type === 'meeting') return { type, at, inMeeting: true };
   if (type === 'music') return { type, at, playing: true, title: 't', artist: 'a' };
   if (type === 'interact') return { type, at, kind: 'click' };
+  if (type === 'garden_highlight') return { type, at, summary: '收获金色草莓' };
   return { type, at };
 }
 

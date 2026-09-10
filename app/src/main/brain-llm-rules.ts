@@ -2,13 +2,23 @@
  * LLM 脑纯逻辑：上下文 → prompt 消息、模型文本 → 决策、节流判定。
  * 零 IO / 零 Electron，可单测（IO 与编排见 brain-llm.ts）。
  *
- * 隐私铁律（行为体系 spec §3）：喂给模型的只有**聚合后的账本摘要 + 当前状态**，
- * 原始事件流（哪个应用、什么时刻、敲了什么）永不进 prompt。曲名/cwd/气泡正文也不进。
+ * 用户已授权聊天和主动脑共享当前应用/窗口标题与带时间的对话。
+ * 不读取页面正文，不传完整原始事件流、进程路径或 PID。
  */
 import type { ChatMessage } from './llm-client';
+import type { ConversationLine } from './conversation-memory';
+import { formatBrainContext } from './brain-context';
 
 /** 喂给模型的精简上下文（从感知快照 + 各监控器状态提炼） */
 export interface BrainInput {
+  gardenHighlights?: Array<{ at: number; summary: string }>;
+  reactingToHarvest?: boolean;
+  behaviorMode?: 'companion' | 'free';
+  characterId?: string;
+  now?: number;
+  windowTitle?: string;
+  foregroundAt?: number;
+  conversation?: ConversationLine[];
   /** 桌宠名字 */
   personaName: string;
   /** 桌宠性格/人设关键词（来自 manifest.persona，可空） */
@@ -52,7 +62,7 @@ const MAX_THOUGHT = 60;
 
 /**
  * 构造发给模型的消息。
- * 设计：强约束「大部分时候不行动」+ 严格 JSON 输出 + 只能引用给它的上下文。
+ * 按所选模式体现主动程度，严格 JSON 输出，只引用已提供的上下文。
  */
 export function buildBrainMessages(input: BrainInput): ChatMessage[] {
   const system = [
@@ -61,13 +71,16 @@ export function buildBrainMessages(input: BrainInput): ChatMessage[] {
     '你会在合适的时机主动做个小动作、说句话，给用户情绪价值和陪伴感。',
     '',
     '铁律：',
-    '1. 大部分时候应该选择「不行动」。频繁打扰会让人烦。只有在时机真的有意思、温馨、或有共鸣时才行动。',
+    input.behaviorMode === 'free'
+      ? '1. 现在是自由模式。你有自己的兴趣、情绪和生活节奏，主动按人设在桌面做事、尝试不同动作、表达想法。无需等用户呼唤或发生特殊事件；优先选一个此刻想做的动作或想说的话，也可以只做动作。'
+      : '1. 现在是陪伴模式。按你的人设和当前情境选择动作或台词，自然地陪伴用户。',
     '2. 你只能看到用户提供给你的上下文，绝不编造看不到的东西（具体文件名、网页内容、聊天记录等）。',
     '3. 台词要短、口语化、有性格，像一个真人朋友随口说的，不要像客服或助手。不要用表情符号堆砌。',
     '4. 不要重复你最近说过的话。',
     '5. 舞台（动作/时机）承担笑点，你只是把话说得有性格——不要讲大道理、不要鸡汤、不要说教。',
     '',
     '输出严格的 JSON（不要 markdown 代码块、不要多余文字），格式：',
+    input.reactingToHarvest ? '刚发生了一次值得庆祝的收获。结合最新花园事件、当前时间和你的人设，优先给一句自然的小反应或庆祝动作。可以联想到食物、下午茶等，但要符合植物品种和时段。不要机械报数值，不必重复“恭喜”，不是固定台词。' : '',
     '{"thought":"你此刻的一句内心想法","do":true或false,"action":"动作意图词","say":"台词或空字符串"}',
     `- action 只能从这些词里选：${input.availableIntents.join('、')}。do=false 时 action 留空字符串。`,
     `- 这些是当前角色已生成的动作 ID，原样返回，不能自创或翻译 ID；没有合适动作时留空，仅说话。`,
@@ -83,6 +96,7 @@ export function buildBrainMessages(input: BrainInput): ChatMessage[] {
       ? input.topApps.map((a) => `${a.name}(${a.switches}次)`).join('、')
       : '无';
   const user = [
+    formatBrainContext(input),
     `现在：${input.timeLabel}。`,
     input.currentApp ? `用户当前在用：${input.currentApp}。` : '不确定用户在哪个应用。',
     `今天用户已经切换应用 ${input.todaySwitches} 次，活跃约 ${input.activeMinutes} 分钟；最常用：${topApps}。`,
@@ -93,7 +107,7 @@ export function buildBrainMessages(input: BrainInput): ChatMessage[] {
       ? `你最近说过这些（别重复）：${input.recentLines.map((l) => `「${l}」`).join('、')}。`
       : '你最近还没说过话。',
     '',
-    '现在这个瞬间，要不要做点什么或说句话？记住：大部分时候答案是不行动。只输出 JSON。',
+    '现在你想做什么、想说什么？结合自己的人设、当前情境和最近行为作出决定。只输出 JSON。',
   ]
     .filter(Boolean)
     .join('\n');

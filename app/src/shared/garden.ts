@@ -6,12 +6,18 @@ export const SPECIES = {
 } as const;
 export type Species = keyof typeof SPECIES;
 export const TRAITS = {
-    shiny: { name: '闪亮', tier: 'blue', level: 1, chance: .22, multiplier: 1.5 },
-    purple: { name: '异色·紫色', tier: 'purple', level: 1, chance: .13, multiplier: 2 },
-    giant: { name: '巨大化', tier: 'gold', level: 1, chance: .09, multiplier: 2.5 },
-    twin: { name: '双生', tier: 'purple', level: 1, chance: .1, multiplier: 1.8 },
-    golden: { name: '鎏金', tier: 'gold', level: 2, chance: .06, multiplier: 3 },
-    rainbow: { name: '虹彩', tier: 'rainbow', level: 3, chance: .035, multiplier: 5 },
+    shiny: { name: '闪亮', category: 'accessory', tier: 'blue', level: 1, chance: .08, multiplier: 1.5 },
+    purple: { name: '异色·紫色', category: 'body', tier: 'purple', level: 1, chance: .13, multiplier: 2 },
+    giant: { name: '巨大化', category: 'body', tier: 'gold', level: 1, chance: .09, multiplier: 2.5 },
+    twin: { name: '双生', category: 'body', tier: 'purple', level: 1, chance: .1, multiplier: 1.8 },
+    golden: { name: '鎏金', category: 'body', tier: 'gold', level: 2, chance: .06, multiplier: 3 },
+    rainbow: { name: '虹彩', category: 'body', tier: 'rainbow', level: 3, chance: .035, multiplier: 5 },
+    mint: { name: '薄荷', category: 'body', tier: 'blue', level: 1, chance: .08, multiplier: 1.4 },
+    coral: { name: '珊瑚', category: 'body', tier: 'blue', level: 1, chance: .08, multiplier: 1.4 },
+    punk: { name: '朋克', category: 'accessory', tier: 'purple', level: 1, chance: .08, multiplier: 1.8 },
+    classical: { name: '古典', category: 'accessory', tier: 'purple', level: 1, chance: .08, multiplier: 1.8 },
+    firefly: { name: '萤火', category: 'accessory', tier: 'blue', level: 1, chance: .08, multiplier: 1.4 },
+    petals: { name: '花雨', category: 'accessory', tier: 'blue', level: 1, chance: .08, multiplier: 1.4 },
 } as const;
 export type Trait = keyof typeof TRAITS;
 export type Tier = 'normal' | 'blue' | 'purple' | 'gold' | 'rainbow';
@@ -92,11 +98,13 @@ export type GardenCommand = {
     type: 'box';
 };
 export interface GardenReveal {
+    items?: GardenRewardItem[];
     title: string;
     produce?: Produce;
     seed?: Seed;
     message?: string;
 }
+export interface GardenRewardItem { kind: 'seed' | 'fertilizer'; id: string; name: string; count: number }
 export type GardenResult = {
     ok: true;
     state: GardenState;
@@ -106,6 +114,7 @@ export type GardenResult = {
     error: string;
 };
 export interface GardenApi {
+    onSpeechBounds(cb: (bounds: { left: number; right: number; top: number; bottom: number } | null) => void): () => void;
     onPerformance(cb: (action: string | null) => void): () => void;
     cancelPerformance(restore?: boolean): void;
     get(): Promise<GardenState>;
@@ -114,6 +123,8 @@ export interface GardenApi {
     open(page: string): void;
     ignoreMouse(ignore: boolean): void;
     onAnchor(cb: (anchor: {
+        top?: number;
+        side?: 'left' | 'right';
         left: number;
         right: number;
         bottom: number;

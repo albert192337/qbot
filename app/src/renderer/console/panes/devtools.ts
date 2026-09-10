@@ -11,6 +11,7 @@ import { toast } from './_studio-shared';
 
 let root: HTMLElement | null = null;
 let unsubProgress: (() => void) | null = null;
+let unsubSettings: (() => void) | null = null;
 let unsubPerception: (() => void) | null = null;
 let brainTimer: ReturnType<typeof setInterval> | null = null;
 let brainLimit = 20;
@@ -21,6 +22,14 @@ export async function mount(host: HTMLElement): Promise<void> {
   root = host;
   host.innerHTML = `
 <div class="studio-body">
+  <div class="conn-card">
+    <h3>桌宠模式</h3>
+    <div class="btn-row" role="group" aria-label="桌宠模式">
+      <button class="btn" data-pet-mode="companion" aria-pressed="false">陪伴模式</button>
+      <button class="btn" data-pet-mode="free" aria-pressed="false">自由模式</button>
+    </div>
+    <p class="studio-hint" id="dev-mode-description"></p>
+  </div>
   <div class="page-heading"><div><p class="eyebrow">仅限调试</p><h2>开发者工具</h2><p class="page-summary">检查行为、感知与游戏化状态；普通使用无需进入这里。</p></div></div>
   <div class="conn-card">
     <h3>LLM 脑调用日志</h3>
@@ -73,7 +82,7 @@ export async function mount(host: HTMLElement): Promise<void> {
 
   <div class="conn-card">
     <h3>前台应用记录</h3>
-    <p class="studio-hint">只在本机记录系统公开的应用名、窗口标题和进程元数据，不读取窗口正文，也不会同步到联机空间。原始记录随感知事件保留 7 天。</p>
+    <p class="studio-hint">在本机记录系统公开的应用名、窗口标题和进程元数据，原始记录保留 7 天。聊天和自动 LLM 脑会使用最近观察的应用名、窗口标题及带时间的对话作为上下文；不读取窗口正文，不同步到联机空间。</p>
     <div id="dev-foreground-current" class="dev-stats">读取中…</div>
     <div id="dev-foreground-events" class="dev-foreground-events">读取中…</div>
   </div>
@@ -89,6 +98,27 @@ export async function mount(host: HTMLElement): Promise<void> {
     <div id="dev-perc-decisions" class="dev-stats"></div>
   </div>
 </div>`;
+  const renderMode = (s: import('../../../shared/ipc-types').Settings) => {
+    const free = s.behaviorMode === 'free';
+    host.querySelectorAll<HTMLButtonElement>('[data-pet-mode]').forEach(b => {
+      const active = (b.dataset.petMode === 'free') === free;
+      b.setAttribute('aria-pressed', String(active)); b.classList.toggle('primary', active); b.classList.toggle('ghost', !active);
+    });
+    host.querySelector('#dev-mode-description')!.textContent = free
+      ? '按人设主动说话、做动作，约每 90 秒思考一次。使用 LLM。'
+      : '保持原有陪伴频率；LLM 脑开启时，台词仍由模型生成。';
+  };
+  renderMode(await window.qbot.settings.get());
+  unsubSettings?.(); unsubSettings = window.qbot.settings.onChanged(renderMode);
+  host.querySelectorAll<HTMLButtonElement>('[data-pet-mode]').forEach(b => b.addEventListener('click', async () => {
+    const buttons = host.querySelectorAll<HTMLButtonElement>('[data-pet-mode]'); buttons.forEach(x => x.disabled = true);
+    try {
+      const behaviorMode = b.dataset.petMode === 'free' ? 'free' : 'companion';
+      await window.qbot.settings.set({ behaviorMode, ...(behaviorMode === 'free' ? { freeMode: true } : {}) });
+      renderMode(await window.qbot.settings.get());
+    } catch { toast(host, '模式保存失败，请重试'); }
+    finally { buttons.forEach(x => x.disabled = false); }
+  }));
 
   const p = await window.qbot.progress.get();
   renderProgress(p);
@@ -180,6 +210,7 @@ async function refreshRules(): Promise<void> {
 }
 
 export function unmount(): void {
+  unsubSettings?.(); unsubSettings = null;
   if (brainTimer) clearInterval(brainTimer);
   brainTimer = null;
   unsubProgress?.();

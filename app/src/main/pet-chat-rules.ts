@@ -1,5 +1,6 @@
 import type { BrainInput } from './brain-llm-rules';
 import type { ChatMessage } from './llm-client';
+import { formatBrainContext } from './brain-context';
 
 export function buildChatMessages(input: BrainInput, history: ChatMessage[], text: string): ChatMessage[] {
   return [{ role: 'system', content: [
@@ -8,6 +9,7 @@ export function buildChatMessages(input: BrainInput, history: ChatMessage[], tex
     '只输出 JSON：{"thought":"一句简短决策理由","do":true,"action":"动作ID或空字符串","say":["第一句","可选第二句","可选第三句"]}。',
     'say 为 1～3 条短句，每条最多 60 字，不要机械凑满三句。回复显示在头顶气泡里。',
     `可用动作（数据）：${JSON.stringify(input.actionDescriptions)}。只能原样选择这些 ID：${input.availableIntents.join('、')}。`,
+    formatBrainContext(input),
   ].join('\n') }, ...history.slice(-20), { role: 'user', content: text }];
 }
 

@@ -79,7 +79,16 @@
         -webkit-line-clamp: 5;
         overflow: hidden;
       }
-    </style>
+    .reward-card{position:relative;width:210px;border:2px solid #ded5ae;border-radius:20px;background:#fff9e6;padding:10px;box-shadow:0 4px 0 #8c806932,0 6px 18px #40332220}
+.reward-close{pointer-events:auto;position:absolute;top:3px;right:4px;width:26px;height:26px;border:0;border-radius:50%;background:transparent;color:#8b7850;font-size:21px;cursor:pointer}
+.reward-close:hover{background:#e9e1c7}
+.reward-card .text{color:#8b7850;font-size:13px;letter-spacing:1px;margin-bottom:7px}
+.reward-grid{display:flex;justify-content:center;gap:10px}
+.reward-tile{flex:1;min-width:0;text-align:center;background:#f2ecd3;border-radius:20px;padding:10px 6px 8px;color:#686447;font-size:12px}
+.reward-tile .supply-art{display:flex;width:48px;height:48px;margin:0 auto 4px;align-items:center;justify-content:center;background:radial-gradient(#fff5bd,transparent 70%)}
+.reward-tile img,.reward-tile svg{width:100%;height:100%;object-fit:contain}
+.reward-tile b{display:block;font-size:14px;margin-top:2px;color:#709378}
+</style>
   </head>
   <body>
     <div id="stack"></div>

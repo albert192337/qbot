@@ -36,6 +36,8 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
 };
 
 export interface SpeakerHooks {
+  /** 返回 true 表示本次交给模型，禁止使用内置台词兜底。 */
+  generateSpeech?(force: boolean): boolean;
   /** 气泡 DOM（pet/index.html 的 #bubble） */
   bubble: HTMLElement;
   /** 桌宠使用统一气泡窗，保留 DOM 作为旧调用方兼容。 */
@@ -128,6 +130,7 @@ export class Speaker {
       this.scheduleNext();
       return;
     }
+    if (this.hooks.generateSpeech?.(force)) { this.scheduleNext(); return; }
     const utterance = pickUtterance(this.utterances, 'idle', this.rng, this.lastUtteranceId);
     if (!utterance) {
       this.scheduleNext();

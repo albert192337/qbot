@@ -3,12 +3,15 @@ import { EventEmitter } from 'node:events';
 import type { BehaviorScript } from '../src/shared/behavior-dsl';
 
 const mocks = vi.hoisted(() => ({ send: vi.fn(), show: vi.fn(), record: vi.fn() }));
+const mode = vi.hoisted(() => ({ freeMode: false }));
+vi.mock('../src/main/config', () => ({ getSettings: async () => mode }));
 vi.mock('../src/main/windows', () => ({ sendToWindows: mocks.send, showBubbleWindow: mocks.show }));
 vi.mock('../src/main/local-sign', () => ({ setLocalSign: vi.fn() }));
 vi.mock('../src/main/perception', () => ({ recordBehavior: mocks.record }));
 vi.mock('../src/main/behavior-rules', () => ({ setBehaviorExecutor: vi.fn() }));
 vi.mock('../src/main/brain-log', () => ({ updateBrainCall: vi.fn() }));
 import { execute, getExecutorState, stopAllBehaviors } from '../src/main/behavior-executor';
+import { rememberConversation, conversationFor } from '../src/main/conversation-memory';
 
 let web: EventEmitter & { send: ReturnType<typeof vi.fn>; isLoading: ReturnType<typeof vi.fn> };
 const script = (id: string, priority = 1, source: BehaviorScript['meta']['source'] = 'rule'): BehaviorScript => ({
@@ -16,10 +19,20 @@ const script = (id: string, priority = 1, source: BehaviorScript['meta']['source
   steps: [{ op: 'play', action: id }, { op: 'say', text: id }],
 });
 beforeEach(() => {
+  mode.freeMode = false;
   vi.useFakeTimers();
   vi.clearAllMocks();
   web = Object.assign(new EventEmitter(), { send: vi.fn(), isLoading: vi.fn(() => false) });
   mocks.show.mockReturnValue({ webContents: web, isDestroyed: () => false });
+});
+it('自由模式屏蔽规则台词但保留模型台词', async () => {
+  mode.freeMode = true;
+  execute(script('rule'));
+  await vi.advanceTimersByTimeAsync(4000);
+  expect(web.send).not.toHaveBeenCalled();
+  execute(script('generated', 2, 'llm'));
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(web.send).toHaveBeenCalledWith('behavior:say', expect.objectContaining({ text: 'generated' }));
 });
 afterEach(async () => {
   stopAllBehaviors();
@@ -101,4 +114,16 @@ it('聊天三句话立即一起冒泡，动作不等气泡消失', async () => {
   expect(web.send.mock.calls.map(c => c[1].text)).toEqual(['一', '二', '三']);
   expect(web.send.mock.calls.every(c => c[1].source === 'chat')).toBe(true);
   expect(mocks.send).toHaveBeenLastCalledWith('behavior:action', expect.objectContaining({ action: 'newDance', preview: true }));
+});
+
+it('实际发出的自动台词进入共享记忆，未发送的旧回应不记成说过', async () => {
+  execute({ meta: { id: 'llm-brain', source: 'llm', priority: 10, characterId: 'memory-sent' }, steps: [{ op: 'say', text: '休息一下吧' }] });
+  expect(conversationFor('memory-sent').at(-1)?.text).toBe('休息一下吧');
+  stopAllBehaviors();
+  execute({ meta: { id: 'llm-brain', source: 'llm', priority: 10, characterId: 'memory-race' }, steps: [{ op: 'play', action: 'wave' }, { op: 'say', text: '过时回复' }] });
+  await vi.advanceTimersByTimeAsync(1000);
+  rememberConversation('memory-race', { role: 'user', source: 'chat', text: '新的问题', at: Date.now() });
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(web.send).not.toHaveBeenCalledWith('behavior:say', expect.objectContaining({ text: '过时回复' }));
+  expect(conversationFor('memory-race').map(line => line.text)).toEqual(['新的问题']);
 });

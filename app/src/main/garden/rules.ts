@@ -28,10 +28,10 @@ export function initialGarden(now: number, rng: Random): GardenState {
 export function value(p: Pick<Produce, 'species' | 'kg' | 'traits'>): number {
     return Math.round(SPECIES[p.species].price * 2 * p.kg / SPECIES[p.species].kg * p.traits.reduce((m, t) => m * TRAITS[t].multiplier, 1));
 }
-function rollTraits(s: GardenState, sp: Species, rng: Random, boost = 1): Trait[] {
-    return (Object.keys(TRAITS) as Trait[]).filter(t => TRAITS[t].level <= level(s.xp[sp]) && rng.random() < TRAITS[t].chance * boost);
+export function rollTraits(s: GardenState, sp: Species, rng: Random, boost = 1, musicPlaying = false): Trait[] {
+    return (Object.keys(TRAITS) as Trait[]).filter(t => TRAITS[t].level <= level(s.xp[sp]) && rng.random() < Math.min(1, TRAITS[t].chance * boost * (musicPlaying && (t === 'punk' || t === 'classical') ? 3 : 1)));
 }
-export function transition(input: GardenState, cmd: GardenCommand, now: number, rng: Random): {
+export function transition(input: GardenState, cmd: GardenCommand, now: number, rng: Random, context: { musicPlaying?: boolean } = {}): {
     state: GardenState;
     reveal?: GardenReveal;
     points?: number;
@@ -51,7 +51,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             if (i < 0)
                 throw Error('种子已用完');
             const seed = s.seeds.splice(i, 1)[0];
-            const traits = [...new Set([...seed.genes, ...rollTraits(s, seed.species, rng)])];
+            const traits = [...new Set([...seed.genes, ...rollTraits(s, seed.species, rng, 1, context.musicPlaying)])];
             const kg = Math.round(SPECIES[seed.species].kg * (.65 + rng.random() * 1.7) * (traits.includes('giant') ? 4 : 1) * 1000) / 1000;
             const p = { id: rng.id(), species: seed.species, traits, kg, value: 0, bred: false, plantedAt: now, readyAt: now + SPECIES[seed.species].minutes * 60000, fertilizers: [] };
             p.value = value(p);
@@ -74,7 +74,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
                 p.kg = Math.round(p.kg * 1.5 * 1000) / 1000;
             if (cmd.fertilizer === 'mutation') {
                 const wasGiant = p.traits.includes('giant');
-                p.traits = [...new Set([...p.traits, ...rollTraits(s, p.species, rng, 1.5)])];
+                p.traits = [...new Set([...p.traits, ...rollTraits(s, p.species, rng, 1.5, context.musicPlaying)])];
                 if (!wasGiant && p.traits.includes('giant'))
                     p.kg *= 4;
             }
@@ -148,7 +148,10 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             const f = (Object.keys(FERTILIZERS) as (keyof typeof FERTILIZERS)[])[Math.floor(rng.random() * 3)];
             s.seeds.push({ id: rng.id(), species: sp, genes: [], bred: false });
             s.fertilizers[f]++;
-            reveal = { title: '花园补给到了！', message: `${SPECIES[sp].name}种子 ×1 · ${FERTILIZERS[f].name} ×1` };
+            reveal = { title: '花园补给到了！', message: `${SPECIES[sp].name}种子 ×1 · ${FERTILIZERS[f].name} ×1`, items: [
+                {kind:'seed',id:sp,name:`${SPECIES[sp].name}种子`,count:1},
+                {kind:'fertilizer',id:f,name:FERTILIZERS[f].name,count:1},
+            ] };
             break;
         }
         case 'mature':
