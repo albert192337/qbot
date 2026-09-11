@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>奶油小屋 · QBot</title></head>
+<body>
+  <header><div class="brand"><span class="mark">⌂</span><div><small>QBOT · LITTLE HOME</small><h1>今天，在小屋待一会儿。</h1></div></div><button id="save" class="primary">保存布置</button></header>
+  <main><section class="room-area" aria-label="互动小屋"><div class="scene-tag"><span></span><span id="sceneLabel">午后的奶油小屋</span></div><canvas id="roomCanvas" tabindex="0" aria-label="可拖动家具的小屋，点击空地让桌宠过去"></canvas><div id="loading" role="status">正在把小屋收拾好…</div><div class="floor-note">拖一拖家具 · 点空地让朋友过去</div></section>
+  <aside><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2>一间有温度的小屋</h2><p class="intro">软软的沙发，暖暖的灯。<br>给每一种模样的朋友，留个位置。</p>
+  <label class="section-label">窗外的时间</label><div class="segments" aria-label="光照时段"><button data-theme="day">午后</button><button data-theme="sunset">落日</button><button data-theme="night">夜晚</button></div>
+  <label class="section-label" for="friend">今天的朋友</label><select id="friend"><option>正在找朋友…</option></select><p id="friendNote" class="muted">仅在小屋里预览，不更换桌面角色。</p>
+  <div class="switches"><label><input type="checkbox" id="rug" checked>铺上软软的地毯</label><label><input type="checkbox" id="shadows" checked>柔影与暖灯</label></div>
+  <div class="selection"><small>正在布置</small><h3 id="selectedName">奶油沙发</h3><p>拖动摆放，方向键微调位置。</p><div class="actions"><button id="flip">换个朝向</button><button id="stow">收起来</button></div></div>
+  <p id="status" role="status">这是一间本地试住小屋，家具可自由试摆。</p><button id="reset" class="quiet">恢复初始布置</button></aside></main>
+  <footer><div class="shelf-title"><strong>小屋的宝贝</strong><span>点选家具，收起后也能放回来</span></div><div id="catalog"></div></footer><div id="actorSource" aria-hidden="true"></div>
+  <script type="module" src="./main.ts"></script>
+</body></html>

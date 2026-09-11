@@ -32,6 +32,7 @@ let petWindow: BrowserWindow | null = null;
 /** 公共房间宠上屏：键控多窗（memberId -> 窗），全员在线上限即窗口数上限 */
 const roomPetWindows = new Map<string, BrowserWindow>();
 let roomWindow: BrowserWindow | null = null;
+let cozyPreviewWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let nurseryWindow: BrowserWindow | null = null;
 let loungeWindow: BrowserWindow | null = null;
@@ -94,7 +95,26 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds();
 }
 
-type RendererPage = 'pet' | 'room' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat';
+type RendererPage = 'pet' | 'room' | 'cozy' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat';
+
+/** Local preview only: does not change room membership or the active pet. */
+export function openCozyPreview(): BrowserWindow {
+  if (cozyPreviewWindow && !cozyPreviewWindow.isDestroyed()) {
+    cozyPreviewWindow.show(); cozyPreviewWindow.focus(); return cozyPreviewWindow;
+  }
+  const area = screen.getPrimaryDisplay().workArea;
+  const win = new BrowserWindow({
+    width: Math.min(1160, area.width), height: Math.min(850, area.height),
+    minWidth: Math.min(720, area.width), minHeight: Math.min(580, area.height),
+    title: 'QBot · 奶油小屋试住', backgroundColor: '#f6f1e8', autoHideMenuBar: true,
+    webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false },
+  });
+  cozyPreviewWindow = win;
+  win.on('closed', () => { cozyPreviewWindow = null; });
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  load(win, 'cozy');
+  return win;
+}
 
 let chatWindow: BrowserWindow | null = null;
 function syncChatBounds(): void {

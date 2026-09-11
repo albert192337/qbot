@@ -65,6 +65,7 @@ const api: QBotApi = {
     },
   },
   room: {
+    openCozyPreview: () => ipcRenderer.send('room:openCozyPreview'),
     openHome: () => ipcRenderer.send('room:openHome'),
     open: () => ipcRenderer.send('room:open'),
     move: (x, y) => ipcRenderer.send('room:move', x, y),

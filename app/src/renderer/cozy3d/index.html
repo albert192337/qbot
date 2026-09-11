@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>立体奶油小屋 · QBot</title></head>
+<body><header><div><small>QBOT · A LITTLE PLACE TO BELONG</small><h1>把日子，过得软一点。</h1></div><a href="../cozy/index.html">看看上一版 2.5D ↗</a></header>
+<main><section id="stage"><div class="tag">真实 3D 小屋 × 原来的 2D 朋友</div><canvas id="scene" aria-label="立体房间，点击空地移动角色"></canvas><div id="loading">正在点亮小屋…</div><div class="hint">点空地走过去 · 选家具后调整朝向</div></section>
+<aside><small>THE SOFTEST CORNER</small><h2>在这里，待一会儿</h2><p>木头、奶油布艺、一盏暖灯。<br>还有你熟悉的那个小家伙。</p><label for="friend">今天的朋友</label><select id="friend"></select><p class="note">只预览，不更换桌面角色。</p>
+<label>窗外的时间</label><div class="row"><button data-light="day" aria-pressed="true">午后</button><button data-light="night">夜晚</button></div>
+<label>看看它怎么融入房间</label><div class="row"><button id="front">沙发前</button><button id="behind">沙发后</button></div><div class="row"><button id="angle">轻轻换个视角</button><button id="shadow" aria-pressed="true">接地柔影</button></div>
+<label for="furniture">小屋的宝贝</label><select id="furniture"><option value="sofa">云朵奶油沙发</option><option value="table">圆圆橡木桌</option><option value="lamp">蘑菇暖灯</option><option value="shelf">鼠尾草小书柜</option><option value="plant">小叶子盆栽</option></select><div class="row"><button id="rotate">转动 45°</button><button id="restore">恢复初始</button></div>
+<label for="zoom">靠近一点</label><input id="zoom" type="range" min="90" max="125" value="100"><p id="status" role="status">本地视觉样板 · 尚未接入多人和家具库存</p></aside></main><footer>有体积的家，有自己模样的朋友。<span>试验版 / 布置暂不保存</span></footer><div id="actorSource" aria-hidden="true"></div><script type="module" src="./main.js"></script></body></html>

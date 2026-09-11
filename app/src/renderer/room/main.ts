@@ -367,6 +367,11 @@ document.addEventListener('contextmenu', (e) => {
   nursery.textContent = '去孵化小屋';
   nursery.addEventListener('click', () => { hideMenu(); window.qbot.ui.openNursery(); });
   menu.appendChild(nursery);
+  const cozy = document.createElement('button');
+  cozy.className = 'menu-item';
+  cozy.textContent = '试住奶油小屋';
+  cozy.addEventListener('click', () => { hideMenu(); window.qbot.room.openCozyPreview(); });
+  menu.appendChild(cozy);
   const sizeLabel = document.createElement('div');
   sizeLabel.className = 'menu-label';
   sizeLabel.textContent = '房间大小';

@@ -41,6 +41,7 @@ export async function mount(host: HTMLElement): Promise<void> {
   const tools = el('div', undefined, 'furnish-tools');
   tools.append(controls, save, status, shelf);
   root.append(
+    button('试住奶油小屋', () => window.qbot.room.openCozyPreview()),
     el(
       'p',
       '从收藏架点选家具，拖到喜欢的位置。方向键可以微调；别忘了保存布置。',

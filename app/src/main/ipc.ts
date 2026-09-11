@@ -4,7 +4,7 @@ import { BrowserWindow, Menu, dialog, ipcMain, powerMonitor } from 'electron';
 import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
-import { showBubbleWindow, getBubbleWindow } from './windows';
+import { showBubbleWindow, getBubbleWindow, openCozyPreview } from './windows';
 import { getBrainLog, updateBrainCall } from './brain-log';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
@@ -141,6 +141,7 @@ export function registerIpc(): void {
   // ── room ───────────────────────────────────────────────
   // 旧的小房间调用兼容到统一联机空间；房间场景由联机空间内的展示模式控制。
   ipcMain.on('room:open', () => createLoungeWindow());
+  ipcMain.on('room:openCozyPreview', () => openCozyPreview());
   ipcMain.on('room:openHome', () => {
     if (getRoomsStatus().phase === 'in-room') void setRoomDisplayMode('room');
     else openRoomWindow('QBot 我的小屋');

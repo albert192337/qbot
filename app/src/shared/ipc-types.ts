@@ -551,6 +551,7 @@ export interface QBotApi {
     onError(cb: (msg: string) => void): () => void;
   };
   room: {
+    openCozyPreview(): void;
     openHome(): void;
     /** 兼容旧调用：打开统一联机空间 */
     open(): void;
