@@ -52,3 +52,13 @@ it('a single-action repair does not submit other failed actions',async()=>{
  await runActions(job,ark,'/mock',async()=>{},2,['idle']);
  expect(job.state.actions.idle.status).toBe('done');expect(job.state.actions.drag.status).toBe('failed');expect(ark.getVideoTask).toHaveBeenCalledTimes(1);
 });
+
+it('an imported character without a turnaround uses its source image for selected regeneration',async()=>{
+ const job=await setup();await rm(path.join(dir,'turnaround.png'));
+ job.state.actions.idle={status:'pending',attempts:{frame:0,video:0}};
+ const ark={generateImage:vi.fn(async()=>Buffer.from('frame')),submitVideoTask:vi.fn(async()=>'new'),getVideoTask:vi.fn(async()=>({status:'succeeded',videoUrl:'https://example.test/video'})),downloadVideo:async(_u:string,d:string)=>{await writeFile(d,'mp4');}} as unknown as ArkClient;
+ await runActions(job,ark,'/mock',async()=>{},1,['idle']);
+ expect(ark.generateImage).toHaveBeenCalledWith(expect.objectContaining({refImageDataUrl:'data:image/png;base64,cG5n'}));
+ expect(job.state.actions.idle.status).toBe('done');expect(ark.submitVideoTask).toHaveBeenCalledTimes(1);
+ expect(job.state.actions.drag.status).toBe('failed');
+});

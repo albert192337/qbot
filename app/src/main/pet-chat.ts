@@ -1,4 +1,6 @@
 import { getSettings } from './config';
+import { applyIdleDecision } from './idle-plan';
+import { queueMemoryExtraction } from './user-memory';
 import { buildInput } from './brain-llm';
 import { BRAIN_MODEL, chatCompleteWithRetry } from './llm-client';
 import { rememberConversation, setChatting } from './conversation-memory';
@@ -19,24 +21,29 @@ export async function sendPetChat(text: unknown): Promise<{ ok: boolean; error?:
     if (!settings.arkApiKey) return { ok: false, error: '请先在设置中配置 LLM API Key。' };
     character = settings.activeCharacter ?? 'default';
     setChatting(character, true);
-    const input = await buildInput();
+    const input = await buildInput('chat', text.trim());
     const messages = buildChatMessages(input, [], text.trim());
     rememberConversation(character, { at: Date.now(), role: 'user', source: 'chat', text: text.trim() });
+    const userAt = Date.now();
     traceId = await beginBrainCall('chat');
     await updateBrainCall(traceId, '用户聊天请求', { input: { model: BRAIN_MODEL, messages } });
     const raw = await chatCompleteWithRetry({ apiKey: settings.arkApiKey, messages,
       onTrace: (stage, detail) => { void updateBrainCall(traceId, stage, {}, detail); },
     });
     await updateBrainCall(traceId, '收到原始输出', { raw });
-    const decision = parseChatReply(raw, input.availableIntents);
+    const decision = parseChatReply(raw, input.availableIntents,input.idleCandidates?.map(a=>a.id));
     if (!decision) throw new Error('回复格式不完整，请重试。');
     await updateBrainCall(traceId, '聊天动作决策', { decision });
     if ((await getSettings()).activeCharacter !== settings.activeCharacter) throw new Error('角色已切换，请与当前角色重新对话。');
     const latest = await buildInput();
+    if (latest.memoryRevision !== input.memoryRevision) throw new Error('记忆已更新，请重新发送这句话。');
     if (decision.action && !latest.availableIntents.includes(decision.action)) decision.action = undefined;
+    applyIdleDecision(character,decision,latest.idleCandidates?.map(a=>a.id)??[]);
     execute({ meta: { id: 'llm-chat', source: 'llm', priority: 100, reason: '用户主动聊天', traceId, characterId: character },
-      steps: [...decision.lines.map(line => ({ op: 'say' as const, text: line })),
+      steps: [...(decision.message ? [{ op: 'sign' as const, text: decision.message }] : []),
+        ...decision.lines.map(line => ({ op: 'say' as const, text: line })),
         ...(decision.action ? [{ op: 'play' as const, action: decision.action, loops: 1 }] : [])] });
+    await queueMemoryExtraction(character, text.trim(), settings.arkApiKey, userAt).catch(error => console.error('[memory] 整理任务保存失败', error));
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

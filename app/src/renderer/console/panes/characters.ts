@@ -61,7 +61,7 @@ async function refresh(): Promise<void> {
     html += `</div>`;
     html += `<div class="char-btns">`;
     if (!isActive) html += `<button class="btn use-char" data-dir="${esc(c.dirId)}">放到桌面</button>`;
-    html += `<button class="btn primary edit-char" data-dir="${esc(c.dirId)}">编辑角色</button>`;
+    html += `<button class="btn primary edit-char" data-dir="${esc(c.dirId)}" data-sticker="${'stickerLibrary' in c.manifest}">${'stickerLibrary' in c.manifest?'管理表情':'编辑角色'}</button>`;
     html += `<button class="btn ghost rename-char" data-dir="${esc(c.dirId)}">改名</button>`;
     html += `<button class="btn danger del-char" data-dir="${esc(c.dirId)}" data-name="${esc(name)}">删除</button>`;
     html += `</div></div>`;
@@ -72,8 +72,13 @@ async function refresh(): Promise<void> {
 }
 
 function bind(host: HTMLElement): void {
+  const stickerCreate = document.createElement('button');
+  stickerCreate.className = 'btn';
+  stickerCreate.textContent = '🐾 从表情包创建';
+  stickerCreate.onclick = () => navigate({ pane:'sticker-create' });
+  host.querySelector('.page-heading')?.append(stickerCreate);
   host.querySelector('#new-character')?.addEventListener('click', () => window.qbot.ui.openConsole('hatch'));
-  host.querySelectorAll<HTMLButtonElement>('.edit-char').forEach((button) => button.addEventListener('click', () => navigate({ pane: 'profile', dirId: button.dataset.dir! })));
+  host.querySelectorAll<HTMLButtonElement>('.edit-char').forEach((button) => button.addEventListener('click', () => navigate({ pane: button.dataset.sticker==='true'?'sticker-create':'profile', dirId: button.dataset.dir! })));
   host.querySelectorAll<HTMLButtonElement>('.use-char').forEach((btn) => {
     btn.addEventListener('click', async () => {
       await guard(host,btn,'正在迎接…',async()=>{await window.qbot.characters.activate(btn.dataset.dir!);});

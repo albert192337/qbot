@@ -11,6 +11,9 @@ import { POINTS_PER_BOX } from '../../shared/furniture';
 import { DECOR_BY_ID } from '../room/decor-pack';
 import { DEFAULT_VOICE_SETTINGS, Speaker, type VoiceSettings } from './voice/speak';
 import { VisitOrchestrator, type VisitAction } from './visit';
+import { ActionHold } from './action-hold';
+import { IdleDirector } from '../../shared/idle-plan';
+import { actionDisplayName, type StickerManifest } from '../../shared/sticker-behavior';
 
 const stage = document.getElementById('stage')!;
 const visitorStage = document.getElementById('visitor-stage')!;
@@ -30,9 +33,23 @@ let meetingStatus: MeetingStatus = { inMeeting: false };
 
 /** step() 上下文：可用动作 + 可选的 agent/meeting/music 覆盖配置 */
 let stepCtx: StepContext = { available: [], rng };
+const actionHold=new ActionHold();
+let holdTimeout:ReturnType<typeof setTimeout>|null=null;
+const idleDirector=new IdleDirector();
+function cancelHold():void{actionHold.cancel();if(holdTimeout)clearTimeout(holdTimeout);holdTimeout=null;}
+function idlePool():string[]{return ((currentCharacter?.manifest as StickerManifest|undefined)?.stickerLibrary?.idleCandidates??[]).filter(id=>available.includes(id));}
+function playIdle():void{
+  const pool=idlePool();
+  if(!pool.length){player.play('idle');return;}
+  const fallback=(currentCharacter?.manifest as StickerManifest|undefined)?.stickerLibrary?.scenes.idle??'idle';
+  player.playOnce(idleDirector.next(pool,fallback,llmSpeech,Date.now(),Math.random));
+}
 
 const player = new Player(stage, () => dispatch({ type: 'VIDEO_ENDED' }));
 const visitorPlayer = new Player(visitorStage, () => {});
+window.qbot.behaviorAction.onIdlePlan(plan=>{
+  if(plan.characterId===currentCharacter?.dirId)idleDirector.accept(plan);
+});
 
 // ── 举牌 ──────────────────────────────────────────────
 const hostSignboard = new Signboard('stage');
@@ -170,6 +187,19 @@ window.qbot.settings.onChanged(applySpeechSettings);
 let signboardOneShot: string | null = null;
 /** 手动举牌（右键菜单输入；收牌前一直举着） */
 let userSign: string | null = null;
+let petMessage: import('../../shared/pet-message').PetMessage | null = null;
+let messageRevision = 0;
+window.qbot.sign.onMessage(message => {
+  messageRevision++;
+  petMessage = message;
+  refreshSignboard();
+});
+const initialMessageRevision = messageRevision;
+void window.qbot.sign.getMessage().then(message => {
+  if (messageRevision !== initialMessageRevision) return;
+  petMessage = message;
+  refreshSignboard();
+}).catch(() => {});
 let syncedSignText: string | null = null;
 const SIGN_TEXT_MAX = 60;
 
@@ -194,6 +224,11 @@ function hideAndSyncSign(): void {
 function refreshSignboard(): void {
   if (userSign) {
     showAndSyncSign(userSign);
+    return;
+  }
+  if (petMessage && petMessage.expiresAt > Date.now() &&
+      (!petMessage.characterId || petMessage.characterId === currentCharacter?.dirId || petMessage.characterId === currentCharacter?.manifest.id)) {
+    showAndSyncSign(petMessage.text);
     return;
   }
   if (signboardOneShot) {
@@ -270,20 +305,12 @@ window.qbot.behaviorAction.onPlay(({ action, loops, preview, traceId }) => {
   if (available.length === 0 || !available.includes(action as PlayableId)) { trace(`动作跳过：不可用 ${action}`); return; }
   if ((!preview && !behaviorCanPlay()) || state.kind === 'drag' || state.kind === 'visit') { trace(`动作让位：当前 ${state.kind}`); return; }
   trace(`请求播放动作：${action}`);
+  cancelHold();
   dispatch({ type: 'PLAY_ACTION', action: action as PlayableId });
-  // loops > 1：state-machine 的 PLAY_ACTION 固定播 1 遍，多遍靠重发（等一动画时长）
-  if (loops > 1) {
-    const dur =
-      (currentCharacter?.manifest.customActions?.[action]?.durationSec ?? 3) * 1000;
-    for (let i = 1; i < loops; i++) {
-      behaviorReplayTimers.push(setTimeout(() => {
-        // 重播时也要确认还在可演状态（这期间可能进了 agent/meeting）
-        if (available.includes(action as PlayableId) && (preview || behaviorCanPlay())) {
-          dispatch({ type: 'PLAY_ACTION', action: action as PlayableId });
-        }
-      }, dur * i));
-    }
-  }
+  actionHold.begin(action,loops,Date.now());
+  const m=currentCharacter?.manifest;
+  const clip={...m?.actions,...m?.importedActions,...m?.expressionActions,...m?.customActions}[action];
+  holdTimeout=setTimeout(()=>{cancelHold();dispatch({type:'VIDEO_ENDED'});},Math.max(6000,(clip?.durationSec??5)*1000*Math.max(1,loops))+15000);
 });
 
 // ── 桌面行走 ──────────────────────────────────────────────
@@ -366,6 +393,7 @@ function clearTimer(): void {
 
 let gardenPerforming = false;
 window.qbot.garden.onPerformance(action => {
+  cancelHold();
   stopDesktopWalk();
   gardenPerforming = !!action;
   document.body.classList.toggle('garden-performing', gardenPerforming);
@@ -373,6 +401,17 @@ window.qbot.garden.onPerformance(action => {
   else dispatch({ type: 'PLAY_ACTION', action: 'idle' });
 });
 function dispatch(event: Parameters<typeof step>[1]): void {
+  if(actionHold.action){
+    if(event.type==='POINTER_DOWN'||event.type==='VISIT_START')cancelHold();
+    else if(event.type==='VIDEO_ENDED'){
+      const replay=actionHold.ended(Date.now());
+      if(replay){player.play(replay);return;}
+      cancelHold();
+    }else return; // Status handlers retain latest states; restore after the full expression ends.
+  }
+  if(state.kind==='idle'&&!gardenPerforming&&idlePool().length&&(event.type==='VIDEO_ENDED'||event.type==='TIMER_FIRE')){
+    if(event.type==='VIDEO_ENDED')playIdle();else scheduleTimer();return;
+  }
   stepCtx.available = available;
   const result = step(state, event, stepCtx);
   state = result.state;
@@ -386,7 +425,7 @@ function dispatch(event: Parameters<typeof step>[1]): void {
   }
 
   if (result.play && !gardenPerforming) {
-    player.play(result.play);
+    if(result.play==='idle')playIdle();else player.play(result.play);
     if (result.play === WALK_ACTION) startDesktopWalk();
     else stopDesktopWalk();
   }
@@ -414,13 +453,18 @@ function activateCharacter(meta: CharacterMeta): void {
   if (!meta?.manifest) return;
   if (gardenPerforming) window.qbot.garden.cancelPerformance();
   currentCharacter = meta;
+  refreshSignboard();
+  cancelHold();idleDirector.reset();
+  void window.qbot.behaviorAction.getIdlePlan(meta.dirId).then(plan=>{
+    if(plan&&currentCharacter?.dirId===meta.dirId&&(!idleDirector.plan||plan.chosenAt>=idleDirector.plan.chosenAt))idleDirector.accept(plan);
+  }).catch(()=>{});
   available = player.load(meta.dirId, meta.manifest);
   stepCtx = {
     available,
     rng,
     agentActionMap: meta.manifest?.agentActions?.thinking !== undefined ||
       meta.manifest?.agentActions?.working !== undefined ||
-      meta.manifest?.agentActions?.waiting !== undefined
+      meta.manifest?.agentActions?.waiting !== undefined || meta.manifest?.agentActions?.error !== undefined
       ? {
           thinking: meta.manifest.agentActions.thinking,
           working: meta.manifest.agentActions.working,
@@ -434,7 +478,7 @@ function activateCharacter(meta: CharacterMeta): void {
     meetingAction: meta.manifest?.agentActions?.meetingAction,
   };
   state = { kind: 'idle' };
-  player.play('idle');
+    playIdle();
   scheduleTimer();
   speaker.setCharacter(meta.manifest.id, meta.manifest.voice);
   // 切角色时清掉进行中的串门
@@ -457,6 +501,7 @@ void window.qbot.characters.getActive().then((meta) => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || available.length === 0) return;
   speaker.interrupt();
+  cancelHold();
   state = { kind: 'idle' };
   player.play('idle');
   scheduleTimer();
@@ -583,7 +628,7 @@ stage.addEventListener('contextmenu', (e) => {
   e.preventDefault();
   window.qbot.pet.popupMenu(
     available
-      .map((id) => ({ id, label: ACTION_LABELS[id] ?? (id === 'idle' || id === 'drag' ? '' : id) }))
+      .map((id) => ({ id, label: ACTION_LABELS[id] ?? (currentCharacter ? actionDisplayName(currentCharacter.manifest,id) : id) }))
       .filter((a) => a.label),
   );
 });
@@ -599,6 +644,7 @@ window.qbot.pet.onMenuCommand((cmd) => {
 let signEntry: HTMLInputElement | null = null;
 
 function applyUserSign(text: string | null): void {
+  if (!text) petMessage = null;
   userSign = text?.trim() ? text.trim().slice(0, 60) : null;
   refreshSignboard();
   window.qbot.sign.set(userSign);
@@ -622,9 +668,10 @@ function showSignPrompt(): void {
       'transform:translateX(-50%)',
       'width:75%',
       'padding:6px 10px',
-      'border-radius:8px',
-      'border:1px solid rgba(0,0,0,0.15)',
-      'background:rgba(255,255,255,0.96)',
+      'border-radius:16px',
+      'border:2px solid #594235',
+      'background:#fff9ef',
+      'color:#594235',
       'box-shadow:0 4px 18px rgba(0,0,0,0.18)',
       'font-size:12px',
       'outline:none',
@@ -632,7 +679,7 @@ function showSignPrompt(): void {
     ].join(';');
     signEntry.addEventListener('keydown', (ev) => {
       ev.stopPropagation();
-      if (ev.key === 'Enter') {
+      if (ev.key === 'Enter' && !ev.isComposing) {
         applyUserSign(signEntry!.value);
         hideSignPrompt();
       } else if (ev.key === 'Escape') {

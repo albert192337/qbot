@@ -241,6 +241,8 @@ export interface ActionState {
 
 /** .job/state.json 整体结构 */
 export interface JobState {
+  /** Existing-character regeneration: resume only these explicitly selected actions. */
+  regenerateActions?: ActionId[];
   jobId: string;
   pipelineVersion: '1';
   tier: 'S';

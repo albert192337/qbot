@@ -46,6 +46,7 @@ interface PerceptionState {
 let cache: PerceptionState | null = null;
 let loading: Promise<PerceptionState> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saving: Promise<void> = Promise.resolve();
 let emitListeners = new Set<(ev: PerceptionEvent) => void>();
 
 function initialForegroundMonitor(): ForegroundMonitorState {
@@ -123,17 +124,20 @@ function scheduleSave(): void {
 }
 
 /** 退出前调用，把防抖里没落的那笔写掉（同 progress.ts 的 flushProgress） */
-export async function flush(): Promise<void> {
+export async function flush(strict = false): Promise<void> {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
   if (!cache) return;
-  try {
+  const job = saving.then(async () => {
     await mkdir(path.dirname(filePath()), { recursive: true });
     await writeFile(filePath(), JSON.stringify(cache, null, 2));
-  } catch (err) {
+  });
+  saving = job.catch(() => {});
+  try { await job; } catch (err) {
     console.error('[perception] 写盘失败', err); // 写失败不阻塞感知
+    if (strict) throw err;
   }
 }
 
@@ -176,6 +180,14 @@ export async function recordDecision(log: DecisionLog): Promise<void> {
   const s = await load();
   s.decisions.push(log);
   scheduleSave();
+}
+/** Generated history can paraphrase user facts, so erase it when forgetting/correcting. */
+export async function clearMemoryHistory(): Promise<void> {
+  const s = await load();
+  s.behaviors = [];
+  s.decisions = [];
+  s.events = s.events.filter(e => e.type !== 'garden_highlight');
+  await flush(true);
 }
 
 /** 调试面板一次性快照（事件倒序、账本当日、行为史/决策倒序） */

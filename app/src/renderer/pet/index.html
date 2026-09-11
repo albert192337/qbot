@@ -97,12 +97,12 @@
       body.visit-mode.flip-visitor #visitor-stage {
         transform: scaleX(-1);
       }
-      /* ── signboard（在角色身后，视频 z-index:1 压住它）── */
+      /* 留言纸牌靠顶部，文字在角色前景，避免头部遮住提醒。 */
       .signboard {
         position: absolute;
-        top: 14%;
+        top: 2%;
         right: 12%;
-        z-index: 0;
+        z-index: 2;
         pointer-events: none;
         opacity: 0;
         display: flex;
@@ -123,28 +123,37 @@
         100% { opacity: 1; transform: scale(1); }
       }
       .signboard-board {
-        background: linear-gradient(135deg, #fdf6e3 0%, #f5e6c8 100%);
-        border: 3px solid #c4956a;
-        border-radius: 8px;
-        padding: 6px 12px;
+        background: #fff9ef;
+        border: 2px solid #594235;
+        border-radius: 16px 16px 14px 14px;
+        padding: 10px 14px;
         margin-top: 2px;
-        font-family: 'STKaiti', 'KaiTi', 'SimKai', 'PingFang SC', serif;
-        font-size: 13px;
-        color: #5c3d2e;
+        font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.5;
+        letter-spacing: .3px;
+        color: #594235;
         text-align: center;
         /* 长歌名会把牌子撑出窗口被裁掉（窗口默认仅 360px）→ 限宽 + 省略号 */
-        max-width: 76vw;
+        max-width: min(180px, 62vw);
         overflow: hidden;
         text-overflow: ellipsis;
-        white-space: nowrap;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+        white-space: normal;
+        overflow-wrap: anywhere;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        box-shadow: 0 3px 0 #e8d8bd, 0 5px 12px rgba(89,66,53,.12);
         min-width: 40px;
       }
       .signboard-post {
-        width: 6px;
-        height: 36px;
-        background: linear-gradient(180deg, #c4956a 0%, #a0724a 100%);
-        border-radius: 0 0 3px 3px;
+        width: 7px;
+        height: 30px;
+        background: #d4b58b;
+        border: 1.5px solid #594235;
+        border-top: 0;
+        border-radius: 0 0 5px 5px;
       }
       #bubble {
         position: absolute;

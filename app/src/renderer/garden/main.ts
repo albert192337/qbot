@@ -262,7 +262,7 @@ function positionQuick(): void {
         // 生长有高度过渡，提前避开目标高度，不能等动画长大后才挪菜单。
         return {left:r.left,right:r.right,bottom:r.bottom,top:Math.min(r.top,r.bottom-(parseFloat(plant.style.height)||r.height))-10};
     });
-    const layout = quickLayout(innerWidth, innerHeight, width, menu.offsetHeight, soil.x + soil.width / 2, [petBounds, ...plants, ...(speechBounds ? [speechBounds] : [])]);
+    const layout = quickLayout(innerWidth, innerHeight, width, menu.offsetHeight, soil.x + soil.width / 2, [petBounds, ...plants, ...(speechBounds ? [speechBounds] : [])], !!quickResult);
     menu.style.maxHeight = `${layout.maxHeight}px`;
     menu.style.left = `${layout.left}px`;
     menu.style.top = `${layout.top}px`;
@@ -498,9 +498,9 @@ function tick(allowRender = true): void {
         if (p) {
             const ratio = growth(p, now);
             const a = e.querySelector<HTMLElement>('.art')!;
-            a.style.height = `${ratio < .55 ? 35 + ratio * 60 : (90 + ratio * 55) * (p.traits.includes('giant') ? 2.9 : 1)}px`;
+            a.style.height = `${ratio < .55 ? 35 + ratio * 60 : (90 + ratio * 55) * (p.traits.includes('giant') ? 1.8 : 1)}px`;
             const side = e.parentElement!;
-            const width = p.traits.includes('giant') && ratio >= .55 ? Math.min(420, side.clientWidth) : e.clientWidth;
+            const width = p.traits.includes('giant') && ratio >= .55 ? 200 : 70;
             const center = Math.max(width / 2, Math.min(e.offsetLeft + e.clientWidth / 2, side.clientWidth - width / 2));
             a.style.width = `${width}px`;
             a.style.left = `${center - e.offsetLeft}px`;

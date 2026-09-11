@@ -3,6 +3,11 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
+  memory: {
+    retry: () => ipcRenderer.invoke('memory:retry'),
+    get: (character, debug) => ipcRenderer.invoke('memory:get', character, debug),
+    edit: (command, character) => ipcRenderer.invoke('memory:edit', command, character),
+  },
   garden: {
     onSpeechBounds: cb => { const fn = (_ev: unknown, bounds: Parameters<typeof cb>[0]) => cb(bounds); ipcRenderer.on('garden:speechBounds', fn); return () => ipcRenderer.removeListener('garden:speechBounds', fn); },
     onPerformance: cb => { const fn = (_ev: unknown, action: string | null) => cb(action); ipcRenderer.on('garden:performance', fn); return () => ipcRenderer.removeListener('garden:performance', fn); },
@@ -200,6 +205,21 @@ const api: QBotApi = {
       return () => ipcRenderer.removeListener('rooms:error', listener);
     },
   },
+  stickerLibrary: {
+    analyze: dir => ipcRenderer.invoke('stickerLibrary:analyze',dir),
+    scan: () => ipcRenderer.invoke('stickerLibrary:scan'),
+    preview: (token,id) => ipcRenderer.invoke('stickerLibrary:preview',token,id),
+    create: req => ipcRenderer.invoke('stickerLibrary:create',req),
+    save: (id,library) => ipcRenderer.invoke('stickerLibrary:save',id,library),
+    frame: (dir,id,seconds) => ipcRenderer.invoke('stickerLibrary:frame',dir,id,seconds),
+    generate: (dir,id,seconds,description) => ipcRenderer.invoke('stickerLibrary:generate',dir,id,seconds,description),
+    package: id => ipcRenderer.invoke('stickerLibrary:package',id),
+    onProgress: cb => {
+      const fn = (_ev: unknown,p: import('../shared/sticker-library').StickerProgress) => cb(p);
+      ipcRenderer.on('stickerLibrary:progress',fn);
+      return () => ipcRenderer.removeListener('stickerLibrary:progress',fn);
+    },
+  },
   studio: {
     savePersona: (dirId, persona) => ipcRenderer.invoke('studio:savePersona', dirId, persona),
     addCustomAction: (dirId, name, poseDesc, motionDesc, durationSec) =>
@@ -330,6 +350,12 @@ const api: QBotApi = {
   },
   /** 举牌：手动牌记账 + 当前实际牌面同步 */
   sign: {
+    getMessage: () => ipcRenderer.invoke('sign:getMessage'),
+    onMessage: (cb: (message: import('../shared/pet-message').PetMessage | null) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, message: import('../shared/pet-message').PetMessage | null) => cb(message);
+      ipcRenderer.on('sign:message', listener);
+      return () => ipcRenderer.removeListener('sign:message', listener);
+    },
     set: (text: string | null) => ipcRenderer.send('sign:set', text),
     sync: (text: string | null) => ipcRenderer.send('sign:sync', text),
   },
@@ -345,6 +371,12 @@ const api: QBotApi = {
   },
   /** 行为引擎 → pet 窗：播指定动作（state-machine 的 PLAY_ACTION 入口） */
   behaviorAction: {
+    getIdlePlan: id=>ipcRenderer.invoke('behavior:getIdlePlan',id),
+    onIdlePlan: cb=>{
+      const fn=(_ev:unknown,plan:import('../shared/idle-plan').IdlePlan)=>cb(plan);
+      ipcRenderer.on('behavior:idlePlan',fn);
+      return ()=>ipcRenderer.removeListener('behavior:idlePlan',fn);
+    },
     onPlay: (cb) => {
       const listener = (_ev: unknown, payload: { action: string; loops: number }) => cb(payload);
       ipcRenderer.on('behavior:action', listener);

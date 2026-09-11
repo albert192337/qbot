@@ -12,6 +12,19 @@ vi.mock('../src/main/behavior-rules', () => ({ setBehaviorExecutor: vi.fn() }));
 vi.mock('../src/main/brain-log', () => ({ updateBrainCall: vi.fn() }));
 import { execute, getExecutorState, stopAllBehaviors } from '../src/main/behavior-executor';
 import { rememberConversation, conversationFor } from '../src/main/conversation-memory';
+import { getPetMessage, clearPetMessage } from '../src/main/pet-message';
+
+it('留言独立于行为队列，后续动作打断不清牌，显式收起生效', async () => {
+  execute({ meta: { id: 'message', source: 'llm', priority: 1, characterId: 'a' }, steps: [{ op: 'sign', text: '别熬太晚' }, { op: 'wait', ms: 5000 }] });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(getPetMessage()).toMatchObject({ text: '别熬太晚', characterId: 'a' });
+  execute(script('interrupt', 100));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(getPetMessage()?.text).toBe('别熬太晚');
+  execute({ meta: { id: 'clear', source: 'debug', priority: 100 }, steps: [{ op: 'sign', text: null }] });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(getPetMessage()).toBeNull();
+});
 
 let web: EventEmitter & { send: ReturnType<typeof vi.fn>; isLoading: ReturnType<typeof vi.fn> };
 const script = (id: string, priority = 1, source: BehaviorScript['meta']['source'] = 'rule'): BehaviorScript => ({
@@ -35,6 +48,7 @@ it('自由模式屏蔽规则台词但保留模型台词', async () => {
   expect(web.send).toHaveBeenCalledWith('behavior:say', expect.objectContaining({ text: 'generated' }));
 });
 afterEach(async () => {
+  clearPetMessage();
   stopAllBehaviors();
   await vi.advanceTimersByTimeAsync(0);
   vi.useRealTimers();

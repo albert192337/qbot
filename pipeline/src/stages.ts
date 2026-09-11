@@ -154,7 +154,13 @@ async function runAction(
   sleep: (ms: number) => Promise<void>,
 ): Promise<void> {
   const a = job.state.actions[action];
-  const turnaroundPng = await readFile(path.join(job.outDir, 'turnaround.png'));
+  let turnaroundPng: Buffer;
+  try { turnaroundPng = await readFile(path.join(job.outDir, 'turnaround.png')); }
+  catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+    // Imported sticker characters have a reference image, not a generated turnaround.
+    turnaroundPng = await readFile(path.join(job.outDir, job.state.refImage));
+  }
 
   // 读取自定义 prompt（poseDesc/motionDesc + 全文覆盖）与人设
   // （初次生成时 manifest 尚未写出，redo/重新生成时已有）

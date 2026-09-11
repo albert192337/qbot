@@ -11,6 +11,7 @@ export const EVENT_ACTIVITY: Record<string, AgentActivity> = {
   UserPromptSubmit: 'thinking',
   PreToolUse: 'working',
   PostToolUse: 'working',
+  PostToolUseFailure: 'error',
   Notification: 'waiting', // 权限确认 / 等输入
   Stop: 'done',
 };

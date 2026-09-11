@@ -405,6 +405,11 @@ export type CraftResult =
   | { ok: false; error: string };
 
 export interface QBotApi {
+  memory: {
+    retry(): Promise<void>;
+    get(character?: string, debug?: boolean): Promise<import('./memory').MemorySnapshot>;
+    edit(command: import('./memory').MemoryEdit, character: string): Promise<void>;
+  };
   garden: import('./garden').GardenApi;
   hatch: {
     cloudAccount(invite?: string): Promise<CloudAccount>;
@@ -472,6 +477,8 @@ export interface QBotApi {
   };
   /** 举牌：set 记录手动牌，sync 将当前实际牌面同步到公共房间 */
   sign: {
+    getMessage(): Promise<import('./pet-message').PetMessage | null>;
+    onMessage(cb: (message: import('./pet-message').PetMessage | null) => void): () => void;
     set(text: string | null): void;
     sync(text: string | null): void;
   };
@@ -551,6 +558,7 @@ export interface QBotApi {
     onError(cb: (msg: string) => void): () => void;
   };
   room: {
+    /** Local art/layout preview, separate from multiplayer and owned furniture. */
     openCozyPreview(): void;
     openHome(): void;
     /** 兼容旧调用：打开统一联机空间 */
@@ -616,6 +624,17 @@ export interface QBotApi {
     onShowScreen(cb: (name: string) => void): () => void;
     /** 打开统一控制台窗并直达 pane（pane 名见 renderer/console/main.ts 的 PaneId） */
     openConsole(pane?: string): void;
+  };
+  stickerLibrary: {
+    analyze(dirId: string): Promise<{suggestions: Record<string, NonNullable<import('./sticker-library').StickerItem['suggestion']>>; failed: number}>;
+    scan(): Promise<import('./sticker-library').StickerDraft | null>;
+    preview(token: string, id: string): Promise<string>;
+    create(req: import('./sticker-library').StickerCreateRequest): Promise<{ dirId: string; failed: string[] }>;
+    onProgress(cb: (p: import('./sticker-library').StickerProgress) => void): () => void;
+    save(dirId: string, library: import('./sticker-library').StickerLibrary): Promise<void>;
+    frame(dirId: string, id: string, seconds: number): Promise<string>;
+    generate(dirId: string, sourceId: string|null, seconds: number, description: string): Promise<string>;
+    package(dirId: string): Promise<{ bytes: number; files: number; fitsMarket: boolean }>;
   };
   studio: {
     /** 保存角色人设到 manifest.json */
@@ -736,6 +755,8 @@ export interface QBotApi {
 
   /** 行为引擎 → pet 窗：播指定动作（state-machine 的 PLAY_ACTION 入口） */
   behaviorAction: {
+    onIdlePlan(cb:(plan:import('./idle-plan').IdlePlan)=>void):()=>void;
+    getIdlePlan(characterId:string):Promise<import('./idle-plan').IdlePlan|null>;
     onPlay(cb: (payload: { action: string; loops: number; preview?: boolean; traceId?: string }) => void): () => void;
   };
 

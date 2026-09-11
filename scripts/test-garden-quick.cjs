@@ -78,6 +78,7 @@ app.whenReady().then(async () => {
     assert.ok(await js(`document.querySelector('.result-card').textContent.includes('kg')&&!!document.querySelector('.result-card img')`));
     const resultBounds = await js(`(()=>{const r=document.querySelector('.result-card').getBoundingClientRect();return [r.width,r.height]})()`);
     assert.ok(resultBounds[0]<=280 && resultBounds[1]<=350);
+    assert.ok(await js(`(()=>{const e=document.querySelector('.result-card .quick-list');return e.scrollHeight<=e.clientHeight+1&&getComputedStyle(e).overflowY==='visible'})()`),'harvest result has no scrolling area');
     await shot('quick-harvest');
     await assertClear();
     await click(btn('收好'));

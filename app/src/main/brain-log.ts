@@ -1,5 +1,5 @@
 import { app } from 'electron';
-import { appendFile, mkdir, readFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { BrainCallLog, BrainLogSnapshot } from '../shared/brain-log';
@@ -49,3 +49,14 @@ export async function getBrainLog(): Promise<BrainLogSnapshot> {
   return { calls: [...calls.values()].sort((a, b) => b.at - a.at), gate, storageError };
 }
 export async function flushBrainLog(): Promise<void> { await saving; }
+/** Full prompts contain recalled facts: erase them when correcting/forgetting memory. */
+export async function clearBrainLog(): Promise<void> {
+  await load();
+  calls.clear();
+  const job = saving.then(async () => {
+    await mkdir(path.dirname(file()), { recursive: true });
+    await writeFile(file(), '', 'utf8');
+  });
+  saving = job.catch(e => { storageError = String(e); });
+  await job;
+}

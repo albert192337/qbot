@@ -9,6 +9,7 @@ vi.mock('electron', () => ({
     webContents={send:vi.fn(),on:vi.fn()};
     constructor(options:any){this.bounds={x:0,y:0,...options};mocks.windows.push(this)}
     getBounds(){return this.bounds} setPosition(x:number,y:number){this.bounds={...this.bounds,x,y};this.listeners.get('move')?.()}
+    setBounds(bounds:any){this.bounds={...this.bounds,...bounds};this.listeners.get('move')?.()}
     on(k:string,v:Function){this.listeners.set(k,v)} isDestroyed(){return false} isVisible(){return this.visible}
     showInactive(){this.visible=true} hide(){this.visible=false}
     setAlwaysOnTop(){} setVisibleOnAllWorkspaces(){} setIgnoreMouseEvents(){} loadFile(){} loadURL(){}

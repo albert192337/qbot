@@ -9,6 +9,7 @@ import path from 'node:path';
 import type { Manifest } from '@qbot/pipeline';
 import type { CharacterMeta } from '../shared/ipc-types';
 import { assignVoice } from '../shared/voice-assign';
+import { enrichStickerBehavior } from '../shared/sticker-behavior';
 
 export function charactersDir(): string {
   return path.join(app.getPath('userData'), 'characters');
@@ -63,6 +64,11 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
     }
     try {
       const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest;
+      if(enrichStickerBehavior(manifest)) {
+        const backup=`${manifestPath}.before-sticker-semantics`;
+        if(!existsSync(backup))await cp(manifestPath,backup);
+        await writeManifest(manifestPath,manifest);
+      }
       if (!manifest.voice) {
         // 声线懒迁移：老角色首次被列出时按 id 哈希分配并写回，之后永久稳定
         manifest.voice = assignVoice(manifest.id);

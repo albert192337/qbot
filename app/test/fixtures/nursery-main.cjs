@@ -12,8 +12,9 @@ app.whenReady().then(async () => {
   session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_request,cb)=>cb({cancel:true}));
   protocol.handle('qbot-asset',async request=>{
     const url=new URL(request.url);const relative=decodeURIComponent(url.pathname).replace(/^\//,'');
-    const filename=path.join(preset,relative);
-    if(!filename.startsWith(preset+path.sep))return new Response(null,{status:403});
+    const sourceRoot=url.hostname==='white-dog'&&process.env.QBOT_QA_REAL_STICKERS?process.env.QBOT_QA_REAL_STICKERS:preset;
+    const filename=path.join(sourceRoot,relative);
+    if(!filename.startsWith(sourceRoot+path.sep))return new Response(null,{status:403});
     try{
       const bytes=await readFile(filename);const type=filename.endsWith('.webm')?'video/webm':'image/png';
       return new Response(bytes,{headers:{'Content-Type':type,'Cache-Control':'no-store'}});
@@ -63,6 +64,34 @@ app.whenReady().then(async () => {
     'characters:getActive':()=>({dirId:'mascot',manifest,hasUnfinishedJob:false}),
     'ui:returnToDesktop':()=>{qa.calls.push(['desktop']);},
   };
+  if(process.env.QBOT_QA_STICKERS==='1') {
+    const names=Array.from({length:255},(_,i)=>({id:`st_${i}`,name:i===0?'开心':`表情${i}`}));
+    const pixel='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    let dog=process.env.QBOT_QA_REAL_STICKERS?JSON.parse(await readFile(path.join(process.env.QBOT_QA_REAL_STICKERS,'manifest.json'),'utf8')):null;
+    Object.assign(handlers,{
+      'stickerLibrary:scan':()=>({token:'fixture',names}),
+      'stickerLibrary:preview':()=>pixel,
+      'stickerLibrary:create':(_e,req)=>{
+        qa.calls.push(['sticker-create',req]);
+        dog={...manifest,name:req.name,actions:{idle:manifest.actions.idle},
+          customActions:Object.fromEntries(req.items.map(i=>[i.id,{...manifest.actions.idle,motionDesc:i.tags.join('；')}])),
+          stickerLibrary:{version:1,referenceId:req.referenceId,scenes:req.scenes,items:req.items.map(i=>({...i,name:names.find(n=>n.id===i.id).name,raw:'source.png'}))}};
+        qa.win.webContents.send('stickerLibrary:progress',{completed:255,total:255,current:'完成',failed:0});
+        return {dirId:'white-dog',failed:[]};
+      },
+      'stickerLibrary:save':(_e,id,library)=>{qa.calls.push(['sticker-save',id]);dog.stickerLibrary=library;},
+      'stickerLibrary:frame':()=>pixel,
+      'stickerLibrary:generate':(_e,id,source,seconds,description)=>{
+        qa.calls.push(['sticker-generate',source,seconds,description]);
+        dog.customActions.variant_fixture={...manifest.actions.idle,poseDesc:description};
+        dog.stickerLibrary.variants={variant_fixture:{description,enabled:false,sourceId:source}};
+        return 'variant_fixture';
+      },
+      'stickerLibrary:package':()=>({bytes:1024*1024,files:257,fitsMarket:true}),
+      'market:upload':()=>{qa.calls.push(['upload']);return {};},
+      'characters:list':()=>[{dirId:'mascot',manifest,hasUnfinishedJob:false},...(dog?[{dirId:'white-dog',manifest:dog,hasUnfinishedJob:false}]:[])],
+    });
+  }
   for(const [channel,handler] of Object.entries(handlers))ipcMain.handle(channel,handler);
   ipcMain.on('ui:openConsole',(_e,pane)=>{qa.calls.push(['console',pane]);qa.win.webContents.send('ui:showScreen',pane);});
   ipcMain.on('rooms:open',()=>qa.win.webContents.send('ui:showScreen','lounge'));

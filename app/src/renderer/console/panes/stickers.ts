@@ -61,6 +61,7 @@ export async function discardChanges(): Promise<void> { reviewItems = []; await 
 async function refresh(): Promise<void> {
   const host = root;
   if (!host) return;
+  // Keep legacy replacement available while making the new whole-library path discoverable.
   const ctx = await loadStudioContext(host);
   if (!ctx) {
     boundDirId = null;
@@ -103,6 +104,11 @@ async function refresh(): Promise<void> {
   html += '</div>';
 
   host.innerHTML = html;
+  const libraryButton = document.createElement('button');
+  libraryButton.className = 'btn primary';
+  libraryButton.textContent = '🐾 从整套表情包创建 / 管理新朋友';
+  libraryButton.onclick = () => window.qbot.ui.openConsole('sticker-create');
+  host.prepend(libraryButton);
   bind(host, ctx.dirId);
   renderReview();
 }

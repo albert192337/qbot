@@ -113,7 +113,12 @@ export class Player {
     this.playImpl(action, true);
   }
 
-  private playImpl(action: PlayableId, forceLoop: boolean): void {
+  /** Let the idle director reconsider only after a complete clip, including the idle alias. */
+  playOnce(action: PlayableId): void {
+    this.playImpl(action, false, true);
+  }
+
+  private playImpl(action: PlayableId, forceLoop: boolean, forceOnce = false): void {
     const generation = ++this.generation;
     this.cancelAttempt?.();
     this.cancelAttempt = null;
@@ -197,7 +202,7 @@ export class Player {
       lastTime = -1;
       armWatchdog();
       try {
-        next.loop = forceLoop || LOOPING.has(action);
+        next.loop = !forceOnce && (forceLoop || LOOPING.has(action));
         if (reload || next.error) next.load();
         if (next.readyState > 0) next.currentTime = 0;
         void next.play().then(() => {

@@ -1,5 +1,5 @@
 /**
- * 举牌模块：长柄木牌，文字在小人头顶上方。
+ * 举牌模块：奶油纸面留言牌，文字在小人头顶上方。
  * 柱子撑高，牌子在顶部；拖拽时自动隐藏，松手后延时弹出。
  * 纯 DOM，不碰状态机。
  */
@@ -60,6 +60,7 @@ export class Signboard {
   /** 拖拽时调用：临时藏起（不丢文字，松手后自动弹回） */
   onDragStart(): void {
     this.clearPending();
+    this.visible = false;
     this.el.classList.remove('show', 'poof-in');
   }
 

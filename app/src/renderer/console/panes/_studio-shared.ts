@@ -7,6 +7,7 @@
 import type { ActionId, Manifest, ManifestAction, PromptData } from '@qbot/pipeline';
 import { getEditingCharacter, navigate } from '../workspace';
 import type { CharacterMeta } from '../../../shared/ipc-types';
+import { actionDisplayName, type StickerManifest } from '../../../shared/sticker-behavior';
 
 /** 标准动作的中文标签（自定义动作直接用动作名）。
  *  口径统一：原先 hatch 叫「呼吸/悬空」、studio 叫「待机/拖拽」，收进同一窗会同屏出现。 */
@@ -138,6 +139,13 @@ export function collectActions(m: Manifest, prompts?: PromptData): ActionInfo[] 
       gif: a.gif,
       isCustom: true,
     });
+  }
+  const lib=(m as StickerManifest).stickerLibrary;
+  for(const action of actions){
+    const name=actionDisplayName(m,action.id);
+    if(name!==action.id)action.label=STD_LABELS[action.id as ActionId]?`${STD_LABELS[action.id as ActionId]} · ${name}`:name;
+    const item=lib?.items.find(i=>i.id===action.id);
+    if(item){action.motionDesc=item.tags.join(' · ');action.isImported=true;}
   }
   return [...new Map(actions.map((action) => [action.id, action])).values()];
 }

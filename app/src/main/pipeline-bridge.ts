@@ -50,6 +50,7 @@ import { charactersDir, getCharacter, restoreGenerationTask } from './characters
 import { getSettings } from './config';
 import { broadcastCharacterActivated, sendToWindows } from './windows';
 import { rebuildTray } from './tray';
+import { loadExistingCharacterJob, mergeRegeneratedActions } from './existing-character-job';
 
 interface ActiveHatch {
   dirId: string;
@@ -167,6 +168,11 @@ export async function resumeHatch(dirId: string): Promise<void> {
   if (active.has(dirId)) return; // 已在跑
   const outDir = path.join(charactersDir(), dirId);
   const job = await Job.load(outDir);
+  if (job.state.regenerateActions?.length) {
+    const pending = job.state.regenerateActions.filter(id => job.state.actions[id]?.status !== 'done');
+    if (pending.length) await rerunActions(dirId, pending, false);
+    return;
+  }
   await restoreGenerationTask(dirId);
   runJob(dirId, job);
 }
@@ -250,17 +256,19 @@ export async function regenerateActions(dirId: string, actionIds: ActionId[]): P
   await rerunActions(dirId, valid);
 }
 
-/** 重置给定动作为 pending 后跑 runActions + runPackage */
-async function rerunActions(dirId: string, actionIds: ActionId[]): Promise<void> {
+/** 重生成所选动作，合并成功结果；导入角色不需要原孵化任务。 */
+async function rerunActions(dirId: string, actionIds: ActionId[], fresh = true): Promise<void> {
   if (active.has(dirId)) throw new Error('该角色已有生成任务在跑，请等它结束');
+  const cfg = await buildConfig();
   const outDir = path.join(charactersDir(), dirId);
-  const job = await Job.load(outDir);
+  const job = await loadExistingCharacterJob(outDir);
   for (const id of actionIds) {
     // Failed actions resume paid upstream IDs; regenerating a successful action is explicitly fresh.
-    if (job.state.actions[id]?.status !== 'failed') {
+    if (fresh && job.state.actions[id]?.status !== 'failed') {
       job.state.actions[id] = { status: 'pending', attempts: { frame: 0, video: 0 } };
     }
   }
+  job.state.regenerateActions = actionIds;
   await job.save();
   await restoreGenerationTask(dirId);
 
@@ -268,12 +276,11 @@ async function rerunActions(dirId: string, actionIds: ActionId[]): Promise<void>
   active.set(dirId, entry);
   job.on('progress', (ev: ProgressEvent) => broadcast(dirId, ev));
   try {
-    const cfg = await buildConfig();
     // 沿用 job 创建时选定的生图后端
     if (job.state.imageProvider) cfg.imageProvider = job.state.imageProvider;
     const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
     await runActions(job, createArkClient(cfg), ffmpegPath, undefined, cfg.concurrency, actionIds);
-    await runPackage(job);
+    await mergeRegeneratedActions(job, actionIds);
     broadcast(dirId, { jobId: job.state.jobId, stage: 'done' });
     await rebuildTray();
     // 新资产落盘 → 让 pet 重建 Player
@@ -545,6 +552,7 @@ export async function addCustomAction(
   poseDesc: string,
   motionDesc: string,
   durationSec: number,
+  referenceImage?: Buffer,
 ): Promise<void> {
   if (!ACTION_NAME_RE.test(name)) {
     throw new Error('动作名称只能包含字母、数字、下划线或中文');
@@ -561,7 +569,7 @@ export async function addCustomAction(
   // 写 manifest：标记 pending（Studio 显示黄色「生成中」）
   manifest.customActions = {
     ...manifest.customActions,
-    [name]: { webm: `actions/${name}.webm`, gif: `actions/${name}.gif`, durationSec, status: 'pending' },
+    [name]: { webm: `actions/${name}.webm`, gif: `actions/${name}.gif`, durationSec, status: 'pending', poseDesc, motionDesc },
   };
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
   await restoreGenerationTask(dirId);
@@ -570,12 +578,13 @@ export async function addCustomAction(
   // 后台生成，不阻塞 IPC 返回
   void generateCustomAction({
     dirId, outDir, manifestPath, name, poseDesc, motionDesc, durationSec,
-    persona: manifest.persona, manifest, cfg,
+    persona: manifest.persona, manifest, cfg, referenceImage,
   });
 }
 
 /** 自定义动作的实际生成流程（首帧 → 视频 → 抠像 → 回写 manifest） */
 async function generateCustomAction(a: {
+  referenceImage?: Buffer;
   dirId: string;
   outDir: string;
   manifestPath: string;
@@ -589,7 +598,7 @@ async function generateCustomAction(a: {
 }): Promise<void> {
   const { dirId, outDir, manifestPath, name, poseDesc, motionDesc, durationSec, persona, manifest, cfg } = a;
   try {
-    const turnaround = await readReferenceImage(outDir);
+    const turnaround = a.referenceImage ?? await readReferenceImage(outDir);
     const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
     const ark = createArkClient(cfg);
 
@@ -712,6 +721,8 @@ export async function saveAgentActions(
   const manifest = JSON.parse(raw) as Manifest;
   manifest.agentActions = Object.keys(config).length > 0 ? config : undefined;
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  const meta=await getCharacter(dirId);
+  if(meta&&(await getSettings()).activeCharacter===dirId)broadcastCharacterActivated(meta);
 }
 
 /** 重建生成 prompt 数据（供 Studio 配置面板展示） */

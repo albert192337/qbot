@@ -460,6 +460,7 @@ export async function gifToWebm(
   outPath: string,
   ffmpegPath: string,
   canvas: number = STICKER_CANVAS,
+  fast: boolean = false,
 ): Promise<void> {
   // decrease=等比缩放不裁切；pad 居中；force_original_aspect_ratio 防拉伸
   const vf =
@@ -471,6 +472,7 @@ export async function gifToWebm(
     '-i', inPath,
     '-vf', vf,
     '-c:v', 'libvpx-vp9',
+    ...(fast ? ['-deadline', 'realtime', '-cpu-used', '5', '-threads', '2'] : []),
     '-pix_fmt', 'yuva420p',
     '-auto-alt-ref', '0',
     '-metadata:s:v:0', 'alpha_mode=1',

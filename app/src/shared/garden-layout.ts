@@ -3,7 +3,8 @@ export function gardenSide(pet: { x: number; width: number }, area: { x: number;
 }
 /** 六块地排在同一侧，最外侧单独留工具列，不与植物共用空间。 */
 export function gardenLane(left: number, right: number, width: number, side: 'left' | 'right') {
-  const start = side === 'left' ? 64 : right + 20;
-  const end = side === 'left' ? left - 20 : width - 64;
-  return { left: start, width: Math.max(60, end - start), toolsLeft: side === 'left' ? 12 : width - 48 };
+  const laneWidth = 455;
+  const desired = side === 'left' ? left - 20 - laneWidth : right + 20;
+  const start = Math.max(54, Math.min(desired, width - laneWidth - 54));
+  return { left: start, width: laneWidth, toolsLeft: side === 'left' ? start - 48 : start + laneWidth + 12 };
 }

@@ -42,6 +42,7 @@ export class CreationForm {
     private preview: (url: string | null) => void,
     private create: (draft: CreationDraft) => Promise<boolean>,
   ) {
+    this.root.append(button('🐾 从一整套表情包创建', () => this.api.ui.openConsole('sticker-create'), 'quiet'));
     this.name.placeholder = '你想怎么称呼它？';
     this.name.maxLength = 24;
     this.name.autocomplete = 'off';

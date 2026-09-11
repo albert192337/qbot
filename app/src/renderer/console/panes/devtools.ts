@@ -8,6 +8,8 @@
  */
 import type { Progress } from '../../../shared/ipc-types';
 import { toast } from './_studio-shared';
+import { mountMemoryPanel } from './memory-panel';
+let memoryPanel: ReturnType<typeof mountMemoryPanel> | undefined;
 
 let root: HTMLElement | null = null;
 let unsubProgress: (() => void) | null = null;
@@ -109,6 +111,10 @@ export async function mount(host: HTMLElement): Promise<void> {
       : '保持原有陪伴频率；LLM 脑开启时，台词仍由模型生成。';
   };
   renderMode(await window.qbot.settings.get());
+  const memoryHost = document.createElement('div');
+  host.querySelector('.studio-body')!.prepend(memoryHost);
+  memoryPanel?.dispose();
+  memoryPanel = mountMemoryPanel(memoryHost, true);
   unsubSettings?.(); unsubSettings = window.qbot.settings.onChanged(renderMode);
   host.querySelectorAll<HTMLButtonElement>('[data-pet-mode]').forEach(b => b.addEventListener('click', async () => {
     const buttons = host.querySelectorAll<HTMLButtonElement>('[data-pet-mode]'); buttons.forEach(x => x.disabled = true);
@@ -210,6 +216,7 @@ async function refreshRules(): Promise<void> {
 }
 
 export function unmount(): void {
+  memoryPanel?.dispose(); memoryPanel = undefined;
   unsubSettings?.(); unsubSettings = null;
   if (brainTimer) clearInterval(brainTimer);
   brainTimer = null;

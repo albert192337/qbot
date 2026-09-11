@@ -1,4 +1,5 @@
 import { recoverCloudJobs } from './cloud-generation';
+import { initUserMemory, flushUserMemory } from './user-memory';
 /** 主进程入口：协议注册（必须在 ready 前）→ 预置角色 → 窗口/托盘/IPC */
 import { app, net, protocol, screen } from 'electron';
 import { existsSync } from 'node:fs';
@@ -57,6 +58,7 @@ if (!app.requestSingleInstanceLock()) {
 app.whenReady().then(async () => {
   // 初始化全局错误处理
   initErrorHandler();
+  await initUserMemory();
 
   // 资源泄漏检测和自动清理
   startResourceMonitoring();
@@ -210,7 +212,7 @@ app.on('before-quit', (ev) => {
   // progress 是玩法数据（点数/箱子/库存），不能丢防抖窗口里最后那笔 →
   // 拦一次退出等落盘完再真退。写失败 flushProgress 内部已吞，不会卡住退出
   ev.preventDefault();
-  void Promise.all([flushProgress(), flushPerception()]).finally(() => {
+  void Promise.all([flushProgress(), flushPerception(), flushUserMemory()]).finally(() => {
     quitFlushed = true;
     app.quit();
   });

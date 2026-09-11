@@ -1,5 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ request: vi.fn(), execute: vi.fn(), settings: vi.fn(), input: vi.fn(), log: vi.fn() }));
+vi.mock('../src/main/user-memory', () => ({ queueMemoryExtraction: vi.fn(async () => {}) }));
+const m = vi.hoisted(() => ({ request: vi.fn(), execute: vi.fn(), settings: vi.fn(), input: vi.fn(), log: vi.fn(), idle: vi.fn() }));
+vi.mock('../src/main/idle-plan', () => ({ applyIdleDecision: m.idle }));
 vi.mock('../src/main/config', () => ({ getSettings: m.settings }));
 vi.mock('../src/main/brain-llm', () => ({ buildInput: m.input }));
 vi.mock('../src/main/brain-log', () => ({ beginBrainCall: async () => 'chat-test', updateBrainCall: m.log }));
@@ -26,6 +28,19 @@ it('请求失败给出错误，不触发保底冒泡', async () => {
 });
 it('请求期间切换角色不让旧回复配上新角色动作', async () => {
   m.settings.mockResolvedValueOnce({ activeCharacter: 'frog', arkApiKey: 'mock' }).mockResolvedValue({ activeCharacter: 'cat' });
+  expect((await sendPetChat('你好')).ok).toBe(false);
+  expect(m.execute).not.toHaveBeenCalled();
+});
+it('一次聊天请求同时给出即时表情与后续待机，不额外请求模型', async () => {
+  m.input.mockResolvedValue({ personaName: '阿呱', availableIntents: ['newDance'], idleCandidates: [{ id: 'rest', description: '安静休息' }] });
+  m.request.mockResolvedValue('{"action":"newDance","say":["好呀"],"idleAction":"rest","idleMinutes":5}');
+  expect((await sendPetChat('休息一下')).ok).toBe(true);
+  expect(m.request).toHaveBeenCalledTimes(1);
+  expect(m.idle).toHaveBeenCalledWith('frog', expect.objectContaining({idleAction:'rest',idleMinutes:5}), ['rest']);
+});
+it('记忆被纠正后，不执行使用旧记忆生成的回复', async () => {
+  m.input.mockResolvedValueOnce({ personaName: '阿呱', availableIntents: ['newDance'], memoryRevision: 0 })
+    .mockResolvedValue({ personaName: '阿呱', availableIntents: ['newDance'], memoryRevision: 1 });
   expect((await sendPetChat('你好')).ok).toBe(false);
   expect(m.execute).not.toHaveBeenCalled();
 });

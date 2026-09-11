@@ -1,3 +1,4 @@
+import { initUserMemory } from './user-memory';
 /**
  * LLM 脑（自由模式）。
  *
@@ -12,9 +13,12 @@
  *  - 克制：prompt 强约束「大部分时候不行动」，模型自己也会经常返回 do=false
  */
 import { getSettings } from './config';
+import { getPetMessage } from './pet-message';
 import { conversationFor, lastUserAt, shouldPauseAutomatic } from './conversation-memory';
 import { getCharacter } from './characters';
 import { brainActions } from './brain-actions';
+import { applyIdleDecision,getIdlePlan } from './idle-plan';
+import type { StickerManifest } from '../shared/sticker-behavior';
 import { beginBrainCall, updateBrainCall, brainGate } from './brain-log';
 import { BRAIN_MODEL, ARK_BASE_URL } from './llm-client';
 import { chatCompleteWithRetry, LlmError } from './llm-client';
@@ -105,7 +109,7 @@ async function think(trigger: string): Promise<void> {
   const callId = await beginBrainCall(trigger);
   brainGate('正在调用 LLM');
   try {
-    const input = await buildInput();
+    const input = await buildInput('auto');
     input.reactingToHarvest = harvest;
     const messages = buildBrainMessages(input);
     await updateBrainCall(callId, '已请求', { input: { endpoint: `${ARK_BASE_URL}/chat/completions`, model: BRAIN_MODEL, temperature: 0.8, messages, context: input } });
@@ -129,8 +133,9 @@ async function think(trigger: string): Promise<void> {
       return;
     }
 
+    if ((await initUserMemory()).revision !== input.memoryRevision) return;
     await updateBrainCall(callId, '收到原始输出', { raw });
-    const decision = parseBrainResponse(raw, input.availableIntents);
+    const decision = parseBrainResponse(raw, input.availableIntents,input.idleCandidates?.map(a=>a.id));
     await updateBrainCall(callId, decision ? (decision.do ? '模型选择行动' : '模型选择不行动') : '输出解析失败', { decision });
     if (!decision) {
       void recordDecision({
@@ -148,6 +153,11 @@ async function think(trigger: string): Promise<void> {
     void recordBehavior({ at: now, kind: 'journal', detail: decision.thought });
 
     if (!decision.do) {
+      if(decision.idleAction){
+        const latest=await buildInput();
+        if(latest.characterId===characterId&&latest.memoryRevision===input.memoryRevision&&lastUserAt(characterId)===userAtRequest)
+          applyIdleDecision(characterId,decision,latest.idleCandidates?.map(a=>a.id)??[]);
+      }
       void recordDecision({
         at: now,
         trigger: `llm:${trigger}`,
@@ -162,11 +172,12 @@ async function think(trigger: string): Promise<void> {
     // 组装行为脚本（模型只给扁平字段，主进程拼 DSL + 校验）
     // 请求期间可能切换角色或删除动作，执行前再次核对，不把旧动作发给新角色。
     const latest = await buildInput();
-    if (latest.characterId !== characterId || lastUserAt(characterId) !== userAtRequest) {
+    if (latest.memoryRevision !== input.memoryRevision || latest.characterId !== characterId || lastUserAt(characterId) !== userAtRequest) {
       await updateBrainCall(callId, '已取消过时的主动回应：角色切换或用户开始聊天');
       return;
     }
     if (decision.action && !latest.availableIntents.includes(decision.action)) decision.action = undefined;
+    applyIdleDecision(characterId,decision,latest.idleCandidates?.map(a=>a.id)??[]);
     const script = buildScript(decision);
     await updateBrainCall(callId, '执行前决策', { decision: { ...decision, script } });
     if (!script) {
@@ -176,7 +187,7 @@ async function think(trigger: string): Promise<void> {
         snapshot: { thought: decision.thought },
         candidates: [],
         selected: null,
-        skippedReason: '决策无动作也无台词',
+        skippedReason: '决策无动作、台词或留言',
       });
       return;
     }
@@ -198,7 +209,7 @@ async function think(trigger: string): Promise<void> {
       trigger: `llm:${trigger}`,
       snapshot: { thought: decision.thought, action: decision.action, say: decision.say },
       candidates: [{ id: 'llm-brain', score: 1, reason: decision.thought }],
-      selected: { action: 'llm-brain', text: decision.say ?? decision.action },
+      selected: { action: 'llm-brain', text: decision.say ?? decision.message ?? decision.action },
     });
     script.meta.traceId = callId;
     script.meta.characterId = characterId;
@@ -214,9 +225,10 @@ async function think(trigger: string): Promise<void> {
 }
 
 /** 把模型决策组装成 BehaviorScript（动作意图 + 台词）。调用前已确保 do=true */
-function buildScript(d: { action?: string; say?: string }): BehaviorScript | null {
-  if (!d.action && !d.say) return null;
+function buildScript(d: { action?: string; say?: string; message?: string }): BehaviorScript | null {
+  if (!d.action && !d.say && !d.message) return null;
   const steps: BehaviorScript['steps'] = [];
+  if (d.message) steps.push({ op: 'sign', text: d.message });
   if (d.action) steps.push({ op: 'play', action: d.action, loops: 1 });
   if (d.say) steps.push({ op: 'say', text: d.say });
   return {
@@ -232,7 +244,9 @@ function buildScript(d: { action?: string; say?: string }): BehaviorScript | nul
 }
 
 /** 从当前全局状态构造喂给模型的上下文 */
-export async function buildInput(): Promise<BrainInput> {
+export async function buildInput(memoryMode?: 'chat' | 'auto', query = ''): Promise<BrainInput> {
+  const memory = await initUserMemory();
+  await memory.flush();
   const settings = await getSettings();
   const focus = currentFocus();
   const agent = getAgentStatus();
@@ -244,6 +258,7 @@ export async function buildInput(): Promise<BrainInput> {
   let personaName = '桌宠';
   let personaTraits: string | undefined;
   let actionDescriptions: ReturnType<typeof brainActions> = [];
+  let idleCandidates:ReturnType<typeof brainActions>=[];
   try {
     if (settings.activeCharacter) {
       const meta = await getCharacter(settings.activeCharacter);
@@ -251,6 +266,8 @@ export async function buildInput(): Promise<BrainInput> {
         personaName = meta.manifest.name || personaName;
         personaTraits = meta.manifest.persona || undefined;
         actionDescriptions = brainActions(meta.manifest);
+        const pool=(meta.manifest as StickerManifest).stickerLibrary?.idleCandidates??['idle'];
+        idleCandidates=actionDescriptions.filter(a=>pool.includes(a.id));
       }
     }
   } catch {
@@ -273,6 +290,10 @@ export async function buildInput(): Promise<BrainInput> {
     .slice(0, 5);
 
   return {
+    currentMessage: !getPetMessage()?.characterId || getPetMessage()?.characterId === (settings.activeCharacter ?? 'default') ? getPetMessage()?.text : undefined,
+    idleCandidates,idlePlan:getIdlePlan(settings.activeCharacter??'default'),
+    memoryRevision: memory.revision,
+    userMemories: memoryMode ? await memory.select(settings.activeCharacter ?? 'default', memoryMode, query) : [],
     behaviorMode: settings.behaviorMode ?? 'companion',
     gardenHighlights: (snap.events ?? []).filter((e): e is Extract<PerceptionEvent, { type: 'garden_highlight' }> => e.type === 'garden_highlight' && Date.now() - e.at < 2 * 3600000).slice(0, 5).map(e => ({ at: e.at, summary: e.summary })),
     personaName,

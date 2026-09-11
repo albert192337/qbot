@@ -1,0 +1,71 @@
+// Isolated real Electron/preload + real MemoryStore; no model calls or user data.
+const { app, ipcMain } = require('electron');
+const path = require('node:path');
+const fs = require('node:fs/promises');
+const assert = require('node:assert/strict');
+const Module = require('node:module');
+const ts = require('../node_modules/typescript');
+const root = path.resolve(__dirname, '..');
+process.env.QBOT_QA_DATA = path.join(root, '.superpowers/memory-ui-data');
+process.env.QBOT_QA_LOGS = '1';
+require('../app/test/fixtures/nursery-main.cjs');
+const wait = ms => new Promise(r => setTimeout(r, ms));
+app.whenReady().then(async () => {
+  try {
+    const code = ts.transpileModule(await fs.readFile(path.join(root, 'app/src/main/memory-store.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
+    const filename = path.join(root, 'app/src/main/memory-store.cjs');
+    const mod = new Module(filename, module); mod.filename = filename; mod._compile(code, filename);
+    const file = path.join(process.env.QBOT_QA_DATA, `store-${Date.now()}.json`);
+    const store = new mod.exports.MemoryStore(file); await store.load();
+    const now = Date.now();
+    await store.apply([{ op: 'upsert', key: 'name', text: '你喜欢我叫你阿贝。', quote: '叫我阿贝', kind: 'preference', scope: 'shared', certainty: 'explicit' }], 'mascot', '叫我阿贝', now, 0);
+    await store.episode('mascot', '我们一起收获的第一株金色草莓，叫作发财。', now + 1);
+    await store.episode('new-friend', '只有栗子参与的秘密回忆', now + 2);
+    await store.apply([{ op: 'upsert', key: 'evening', text: '近期晚上常在线，还不能判断作息。', quote: '最近晚上在线', kind: 'observation', scope: 'shared', certainty: 'tentative' }], 'mascot', '最近晚上在线', now + 3, 0);
+    let failEdit = false;
+    ipcMain.handle('memory:get', (_e, character = 'mascot', debug) => store.snapshot(character, debug));
+    ipcMain.handle('memory:edit', (_e, command, character) => { if (failEdit) throw Error('模拟写入失败'); return store.edit(command, character); });
+    ipcMain.handle('memory:retry', () => {});
+    for (let i = 0; i < 100 && !global.qa?.win; i++) await wait(100);
+    const win = global.qa.win;
+    global.qa.status = { phase: 'done' };
+    async function js(code) { return win.webContents.executeJavaScript(code); }
+    async function until(code) { for (let i = 0; i < 100; i++) { if (await js(code)) return; await wait(100); } throw Error('Timed out: ' + code); }
+    await until(`!!document.querySelector('#scene canvas')`);
+    await js(`document.querySelector('#memory-book').click()`);
+    await until(`document.querySelector('[data-pane="memory"] .memory-cards')?.textContent.includes('阿贝')`);
+    assert.equal(await js(`document.querySelector('[data-pane="memory"]').textContent.includes('秘密回忆')`), false);
+    assert.equal(await js(`document.querySelector('[data-pane="memory"]').textContent.includes('还不能判断作息')`), false);
+    await fs.mkdir(path.join(root, '.superpowers/memory-ui'), { recursive: true });
+    await wait(500);
+    await fs.writeFile(path.join(root, '.superpowers/memory-ui/user.png'), (await win.webContents.capturePage()).toPNG());
+    await js(`Array.from(document.querySelectorAll('[data-pane="memory"] article button')).find(b=>b.textContent==='改一下').click()`);
+    await js(`document.querySelector('[data-pane="memory"] textarea').value='纠正后的记忆 <img src=x onerror=window.injected=true>'`);
+    await wait(3200);
+    assert.ok((await js(`document.querySelector('[data-pane="memory"] textarea').value`)).includes('纠正后的记忆'));
+    failEdit = true;
+    await js(`document.querySelector('[data-pane="memory"] form').requestSubmit()`);
+    await until(`document.querySelector('[data-pane="memory"] [role="status"]').textContent.includes('没有保存成功')`);
+    assert.ok(await js(`!!document.querySelector('[data-pane="memory"] textarea')`));
+    failEdit = false;
+    await js(`document.querySelector('[data-pane="memory"] form').requestSubmit()`);
+    await until(`!document.querySelector('[data-pane="memory"] textarea')`);
+    assert.equal(await js('window.injected'), undefined);
+    const restored = new mod.exports.MemoryStore(file); await restored.load();
+    assert.ok(restored.candidates('mascot').some(m => m.text.includes('纠正后的记忆')));
+    await js(`const picker=document.querySelector('[data-pane="memory"] select');picker.value='new-friend';picker.dispatchEvent(new Event('change'))`);
+    await until(`document.querySelector('[data-pane="memory"]').textContent.includes('秘密回忆')`);
+    assert.equal(await js(`document.querySelector('[data-pane="memory"]').textContent.includes('纠正后的记忆')`), false);
+    win.webContents.send('ui:showScreen', 'devtools');
+    await until(`document.querySelector('[data-pane="devtools"] .memory-panel')?.textContent.includes('还不能判断作息')`);
+    assert.ok(await js(`document.querySelector('[data-pane="devtools"] .memory-panel').textContent.includes('秘密回忆')`));
+    await js(`document.querySelector('[data-pane="devtools"] .memory-panel details').open=true`);
+    await wait(300);
+    await fs.writeFile(path.join(root, '.superpowers/memory-ui/debug.png'), (await win.webContents.capturePage()).toPNG());
+    win.setSize(840, 650); await wait(200);
+    assert.ok(await js(`document.querySelector('.memory-panel').scrollWidth <= document.querySelector('.memory-panel').clientWidth + 2`));
+    await fs.writeFile(path.join(root, '.superpowers/memory-ui/small.png'), (await win.webContents.capturePage()).toPNG());
+    console.log('PASS: user/debug views, scope isolation, tentative filtering, persistent edit, failure draft retention, refresh draft retention, escaping, small window.');
+    app.exit(0);
+  } catch (e) { console.error(e); app.exit(1); }
+});

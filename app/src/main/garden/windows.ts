@@ -5,8 +5,10 @@ import { getSettings } from '../config';
 import { getCharacter } from '../characters';
 import { plotPetPosition } from './interaction';
 import { gardenSide } from '../../shared/garden-layout';
+import { moveFixedSize } from '../fixed-window';
 let strip: BrowserWindow | null = null, panel: BrowserWindow | null = null, pet: BrowserWindow | null = null;
 let expanded = false;
+let stripSize = {width:1100,height:800};
 let speechBounds: { left: number; right: number; top: number; bottom: number } | null = null;
 export function setGardenSpeechBounds(bounds: typeof speechBounds): void {
     speechBounds = bounds; syncSpeechBounds();
@@ -64,7 +66,7 @@ function anchor(): void {
     const side = gardenSide(p, wa);
     const x = Math.max(wa.x, Math.min(side === 'left' ? p.x + p.width - b.width : p.x, wa.x + wa.width - b.width));
     const y = Math.max(wa.y, Math.min(p.y + p.height - b.height, wa.y + wa.height - b.height));
-    strip.setPosition(Math.round(x), Math.round(y));
+    moveFixedSize(strip, x, y, stripSize);
     syncSpeechBounds();
     strip.webContents.send('garden:anchor', { side, left: p.x - x, right: p.x + p.width - x, top: p.y - y, bottom: Math.min(b.height - 10, p.y + p.height - y - 25) });
 }
@@ -90,7 +92,8 @@ function toggle(): void {
     }
     const wa = screen.getDisplayMatching(pet.getBounds()).workArea;
     if (!strip || strip.isDestroyed()) {
-        strip = new BrowserWindow({ width: Math.min(1100, wa.width), height: wa.height, frame: false, transparent: true, hasShadow: false, resizable: false, skipTaskbar: true, show: false,
+        stripSize = {width:Math.min(1100,wa.width),height:wa.height};
+        strip = new BrowserWindow({ ...stripSize, frame: false, transparent: true, hasShadow: false, resizable: false, skipTaskbar: true, show: false,
             webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
         strip.setAlwaysOnTop(true, 'floating');
         strip.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });

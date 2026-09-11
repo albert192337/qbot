@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+vi.mock('../src/main/user-memory', () => ({ initUserMemory: async () => ({ revision: 0, flush: async () => {}, select: async () => [] }) }));
 const mocks = vi.hoisted(() => ({ character: vi.fn(), chat: vi.fn(), execute: vi.fn(), log: vi.fn(), perception: vi.fn() }));
 vi.mock('../src/main/brain-log', () => ({ beginBrainCall: async () => 'test-call', updateBrainCall: mocks.log, brainGate: vi.fn() }));
 vi.mock('../src/main/config', () => ({ getSettings: async () => ({ activeCharacter: 'test', freeMode: true, arkApiKey: 'mock-only' }) }));
@@ -45,6 +46,13 @@ it('模型选择不行动的内心想法不进入执行器，也不会冒泡', a
 const character = (extras: object = {}) => ({ manifest: {
   name: '测试', actions: { idle: { status: 'done', webm: 'idle.webm' } }, customActions: extras,
 } });
+it('模型仅留言的决定进入真实行为脚本', async () => {
+  mocks.character.mockResolvedValue(character());
+  mocks.chat.mockResolvedValue('{"do":true,"message":"别熬太晚"}');
+  await debugThink();
+  expect(mocks.execute.mock.calls[0][0].steps).toEqual([{ op: 'sign', text: '别熬太晚' }]);
+  expect(mocks.chat.mock.calls[0][0].messages[0].content).toContain('持续30分钟');
+});
 it('新增动作的描述进入请求，响应解析后真实 ID 进入执行器；下次请求刷新动作库', async () => {
   mocks.character.mockResolvedValue(character({ NewDance: { status: 'done', webm: 'dance.webm', motionDesc: '跳新舞步' } }));
   mocks.chat.mockResolvedValue('{"do":true,"action":"NewDance","say":"跳一下"}');

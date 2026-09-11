@@ -594,6 +594,7 @@ $('settings').addEventListener(
   'click',
   () => void openBook({ pane: 'settings' }),
 );
+$('memory-book').addEventListener('click', () => void openBook({ pane: 'memory' }));
 source.addEventListener('load', updateScene);
 document
   .querySelectorAll<HTMLButtonElement>('[data-place]')
@@ -742,7 +743,7 @@ async function openBook(request: ConsoleRoute): Promise<void> {
     document.querySelector('[role=dialog],#modal.on')
   )
     return;
-  const next: Area = ['characters', 'profile', 'rewards', 'furnish'].includes(
+  const next: Area = ['characters', 'profile', 'rewards', 'furnish', 'memory'].includes(
     request.pane,
   )
     ? 'living'

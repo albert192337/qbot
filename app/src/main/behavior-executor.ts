@@ -18,7 +18,7 @@
  */
 import { sendToWindows } from './windows';
 import { getSettings } from './config';
-import { setLocalSign } from './local-sign';
+import { leavePetMessage, clearPetMessage } from './pet-message';
 import { recordBehavior } from './perception';
 import { showBubbleWindow } from './windows';
 import { validateScript, type BehaviorScript, type BehaviorStep } from '../shared/behavior-dsl';
@@ -105,7 +105,7 @@ function interruptCurrent(): void {
   // 停动作（让 pet 回到 idle）
   sendToWindows('behavior:action', { action: 'idle', loops: 0 });
   // 清空举牌（如果有）
-  setLocalSign(null);
+  // 留言独立保留至到期或用户收起，不随动作被打断而消失。
 }
 
 /** 运行整个脚本 */
@@ -233,7 +233,10 @@ async function executeStep(step: BehaviorStep): Promise<void> {
 
       case 'sign': {
         // 举牌/收牌
-        setLocalSign(step.text);
+        if (step.text === null) clearPetMessage();
+        else leavePetMessage(step.text, current.script.meta.characterId);
+        void recordBehavior({ at: Date.now(), kind: 'sign', detail: step.text ?? '收起留言' });
+        void updateBrainCall(current.script.meta.traceId, '留言已更新', {}, step.text ?? '收起留言');
         // 举牌是状态，不占时间——立即继续
         resolve();
         break;

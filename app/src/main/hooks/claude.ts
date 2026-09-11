@@ -24,6 +24,7 @@ export const HOOK_EVENTS = [
   'UserPromptSubmit',
   'PreToolUse',
   'PostToolUse',
+  'PostToolUseFailure',
   'Notification',
   'Stop',
   'SessionEnd',
@@ -169,7 +170,7 @@ export async function toggleClaudeHooks(installed: boolean): Promise<boolean> {
     type: 'question',
     message: '接入 Claude Code 联动？',
     detail:
-      `将往 ~/.claude/settings.json 写入 ${HOOK_EVENTS.length} 条 hooks（SessionStart/UserPromptSubmit/PreToolUse/PostToolUse/Notification/Stop/SessionEnd）。\n\n` +
+      `将往 ~/.claude/settings.json 写入 ${HOOK_EVENTS.length} 条 hooks（包含工具失败 PostToolUseFailure）。\n\n` +
       'Claude Code 干活时桌宠会跟着切状态：思考=喝茶、干活=聊天、要授权=蹦跳求关注、完成=开心。\n' +
       'hook 只把事件转发到本机 127.0.0.1，不出网。首次写入前自动备份。',
     buttons: ['接入', '取消'],

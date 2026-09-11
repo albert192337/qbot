@@ -5,6 +5,7 @@ import path from 'node:path';
 import type { GardenCommand, GardenResult, GardenState } from '../../shared/garden';
 import { applyGardenTransaction } from '../progress';
 import { getMusicStatus } from '../music-monitor';
+import { getSettings } from '../config';
 import { emitEvent } from '../perception';
 import { harvestHighlight } from './highlight';
 import { initialGarden, refreshShop, transition, validateGarden } from './rules';
@@ -91,6 +92,7 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
         try {
             if (!command || typeof command !== 'object')
                 throw Error('无效花园操作');
+            const participant = command.type === 'harvest' ? (await getSettings()).activeCharacter ?? 'default' : undefined;
             const state = await recover();
             const result = transition(state, command, Date.now(), rng, { musicPlaying: getMusicStatus().playing });
             if (result.points !== undefined) {
@@ -101,7 +103,14 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
                 await save({ state: result.state });
             if (command.type === 'harvest' && result.reveal?.produce) {
                 const summary = harvestHighlight(result.reveal.produce);
-                if (summary) await emitEvent({ type: 'garden_highlight', at: Date.now(), summary }).catch(error => console.error('[garden] 收获事件记录失败', error));
+                if (summary) {
+                    const at = Date.now();
+                    await emitEvent({ type: 'garden_highlight', at, summary }).catch(error => console.error('[garden] 收获事件记录失败', error));
+                    try {
+                        const { initUserMemory } = await import('../user-memory');
+                        await (await initUserMemory()).episode(participant!, summary, at);
+                    } catch (error) { console.error('[garden] 共同回忆保存失败', error); }
+                }
             }
             for (const w of BrowserWindow.getAllWindows())
                 if (!w.isDestroyed())

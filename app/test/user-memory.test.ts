@@ -1,0 +1,55 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+const mocks = vi.hoisted(() => ({ dir: '', request: vi.fn(), clearLog: vi.fn(async () => {}), clearHistory: vi.fn(async () => {}), stop: vi.fn(), hide: vi.fn() }));
+vi.mock('electron', () => ({ app: { getPath: () => mocks.dir } }));
+vi.mock('../src/main/config', () => ({ getSettings: async () => ({ arkApiKey: 'mock-only' }) }));
+vi.mock('../src/main/llm-client', () => ({ chatComplete: mocks.request }));
+vi.mock('../src/main/brain-log', () => ({ clearBrainLog: mocks.clearLog }));
+vi.mock('../src/main/perception', () => ({ clearMemoryHistory: mocks.clearHistory }));
+vi.mock('../src/main/behavior-executor', () => ({ stopAllBehaviors: mocks.stop }));
+vi.mock('../src/main/windows', () => ({ hideBubbleWindow: mocks.hide }));
+const response = JSON.stringify({ changes: [{ op: 'upsert', key: 'name', text: '喜欢被叫小李', quote: '叫我小李', kind: 'preference', scope: 'shared', certainty: 'explicit' }] });
+beforeEach(async () => { vi.resetModules(); vi.clearAllMocks(); mocks.dir = await mkdtemp(path.join(tmpdir(), 'qbot-memory-service-')); mocks.request.mockResolvedValue(response); mocks.clearLog.mockResolvedValue(); });
+afterEach(async () => { await new Promise(r => setTimeout(r, 20)); await rm(mocks.dir, { recursive: true, force: true }); });
+it('extracts only user input in the background and completes its durable job', async () => {
+  const service = await import('../src/main/user-memory');
+  const store = await service.initUserMemory();
+  await service.queueMemoryExtraction('frog', '叫我小李', 'mock-only', Date.now());
+  await vi.waitFor(() => expect(store.candidates('cat')[0]?.text).toBe('喜欢被叫小李'));
+  await vi.waitFor(() => expect(store.jobs()).toHaveLength(0));
+  expect(mocks.request.mock.calls[0][0].messages[1].content).toContain('叫我小李');
+});
+it('deleting during extraction prevents late output and scrubs generated logs', async () => {
+  const service = await import('../src/main/user-memory'); const store = await service.initUserMemory();
+  await store.episode('frog', '待删除的共同回忆', Date.now());
+  let resolve!: (s: string) => void;
+  mocks.request.mockImplementation(() => new Promise<string>(r => resolve = r));
+  await service.queueMemoryExtraction('frog', '叫我小李', 'mock-only', Date.now());
+  await vi.waitFor(() => expect(mocks.request).toHaveBeenCalled());
+  await service.editUserMemory({ id: store.candidates('frog')[0].id, action: 'forget' }, 'frog');
+  resolve(response);
+  await vi.waitFor(() => expect(store.processing.status).toBe('旧请求已取消'));
+  await store.flush();
+  expect(store.candidates('frog')).toEqual([]); expect(mocks.clearLog).toHaveBeenCalled(); expect(mocks.clearHistory).toHaveBeenCalled(); expect(mocks.stop).toHaveBeenCalled();
+  expect(await readFile(path.join(mocks.dir, 'user-memory.json'), 'utf8')).not.toContain('小李');
+});
+it('failed extraction stays visible and can be retried without duplicating memory', async () => {
+  mocks.request.mockRejectedValueOnce(new Error('test network failure'));
+  const service = await import('../src/main/user-memory'); const store = await service.initUserMemory();
+  await service.queueMemoryExtraction('frog', '叫我小李', 'mock-only', Date.now());
+  await vi.waitFor(() => expect(store.jobs()[0]?.status).toBe('failed'));
+  await service.resumeMemoryExtraction(true);
+  await vi.waitFor(() => expect(store.candidates('frog')).toHaveLength(1));
+  await vi.waitFor(() => expect(store.jobs()).toHaveLength(0));
+});
+it('failed log scrubbing leaves the card available for retry instead of claiming deletion succeeded', async () => {
+  const service = await import('../src/main/user-memory'); const store = await service.initUserMemory();
+  await store.episode('frog', '共同回忆', Date.now());
+  const command = { id: store.candidates('frog')[0].id, action: 'forget' as const };
+  mocks.clearLog.mockRejectedValueOnce(new Error('disk unavailable'));
+  await expect(service.editUserMemory(command, 'frog')).rejects.toThrow('disk unavailable');
+  expect(store.candidates('frog')).toHaveLength(1);
+  await service.editUserMemory(command, 'frog'); expect(store.candidates('frog')).toHaveLength(0);
+});

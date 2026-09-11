@@ -64,15 +64,14 @@ async function refresh(force = false): Promise<void> {
   // 只列已生成完成的动作：未完成的选了也播不出来（状态机会退化成 idle）
   const options = collectActions(ctx.m, ctx.prompts)
     .filter((a) => a.status === 'done' && a.id !== 'idle' && a.id !== 'drag')
-    .map((a) => a.id);
+    ;
 
   const select = (id: string, cur: string | undefined, def: string): string => {
     let s = `<select id="scene-${esc(id)}" data-scene="${esc(id)}">`;
-    if (options.length === 0) s += `<option value="">（暂无可用动作）</option>`;
+    if(!options.some(a=>a.id===(cur??def)))s+='<option value="" selected>未设置，请选择表情</option>';
     for (const opt of options) {
-      const label = STD_LABELS[opt as ActionId] ?? opt;
-      const selected = (cur ?? def) === opt ? ' selected' : '';
-      s += `<option value="${esc(opt)}"${selected}>${esc(label)}</option>`;
+      const selected = (cur ?? def) === opt.id ? ' selected' : '';
+      s += `<option value="${esc(opt.id)}"${selected}>${esc(opt.label)}${opt.motionDesc?' · '+esc(opt.motionDesc):''}</option>`;
     }
     return s + `</select>`;
   };
@@ -83,6 +82,7 @@ async function refresh(force = false): Promise<void> {
   html += `<div class="integration-strip"><span class="status-chip ${claudeConnected ? 'success' : 'muted'}">Claude Code ${claudeConnected ? '已接入' : '未接入'}</span><span class="status-chip ${navigator.platform.toLowerCase().includes('win') ? 'success' : 'muted'}">网易云监听 ${navigator.platform.toLowerCase().includes('win') ? '可用' : '仅 Windows'}</span><button class="text-action" id="open-claude-settings">管理连接</button></div>`;
 
   html += `<h3>Claude Code</h3>`;
+  html += '<p class="studio-hint">新增工具失败监听：旧连接请在“管理连接”中断开再接入一次。工作、思考、等待和失败可分别选择不同的表情。</p>';
   html += `<div class="scene-grid">`;
   for (const s of SCENES) {
     html += `<div class="scene-row">`;

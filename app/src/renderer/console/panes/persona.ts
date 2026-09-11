@@ -96,6 +96,7 @@ async function refresh(force = false): Promise<void> {
     html += `时长 ${a.durationSec}s`;
     if (a.isCustom) html += ` <button class="del-action btn danger" data-id="${esc(a.id)}">删除</button>`;
     html += `</div>`;
+    if(a.motionDesc)html+=`<p class="studio-hint">${esc(a.motionDesc)}</p>`;
     if (frameUrl) html += `<video src="${frameUrl}" poster="qbot-asset://${ctx.dirId}/${esc(a.gif ?? ctx.m.sourceImage)}" aria-label="${esc(a.label)}动作预览" muted controls loop playsinline preload="none"></video>`;
     html += `<p class="studio-hint">${a.isImported ? '导入 GIF' : a.isCustom ? '自定义动作' : a.isExpression ? '预设动作' : '随角色生成'}</p>`;
     if (a.status === 'done') html += `<button class="preview-action btn ghost" data-id="${esc(a.id)}">${root.closest('#house-book') ? '上台练习' : '在桌面播放'}</button>`;

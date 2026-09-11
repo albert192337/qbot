@@ -105,6 +105,7 @@ describe('hook 事件映射', () => {
     expect(EVENT_ACTIVITY.UserPromptSubmit).toBe('thinking');
     expect(EVENT_ACTIVITY.PreToolUse).toBe('working');
     expect(EVENT_ACTIVITY.PostToolUse).toBe('working');
+    expect(EVENT_ACTIVITY.PostToolUseFailure).toBe('error');
     expect(EVENT_ACTIVITY.Notification).toBe('waiting');
     expect(EVENT_ACTIVITY.Stop).toBe('done');
   });

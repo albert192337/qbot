@@ -19,7 +19,7 @@ export const CHUNK_SIZE = 64 * 1024;
 /** 总块数上限（× 64KB = 512MB，防对端恶意 total 撑爆内存） */
 const MAX_CHUNKS = 8192;
 /** 包内合法路径：manifest.json 或 actions/ 下一层的 .webm（防路径穿越） */
-const SAFE_PATH_RE = /^(manifest\.json|actions\/[^/\\]+\.webm)$/;
+const SAFE_PATH_RE = /^(manifest\.json|source\.png|actions\/[^/\\]+\.webm)$/;
 
 interface PackEntry {
   path: string;
@@ -35,33 +35,59 @@ export interface PackedCharacter {
 /** 从 manifest 收集要打包的动作文件（标准 + 自定义，只要 done 的） */
 function collectActionFiles(manifest: Record<string, unknown>): string[] {
   const out: string[] = [];
-  for (const group of [manifest.actions, manifest.customActions]) {
+  for (const group of [manifest.actions, manifest.importedActions, manifest.expressionActions, manifest.customActions]) {
     if (!group || typeof group !== 'object') continue;
     for (const action of Object.values(group as Record<string, { status?: string; webm?: string }>)) {
-      if (action?.status === 'done' && typeof action.webm === 'string') out.push(action.webm);
+      if ((action?.status === 'done' || action?.status === undefined) && typeof action.webm === 'string') out.push(action.webm);
     }
   }
-  return out;
+  return [...new Set(out)];
 }
 
 /** 脱敏：persona 等文本永不出本机（spec §四） */
 export function sanitizeManifest(manifest: Record<string, unknown>): Record<string, unknown> {
-  const { persona: _persona, ...rest } = manifest;
+  const { persona: _persona, turnaroundPromptFull: _prompt, spareStickers: _spares, ...rest } = structuredClone(manifest);
+  for (const group of ['actions','importedActions','expressionActions','customActions']) {
+    const entries = rest[group];
+    if (!entries || typeof entries !== 'object') continue;
+    for (const value of Object.values(entries)) {
+      if (!value || typeof value !== 'object') continue;
+      for (const key of ['raw','gif','poseDesc','motionDesc','framePromptFull','videoPromptFull','sourceName']) delete value[key];
+    }
+  }
+  const library = rest.stickerLibrary as { items?:Array<Record<string,unknown>> }|undefined;
+  for (const item of library?.items ?? []) { delete item.raw; delete item.error; }
   return rest;
 }
 
 export async function packCharacterDir(charDir: string): Promise<PackedCharacter> {
   const raw = JSON.parse(await readFile(path.join(charDir, 'manifest.json'), 'utf8'));
   const manifest = sanitizeManifest(raw);
+  const originalPaths = new Map<string,string>();
+  for (const group of ['actions','importedActions','expressionActions','customActions']) {
+    for (const a of Object.values((manifest[group] ?? {}) as Record<string,{webm?:string}>)) {
+      if (a.webm && /^imported\/[^/\\]+\.webm$/.test(a.webm)) {
+        const original = a.webm;
+        a.webm = `actions/import_${createHash('sha256').update(original).digest('hex').slice(0,16)}.webm`;
+        originalPaths.set(a.webm,original);
+      }
+    }
+  }
   const manifestBuf = Buffer.from(JSON.stringify(manifest), 'utf8');
 
   const entries: PackEntry[] = [{ path: 'manifest.json', size: manifestBuf.length }];
   const datas: Buffer[] = [manifestBuf];
   for (const rel of collectActionFiles(manifest)) {
     if (!SAFE_PATH_RE.test(rel)) continue; // manifest 被手改出怪路径：跳过不打包
-    const buf = await readFile(path.join(charDir, rel));
+    const buf = await readFile(path.join(charDir, originalPaths.get(rel) ?? rel));
     entries.push({ path: rel, size: buf.length });
     datas.push(buf);
+  }
+  if (raw.stickerLibrary) {
+    try {
+      const source = await readFile(path.join(charDir,'source.png'));
+      entries.push({path:'source.png',size:source.length}); datas.push(source);
+    } catch { /* Older downloaded packs may have no reference image. */ }
   }
 
   const header = Buffer.from(JSON.stringify({ files: entries }), 'utf8');

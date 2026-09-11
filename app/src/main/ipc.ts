@@ -1,4 +1,5 @@
 import { cloudAccount, acknowledgeCloudJob, forgetCloudJob } from './cloud-generation';
+import { initUserMemory, editUserMemory, resumeMemoryExtraction } from './user-memory';
 /** IPC 注册：preload 契约的主进程实现 */
 import { BrowserWindow, Menu, dialog, ipcMain, powerMonitor } from 'electron';
 import path from 'node:path';
@@ -14,6 +15,7 @@ import { createNurseryWindow, closeRoomWindow, openRoomWindow, createConsoleWind
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, isSecureTransport, reportChat, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms, pushLocalSign } from './rooms/rooms';
 import { getLocalSign, setLocalSign } from './local-sign';
+import { getPetMessage, clearPetMessage, onPetMessageChanged } from './pet-message';
 import { notifyRoomCharacterChanged } from './rooms/rooms';
 import { getMemberSnapshot } from './rooms/room-pets';
 import { getRoomDisplayMode, refreshRoomPetLayout, setRoomDisplayMode } from './rooms/room-pet-display';
@@ -54,8 +56,31 @@ import { setGardenSpeechBounds } from './garden/windows';
 import { sendPetChat } from './pet-chat';
 import { openPetChat, closePetChat } from './windows';
 import { registerGardenIpc } from './garden/windows';
+import { registerStickerLibraryIpc } from './sticker-library-ipc';
+import { getIdlePlan } from './idle-plan';
 
 export function registerIpc(): void {
+  ipcMain.handle('behavior:getIdlePlan',(_ev,id:string)=>getIdlePlan(id));
+  ipcMain.handle('memory:retry', async () => {
+    if (!(await getSettings()).developerMode) throw new Error('请先开启开发者模式');
+    await resumeMemoryExtraction(true);
+  });
+  const memoryCharacter = async (value: unknown) => {
+    const id = value === undefined ? (await getSettings()).activeCharacter ?? 'default' : value;
+    if (typeof id !== 'string' || (id !== 'default' && !(await listCharacters()).some(c => c.dirId === id))) throw new Error('角色不存在');
+    return id;
+  };
+  ipcMain.handle('memory:get', async (_ev, character, debug) => {
+    const id = await memoryCharacter(character);
+    if (debug === true && !(await getSettings()).developerMode) throw new Error('请先开启开发者模式');
+    const store = await initUserMemory();
+    await store.flush();
+    return store.snapshot(id, debug === true);
+  });
+  ipcMain.handle('memory:edit', async (_ev, command, character) => {
+    await editUserMemory(command, await memoryCharacter(character));
+  });
+  registerStickerLibraryIpc();
   registerGardenIpc();
   ipcMain.on('petChat:open', () => openPetChat());
   ipcMain.on('petChat:close', () => closePetChat());
@@ -131,9 +156,12 @@ export function registerIpc(): void {
   ipcMain.on('pet:setVisitMode', (_ev, enter: boolean) => setPetVisitMode(enter));
 
   // ── 手动举牌（纯本地记账）────────────────────────────────
-  ipcMain.on('sign:set', (_ev, text: string | null) =>
-    setLocalSign(typeof text === 'string' ? text : null),
-  );
+  onPetMessageChanged(message => sendToWindows('sign:message', message));
+  ipcMain.handle('sign:getMessage', () => getPetMessage());
+  ipcMain.on('sign:set', (_ev, text: string | null) => {
+    setLocalSign(typeof text === 'string' ? text : null);
+    if (!text) clearPetMessage();
+  });
   ipcMain.on('sign:sync', (_ev, text: string | null) =>
     pushLocalSign(typeof text === 'string' ? text : null),
   );
@@ -270,7 +298,7 @@ export function registerIpc(): void {
         label: getLocalSign() ? '换个牌子…' : '举牌…',
         click: () => send({ type: 'signPrompt' }),
       },
-      ...(getLocalSign() ? [{ label: '收牌', click: () => send({ type: 'signClear' as const }) }] : []),
+      ...(getLocalSign() || getPetMessage() ? [{ label: '收牌 / 收起留言', click: () => send({ type: 'signClear' as const }) }] : []),
       { type: 'separator' },
       // ── 去处（角色能去的地方 + 控制台）──────────────────
       { label: '联机空间…', click: () => createLoungeWindow() },

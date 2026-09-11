@@ -7,6 +7,7 @@ import { clampPetScale, petTargetSize } from './pet-geometry';
 import { attachPetWindowRecovery } from './pet-window-recovery';
 import { aboveBubbleLayout } from './bubble-layout';
 import { attachGarden } from './garden/windows';
+import { moveFixedSize } from './fixed-window';
 
 const PET_SIZE = 360;
 /** 房间宠上屏窗：比本地宠小一档（房友是客人体量），固定尺寸永不 resize */
@@ -61,28 +62,6 @@ let roomSizePreset: RoomSizePreset = 'large';
  * 需临时放开（Windows 实测不拦，但保留以免回归 mac）。纯移动不用付这个开销，
  * 拖拽时这里是每帧调用的热路径。
  */
-function moveFixedSize(
-  win: BrowserWindow | null,
-  x: number,
-  y: number,
-  size: { width: number; height: number },
-  changesSize = false,
-): void {
-  if (!win || win.isDestroyed()) return;
-  const bounds = {
-    x: Math.round(x),
-    y: Math.round(y),
-    width: size.width,
-    height: size.height,
-  };
-  if (!changesSize) {
-    win.setPosition(bounds.x, bounds.y);
-    return;
-  }
-  win.setResizable(true);
-  win.setBounds(bounds);
-  win.setResizable(false);
-}
 
 /** 桌宠缩放（0.5~2）：窗口即画布，改窗口尺寸即改桌宠大小；右下角锚定 */
 export function setPetScale(scale: number): void {
@@ -97,7 +76,7 @@ export function setPetScale(scale: number): void {
 
 type RendererPage = 'pet' | 'room' | 'cozy' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat';
 
-/** Local preview only: does not change room membership or the active pet. */
+/** A local, framed preview: never changes room membership or the active desktop pet. */
 export function openCozyPreview(): BrowserWindow {
   if (cozyPreviewWindow && !cozyPreviewWindow.isDestroyed()) {
     cozyPreviewWindow.show(); cozyPreviewWindow.focus(); return cozyPreviewWindow;
@@ -123,7 +102,7 @@ function syncChatBounds(): void {
   const wa = screen.getDisplayMatching(pet).workArea;
   const x = Math.max(wa.x, Math.min(pet.x + pet.width / 2 - 190, wa.x + wa.width - 380));
   const y = Math.max(wa.y, Math.min(pet.y + pet.height + 6, wa.y + wa.height - 110));
-  chatWindow.setPosition(Math.round(x), Math.round(y));
+  moveFixedSize(chatWindow, x, y, {width:380,height:110});
 }
 export function closePetChat(): void { chatWindow?.hide(); }
 export function openPetChat(): void {
@@ -132,7 +111,7 @@ export function openPetChat(): void {
     const pet = petWindow.getBounds();
     const wa = screen.getDisplayMatching(pet).workArea;
     if (pet.y + pet.height + 116 > wa.y + wa.height) {
-      petWindow.setPosition(pet.x, Math.max(wa.y, wa.y + wa.height - pet.height - 116));
+      movePetWindow(pet.x, Math.max(wa.y, wa.y + wa.height - pet.height - 116));
     }
   }
   if (!chatWindow || chatWindow.isDestroyed()) {
@@ -590,11 +569,12 @@ export type ConsolePane =
   | 'persona'
   | 'scene-actions'
   | 'stickers'
+  | 'sticker-create'
   | 'prompts'
   | 'market'
   | 'claude'
   | 'settings'
-  | 'devtools' | 'rewards' | 'furnish';
+  | 'devtools' | 'rewards' | 'furnish' | 'memory';
 
 export function getConsoleWindow(): BrowserWindow | null {
   return consoleWindow;

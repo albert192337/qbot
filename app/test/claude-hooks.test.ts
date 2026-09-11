@@ -58,7 +58,7 @@ describe('withHooks', () => {
   it('写入全部 7 类事件', () => {
     const s = withHooks({});
     expect(Object.keys(s.hooks ?? {}).sort()).toEqual([...HOOK_EVENTS].sort());
-    expect(HOOK_EVENTS.length).toBe(7);
+    expect(HOOK_EVENTS.length).toBe(8);
   });
 
   it('幂等：装两次不叠加', () => {

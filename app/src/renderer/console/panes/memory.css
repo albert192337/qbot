@@ -1,0 +1,13 @@
+.memory-panel { padding: 20px; color: #544638; max-width: 900px; margin: auto; }
+.memory-panel h3 { font-size: 23px; margin: 0 0 12px; }
+.memory-panel p { line-height: 1.7; overflow-wrap: anywhere; }
+.memory-toolbar, .memory-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.memory-panel button, .memory-panel select { border: 1px solid #cdbda5; border-radius: 9px; background: #fffaf0; color: #544638; padding: 8px 12px; font: inherit; cursor: pointer; }
+.memory-panel button:disabled { opacity: .55; cursor: wait; }
+.memory-panel button:focus-visible, .memory-panel select:focus-visible, .memory-panel textarea:focus-visible { outline: 2px solid #72836b; outline-offset: 2px; }
+.memory-panel article { background: #fffaf1; border: 1px solid #dfd1bc; border-radius: 14px; padding: 18px; margin: 12px 0; }
+.memory-panel small { color: #796b59; line-height: 1.6; }
+.memory-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 400px; overflow: auto; font-size: 12px; background: #f2ecdf; padding: 12px; border-radius: 8px; }
+.memory-panel textarea { width: 100%; box-sizing: border-box; min-height: 90px; padding: 12px; font: inherit; border: 1px solid #cdbda5; border-radius: 8px; }
+.memory-panel details { margin: 12px 0; }
+.memory-panel summary { cursor: pointer; }

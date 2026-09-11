@@ -2,6 +2,23 @@ import { expect, it } from 'vitest';
 import { buildBrainMessages, type BrainInput } from '../src/main/brain-llm-rules';
 import { buildChatMessages } from '../src/main/pet-chat-rules';
 import { conversationFor, rememberConversation, setChatting, shouldPauseAutomatic } from '../src/main/conversation-memory';
+import { agentActivityLabel } from '../src/main/brain-llm-rules';
+
+it('深夜AI空闲不能被序列化为用户工作状态，两个入口都不信历史助手猜测', () => {
+  const input: BrainInput = { personaName: '小狗', timeLabel: '周五 00:18 深夜', currentApp: 'Codex',
+    todaySwitches: 4, activeMinutes: 3, topApps: [], agentLabel: agentActivityLabel('idle'),
+    inMeeting: false, musicPlaying: false, availableIntents: ['idle'], recentLines: ['摸鱼快乐'],
+    conversation: [{ at: Date.now(), role: 'assistant', source: 'auto', text: '你在摸鱼' }] };
+  for (const messages of [buildBrainMessages(input), buildChatMessages(input, [], '我没在上班，为什么说我摸鱼？')]) {
+    const prompt = messages.map(m => m.content).join('\n');
+    const data = JSON.parse(prompt.split('\n').find(line => line.startsWith('{"当前时间"'))!);
+    expect(data).not.toHaveProperty('工作状态');
+    expect(data.ClaudeCode任务状态).toContain('不代表用户状态');
+    expect(prompt).toContain('不是用户事实的证据');
+    expect(prompt).toContain('用户对称呼、措辞或判断的纠正优先');
+  }
+  expect(agentActivityLabel('unrecognized')).toContain('未知');
+});
 
 it('聊天与自动脑共享标题、双向对话和经过时间，不把历史当新问题', () => {
   const now = Date.now();

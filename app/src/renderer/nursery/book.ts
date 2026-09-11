@@ -19,12 +19,14 @@ interface Module {
   discardChanges?(): void | Promise<void>;
 }
 const LOADERS: Record<string, () => Promise<Module>> = {
+  memory: () => import('../console/panes/memory'),
   characters: () => import('../console/panes/characters'),
   profile: () => import('../console/panes/profile'),
   persona: () => import('../console/panes/persona'),
   'scene-actions': () => import('../console/panes/scene-actions'),
   prompts: () => import('../console/panes/prompts'),
   stickers: () => import('../console/panes/stickers'),
+  'sticker-create': () => import('../console/panes/sticker-create'),
   tasks: () => import('../console/panes/tasks'),
   market: () => import('../console/panes/market'),
   settings: () => import('../console/panes/settings'),
@@ -45,12 +47,14 @@ const LOADERS: Record<string, () => Promise<Module>> = {
   furnish: () => import('./furnish'),
 };
 export const BOOK_TITLES: Record<string, string> = {
+  memory: '我记得的你',
   characters: '朋友相册',
   profile: '它的故事',
   persona: '动作练习册',
   'scene-actions': '生活排练表',
   prompts: '创作笔记',
   stickers: '贴纸收集册',
+  'sticker-create': '贴纸新朋友',
   tasks: '练习手记',
   market: '街角集市',
   settings: '小屋手册',
@@ -235,6 +239,7 @@ export class Book {
         button('在桌面展开小屋', () => window.qbot.room.openHome(), 'bookmark'),
       );
     }
+    this.tabs.append(button('我记得的你', () => this.request({ pane: 'memory' }), 'bookmark'));
     let entry = this.entries.get(id);
     if (!entry) {
       const root = el('section', undefined, 'pane active');
