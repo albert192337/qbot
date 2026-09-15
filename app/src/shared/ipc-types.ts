@@ -450,6 +450,10 @@ export interface QBotApi {
     getActive(): Promise<CharacterMeta | null>;
   };
   pet: {
+    perch(): Promise<{ok:boolean; reason?:string}>;
+    detachPerch(): void;
+    getPerch(): Promise<import('./window-perch').PerchState | null>;
+    onPerch(cb: (state: import('./window-perch').PerchState | null) => void): () => void;
     /** 高频拖拽移动（send，不走 invoke） */
     move(screenX: number, screenY: number): void;
     /** 串门模式：拓宽/恢复窗口 */

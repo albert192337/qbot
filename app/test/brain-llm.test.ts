@@ -38,7 +38,8 @@ function baseInput(overrides: Partial<BrainInput> = {}): BrainInput {
 describe('buildBrainMessages', () => {
   it('自由模式按人设主动行动，不要求多数不行动', () => {
     const prompt = buildBrainMessages(baseInput({ behaviorMode: 'free' })).map(m => m.content).join('\n');
-    expect(prompt).toContain('无需等用户呼唤');
+    expect(prompt).toContain('主动按人设尝试不同动作');
+    expect(prompt).toContain('自由活动不等于不停说话');
     expect(prompt).not.toContain('大部分时候');
     expect(prompt).not.toContain('频繁打扰');
   });

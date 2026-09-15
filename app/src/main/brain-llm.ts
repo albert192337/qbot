@@ -1,4 +1,5 @@
 import { initUserMemory } from './user-memory';
+import { getPerchObservation } from './perch-observation';
 /**
  * LLM 脑（自由模式）。
  *
@@ -265,7 +266,7 @@ export async function buildInput(memoryMode?: 'chat' | 'auto', query = ''): Prom
       if (meta?.manifest) {
         personaName = meta.manifest.name || personaName;
         personaTraits = meta.manifest.persona || undefined;
-        actionDescriptions = brainActions(meta.manifest);
+        actionDescriptions = brainActions(meta.manifest).filter(a=>a.id!=='perch_sit'&&a.id!=='perch_lie');
         const pool=(meta.manifest as StickerManifest).stickerLibrary?.idleCandidates??['idle'];
         idleCandidates=actionDescriptions.filter(a=>pool.includes(a.id));
       }
@@ -291,6 +292,7 @@ export async function buildInput(memoryMode?: 'chat' | 'auto', query = ''): Prom
 
   return {
     currentMessage: !getPetMessage()?.characterId || getPetMessage()?.characterId === (settings.activeCharacter ?? 'default') ? getPetMessage()?.text : undefined,
+    perchObservation: settings.freeMode && settings.behaviorMode === 'free' ? getPerchObservation() : null,
     idleCandidates,idlePlan:getIdlePlan(settings.activeCharacter??'default'),
     memoryRevision: memory.revision,
     userMemories: memoryMode ? await memory.select(settings.activeCharacter ?? 'default', memoryMode, query) : [],

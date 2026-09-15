@@ -1,3 +1,4 @@
+import { prepareTravelMemory, writeTravelDiary } from './travel-memory';
 import { app, BrowserWindow } from 'electron';
 import { readFile, writeFile, mkdir, rename, copyFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -92,17 +93,19 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
         try {
             if (!command || typeof command !== 'object')
                 throw Error('无效花园操作');
-            const participant = command.type === 'harvest' ? (await getSettings()).activeCharacter ?? 'default' : undefined;
+            const participant = (command.type === 'harvest' || command.type === 'harvestMany') ? (await getSettings()).activeCharacter ?? 'default' : undefined;
             const state = await recover();
             const result = transition(state, command, Date.now(), rng, { musicPlaying: getMusicStatus().playing });
+            const travelMemory = command.type === 'travelExperience' && result.state.travel ? await prepareTravelMemory(result.state.travel) : undefined;
             if (result.points !== undefined) {
                 await save({ state, pending: { id: randomUUID(), points: result.points, boxes: result.boxes ?? 0, next: result.state } });
                 await recover();
             }
             else
                 await save({ state: result.state });
-            if (command.type === 'harvest' && result.reveal?.produce) {
-                const summary = harvestHighlight(result.reveal.produce);
+            if ((command.type === 'harvest' || command.type === 'harvestMany') && result.reveal?.produce) {
+                const summary = (result.reveal.harvests ?? [result.reveal.produce])
+                    .slice().sort((a,b) => b.value-a.value).map(harvestHighlight).find(Boolean);
                 if (summary) {
                     const at = Date.now();
                     await emitEvent({ type: 'garden_highlight', at, summary }).catch(error => console.error('[garden] 收获事件记录失败', error));
@@ -111,6 +114,19 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
                         await (await initUserMemory()).episode(participant!, summary, at);
                     } catch (error) { console.error('[garden] 共同回忆保存失败', error); }
                 }
+            }
+            if (travelMemory) {
+                // Persist payment and factual diary first. A slow model cannot block clicks or roll back a paid experience.
+                void writeTravelDiary(travelMemory).then(text => { if (!text) return; return serial(async () => {
+                    const latest = structuredClone(await recover());
+                    const diary = latest.travel?.diaries.find(d => d.day === travelMemory.diary.day && d.actor === travelMemory.diary.actor);
+                    if (!diary || diary.signature !== travelMemory.diary.signature) return;
+                    diary.text = text; diary.generated = true;
+                    await save({state:latest});
+                    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('garden:changed');
+                }); }).catch(error => console.error('[travel] 日记保存失败', error));
+                const post = result.state.travel!.posts.at(-1)!;
+                void import('../user-memory').then(async ({initUserMemory}) => (await initUserMemory()).episode(travelMemory.diary.actor, `一起旅行：${post.title}`,post.at)).catch(error=>console.error('[travel] 回忆同步失败',error));
             }
             for (const w of BrowserWindow.getAllWindows())
                 if (!w.isDestroyed())

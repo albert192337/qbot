@@ -219,7 +219,7 @@
         display: flex;
         align-items: flex-end;
         justify-content: center;
-        gap: 5%;
+        gap: clamp(3px, 1.5vw, 8px);
         pointer-events: none;
         font-size: clamp(9px, 3.4vh, 15px);
         transition: opacity 0.3s;
@@ -337,7 +337,6 @@
     <div id="visitor-stage"></div>
     <div id="bubble"></div>
     <div id="menu"></div>
-    <div id="pet-hud" class="lifted"></div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

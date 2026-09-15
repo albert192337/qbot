@@ -9,6 +9,7 @@ const api: QBotApi = {
     edit: (command, character) => ipcRenderer.invoke('memory:edit', command, character),
   },
   garden: {
+    closeTravel: () => ipcRenderer.send('garden:closeTravel'),
     onSpeechBounds: cb => { const fn = (_ev: unknown, bounds: Parameters<typeof cb>[0]) => cb(bounds); ipcRenderer.on('garden:speechBounds', fn); return () => ipcRenderer.removeListener('garden:speechBounds', fn); },
     onPerformance: cb => { const fn = (_ev: unknown, action: string | null) => cb(action); ipcRenderer.on('garden:performance', fn); return () => ipcRenderer.removeListener('garden:performance', fn); },
     cancelPerformance: restore => ipcRenderer.send('garden:cancelPerformance', restore),
@@ -58,6 +59,10 @@ const api: QBotApi = {
     getActive: () => ipcRenderer.invoke('characters:getActive'),
   },
   pet: {
+    perch: () => ipcRenderer.invoke('pet:perch'),
+    detachPerch: () => ipcRenderer.send('pet:detachPerch'),
+    getPerch: () => ipcRenderer.invoke('pet:getPerch'),
+    onPerch: cb => { const fn=(_ev:unknown,state:Parameters<typeof cb>[0])=>cb(state); ipcRenderer.on('pet:perch',fn); return ()=>ipcRenderer.removeListener('pet:perch',fn); },
     // 高频拖拽走 send（不等待回包）
     move: (x, y) => ipcRenderer.send('pet:move', x, y),
     setVisitMode: (enter) => ipcRenderer.send('pet:setVisitMode', enter),

@@ -23,3 +23,14 @@ export function shouldPauseAutomatic(character: string, now = Date.now()): boole
   const last = conversationFor(character, now).filter(line => line.source === 'chat').at(-1)?.at;
   return chatting.has(character) || (last !== undefined && now - last < 120000);
 }
+
+/** 主动文字预算独立于动作/思考频率；用实际发送且持久化的记录恢复。 */
+export function automaticSpeechBudget(lines: ConversationLine[], now = Date.now()): { allowed: boolean; unanswered: number; nextAt: number } {
+  const recent = lines.filter(line => line.at <= now && now - line.at < 86400000);
+  const lastUser = recent.filter(line => line.role === 'user').at(-1)?.at ?? -Infinity;
+  const automatic = recent.filter(line => line.role === 'assistant' && line.source === 'auto');
+  const unanswered = automatic.filter(line => line.at > lastUser).length;
+  const last = automatic.at(-1)?.at;
+  const nextAt = last === undefined ? 0 : last + 3 * 60000;
+  return { allowed: now >= nextAt, unanswered, nextAt };
+}

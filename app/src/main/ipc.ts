@@ -1,4 +1,5 @@
 import { cloudAccount, acknowledgeCloudJob, forgetCloudJob } from './cloud-generation';
+import { tryPerch, detachPerch, getPerchState } from './window-perch';
 import { initUserMemory, editUserMemory, resumeMemoryExtraction } from './user-memory';
 /** IPC 注册：preload 契约的主进程实现 */
 import { BrowserWindow, Menu, dialog, ipcMain, powerMonitor } from 'electron';
@@ -152,6 +153,10 @@ export function registerIpc(): void {
   });
 
   // ── pet ────────────────────────────────────────────────
+  ipcMain.handle('pet:perch', ev => ev.sender === getPetWindow()?.webContents ? tryPerch() : {ok:false});
+  app.once('before-quit',detachPerch);
+  ipcMain.handle('pet:getPerch', ev => ev.sender === getPetWindow()?.webContents ? getPerchState() : null);
+  ipcMain.on('pet:detachPerch', ev => { if(ev.sender === getPetWindow()?.webContents)detachPerch(); });
   ipcMain.on('pet:move', (_ev, x: number, y: number) => movePetWindow(x, y));
   ipcMain.on('pet:setVisitMode', (_ev, enter: boolean) => setPetVisitMode(enter));
 

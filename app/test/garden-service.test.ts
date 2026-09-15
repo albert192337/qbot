@@ -23,8 +23,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
             return real.rename(...args);
         } };
 });
-beforeEach(async () => { vi.resetModules(); mock.dir = await mkdtemp(path.join(os.tmpdir(), 'garden-store-')); mock.points = 500; mock.boxes = 1; mock.receipts.clear(); mock.renameCount = 0; mock.failAt = 0; });
-afterEach(async () => { await rm(mock.dir, { recursive: true, force: true }); });
+beforeEach(async () => { vi.resetModules(); vi.spyOn(Math, 'random').mockReturnValue(.8); mock.dir = await mkdtemp(path.join(os.tmpdir(), 'garden-store-')); mock.points = 500; mock.boxes = 1; mock.receipts.clear(); mock.renameCount = 0; mock.failAt = 0; });
+afterEach(async () => { vi.restoreAllMocks(); await rm(mock.dir, { recursive: true, force: true }); });
 describe('garden transaction journal', () => {
     it('serializes simultaneous box clicks without negative balances or duplicate supplies', async () => {
         const api = await import('../src/main/garden/service');
@@ -33,7 +33,7 @@ describe('garden transaction journal', () => {
         expect(results.filter(x => x.ok)).toHaveLength(1);
         expect(mock.points).toBe(0);
         expect(mock.boxes).toBe(0);
-        expect((await api.getGarden()).seeds.length).toBe(s.seeds.length + 1);
+        expect((await api.getGarden()).seeds.length).toBe(s.seeds.length + 2);
     });
     it('recovers an interrupted final save without charging twice', async () => {
         const api = await import('../src/main/garden/service');
@@ -43,7 +43,7 @@ describe('garden transaction journal', () => {
         expect(mock.points).toBe(0);
         vi.resetModules();
         const restarted = await import('../src/main/garden/service');
-        expect((await restarted.getGarden()).seeds.length).toBe(s.seeds.length + 1);
+        expect((await restarted.getGarden()).seeds.length).toBe(s.seeds.length + 2);
         expect(mock.points).toBe(0);
         expect(mock.receipts.size).toBe(1);
         expect(JSON.parse(await readFile(path.join(mock.dir, 'garden-demo.json'), 'utf8')).pending).toBeUndefined();

@@ -23,6 +23,8 @@ let state: PetState = { kind: 'idle' };
 let available: PlayableId[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
 let currentCharacter: CharacterMeta | null = null;
+let perched: import('../../shared/window-perch').PerchState | null = null;
+let perchButtonsVisible = false;
 let visitorCharacter: CharacterMeta | null = null;
 /** 最新 agent 活动（done 是一次性事件，派发后立即视为 idle） */
 let agentActivity: AgentActivity = 'idle';
@@ -71,6 +73,23 @@ const speaker = new Speaker({
 
 // ── HUD（点数 + 宝箱）──────────────────────────────────
 const hud = new ProgressHud();
+function applyPerch(value: import('../../shared/window-perch').PerchState | null): void {
+  const changed=perched?.action!==value?.action;
+  perched=value;
+  if(changed)perchButtonsVisible=false;
+  hud.root.style.visibility=perched&&!perchButtonsVisible?'hidden':'';
+  if(!changed||!available.length)return;
+  cancelHold(); stopDesktopWalk(); clearTimer();
+  state={kind:'idle'};
+  if(value)player.play(value.action);
+  else { playIdle(); scheduleTimer();
+    if(agentActivity!=='idle')dispatch({type:'AGENT_STATUS',activity:agentActivity});
+    else if(meetingStatus.inMeeting)dispatch({type:'MEETING_STATUS',inMeeting:true});
+    else if(musicStatus.playing)dispatch({type:'MUSIC_STATUS',playing:true});
+  }
+}
+window.qbot.pet.onPerch(applyPerch);
+void window.qbot.pet.getPerch().then(applyPerch);
 let hudBusy = false;
 let lastProgress: import('../../shared/ipc-types').Progress | null = null;
 
@@ -297,6 +316,7 @@ function behaviorCanPlay(): boolean {
 }
 let behaviorReplayTimers: ReturnType<typeof setTimeout>[] = [];
 window.qbot.behaviorAction.onPlay(({ action, loops, preview, traceId }) => {
+  if(perched)return;
   const trace = (stage: string) => { if (traceId) window.qbot.behavior.reportTrace(traceId, stage); };
   behaviorReplayTimers.forEach(clearTimeout);
   behaviorReplayTimers = [];
@@ -381,6 +401,7 @@ function startDesktopWalk(): void {
 
 function scheduleTimer(): void {
   clearTimer();
+  if(perched)return;
   timer = setTimeout(() => dispatch({ type: 'TIMER_FIRE' }), randomDelay(rng));
 }
 
@@ -393,6 +414,7 @@ function clearTimer(): void {
 
 let gardenPerforming = false;
 window.qbot.garden.onPerformance(action => {
+  if(perched){window.qbot.pet.detachPerch();applyPerch(null);}
   cancelHold();
   stopDesktopWalk();
   gardenPerforming = !!action;
@@ -401,6 +423,10 @@ window.qbot.garden.onPerformance(action => {
   else dispatch({ type: 'PLAY_ACTION', action: 'idle' });
 });
 function dispatch(event: Parameters<typeof step>[1]): void {
+  if(perched){
+    if(event.type==='POINTER_DOWN'){window.qbot.pet.detachPerch();applyPerch(null);}
+    else { if(event.type==='VIDEO_ENDED')player.play(perched.action); return; }
+  }
   if(actionHold.action){
     if(event.type==='POINTER_DOWN'||event.type==='VISIT_START')cancelHold();
     else if(event.type==='VIDEO_ENDED'){
@@ -451,6 +477,7 @@ function dispatch(event: Parameters<typeof step>[1]): void {
 // ── 角色加载 ─────────────────────────────────────────────
 function activateCharacter(meta: CharacterMeta): void {
   if (!meta?.manifest) return;
+  if(currentCharacter?.dirId!==meta.dirId){window.qbot.pet.detachPerch();applyPerch(null);}
   if (gardenPerforming) window.qbot.garden.cancelPerformance();
   currentCharacter = meta;
   refreshSignboard();
@@ -478,7 +505,7 @@ function activateCharacter(meta: CharacterMeta): void {
     meetingAction: meta.manifest?.agentActions?.meetingAction,
   };
   state = { kind: 'idle' };
-    playIdle();
+    if(perched)player.play(perched.action);else playIdle();
   scheduleTimer();
   speaker.setCharacter(meta.manifest.id, meta.manifest.voice);
   // 切角色时清掉进行中的串门
@@ -500,6 +527,7 @@ void window.qbot.characters.getActive().then((meta) => {
 // 状态机会卡死在半路 → 恢复可见时整体重置回 idle 循环。
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || available.length === 0) return;
+  if(perched){player.play(perched.action);return;}
   speaker.interrupt();
   cancelHold();
   state = { kind: 'idle' };
@@ -548,6 +576,8 @@ stage.addEventListener('pointermove', (e) => {
     const dy = e.screenY - downScreenY;
     if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD) return;
     dragStarted = true;
+    window.qbot.pet.detachPerch();
+    applyPerch(null);
     if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
     speaker.interrupt();
     // 拖拽开始就结束串门
@@ -579,10 +609,12 @@ stage.addEventListener('pointerup', (e) => {
   if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
   if (dragStarted) {
     dragStarted = false;
+    window.qbot.pet.move(e.screenX-offsetX,e.screenY-offsetY);
     dispatch({ type: 'POINTER_UP' });
     hostSignboard.onDragEnd();
     hud.onDragEnd();
     window.qbot.perception.report('drag_end');
+    void window.qbot.pet.perch().then(result=>{if(result.reason)hud.toast(result.reason);});
     return;
   }
   // 双击 = 立即说一句；单击不做任何事（房间入口在右键菜单）
@@ -593,6 +625,7 @@ stage.addEventListener('pointerup', (e) => {
   } else {
     clickTimer = setTimeout(() => {
       clickTimer = null;
+      if(perched){perchButtonsVisible=!perchButtonsVisible;hud.root.style.visibility=perchButtonsVisible?'':'hidden';}
       // 单击只选中/准备拖拽，不自动接一句；双击和右键才主动说话。
     }, DBLCLICK_MS);
   }
@@ -617,6 +650,8 @@ window.addEventListener('blur', cancelPointer);
 
 // ── 右键菜单 ───────────────────────────
 const ACTION_LABELS: Record<string, string | undefined> = {
+  perch_sit: '坐窗沿',
+  perch_lie: '趴窗沿',
   sleep: '睡觉',
   tea: '喝茶',
   talk_happy: '聊天·开心',

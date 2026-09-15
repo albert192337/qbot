@@ -24,7 +24,7 @@ import { showBubbleWindow } from './windows';
 import { validateScript, type BehaviorScript, type BehaviorStep } from '../shared/behavior-dsl';
 import { setBehaviorExecutor } from './behavior-rules';
 import { updateBrainCall } from './brain-log';
-import { rememberConversation, shouldPauseAutomatic, lastUserAt } from './conversation-memory';
+import { rememberConversation, shouldPauseAutomatic, lastUserAt, conversationFor, automaticSpeechBudget } from './conversation-memory';
 
 /** 当前正在执行的行为（null = 空闲） */
 let current: {
@@ -114,6 +114,13 @@ async function runScript(script: BehaviorScript): Promise<void> {
     void updateBrainCall(script.meta.traceId, '取消排队的主动回应：用户正在聊天');
     runNextFromQueue();
     return;
+  }
+  if (script.meta.id === 'llm-brain' && script.meta.characterId) {
+    const budget = automaticSpeechBudget(conversationFor(script.meta.characterId));
+    if (!budget.allowed) {
+      script = { ...script, steps: script.steps.filter(step => step.op !== 'say' && step.op !== 'sign') };
+      void updateBrainCall(script.meta.traceId, '主动文字冷却，仅执行动作');
+    }
   }
   current = {
     script,
@@ -235,6 +242,10 @@ async function executeStep(step: BehaviorStep): Promise<void> {
         // 举牌/收牌
         if (step.text === null) clearPetMessage();
         else leavePetMessage(step.text, current.script.meta.characterId);
+        // 仅留言的主动决定也消耗文字预算，不能通过换成牌子绕过冷却。
+        if (step.text && current.script.meta.id === 'llm-brain' && current.script.meta.characterId && !current.script.steps.some(s => s.op === 'say')) {
+          rememberConversation(current.script.meta.characterId, { at: Date.now(), role: 'assistant', source: 'auto', text: step.text });
+        }
         void recordBehavior({ at: Date.now(), kind: 'sign', detail: step.text ?? '收起留言' });
         void updateBrainCall(current.script.meta.traceId, '留言已更新', {}, step.text ?? '收起留言');
         // 举牌是状态，不占时间——立即继续

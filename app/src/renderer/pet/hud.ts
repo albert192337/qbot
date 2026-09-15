@@ -94,6 +94,13 @@ export class ProgressHud {
     garden.addEventListener('pointerdown', e => e.stopPropagation());
     garden.addEventListener('click', e => { e.stopPropagation(); window.qbot.garden.toggle(); });
     this.root.appendChild(garden);
+    for (const [page,label,svg] of [
+      ['travel','世界旅行','<circle cx="16" cy="16" r="12" fill="#add7c6" stroke="#594235" stroke-width="2"/><path d="m8 8 8-3 3 7-5 4 4 7-6 4-5-10z" fill="#739970"/>'],
+      ['moments','旅行朋友圈','<rect x="4" y="4" width="24" height="25" rx="4" fill="#fff1d4" stroke="#594235" stroke-width="2"/><path d="M8 9h16v13H8z" fill="#b1d1c5"/><path d="m8 22 6-9 4 6 3-3 3 6" fill="#7d9c79"/>'],
+    ]) {
+      const b=document.createElement('button');b.className='hud-chat';b.title=label;b.setAttribute('aria-label',label);b.innerHTML=`<svg viewBox="0 0 32 32">${svg}</svg>`;
+      b.addEventListener('pointerdown',e=>e.stopPropagation());b.addEventListener('click',e=>{e.stopPropagation();window.qbot.garden.open(page);});this.root.append(b);
+    }
     const stopGardenHint = attachGardenHint(garden, window.qbot.garden);
     window.addEventListener('pagehide', stopGardenHint, { once: true });
     this.root.appendChild(this.floatEl);

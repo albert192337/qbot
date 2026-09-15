@@ -141,3 +141,28 @@ it('实际发出的自动台词进入共享记忆，未发送的旧回应不记�
   expect(web.send).not.toHaveBeenCalledWith('behavior:say', expect.objectContaining({ text: '过时回复' }));
   expect(conversationFor('memory-race').map(line => line.text)).toEqual(['新的问题']);
 });
+
+it('模型无视预算仍说话时拦住文字和留言，动作继续，直接聊天不受限', async () => {
+  const characterId = 'quiet-budget';
+  rememberConversation(characterId, { at: Date.now() - 60000, role: 'assistant', source: 'auto', text: '刚说过' });
+  execute({ meta: { id: 'llm-brain', source: 'llm', priority: 10, characterId }, steps: [
+    { op: 'sign', text: '换成留言也不行' }, { op: 'play', action: 'idle' }, { op: 'say', text: '继续自言自语' },
+  ] });
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(web.send).not.toHaveBeenCalled();
+  expect(getPetMessage()).toBeNull();
+  expect(mocks.send).toHaveBeenCalledWith('behavior:action', expect.objectContaining({ action: 'idle' }));
+  execute({ meta: { id: 'llm-chat', source: 'llm', priority: 100, characterId }, steps: [{ op: 'say', text: '我在呀' }] });
+  await vi.advanceTimersByTimeAsync(1);
+  expect(web.send).toHaveBeenCalledWith('behavior:say', expect.objectContaining({ text: '我在呀' }));
+});
+
+it('仅留言也记录预算，排队文字在开始执行时重新检查', async () => {
+  const characterId = 'sign-budget';
+  execute({ meta: { id: 'llm-brain', source: 'llm', priority: 10, characterId }, steps: [{ op: 'sign', text: '我去喝茶' }, { op: 'wait', ms: 1000 }] });
+  execute({ meta: { id: 'llm-brain', source: 'llm', priority: 10, characterId }, steps: [{ op: 'say', text: '继续说' }] });
+  await vi.advanceTimersByTimeAsync(1001);
+  expect(getPetMessage()?.text).toBe('我去喝茶');
+  expect(conversationFor(characterId).at(-1)?.text).toBe('我去喝茶');
+  expect(web.send).not.toHaveBeenCalled();
+});

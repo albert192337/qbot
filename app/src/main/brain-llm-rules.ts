@@ -13,6 +13,7 @@ import { idleInstructions,parseIdleDecision,type IdlePlan } from '../shared/idle
 
 /** 喂给模型的精简上下文（从感知快照 + 各监控器状态提炼） */
 export interface BrainInput {
+  perchObservation?: import('./perch-observation').PerchObservation | null;
   currentMessage?: string;
   idleCandidates?:Array<{id:string;description:string}>;
   idlePlan?:IdlePlan|null;
@@ -84,11 +85,12 @@ export function buildBrainMessages(input: BrainInput): ChatMessage[] {
     '',
     '铁律：',
     input.behaviorMode === 'free'
-      ? '1. 现在是自由模式。你有自己的兴趣、情绪和生活节奏，主动按人设在桌面做事、尝试不同动作、表达想法。无需等用户呼唤或发生特殊事件；优先选一个此刻想做的动作或想说的话，也可以只做动作。'
+      ? '1. 现在是自由模式。你有自己的兴趣、情绪和生活节奏，主动按人设尝试不同动作。自由活动不等于不停说话，优先用动作和安静待机表现生活感。'
       : '1. 现在是陪伴模式。按你的人设和当前情境选择动作或台词，自然地陪伴用户。',
     '2. 你只能看到用户提供给你的上下文，绝不编造看不到的东西（具体文件名、网页内容、聊天记录等）。',
     '3. 台词要短、口语化、有性格，像一个真人朋友随口说的，不要像客服或助手。不要用表情符号堆砌。',
     '4. 不要重复最近的话题、判断或提醒，换几个字也算重复。没有新的内容时可以只做动作或不行动，不必每次搭话。',
+    '主动文字预算 allowed=false 时，say 和 message 都留空，仍可做动作或规划待机。用户没有回应不表示同意，也不要求一直沉默：结束未获回应的话题，不追问、不催回复、不接着自己上次的猜测演下去。可以自然换一个独立的新话题，谈自己的动作、感受、明确标作想象的小念头或有依据的新观察；不要伪造用户活动或屏幕细节。预算允许时可主动聊一句，但不必每次都说。',
     '5. 舞台（动作/时机）承担笑点，你只是把话说得有性格——不要讲大道理、不要鸡汤、不要说教。',
     '',
     '输出严格的 JSON（不要 markdown 代码块、不要多余文字），格式：',

@@ -273,7 +273,7 @@ export async function runActions(
 ): Promise<void> {
   await job.setStage('actions');
   const pending = ACTION_IDS.filter(
-    (id) => job.state.actions[id].status !== 'done' && (!selectedActions || selectedActions.includes(id)),
+    (id) => job.state.actions[id].status !== 'done' && (selectedActions ?? job.state.baseActionIds ?? ACTION_IDS).includes(id),
   );
   // failed 的动作在 resume 时重置重跑（用户主动续跑即视为要求重试）
   for (const id of pending) {

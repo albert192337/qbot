@@ -5,7 +5,7 @@
  */
 import type { Manifest, ManifestAction, PlayableId } from '@qbot/pipeline';
 
-const LOOPING: ReadonlySet<string> = new Set(['idle', 'drag']);
+const LOOPING: ReadonlySet<string> = new Set(['idle', 'drag', 'perch_sit', 'perch_lie']);
 
 export class Player {
   private videos = new Map<string, HTMLVideoElement>();

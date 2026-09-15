@@ -8,6 +8,7 @@ import { attachPetWindowRecovery } from './pet-window-recovery';
 import { aboveBubbleLayout } from './bubble-layout';
 import { attachGarden } from './garden/windows';
 import { moveFixedSize } from './fixed-window';
+import { attachPetWindowLayer, raisePetWindowGroup } from './pet-window-layer';
 
 const PET_SIZE = 360;
 /** 房间宠上屏窗：比本地宠小一档（房友是客人体量），固定尺寸永不 resize */
@@ -96,6 +97,7 @@ export function openCozyPreview(): BrowserWindow {
 }
 
 let chatWindow: BrowserWindow | null = null;
+const desktopWindowGroup = () => [petWindow, bubbleWindow, chatWindow];
 function syncChatBounds(): void {
   if (!chatWindow || chatWindow.isDestroyed() || !petWindow) return;
   const pet = petWindow.getBounds();
@@ -119,6 +121,7 @@ export function openPetChat(): void {
       resizable: false, hasShadow: false, skipTaskbar: true, show: false,
       webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
     chatWindow.setAlwaysOnTop(true, 'floating');
+    attachPetWindowLayer(chatWindow, desktopWindowGroup, petWindow);
     chatWindow.on('closed', () => { chatWindow = null; });
     chatWindow.once('ready-to-show', () => { syncChatBounds(); chatWindow?.show(); });
     load(chatWindow, 'chat');
@@ -229,6 +232,7 @@ export function createPetWindow(): BrowserWindow {
     },
   });
   petWindow.setAlwaysOnTop(true, 'floating'); // 盖普通窗，不盖 Mission Control
+  attachPetWindowLayer(petWindow, desktopWindowGroup);
   petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   // 气泡窗跟随：move 覆盖拖拽与 OS 侧移动，resize 覆盖缩放
   petWindow.on('move', syncBubbleBounds);
@@ -402,6 +406,7 @@ function createBubbleWindow(): BrowserWindow {
   });
   bubbleWindow.setIgnoreMouseEvents(true, { forward: true }); // 转发移动以命中奖励卡关闭按钮。
   bubbleWindow.setAlwaysOnTop(true, 'floating');
+  attachPetWindowLayer(bubbleWindow, desktopWindowGroup, petWindow);
   bubbleWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   bubbleWindow.on('closed', () => (bubbleWindow = null));
   bubbleWindow.webContents.on('did-finish-load', () => {
@@ -424,6 +429,7 @@ export function showBubbleWindow(): BrowserWindow {
     win.showInactive(); // 不抢焦点
   }
   syncBubbleBounds();
+  raisePetWindowGroup(desktopWindowGroup());
   return win;
 }
 

@@ -1,0 +1,77 @@
+// Real renderer + production rules, isolated inventory; never touches the user's garden.
+const { app, BrowserWindow, ipcMain, session } = require('electron');
+const fs=require('node:fs'), path=require('node:path'), assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..'),ts=require(path.join(root,'node_modules/typescript'));
+require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,f);
+app.setPath('userData',fs.mkdtempSync(path.join(require('node:os').tmpdir(),'qbot-garden-expansion-')));
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+app.whenReady().then(async()=>{
+ try {
+  session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_,cb)=>cb({cancel:true}));
+  const {initialGarden,transition}=require('../app/src/main/garden/rules.ts');
+  let n=0;const rng={random:()=>.05,id:()=>`ui-${n++}`};let state=initialGarden(Date.now(),rng);state.coins=5000;
+  for(const sp of ['apple','pineapple','blueberry','tomato','carrot','tulip'])state.seeds.push({id:rng.id(),species:sp,genes:[],bred:false});
+  state.seeds.find(s=>s.species==='strawberry').genes=['golden'];
+  const apply=c=>{const r=transition(state,c,Date.now(),rng);state=r.state;return {ok:true,...r};};
+  ipcMain.handle('garden:get',()=>state);
+  ipcMain.handle('garden:act',(_,cmd)=>{try {const r=apply(cmd);for(const w of BrowserWindow.getAllWindows())w.webContents.send('garden:changed');return r;}catch(e){return {ok:false,error:e.message};}});
+  let ignored=true;
+  ipcMain.on('garden:ignore',(_,value)=>{ignored=value;});ipcMain.on('garden:open',(_,page)=>panel.webContents.send('garden:page',page));
+  const webPreferences={preload:path.join(root,'app/out/preload/index.js'),backgroundThrottling:false,offscreen:true};
+  const panel=new BrowserWindow({width:860,height:780,show:false,webPreferences});
+  const strip=new BrowserWindow({width:1100,height:700,show:false,transparent:true,frame:false,webPreferences});
+  const errors=[];for(const w of [panel,strip])w.webContents.on('console-message',e=>{if(e.level==='error'){errors.push(e.message);console.error(e.message);}});
+  await panel.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'shop'}});
+  await strip.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'strip'}});
+  strip.webContents.send('garden:anchor',{left:780,right:1040,top:340,bottom:620,side:'left'});
+  const js=code=>panel.webContents.executeJavaScript(code).catch(e=>{console.error(code);throw e;});
+  const until=async pred=>{for(let i=0;i<80;i++){if(await pred())return;await wait(80);}throw Error('UI timed out');};
+  const pointerClick=async selector=>{
+   const point=await strip.webContents.executeJavaScript(`(()=>{const b=document.querySelector(${JSON.stringify(selector)}),r=b.getBoundingClientRect(),x=Math.round(r.x+r.width/2),y=Math.round(r.y+r.height/2);return {x,y,hit:b.contains(document.elementFromPoint(x,y)),enabled:!b.disabled}})()`);
+   assert.ok(point.hit&&point.enabled,`Button must receive pointer: ${selector}`);
+   strip.webContents.sendInputEvent({type:'mouseMove',x:point.x,y:point.y});await wait(100);
+   assert.equal(ignored,false,'Button hover must disable native mouse passthrough');
+   strip.webContents.sendInputEvent({type:'mouseDown',x:point.x,y:point.y,button:'left',clickCount:1});
+   strip.webContents.sendInputEvent({type:'mouseUp',x:point.x,y:point.y,button:'left',clickCount:1});await wait(130);
+  };
+  const click=async text=>{await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)}&&!b.disabled);if(!b)throw Error('Missing '+${JSON.stringify(text)});b.click()})()`);await wait(130);};
+  const out=path.join(root,'.superpowers/garden-expansion');fs.mkdirSync(out,{recursive:true});
+  const shot=async(w,name)=>{await w.webContents.executeJavaScript('Promise.all([...document.images].map(i=>i.decode().catch(()=>{})))');await wait(180);fs.writeFileSync(path.join(out,name+'.png'),(await w.webContents.capturePage()).toPNG());};
+  await until(()=>js('document.querySelectorAll(".shop-card").length===18'));
+  assert.equal(await js('document.querySelectorAll(".shop-card .growth-duration").length'),9);
+  assert.ok(await js('[...document.querySelectorAll(".shop-card")].some(c=>c.textContent.includes("苹果")&&c.textContent.includes("8 小时 / 轮 · 可采 3 次"))'));
+  await click('批量购买');
+  await js('document.querySelector(".shop-card .select-check").click()');await wait(100);
+  assert.ok(await js('!!document.querySelector(".batch-bar")'));
+  await shot(panel,'shop-batch');
+  const pre=state.coins;
+  await js('document.querySelector(".batch-bar button").click()');await until(()=>state.coins<pre);
+  assert.equal(state.coins,pre-12); // low RNG gives one carrot seed
+  assert.equal(await js('document.querySelectorAll(".sell-confirm").length'),0);
+  await click('背包');await shot(panel,'seed-packets');
+  await pointerClick('.strip-sow');
+  assert.ok(await strip.webContents.executeJavaScript(`(()=>{const buttons=[...document.querySelectorAll('.garden-tools button')];const q=document.querySelector('.quest-pill').getBoundingClientRect();return buttons.length===3 && buttons.every(b=>b.getBoundingClientRect().top===buttons[0].getBoundingClientRect().top) && q.bottom<=340 && Math.abs(q.x+q.width/2-910)<2})()`));
+  await until(()=>js('!!document.querySelector(".page-sow")'));
+  await shot(panel,'batch-sowing');
+  await js('document.querySelectorAll(".seed-card").forEach(c=>{if(c.textContent.includes("草莓")&&c.textContent.includes("鎏金"))c.querySelector(".batch-sow").click()})');
+  await until(()=>state.plots.some(Boolean));
+  for(const sp of ['apple','pineapple','blueberry','tomato'])apply({type:'plant',plot:state.plots.indexOf(null),seed:state.seeds.find(s=>s.species===sp).id});
+  apply({type:'mature'});strip.webContents.send('garden:changed');panel.webContents.send('garden:changed');
+  await wait(400);await shot(strip,'ripe-plants');
+  apply({type:'keep',plot:0});
+  strip.webContents.send('garden:changed');await wait(150);
+  panel.webContents.send('garden:page','plots');await wait(150);
+  await pointerClick('.strip-harvest');await until(()=>state.produce.length===4);
+  assert.equal(state.plots[0].keep,true);assert.equal(state.plots[1].harvestsLeft,2);
+  await shot(strip,'harvest-summary');await shot(strip,'regrowing-plants');
+  await click('背包');await until(()=>js('document.querySelectorAll(".produce-card").length===4'));await shot(panel,'fruit-bag');
+  await js('document.querySelector(".produce-card .collection").click()');await wait(130);
+  await click('批量售出');await click('全选');
+  await js('document.querySelector(".batch-bar button").click()');await until(()=>state.produce.length===1);assert.equal(state.produce[0].locked,true);
+  await click('限时商店');panel.setSize(480,640);await wait(150);await shot(panel,'small-shop');
+  assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));
+  assert.ok((await js('Promise.all([...document.images].map(i=>i.decode().then(()=>true,()=>false)))')).every(Boolean));
+  assert.deepEqual(errors,[]);
+  console.log('PASS: batch buy, multi-harvest, keep/collection, direct batch sale, plant/fruit art, narrow UI. Screenshots:',out);app.exit(0);
+ } catch(e){console.error(e);app.exit(1);}
+});

@@ -5,6 +5,7 @@
 import type { AgentMessage } from '../../shared/ipc-types';
 import { advanceReading } from './reading';
 import { supplyArt } from '../garden/supply-art';
+import { FERTILIZERS, type Fertilizer } from '../../shared/garden';
 import {
   displayLabels,
   FADE_MS,
@@ -44,6 +45,7 @@ function buildNode(msg: BubbleItem): HTMLElement {
   el.append(src, text);
   if (msg.rewards) {
     el.classList.add('reward-card');
+    el.classList.toggle('rare-reward', msg.rewards.some(item => item.kind === 'fertilizer' && FERTILIZERS[item.id as Fertilizer]?.grade === 3));
     const close = document.createElement('button');
     close.className = 'reward-close'; close.textContent = '×'; close.setAttribute('aria-label', '关闭开箱结果');
     close.onclick = () => {

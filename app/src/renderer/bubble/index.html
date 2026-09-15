@@ -88,6 +88,12 @@
 .reward-tile .supply-art{display:flex;width:48px;height:48px;margin:0 auto 4px;align-items:center;justify-content:center;background:radial-gradient(#fff5bd,transparent 70%)}
 .reward-tile img,.reward-tile svg{width:100%;height:100%;object-fit:contain}
 .reward-tile b{display:block;font-size:14px;margin-top:2px;color:#709378}
+.reward-tile .supply-art{position:relative}
+.reward-tile .fert-grade{position:absolute;bottom:0;left:0;right:0;font-size:8px;text-align:center;color:#8b7850}
+.rare-reward.show{animation:rare-unbox .65s ease-out}
+.rare-reward .reward-tile{background:radial-gradient(ellipse at top,#fff3bd,#f2ecd3)}
+@keyframes rare-unbox{0%{box-shadow:0 0 0 0 #f5cf70;transform:scale(.94)}45%{box-shadow:0 0 26px 5px #f5cf70a0;transform:scale(1.02)}100%{box-shadow:0 4px 0 #8c806932,0 6px 18px #40332220;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.rare-reward.show{animation:none}}
 </style>
   </head>
   <body>

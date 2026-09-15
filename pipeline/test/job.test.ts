@@ -19,6 +19,21 @@ async function makeRefImage(): Promise<string> {
 }
 
 describe('Job', () => {
+  it('旧任务升级不自动增加两项付费生成，新任务包含窗沿动作', async () => {
+    const job=await Job.create(path.join(tmpDir,'legacy'),{refImagePath:await makeRefImage()});
+    expect(job.state.baseActionIds).toContain('perch_sit');expect(job.state.baseActionIds).toContain('perch_lie');
+    delete job.state.baseActionIds;
+    delete (job.state.actions as Partial<typeof job.state.actions>).perch_sit;
+    delete (job.state.actions as Partial<typeof job.state.actions>).perch_lie;
+    job.state.stage='done';
+    for(const action of Object.values(job.state.actions))action.status='failed';
+    await job.save();
+    const loaded=await Job.load(job.outDir);
+    expect(loaded.state.baseActionIds).toHaveLength(8);
+    expect(loaded.state.baseActionIds).not.toContain('perch_sit');
+    expect(loaded.state.actions.perch_sit.status).toBe('pending');
+    expect(loaded.state.stage).toBe('done');
+  });
   it('create 初始化 state.json 与目录结构', async () => {
     const out = path.join(tmpDir, 'char');
     await mkdir(out, { recursive: true });

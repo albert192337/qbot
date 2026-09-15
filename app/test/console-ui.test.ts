@@ -47,7 +47,7 @@ describe('console UI invariants', () => {
     expect(source).toContain('selectedSourceFile');
     expect(source).toContain('高级生成设置');
     expect(source).toContain('开始后先生成 1 个角色方案供你确认');
-    expect(source).toContain('8 个常用动作');
+    expect(source).toContain('10 个常用动作');
     expect(source).not.toContain('表现力动作（M 档）');
   });
 

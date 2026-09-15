@@ -66,6 +66,7 @@ export class Job extends EventEmitter {
     const state: JobState = {
       jobId: randomUUID(),
       pipelineVersion: '1',
+      baseActionIds: [...ACTION_IDS],
       tier: opts.tier ?? 'S',
       createdAt: new Date().toISOString(),
       stage: 'turnaround',
@@ -96,6 +97,7 @@ export class Job extends EventEmitter {
   /** 校验状态宣称的产物是否真实存在，缺失则回退（防"state 说下载完了但文件被删"） */
   private reconcile(): void {
     const s = this.state;
+    s.baseActionIds ??= ACTION_IDS.filter(id => !!s.actions[id]);
     for (const id of ACTION_IDS) {
       s.actions[id] ??= initialActionState();
     }
@@ -150,7 +152,7 @@ export class Job extends EventEmitter {
     }
     // 整体 stage 与动作状态对齐
     if (s.stage === 'done' || s.stage === 'package') {
-      const allSettled = ACTION_IDS.every(
+      const allSettled = s.baseActionIds.every(
         (id) => s.actions[id].status === 'done' || s.actions[id].status === 'failed',
       );
       if (!allSettled) s.stage = 'actions';

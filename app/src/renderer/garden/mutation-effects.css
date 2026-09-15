@@ -1,0 +1,44 @@
+/* Fixed effect modules: no images per combination, no timers per plant. */
+.art.mutation-art { overflow:visible; }
+.art.mutation-art.quality-purple,.art.mutation-art.quality-gold,.art.mutation-art.quality-rainbow { filter:none; }
+.art.mutation-art.rainbow img { animation:none; }
+.mutation-surface { position:absolute;inset:0;pointer-events:none;mask-image:var(--plant-mask);mask-size:contain;mask-repeat:no-repeat;mask-position:center bottom; }
+.art.twin .mutation-surface { width:72%;left:0;transform:rotate(-8deg);transform-origin:bottom center; }
+.art.twin .mutation-surface.twin-copy { left:28%;transform:rotate(9deg) scale(.9); }
+.mutation-surface > div { position:absolute;inset:0; }
+.surface-rainbow { background:linear-gradient(125deg,#ff83bc,#c394ff,#69dfff,#8ef1b1,#fff1a1,#ff83bc);background-size:300% 300%;mix-blend-mode:color;opacity:.5;animation:plant-prism 8s ease-in-out infinite; }
+.surface-golden { background:linear-gradient(110deg,transparent 20%,#fff1a580 43%,#fffbe4d9 49%,transparent 58%);background-size:260% 100%;opacity:.6;animation:plant-gold 5s ease-in-out infinite; }
+.surface-frost { background-image:var(--ice-cracks),linear-gradient(145deg,#b2f2ff45,#d8fbff75 45%,#46c5ed45);background-size:100% 100%; }
+.surface-frost::after { content:'';position:absolute;inset:0;background:linear-gradient(120deg,transparent 30%,#f0fcffb0 49%,transparent 60%);background-size:260% 100%;animation:plant-gold 6s ease-in-out infinite; }
+.surface-thunder { background:#dcfaff;opacity:0;animation:plant-charge 4.6s ease-out infinite; }
+.mutation-particles,.thunder-arcs { position:absolute;width:var(--fx-width,100%);height:var(--fx-height,100%);left:50%;bottom:0;transform:translateX(-50%);pointer-events:none; }
+.mutation-particles i { position:absolute;left:calc(8% + var(--i)*14%);top:calc(16% + var(--i)*11%);display:block; }
+.particles-ice i { width:clamp(4px,9%,11px);height:clamp(8px,17%,22px);background:linear-gradient(100deg,#38b8e6,#d9ffff 45%,#76daf3 49%,#65afdd);clip-path:polygon(50% 0,100% 35%,75% 100%,20% 83%,0 27%);filter:drop-shadow(0 0 3px #a6efff);opacity:.9;animation:plant-ice 4s ease-in-out infinite;animation-delay:calc(var(--i)*-.63s); }
+.frost-mist { position:absolute;pointer-events:none;left:10%;right:10%;bottom:5%;height:calc(var(--fx-height,100px)*.28);background:radial-gradient(ellipse,#cbf7ff85,transparent 68%);filter:blur(3px);animation:plant-mist 5s ease-in-out infinite; }
+.thunder-arcs svg { width:100%;height:100%;overflow:visible; }
+.thunder-arcs path { fill:none;stroke-linejoin:bevel;stroke-linecap:round;vector-effect:non-scaling-stroke; }
+.arc { opacity:.42;animation:plant-arc 4.6s ease-out infinite; }
+.arc-b { animation-delay:-2.2s; }.arc-c { animation-delay:-.9s; }
+.arc-glow { stroke:#60cfff;stroke-width:4;filter:drop-shadow(0 0 3px #4ebeff); }
+.arc-core { stroke:#f4fcff;stroke-width:1.3; }
+.particles-charge i { width:4px;height:4px;background:#fff4ab;box-shadow:0 0 5px #5fcfff;border-radius:50%;animation:plant-charge-particle 2.8s ease-out infinite;animation-delay:calc(var(--i)*-.5s); }
+.particles-star i { width:clamp(6px,12%,17px);aspect-ratio:1;background:#fff0a7;clip-path:polygon(50% 0,61% 38%,100% 50%,61% 62%,50% 100%,39% 62%,0 50%,39% 38%);animation:plant-star 3.2s ease-in-out infinite;animation-delay:calc(var(--i)*-.43s); }
+.art.rainbow.shiny .particles-star i:nth-child(even) { background:#a4eaff; }
+.fx-offscreen *,.fx-offscreen *::after,.garden-fx-paused .art *,.garden-fx-paused .art *::after { animation-play-state:paused!important; }
+.factor:not(.unlocked) .mutation-particles,.factor:not(.unlocked) .thunder-arcs,.factor:not(.unlocked) .frost-mist { display:none; }
+.harvest-reveal .art { animation:harvest-grow .65s cubic-bezier(.16,1,.3,1) both; }
+.harvest-reveal .tag { animation:harvest-trait .35s ease-out both;animation-delay:calc(.25s + var(--reveal-i,0)*.13s); }
+.harvest-reveal .result-stats { animation:harvest-trait .45s ease-out .7s both; }
+.harvest-multiplier { font-size:11px;color:#826027;margin:3px 0; }
+.harvest-reveal.quality-purple,.harvest-reveal.quality-gold,.harvest-reveal.quality-rainbow { filter:none; }
+@keyframes plant-prism { 0%,100%{background-position:0 50%}50%{background-position:100% 50%} }
+@keyframes plant-gold { 0%,15%{background-position:130% 0}65%,100%{background-position:-90% 0} }
+@keyframes plant-ice { 0%,100%{transform:translateY(0) rotate(-12deg);opacity:.55}50%{transform:translateY(-6px) rotate(9deg);opacity:1} }
+@keyframes plant-mist { 0%,100%{transform:translateX(-3px) scale(.9);opacity:.55}50%{transform:translateX(3px) scale(1.1);opacity:.9} }
+@keyframes plant-arc { 0%,52%,100%{opacity:.42}57%{opacity:1;transform:translateX(-1px)}62%{opacity:.7;transform:translateX(1px)}70%{opacity:.42;transform:none} }
+@keyframes plant-charge { 0%,52%,72%,100%{opacity:0}58%{opacity:.24} }
+@keyframes plant-charge-particle { 0%{transform:translate(0,5px) scale(.5);opacity:0}25%{opacity:1}100%{transform:translate(7px,-16px) scale(.3);opacity:0} }
+@keyframes plant-star { 0%,100%{transform:scale(.5) rotate(0);opacity:.35}50%{transform:scale(1) rotate(35deg);opacity:1} }
+@keyframes harvest-grow { from{transform:translateY(12px) scale(.7);opacity:.2}to{transform:none;opacity:1} }
+@keyframes harvest-trait { from{transform:translateY(5px);opacity:0}to{transform:none;opacity:1} }
+@media(prefers-reduced-motion:reduce) { .surface-thunder{opacity:.08}.arc{opacity:.8}.mutation-art *,.harvest-reveal *{animation:none!important} }

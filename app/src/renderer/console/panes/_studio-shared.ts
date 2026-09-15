@@ -12,6 +12,7 @@ import { actionDisplayName, type StickerManifest } from '../../../shared/sticker
 /** 标准动作的中文标签（自定义动作直接用动作名）。
  *  口径统一：原先 hatch 叫「呼吸/悬空」、studio 叫「待机/拖拽」，收进同一窗会同屏出现。 */
 export const STD_LABELS: Partial<Record<ActionId, string>> = {
+  perch_sit: '坐窗沿', perch_lie: '趴窗沿',
   idle: '待机', drag: '拖拽', sleep: '睡觉', tea: '喝茶',
   talk_happy: '聊天·开心', talk_annoyed: '聊天·嫌弃',
   wave: '挥手问候', stretch: '伸懒腰',

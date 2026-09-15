@@ -42,6 +42,16 @@ const PROPORTION_LOCK =
  *   凭空长出一条（写实喝茶动作实测长出猫尾巴）；通用动作也不驱动耳朵，避免给人形角色套用兽耳运动
  */
 export const ACTIONS: Record<ActionId, ActionSpec> = {
+  perch_sit: {
+    poseDesc: '角色坐在想象中的水平窗沿上，臀部为稳定支点，上身直立放松，小腿自然垂在支点下方。只画角色，不画窗口、椅子、桌面或任何支撑物，四肢比例严格保持参考图。',
+    motionDesc: '保持坐姿与臀部支点不动，轻轻眨眼和呼吸，小腿小幅晃动，首尾姿势一致，可无缝循环。角色不位移，不站起。',
+    durationSec: 5,
+  },
+  perch_lie: {
+    poseDesc: '角色横向趴在想象中的水平窗沿上，腹部和前臂处于同一稳定承托水平线，侧脸朝观众，姿态惬意。只画角色，不画窗口、床、桌面、枕头或任何支撑物，完整身体不出画。',
+    motionDesc: '保持横向趴姿与腹部承托位置不动，轻轻呼吸、眨眼，首尾姿势一致，可无缝循环。角色不位移，不站起。',
+    durationSec: 5,
+  },
   idle: {
     poseDesc:
       '角色自然站立，双臂自然下垂，表情平静放松。画面中不出现其他人的手或身体部位，不出现任何额外人物或物体。',
@@ -106,6 +116,14 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
  * 一律用"整体""姿态""轮廓"级别的措辞，防翻车排除项与人形档保持一致。
  */
 export const ABSTRACT_ACTIONS: Record<ActionId, ActionSpec> = {
+  perch_sit: {
+    poseDesc: '保持参考图的原本结构，整体收拢，重心稳定停靠在想象中的水平边沿上，轮廓轻松自然。不增加任何部位，不画边沿、窗口或任何支撑物。',
+    motionDesc: '整体保持稳定停靠姿态，仅轻微起伏和晃动，支点不移动，首尾一致，可循环。', durationSec: 5,
+  },
+  perch_lie: {
+    poseDesc: '保持参考图的原本结构，整体放松横向伏在想象中的水平边沿上。不增加任何部位，不画边沿、窗口或任何支撑物，完整轮廓不出画。',
+    motionDesc: '整体保持横向伏着的放松姿态，轮廓轻微起伏，承托位置不移动，首尾一致，可循环。', durationSec: 5,
+  },
   idle: {
     poseDesc: '角色保持参考图中原本的自然姿态，安静放松。没有其他任何人物或物体。',
     motionDesc:
@@ -160,6 +178,8 @@ export const ABSTRACT_ACTIONS: Record<ActionId, ActionSpec> = {
  * 一律换成头发/衣角级别的自然运动（尾巴已全档禁提，见 ACTIONS 注释）。
  */
 export const FAITHFUL_ACTIONS: Record<ActionId, ActionSpec> = {
+  perch_sit: ACTIONS.perch_sit,
+  perch_lie: ACTIONS.perch_lie,
   idle: {
     poseDesc: ACTIONS.idle.poseDesc,
     motionDesc:

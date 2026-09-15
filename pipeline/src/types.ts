@@ -4,7 +4,7 @@
  * 铁律：本模块（整个 pipeline/）不得 import 任何 Electron API。
  */
 
-/** 新角色默认生成的 8 个动作 ID。 */
+/** 新角色默认生成的 10 个动作 ID。 */
 export const ACTION_IDS = [
   'idle',
   'drag',
@@ -14,6 +14,8 @@ export const ACTION_IDS = [
   'talk_annoyed',
   'wave',
   'stretch',
+  'perch_sit',
+  'perch_lie',
 ] as const;
 
 export type ActionId = (typeof ACTION_IDS)[number];
@@ -98,6 +100,8 @@ export type CharacterStyle = 'chibi' | 'faithful';
 
 /** manifest.json 中单动作条目（spec §4） */
 export interface ManifestAction {
+  /** Optional contact line (0..1 of canvas height) for window-edge poses. */
+  perchAnchor?: number;
   webm: string;
   gif: string;
   durationSec: number;
@@ -263,6 +267,8 @@ export interface JobState {
     picked: number | null;
   };
   actions: Record<ActionId, ActionState>;
+  /** Freeze the originally requested base set so upgrading does not add paid work to old jobs. */
+  baseActionIds?: ActionId[];
 }
 
 /** 每动作的生成配置（姿势文案等在 prompts.ts） */
