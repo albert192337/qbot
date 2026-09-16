@@ -1,3 +1,4 @@
+import { regenerateWithReference } from './character-image-picker';
 import { navigate } from '../workspace';
 /**
  * 人设与动作 pane：角色人设 + 动作列表（含 poseDesc/motionDesc 编辑、删除）+ 新增自定义动作。
@@ -198,7 +199,7 @@ function bind(root: HTMLElement, dirId: string): void {
     void (async () => {
       if (!(await confirmBox(root, '重新生成这个动作？会生成新的首帧和视频并产生模型费用，完成后替换当前动作。'))) return;
       await guard(root, button, '生成中…', async () => {
-        await window.qbot.studio.regenerateActions(dirId, [button.dataset.id!]);
+        if (!await regenerateWithReference(root, dirId, button.dataset.id!)) return;
         if (!hasUnsavedChanges()) await refresh();
         else toast(root, '动作已更新，当前输入已保留。');
       });

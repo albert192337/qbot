@@ -82,7 +82,7 @@ export async function createStickerCharacter(baseDir: string, req: StickerCreate
     await extractLibraryFrame(draft.files.get(req.referenceId)!, path.join(out, 'source.png'));
     const library: StickerLibrary = { version:1, items:[], scenes:{}, referenceId:req.referenceId };
     const m: LibraryManifest = { id:dirId, name:req.name.trim(), createdAt:new Date().toISOString(), tier:'S',
-      sourceImage:'source.png', turnaround:'', pipelineVersion:'1', actions:{} as Manifest['actions'], customActions:{}, stickerLibrary:library };
+      generationMode:'original', sourceImage:'source.png', turnaround:'', pipelineVersion:'1', actions:{} as Manifest['actions'], customActions:{}, stickerLibrary:library };
     let completed = 0;
     for (const item of req.items) {
       const file = draft.files.get(item.id)!;

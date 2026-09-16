@@ -59,3 +59,5 @@ export { checkGreenFrame, checkVideoDrift, classifyDrift, selectChromaKey, selec
 export { turnaroundPrompt, framePrompt, videoPrompt, actionSpec, ACTIONS, ABSTRACT_ACTIONS, FAITHFUL_ACTIONS, DEFAULT_CHARACTER_DESC, expressionActionSpec, EXPRESSION_ACTIONS, EXPRESSION_ABSTRACT_ACTIONS, EXPRESSION_FAITHFUL_MOTION } from './prompts.js';
 export { EXPRESSION_ACTION_IDS } from './types.js';
 export type { ExpressionActionId } from './types.js';
+
+export { originalActionSpec, originalFramePrompt, originalVideoPrompt } from './original-prompts.js';

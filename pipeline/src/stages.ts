@@ -1,3 +1,4 @@
+import { originalActionSpec, originalFramePrompt, originalVideoPrompt } from './original-prompts.js';
 /**
  * 五阶段编排：turnaround → (人工挑选) → 每动作 frame→qc→video→keying → package。
  * - 每动作独立异步链，Promise.allSettled 并发，单动作失败不阻塞其他
@@ -155,11 +156,13 @@ async function runAction(
 ): Promise<void> {
   const a = job.state.actions[action];
   let turnaroundPng: Buffer;
-  try { turnaroundPng = await readFile(path.join(job.outDir, 'turnaround.png')); }
+  let referenceImage = a.referenceImage ?? (job.state.generationMode === 'original' ? job.state.refImage : 'turnaround.png');
+  try { turnaroundPng = await readFile(path.join(job.outDir, referenceImage)); }
   catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+    if (a.referenceImage || (e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
     // Imported sticker characters have a reference image, not a generated turnaround.
-    turnaroundPng = await readFile(path.join(job.outDir, job.state.refImage));
+    referenceImage = job.state.refImage;
+    turnaroundPng = await readFile(path.join(job.outDir, referenceImage));
   }
 
   // 读取自定义 prompt（poseDesc/motionDesc + 全文覆盖）与人设
@@ -182,6 +185,10 @@ async function runAction(
     // manifest 不存在 → 初次生成，无自定义 prompt
   }
 
+  const original = job.state.generationMode === 'original';
+  const spec = original ? originalActionSpec(action) : ACTIONS[action];
+  const fp = original && !framePromptFull?.trim() ? originalFramePrompt(customPoseDesc ?? spec.poseDesc, persona) : framePrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customPoseDesc, framePromptFull);
+  const vp = original && !videoPromptFull?.trim() ? originalVideoPrompt(customMotionDesc ?? spec.motionDesc) : videoPrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customMotionDesc, videoPromptFull);
   try {
     // ── Stage 2: 绿幕首帧（QC 不过自动重试 1 次）─────────────────
     if (!a.framePath || a.status === 'pending' || a.status === 'generating_frame') {
@@ -190,8 +197,9 @@ async function runAction(
         await job.transition(action, 'generating_frame', {
           attempts: { ...a.attempts, frame: a.attempts.frame + 1 },
         });
+        await writeFile(job.jobPath(`${action}_request.json`), JSON.stringify({ at: new Date().toISOString(), referenceImage, referenceSelection: a.referenceSelection, mode: job.state.generationMode, framePrompt: fp, videoPrompt: vp }, null, 2));
         const frameBuf = await ark.generateImage({
-          prompt: framePrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customPoseDesc, framePromptFull),
+          prompt: fp,
           refImageDataUrl: toDataUrl(turnaroundPng),
           size: IMAGE_SIZES.frame,
         });
@@ -209,6 +217,8 @@ async function runAction(
       }
     }
 
+    if (a.needsFrameApproval) return;
+
     // ── Stage 3: 循环视频（taskId 提交成功立刻落盘，重启恢复轮询不重提）──
     if (!a.videoPath) {
       if (!a.videoTaskId) {
@@ -217,7 +227,7 @@ async function runAction(
         });
         const frameBuf = await readFile(job.jobPath(a.framePath!));
         const taskId = await ark.submitVideoTask({
-          prompt: videoPrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customMotionDesc, videoPromptFull),
+          prompt: vp,
           frameDataUrl: toDataUrl(frameBuf),
         });
         await job.transition(action, 'generating_video', { videoTaskId: taskId });

@@ -46,7 +46,7 @@ function collectActionFiles(manifest: Record<string, unknown>): string[] {
 
 /** 脱敏：persona 等文本永不出本机（spec §四） */
 export function sanitizeManifest(manifest: Record<string, unknown>): Record<string, unknown> {
-  const { persona: _persona, turnaroundPromptFull: _prompt, spareStickers: _spares, ...rest } = structuredClone(manifest);
+  const { persona: _persona, turnaroundPromptFull: _prompt, spareStickers: _spares, coverImage: _cover, cover: _coverMeta, ...rest } = structuredClone(manifest);
   for (const group of ['actions','importedActions','expressionActions','customActions']) {
     const entries = rest[group];
     if (!entries || typeof entries !== 'object') continue;

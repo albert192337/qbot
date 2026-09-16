@@ -54,7 +54,7 @@ async function refresh(): Promise<void> {
     const doneCount = collectActions(c.manifest).filter((a) => a.status === 'done').length;
     const failed = Object.values(c.manifest.actions).filter((a) => a.status === 'failed').length;
     html += `<div class="char-card${isActive ? ' active' : ''}" data-dir="${esc(c.dirId)}">`;
-    html += `<div class="char-thumb"><img src="qbot-asset://${esc(c.dirId)}/source.png" alt="" /></div>`;
+    html += `<div class="char-thumb">${c.coverImage ? `<img src="qbot-asset://${esc(c.dirId)}/${esc(c.coverImage)}" alt="" />` : '<span>未选封面</span>'}</div>`;
     html += `<div class="char-name">${esc(name)}${isActive ? '<span class="char-badge">使用中</span>' : ''}</div>`;
     html += `<div class="char-meta">${doneCount} 个动作${failed ? ` · ${failed} 个失败` : ''}`;
     if (c.hasUnfinishedJob) html += ` · <b>未完成</b>`;

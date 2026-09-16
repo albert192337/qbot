@@ -226,6 +226,14 @@ const api: QBotApi = {
     },
   },
   studio: {
+    imageChoices: id => ipcRenderer.invoke('studio:imageChoices',id),
+    previewImage: (id,selection) => ipcRenderer.invoke('studio:previewImage',id,selection),
+    saveCover: (id,selection) => ipcRenderer.invoke('studio:saveCover',id,selection),
+    prepareActionFrame: (dir,id,selection) => ipcRenderer.invoke('studio:prepareActionFrame',dir,id,selection),
+    actionReference: (dir,id) => ipcRenderer.invoke('studio:actionReference',dir,id),
+    pendingActionFrame: (dir,id) => ipcRenderer.invoke('studio:pendingActionFrame',dir,id),
+    approveActionFrame: (dir,id,frame) => ipcRenderer.invoke('studio:approveActionFrame',dir,id,frame),
+
     savePersona: (dirId, persona) => ipcRenderer.invoke('studio:savePersona', dirId, persona),
     addCustomAction: (dirId, name, poseDesc, motionDesc, durationSec) =>
       ipcRenderer.invoke('studio:addCustomAction', dirId, name, poseDesc, motionDesc, durationSec),

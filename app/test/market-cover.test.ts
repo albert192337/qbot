@@ -1,0 +1,33 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+const fixture=vi.hoisted(()=>({dir:'',fetch:vi.fn()}));
+vi.mock('electron',()=>({nativeImage:{createFromPath:()=>({isEmpty:()=>true})}}));
+vi.mock('../src/main/characters',()=>({charactersDir:()=>fixture.dir,getCharacter:async(id:string)=>({dirId:id,manifest:{name:'test'}})}));
+vi.mock('../src/main/config',()=>({getSettings:async()=>({}),setSettings:async()=>{}}));
+vi.mock('../src/main/tray',()=>({rebuildTray:async()=>{}}));
+vi.mock('../src/main/windows',()=>({broadcastCharacterActivated:()=>{}}));
+afterEach(async()=>{vi.unstubAllGlobals();vi.resetModules();if(fixture.dir)await rm(fixture.dir,{recursive:true,force:true});});
+it('downloads preview as cover without replacing the packaged original reference',async()=>{
+  fixture.dir=await mkdtemp(path.join(os.tmpdir(),'qbot-market-cover-'));
+  const input=path.join(fixture.dir,'input');await mkdir(input);
+  await writeFile(path.join(input,'manifest.json'),JSON.stringify({id:'test',actions:{},stickerLibrary:{items:[]}}));
+  await writeFile(path.join(input,'source.png'),'real-reference');
+  const {packCharacterDir}=await import('../src/main/asset-pack');const pack=await packCharacterDir(input);
+  fixture.fetch.mockImplementation(async(url:string)=>({ok:true,arrayBuffer:async()=>url.endsWith('/pack')?pack.buffer:Buffer.from('display-cover')}));
+  vi.stubGlobal('fetch',fixture.fetch);
+  const {downloadSkin}=await import('../src/main/market');await downloadSkin(pack.hash);
+  const dest=path.join(fixture.dir,`market-${pack.hash}`);
+  expect(await readFile(path.join(dest,'source.png'),'utf8')).toBe('real-reference');
+  expect(await readFile(path.join(dest,'cover.png'),'utf8')).toBe('display-cover');
+});
+it('does not upload the source as a cover when no cover has been selected',async()=>{
+  fixture.dir=await mkdtemp(path.join(os.tmpdir(),'qbot-market-preview-'));const input=path.join(fixture.dir,'input');await mkdir(input);
+  await writeFile(path.join(input,'manifest.json'),JSON.stringify({id:'test',actions:{}}));await writeFile(path.join(input,'source.png'),'private-reference');
+  fixture.fetch.mockReset();fixture.fetch.mockResolvedValue({ok:true,status:200,json:async()=>({hash:'1234567890abcdef',token:'fixture'})});vi.stubGlobal('fetch',fixture.fetch);
+  const {uploadSkin}=await import('../src/main/market');await uploadSkin('input');
+  expect(fixture.fetch).toHaveBeenCalledTimes(1);
+  await writeFile(path.join(input,'cover.png'),'chosen-cover');await uploadSkin('input');
+  expect(fixture.fetch).toHaveBeenLastCalledWith(expect.stringContaining('/preview?'),expect.objectContaining({body:new Uint8Array(Buffer.from('chosen-cover'))}));
+});

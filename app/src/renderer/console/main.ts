@@ -261,7 +261,7 @@ async function refreshContextBar(): Promise<void> {
   const taskCount = taskCharacters(characters).length;
   const shown = isWorkspace(activePane) ? editing : active;
   contextbar.innerHTML = `<div class="context-character">
-    ${shown ? `<img src="qbot-asset://${shown.dirId}/${shown.manifest.sourceImage}" alt="" />` : `<span class="context-placeholder">${icon('characters')}</span>`}
+    ${shown?.coverImage ? `<img src="qbot-asset://${shown.dirId}/${shown.coverImage}" alt="" />` : `<span class="context-placeholder">${icon('characters')}</span>`}
     <label><span>${isWorkspace(activePane) ? '正在编辑 · 不影响桌面角色' : '桌面角色'}</span><select id="context-character-select" ${ready.length === 0 ? 'disabled' : ''}>
       ${ready.length === 0 ? '<option>暂无角色</option>' : ready.map((character) => `<option value="${character.dirId}"${character.dirId === shown?.dirId ? ' selected' : ''}>${escapeHtml(character.manifest.name || '未命名')}</option>`).join('')}
     </select></label>

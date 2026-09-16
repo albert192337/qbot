@@ -1,3 +1,5 @@
+import { imageChoices, selectedImage, saveCover } from './character-images';
+import { prepareActionFrame, approveActionFrame, pendingActionFrame, actionReference } from './pipeline-bridge';
 import { cloudAccount, acknowledgeCloudJob, forgetCloudJob } from './cloud-generation';
 import { tryPerch, detachPerch, getPerchState } from './window-perch';
 import { initUserMemory, editUserMemory, resumeMemoryExtraction } from './user-memory';
@@ -10,7 +12,7 @@ import { showBubbleWindow, getBubbleWindow, openCozyPreview } from './windows';
 import { getBrainLog, updateBrainCall } from './brain-log';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
-import { getCharacter, listCharacters, renameCharacter, deleteCharacter, deleteGenerationTask } from './characters';
+import { charactersDir, getCharacter, listCharacters, renameCharacter, deleteCharacter, deleteGenerationTask } from './characters';
 import { getSettings, setSettings } from './config';
 import { createNurseryWindow, closeRoomWindow, openRoomWindow, createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, getPetWindow, getRoomSizePreset, setRoomSizePreset, type ConsolePane } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
@@ -361,6 +363,13 @@ export function registerIpc(): void {
     await saveTurnaroundPrompt(dirId, prompt);
   });
   // 下面两个会调 API 花钱，渲染层已做二次确认
+  ipcMain.handle('studio:imageChoices', async (_ev, dirId: string) => imageChoices(path.join(charactersDir(),checkedImageDir(dirId))));
+  ipcMain.handle('studio:previewImage', async (_ev, dirId: string, selection) => `data:image/png;base64,${(await selectedImage(path.join(charactersDir(),checkedImageDir(dirId)),selection)).toString('base64')}`);
+  ipcMain.handle('studio:saveCover', async (_ev, dirId: string, selection) => saveCover(path.join(charactersDir(),checkedImageDir(dirId)),selection));
+  ipcMain.handle('studio:prepareActionFrame', async (_ev, dirId: string, id, selection) => prepareActionFrame(checkedImageDir(dirId),id,selection));
+  ipcMain.handle('studio:actionReference', async (_ev, dirId: string, id) => actionReference(checkedImageDir(dirId),id));
+  ipcMain.handle('studio:pendingActionFrame', async (_ev, dirId: string, id) => pendingActionFrame(checkedImageDir(dirId),id));
+  ipcMain.handle('studio:approveActionFrame', async (_ev, dirId: string, id, frame) => approveActionFrame(checkedImageDir(dirId),id,frame));
   ipcMain.handle('studio:regenerateActions', async (_ev, dirId: string, actionIds: string[]) => {
     await regenerateActions(dirId, actionIds as never);
   });
@@ -496,4 +505,9 @@ export function registerIpc(): void {
   ipcMain.handle('behavior:requestThink', async (ev, force) => {
     if (ev.sender === getPetWindow()?.webContents) await requestThink(force === true);
   });
+}
+
+function checkedImageDir(id: string): string {
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('无效角色');
+  return id;
 }

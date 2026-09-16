@@ -12,10 +12,12 @@ async function fixture(){
 }
 it('creates a missing job without replacing source or original manifest',async()=>{
  const {dir,manifest}=await fixture();const job=await loadExistingCharacterJob(dir);
- expect(job.state.jobId).toBe('dog');expect(job.state.refImage).toBe('source.png');
+ expect(job.state.generationMode).toBe('original');expect(job.state.jobId).toBe('dog');expect(job.state.refImage).toBe('source.png');
  expect(JSON.parse(await readFile(path.join(dir,'manifest.json'),'utf8'))).toEqual(manifest);
  expect(await readFile(path.join(dir,'source.png'),'utf8')).toBe('reference');
  job.state.actions.idle={status:'failed',attempts:{frame:1,video:1},videoTaskId:'paid-task'};await job.save();
+ delete job.state.generationMode;await job.save();
+ expect((await loadExistingCharacterJob(dir)).state.generationMode).toBe('original');
  expect((await loadExistingCharacterJob(dir)).state.actions.idle.videoTaskId).toBe('paid-task');
 });
 it('merges only successful selected actions, retains library and refreshes the scene binding',async()=>{

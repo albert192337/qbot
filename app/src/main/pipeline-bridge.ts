@@ -1,3 +1,6 @@
+import { selectedImage } from './character-images';
+import type { ImageSelection } from '../shared/character-images';
+import { originalActionSpec, originalFramePrompt, originalVideoPrompt } from '@qbot/pipeline';
 import { isCloudJob, startCloudHatch, cloudOperation, syncCloudJob } from './cloud-generation';
 /**
  * pipeline-bridge：唯一 import @qbot/pipeline 的地方。
@@ -165,7 +168,7 @@ export async function startHatch(
 /** 续跑未完成的孵化（断点续跑） */
 export async function resumeHatch(dirId: string): Promise<void> {
   if (isCloudJob(dirId)) return cloudOperation(dirId, 'resume');
-  if (active.has(dirId)) return; // 已在跑
+  if (active.has(dirId) || preparingFrames.has(dirId)) return; // 已在跑或准备参考帧
   const outDir = path.join(charactersDir(), dirId);
   const job = await Job.load(outDir);
   if (job.state.regenerateActions?.length) {
@@ -251,9 +254,69 @@ export async function regenerateActions(dirId: string, actionIds: ActionId[]): P
     if (actionIds.some(id => status.actions[id]?.status !== 'failed')) throw new Error('此操作仅支持修复失败动作；重新设计动作请使用本地高级生成');
     return cloudOperation(dirId, 'resume', undefined, actionIds);
   }
+  const meta = await getCharacter(dirId);
+  if (meta?.manifest && ('stickerLibrary' in meta.manifest || meta.manifest.generationMode === 'original')) throw new Error('保留原样角色请先选择参考帧并确认生成首帧');
   const valid = actionIds.filter((id) => (ACTION_IDS as readonly string[]).includes(id));
   if (!valid.length) throw new Error('没有合法的动作 id');
   await rerunActions(dirId, valid);
+}
+
+/** Two-stage review: an unapproved frame cannot submit a paid video, including after restart. */
+const preparingFrames = new Set<string>();
+export async function prepareActionFrame(dirId: string, id: ActionId, selection: ImageSelection): Promise<string> {
+  if (preparingFrames.has(dirId)) throw new Error('该角色正在准备生成，请稍候');
+  preparingFrames.add(dirId);
+  try { return await prepareActionFrameInner(dirId,id,selection); }
+  finally { preparingFrames.delete(dirId); }
+}
+async function prepareActionFrameInner(dirId: string, id: ActionId, selection: ImageSelection): Promise<string> {
+  if (!ACTION_IDS.includes(id)) throw new Error('无效动作');
+  if (isCloudJob(dirId)) throw new Error('云端任务请使用原有任务入口');
+  if (active.has(dirId)) throw new Error('该角色已有生成任务');
+  const outDir = path.join(charactersDir(), dirId);
+  await buildConfig(); // Validate credentials before replacing any resumable action record.
+  const reference = await selectedImage(outDir, selection);
+  const job = await loadExistingCharacterJob(outDir);
+  const rel = `.job/${id}_reference_${randomUUID()}.png`;
+  await writeFile(path.join(outDir,rel),reference);
+  job.state.actions[id] = {status:'pending', attempts:{frame:0,video:0}, referenceImage:rel, referenceSelection:selection, needsFrameApproval:true};
+  job.state.regenerateActions = [id];
+  await job.save();
+  await rerunActions(dirId,[id],false);
+  const saved = await Job.load(outDir);
+  const a = saved.state.actions[id];
+  if (!a.frameQcPass || !a.framePath || a.status === 'failed') throw new Error(a.error || '首帧生成失败');
+  return toDataUrl(await readFile(saved.jobPath(a.framePath)));
+}
+export async function actionReference(dirId: string, id: ActionId): Promise<string> {
+  if (!ACTION_IDS.includes(id)) throw new Error('无效动作');
+  const dir = path.join(charactersDir(),dirId);
+  const state: JobState = JSON.parse(await readFile(path.join(dir,'.job/state.json'),'utf8'));
+  const rel = state.actions[id]?.referenceImage ?? state.refImage;
+  return toDataUrl(await readFile(path.join(dir,rel)));
+}
+export async function pendingActionFrame(dirId: string, id: ActionId): Promise<string|null> {
+  if (!ACTION_IDS.includes(id)) throw new Error('无效动作');
+  try {
+    const dir = path.join(charactersDir(),dirId);
+    const state: JobState = JSON.parse(await readFile(path.join(dir,'.job/state.json'),'utf8')); const a = state.actions[id];
+    return (a?.needsFrameApproval || a?.status === 'failed') && a.frameQcPass && a.framePath ? toDataUrl(await readFile(path.join(dir,'.job',a.framePath))) : null;
+  } catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null; throw e; }
+}
+export async function approveActionFrame(dirId: string, id: ActionId, expectedFrame: string): Promise<void> {
+  if (preparingFrames.has(dirId)) throw new Error('该角色正在准备生成，请稍候');
+  preparingFrames.add(dirId);
+  try { await approveActionFrameInner(dirId,id,expectedFrame); }
+  finally { preparingFrames.delete(dirId); }
+}
+async function approveActionFrameInner(dirId: string, id: ActionId, expectedFrame: string): Promise<void> {
+  if (!ACTION_IDS.includes(id)) throw new Error('无效动作');
+  if (active.has(dirId)) throw new Error('该角色已有生成任务');
+  const job = await Job.load(path.join(charactersDir(),dirId)); const a = job.state.actions[id];
+  if ((!a.needsFrameApproval && a.status !== 'failed') || !a.frameQcPass || !a.framePath) throw new Error('没有待确认首帧');
+  if (toDataUrl(await readFile(job.jobPath(a.framePath))) !== expectedFrame) throw new Error('首帧已经变化，请重新检查后确认');
+  a.needsFrameApproval = false; await job.save();
+  await rerunActions(dirId,[id],false);
 }
 
 /** 重生成所选动作，合并成功结果；导入角色不需要原孵化任务。 */
@@ -280,6 +343,7 @@ async function rerunActions(dirId: string, actionIds: ActionId[], fresh = true):
     if (job.state.imageProvider) cfg.imageProvider = job.state.imageProvider;
     const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
     await runActions(job, createArkClient(cfg), ffmpegPath, undefined, cfg.concurrency, actionIds);
+    if (actionIds.some(id => job.state.actions[id].needsFrameApproval && job.state.actions[id].status !== 'failed')) { await job.setStage('actions'); return; }
     await mergeRegeneratedActions(job, actionIds);
     broadcast(dirId, { jobId: job.state.jobId, stage: 'done' });
     await rebuildTray();
@@ -294,6 +358,7 @@ async function rerunActions(dirId: string, actionIds: ActionId[], fresh = true):
       stage: 'failed',
       error: String(err instanceof Error ? err.message : err),
     });
+    throw err;
   } finally {
     active.delete(dirId);
   }
@@ -385,7 +450,9 @@ async function readCharacterForm(outDir: string): Promise<CharacterForm | undefi
  * 这正是「预设动作生成失败、可用列表里永远没有它们」的物理根因。
  */
 async function readReferenceImage(outDir: string): Promise<Buffer> {
-  for (const rel of ['turnaround.png', 'source.png']) {
+  const m = JSON.parse(await readFile(path.join(outDir,'manifest.json'),'utf8')) as Manifest;
+  const original = 'stickerLibrary' in m || m.generationMode === 'original';
+  for (const rel of (original ? [m.sourceImage] : [m.turnaround, m.sourceImage]).filter(Boolean)) {
     try {
       return await readFile(path.join(outDir, rel));
     } catch {
@@ -412,7 +479,7 @@ export async function generateExpressionAction(
   // API key 等配置在返回前校验：detach 后的错误渲染层拿不到
   const cfg = await buildConfig();
   const form = await readCharacterForm(outDir);
-  const spec = expressionActionSpec(action, form);
+  const spec = expressionActionSpec(action, 'stickerLibrary' in manifest || manifest.generationMode === 'original' ? 'abstract' : form);
 
   // 写 manifest：标记 pending
   manifest.expressionActions = {
@@ -764,13 +831,14 @@ export async function getPrompts(dirId: string): Promise<PromptData> {
   const actions = Object.fromEntries(
     ACTION_IDS.map((id) => {
       const custom = manifest?.actions[id];
-      const spec = actionSpec(id, characterForm, characterStyle);
+      const original = !!manifest && ('stickerLibrary' in manifest || manifest.generationMode === 'original');
+      const spec = original ? originalActionSpec(id) : actionSpec(id, characterForm, characterStyle);
       // 优先使用 manifest 中保存的自定义 prompt，未保存的用默认 actionSpec
       const poseDesc = custom?.poseDesc || spec.poseDesc;
       const motionDesc = custom?.motionDesc || spec.motionDesc;
       // 传入全文覆盖 → 返回的就是实际会用于生成的 prompt（UI 直接展示可编辑）
-      const fp = framePrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.poseDesc, custom?.framePromptFull);
-      const vp = videoPrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.motionDesc, custom?.videoPromptFull);
+      const fp = original && !custom?.framePromptFull?.trim() ? originalFramePrompt(poseDesc,persona) : framePrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.poseDesc, custom?.framePromptFull);
+      const vp = original && !custom?.videoPromptFull?.trim() ? originalVideoPrompt(motionDesc) : videoPrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.motionDesc, custom?.videoPromptFull);
       return [
         id,
         {
@@ -802,11 +870,12 @@ function toDataUrl(buf: Buffer): string {
 }
 
 function buildCustomFramePrompt(poseDesc: string, manifest: Manifest, persona?: string): string {
-  const style = manifest.actions.talk_happy?.facing ? 'chibi' : 'faithful';
+  if ('stickerLibrary' in manifest || manifest.generationMode === 'original') return originalFramePrompt(poseDesc, persona);
   const personaSuffix = persona ? `角色人设：${persona}。按照此设定表现角色。` : '';
   return `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。${poseDesc}${personaSuffix}画面中只有这一个角色，不出现其他人的手或身体部位，没有家具、没有白色贴纸描边。背景为纯色绿幕（纯正绿色，无渐变无阴影无纹理），角色边缘描线清晰，全身完整可见，角色占画面高度约70%，粗描边贴纸插画风格，无文字无水印`;
 }
 
 function buildCustomVideoPrompt(motionDesc: string, _manifest: Manifest, durationSec: number): string {
+  if ('stickerLibrary' in _manifest || _manifest.generationMode === 'original') return originalVideoPrompt(motionDesc,durationSec);
   return `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。${motionDesc}镜头完全固定不动，静止镜头，角色不位移不走出画面，绿幕背景纯绿色保持不变，画面中始终只有这一个角色，绝对不出现其他人物、手或物体。丝滑流畅循环动画。 --resolution 480p --duration ${durationSec} --camerafixed true`;
 }

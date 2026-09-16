@@ -74,7 +74,7 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
         manifest.voice = assignVoice(manifest.id);
         await writeManifest(manifestPath, manifest);
       }
-      out.push({ dirId: entry.name, manifest, hasUnfinishedJob: cloudPending, taskDismissed });
+      out.push({ dirId: entry.name, coverImage: existsSync(path.join(charDir,'cover.png')) ? 'cover.png' : undefined, manifest, hasUnfinishedJob: cloudPending, taskDismissed });
     } catch {
       /* 损坏的包跳过 */
     }

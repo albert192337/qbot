@@ -1,3 +1,4 @@
+import { regenerateWithReference } from './character-image-picker';
 /**
  * 生成 Prompt pane：三视图 prompt + 每个动作的首帧/视频 prompt（可编辑、可恢复默认、可重生）。
  * 自 renderer/studio/main.ts 的「生成 Prompt」tab 迁入（阶段 4）。
@@ -223,7 +224,7 @@ function bind(root: HTMLElement, dirId: string): void {
         const { frame, video } = readBlock(id);
         await guard(root, btn, '生成中…', async () => {
           await window.qbot.studio.saveFullPrompts(dirId, id, frame, video);
-          await window.qbot.studio.regenerateActions(dirId, [id]);
+          if (!await regenerateWithReference(root, dirId, id)) return;
           toast(root, `「${id}」重新生成完成，桌宠已重新加载`);
           await refreshPreservingDrafts();
         });

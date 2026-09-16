@@ -17,7 +17,7 @@ import { broadcastCharacterActivated } from './windows';
 
 const MARKET_URL = process.env.QBOT_MARKET_URL || 'http://14.103.59.73:24251';
 const HASH_RE = /^[0-9a-f]{16}$/;
-/** 封面统一缩到 512 宽（source.png 原图可能超服务端 2MB 上限） */
+/** 封面统一缩到 512 宽（独立展示图可能超服务端 2MB 上限） */
 const PREVIEW_WIDTH = 512;
 
 /** 服务端货架条目（meta 剥 token 后的形状） */
@@ -92,9 +92,9 @@ export async function uploadSkin(dirId: string): Promise<string> {
   // 管理码入库（下架凭证）
   await setSettings({ marketTokens: { ...settings.marketTokens, [hash]: token } });
 
-  // 封面：source.png 缩到 512 宽再传；没有/失败不阻塞上架
+  // Only an explicitly selected cover is published as preview; never substitute a generation reference.
   try {
-    const srcPng = path.join(charDir, 'source.png');
+    const srcPng = path.join(charDir, 'cover.png');
     if (existsSync(srcPng)) {
       const img = nativeImage.createFromPath(srcPng);
       const png = img.isEmpty() ? await readFile(srcPng) : img.resize({ width: PREVIEW_WIDTH }).toPNG();
@@ -127,10 +127,10 @@ export async function downloadSkin(hash: string): Promise<void> {
     await rm(tmpDir, { recursive: true, force: true });
     try {
       await unpackCharacter(buffer, tmpDir);
-      // 封面顺手存成 source.png（画廊/预览用）；失败不阻塞
+      // Downloaded preview is display-only; it must never overwrite the original reference.
       try {
         const pv = await fetchFn(`${MARKET_URL}/skins/${hash}/preview`);
-        if (pv.ok) await writeFile(path.join(tmpDir, 'source.png'), Buffer.from(await pv.arrayBuffer()));
+        if (pv.ok) await writeFile(path.join(tmpDir, 'cover.png'), Buffer.from(await pv.arrayBuffer()));
       } catch {
         /* ignore */
       }

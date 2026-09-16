@@ -1,8 +1,9 @@
+import { selectedImage } from './character-images';
 import { ipcMain, dialog } from 'electron';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createArkClient, extractFrames, resolveFfmpegPath, type VisionPart } from '@qbot/pipeline';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { charactersDir, getCharacter } from './characters';
 import { getSettings } from './config';
 import { broadcastCharacterActivated } from './windows';
@@ -82,13 +83,8 @@ export function registerStickerLibraryIpc(): void {
   });
   ipcMain.handle('stickerLibrary:frame', async (_ev, dirId: string, id: string, seconds: number) => {
     const m = await character(dirId);
-    const item = m.stickerLibrary?.items.find(i => i.id === id);
-    if (!item || !/^imported\/_raw\/st_[a-f0-9]+\.gif$/.test(item.raw)) throw new Error('原始素材不存在');
-    const out = path.join(charactersDir(),dirId);
-    await mkdir(path.join(out,'.job'),{recursive:true});
-    const file = path.join(out,'.job',`preview-${randomUUID()}.png`);
-    await extractLibraryFrame(path.join(out,item.raw),file,seconds);
-    return `data:image/png;base64,${(await readFile(file)).toString('base64')}`;
+    if (!m.stickerLibrary?.items.some(i=>i.id===id)) throw new Error('表情不存在');
+    return `data:image/png;base64,${(await selectedImage(path.join(charactersDir(),dirId),{kind:'action',actionId:id,seconds})).toString('base64')}`;
   });
   ipcMain.handle('stickerLibrary:generate', async (_ev, dirId: string, sourceId: string|null, seconds: number, description: string) => {
     const m = await character(dirId);
@@ -99,11 +95,10 @@ export function registerStickerLibraryIpc(): void {
     const name = `variant_${randomUUID().replace(/-/g,'').slice(0,12)}`;
     let reference: Buffer|undefined;
     if (sourceId) {
-      const item = m.stickerLibrary.items.find(i => i.id === sourceId);
-      if (!item || !/^imported\/_raw\/st_[a-f0-9]+\.gif$/.test(item.raw)) throw new Error('原始素材不存在');
-      const frame = path.join(out,'.job',`${name}_reference.png`);
-      await extractLibraryFrame(path.join(out,item.raw),frame,seconds);
-      reference = await readFile(frame);
+      if (!m.stickerLibrary.items.some(i=>i.id===sourceId)) throw new Error('表情不存在');
+      reference = await selectedImage(out,{kind:'action',actionId:sourceId,seconds});
+      await writeFile(path.join(out,'.job',`${name}_reference.png`),reference);
+
     }
     m.stickerLibrary.variants = { ...m.stickerLibrary.variants, [name]: { description:description.trim(),enabled:false,sourceId:sourceId??undefined } };
     await saveLibraryManifest(path.join(out,'manifest.json'),m);

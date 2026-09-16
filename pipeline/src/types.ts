@@ -164,6 +164,8 @@ export interface ManifestVoice {
 
 /** 角色资产包 manifest.json（spec §4，两模块唯一接口） */
 export interface Manifest {
+  /** Preserve imported artwork without anatomy/style assumptions. */
+  generationMode?: 'original';
   id: string;
   name: string;
   createdAt: string;
@@ -229,6 +231,9 @@ export interface ProgressEvent {
 
 /** .job/state.json 中单动作状态 */
 export interface ActionState {
+  referenceImage?: string;
+  referenceSelection?: { kind: string; actionId?: string; seconds?: number };
+  needsFrameApproval?: boolean;
   status: ActionStatus;
   attempts: { frame: number; video: number };
   /** 相对 .job/ 的路径 */
@@ -245,6 +250,7 @@ export interface ActionState {
 
 /** .job/state.json 整体结构 */
 export interface JobState {
+  generationMode?: 'original';
   /** Existing-character regeneration: resume only these explicitly selected actions. */
   regenerateActions?: ActionId[];
   jobId: string;

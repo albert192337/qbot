@@ -1,3 +1,4 @@
+import { regenerateWithReference } from './character-image-picker';
 /** 创建角色 pane：从参考图到可上桌角色的完整生成流程。 */
 import type { ActionId, ActionStatus, ImageProvider } from '@qbot/pipeline';
 import type { HatchProgress, HatchStatus } from '../../../shared/ipc-types';
@@ -227,7 +228,7 @@ async function regenerateAction(actionId: ActionId): Promise<void> {
 
   try {
     if (!(await confirmBox(root!, `重试「${ACTION_LABELS[actionId]}」？只重新生成这一个动作，会调用模型服务并产生费用。`))) return;
-    await window.qbot.studio.regenerateActions(currentDirId, [actionId]);
+    if (!await regenerateWithReference(root!, currentDirId, actionId)) return;
     await seedFromStatus(currentDirId);
   } catch (err) {
     showError(String(err instanceof Error ? err.message : err));

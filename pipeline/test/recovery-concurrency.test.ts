@@ -62,3 +62,21 @@ it('an imported character without a turnaround uses its source image for selecte
  expect(job.state.actions.idle.status).toBe('done');expect(ark.submitVideoTask).toHaveBeenCalledTimes(1);
  expect(job.state.actions.drag.status).toBe('failed');
 });
+
+it('snapshots the selected reference and pauses before video until approval, including reload',async()=>{
+ const job=await setup();job.state.generationMode='original';
+ await writeFile(path.join(dir,'cover.png'),'wrong-cover');
+ await writeFile(job.jobPath('selected.png'),'chosen-frame');
+ job.state.actions.idle={status:'pending',attempts:{frame:0,video:0},referenceImage:'.job/selected.png',referenceSelection:{kind:'action',actionId:'st_original',seconds:0.4},needsFrameApproval:true};
+ const ark={generateImage:vi.fn(async()=>Buffer.from('generated-frame')),submitVideoTask:vi.fn(async()=>'new'),getVideoTask:vi.fn(async()=>({status:'succeeded',videoUrl:'https://example.test/video'})),downloadVideo:async(_u:string,d:string)=>{await writeFile(d,'mp4');}} as unknown as ArkClient;
+ await runActions(job,ark,'/mock',async()=>{},1,['idle']);
+ expect(ark.generateImage).toHaveBeenCalledWith(expect.objectContaining({refImageDataUrl:`data:image/png;base64,${Buffer.from('chosen-frame').toString('base64')}`,prompt:expect.stringContaining('原画风')}));
+ expect(ark.submitVideoTask).not.toHaveBeenCalled();
+ const resumed=await Job.load(dir);await runActions(resumed,ark,'/mock',async()=>{},1,['idle']);
+ expect(ark.generateImage).toHaveBeenCalledTimes(1);expect(ark.submitVideoTask).not.toHaveBeenCalled();
+ const log=JSON.parse(await readFile(job.jobPath('idle_request.json'),'utf8'));expect(log.referenceSelection.seconds).toBe(0.4);expect(log.referenceImage).toBe('.job/selected.png');
+ resumed.state.actions.idle.needsFrameApproval=false;await resumed.save();
+ await runActions(resumed,ark,'/mock',async()=>{},1,['idle']);
+ expect(ark.generateImage).toHaveBeenCalledTimes(1);expect(ark.submitVideoTask).toHaveBeenCalledTimes(1);
+ expect(resumed.state.actions.idle.status).toBe('done');
+});

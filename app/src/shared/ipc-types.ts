@@ -13,6 +13,8 @@ import type {
 import type { FurnitureTier } from './furniture';
 
 export interface CharacterMeta {
+  /** Display only. Never a model reference or playback fallback. */
+  coverImage?: string;
   /** User removed this character’s current generation record from the task list. */
   taskDismissed?: boolean;
   /** 目录名（qbot-asset:// 的 host） */
@@ -643,6 +645,14 @@ export interface QBotApi {
     package(dirId: string): Promise<{ bytes: number; files: number; fitsMarket: boolean }>;
   };
   studio: {
+    imageChoices(dirId: string): Promise<import('./character-images').ImageChoice[]>;
+    previewImage(dirId: string, selection: import('./character-images').ImageSelection): Promise<string>;
+    saveCover(dirId: string, selection: import('./character-images').ImageSelection): Promise<void>;
+    prepareActionFrame(dirId: string, id: string, selection: import('./character-images').ImageSelection): Promise<string>;
+    actionReference(dirId: string, id: string): Promise<string>;
+    pendingActionFrame(dirId: string, id: string): Promise<string|null>;
+    approveActionFrame(dirId: string, id: string, expectedFrame: string): Promise<void>;
+
     /** 保存角色人设到 manifest.json */
     savePersona(dirId: string, persona: string): Promise<void>;
     /** 新增自定义动作并开始生成 */

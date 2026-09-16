@@ -7,11 +7,15 @@ import { saveLibraryManifest } from './sticker-library';
 /** Imported/shared characters have assets, but intentionally no original generation job. */
 export async function loadExistingCharacterJob(outDir: string): Promise<Job> {
   const stateFile = path.join(outDir, '.job', 'state.json');
-  try { await access(stateFile); return await Job.load(outDir); }
+  try { await access(stateFile); const job = await Job.load(outDir);
+    const m = JSON.parse(await readFile(path.join(outDir, 'manifest.json'), 'utf8')) as StickerManifest;
+    if (m.stickerLibrary || m.generationMode === 'original') job.state.generationMode = 'original';
+    return job; }
   catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
-  const m: Manifest = JSON.parse(await readFile(path.join(outDir, 'manifest.json'), 'utf8'));
+  const m: StickerManifest = JSON.parse(await readFile(path.join(outDir, 'manifest.json'), 'utf8'));
   await access(path.join(outDir, m.sourceImage || 'source.png'));
   const state: JobState = {
+    generationMode: m.stickerLibrary || m.generationMode === 'original' ? 'original' : undefined,
     jobId: m.id, pipelineVersion: '1', tier: 'S', createdAt: m.createdAt,
     stage: 'actions', refImage: m.sourceImage || 'source.png',
     turnaround: { candidates: [], picked: null },

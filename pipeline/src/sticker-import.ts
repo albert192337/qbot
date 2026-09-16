@@ -326,9 +326,10 @@ export function splitPngStream(buf: Buffer): Buffer[] {
 async function countGifFrames(gifPath: string, ffmpegPath: string): Promise<number> {
   const { stderr } = await execFileP(
     ffmpegPath,
-    ['-i', gifPath, '-map', '0:v:0', '-c', 'copy', '-f', 'null', '-'],
+    ['-i', gifPath, '-map', '0:v:0', '-f', 'null', '-'],
     { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 },
   ).catch((err: { stderr?: string }) => ({ stderr: err?.stderr ?? '' }));
+  // Decode rather than stream-copy: some FFmpeg builds only report packets for GIF copy.
   // 取最后一个 frame= N（ffmpeg 进度行会多次出现）
   const matches = [...String(stderr).matchAll(/frame=\s*(\d+)/g)];
   const last = matches.at(-1);
