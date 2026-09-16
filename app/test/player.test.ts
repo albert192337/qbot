@@ -139,3 +139,9 @@ it('recovers from a runtime media error after playback has started', async () =>
   video('idle').error = { message: 'decoder lost' }; video('idle').emit('error'); await flush();
   expect(video('idle').load).toHaveBeenCalledOnce(); expect(visible()).toEqual([video('idle')]);
 });
+it('preserves one-shot completion when a looping idle clip fails and falls back', async () => {
+ video('idle').play.mockRejectedValue(new Error('failed idle'));
+ player.playOnce('idle'); await flush(); await flush();
+ expect(visible()).toEqual([video('tea')]); expect(video('tea').loop).toBe(false);
+ video('tea').emit('ended'); expect(ended).toHaveBeenCalledOnce();
+});

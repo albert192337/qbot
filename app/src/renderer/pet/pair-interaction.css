@@ -1,0 +1,49 @@
+body.visit-mode.pair-mode { display:block; }
+body.visit-mode.pair-mode #stage, body.visit-mode.pair-mode #visitor-stage {
+  position:absolute; top:10%; width:46%; height:82%; margin:0; transform:none;
+}
+body.pair-mode #stage { left:10%; }
+body.pair-mode #visitor-stage { left:44%; }
+body.pair-mode.pair-swapped #stage { left:44%; }
+body.pair-mode.pair-swapped #visitor-stage { left:10%; }
+body.visit-mode.pair-mode.flip-host #stage > video, body.visit-mode.pair-mode.flip-host #stage > img,
+body.visit-mode.pair-mode.flip-visitor #visitor-stage > video, body.visit-mode.pair-mode.flip-visitor #visitor-stage > img { transform:scaleX(-1); }
+body.pair-mode #pet-hud, body.pair-mode .signboard { visibility:hidden; }
+#pair-interaction { --from:33%; --to:67%; position:absolute; inset:0; z-index:10; pointer-events:none; color:#594235; font:13px 'Microsoft YaHei',sans-serif; }
+body.pair-swapped #pair-interaction { --from:67%; --to:33%; }
+.pair-caption { position:absolute; top:12%; transform:translateX(-50%); background:#fff9ef; border:2px solid #72574a; border-radius:18px; padding:7px 12px; max-width:29%; width:max-content; text-align:center; overflow-wrap:anywhere; }
+.pair-caption[data-speaker='host'] { left:var(--from); }
+.pair-caption[data-speaker='guest'] { left:var(--to); }
+.pair-caption::after { content:''; position:absolute; bottom:-7px; left:50%; width:10px; height:10px; background:#fff9ef; border-right:2px solid #72574a; border-bottom:2px solid #72574a; transform:translateX(-50%) rotate(45deg); }
+.pair-toolbar { position:absolute; bottom:2px; left:50%; transform:translateX(-50%); display:flex; align-items:center; justify-content:center; gap:4px; max-width:98%; flex-wrap:wrap; pointer-events:auto; background:#fff9eff2; border-radius:12px; padding:4px; }
+.pair-toolbar button { cursor:pointer; border:1px solid #cbb5a0; background:#fff9ef; color:#594235; border-radius:8px; padding:4px 7px; white-space:nowrap; font:inherit; }
+.pair-toolbar button:hover { background:#ffe3d6; }
+.pair-names { max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+.pair-effects { position:absolute; inset:0; }
+.pair-heart { position:absolute; opacity:0; left:var(--from); top:43%; color:#ef6c96; font-size:34px; filter:drop-shadow(0 2px 2px #fff); animation:pair-send-heart 2.3s ease-in-out both; }
+@keyframes pair-send-heart { 0% { opacity:0; transform:translate(-50%,0) scale(.4); } 15% { opacity:1; } 55% { top:23%; } 90% { opacity:1; } 100% { left:var(--to); top:43%; opacity:0; transform:translate(-50%,0) scale(1.15); } }
+.pair-tea { position:absolute; left:50%; top:64%; transform:translateX(-50%); padding:5px 14px; border-radius:50%; background:#e5c5a0; box-shadow:0 5px 0 #a98469; font-size:30px; white-space:nowrap; }
+.pair-talk { position:absolute; left:var(--from); top:22%; transform:translateX(-50%); background:#fff9ef; border:2px solid #cfb19a; border-radius:15px; padding:3px 12px; color:#9c7863; }
+.pair-effects[data-effect='guest-talk'] .pair-talk { left:var(--to); }
+@media (prefers-reduced-motion:reduce) { .pair-heart { animation:none; left:50%; opacity:1; } .pair-heart:not(:first-child) { display:none; } }
+
+/* Conceal both DOM reflow and native window repositioning between two soft fades. */
+body.pair-leaving #stage, body.pair-leaving #visitor-stage,
+body.pair-leaving .pair-caption, body.pair-leaving .pair-toolbar, body.pair-leaving .pair-effects {
+  animation:pair-depart 220ms ease-out both;
+}
+body.pair-leaving #pair-interaction::after {
+  content:''; position:absolute; inset:20% 12% 8%;
+  background:radial-gradient(ellipse at 28% 60%,#fff8e4c9,transparent 35%),radial-gradient(ellipse at 72% 60%,#fff8e4c9,transparent 35%);
+  animation:pair-mist 240ms ease-out both;
+}
+body.pair-returning #stage, body.pair-returning #pet-hud { opacity:0 !important; }
+body.pair-arriving #stage, body.pair-arriving #pet-hud { animation:pair-arrive 400ms ease-out both; }
+body.pair-arriving #stage::after { content:''; position:absolute; inset:12%; pointer-events:none; z-index:4; background:radial-gradient(ellipse,#fff5ddd9,transparent 68%); animation:pair-glow 400ms ease-out both; }
+@keyframes pair-depart { from { opacity:1; } to { opacity:0; } }
+@keyframes pair-arrive { from { opacity:0; } to { opacity:1; } }
+@keyframes pair-mist { 0% { opacity:0; } 45% { opacity:.9; } 100% { opacity:0; } }
+@keyframes pair-glow { from { opacity:.8; } to { opacity:0; } }
+@media (prefers-reduced-motion:reduce) {
+  body.pair-leaving #pair-interaction::after, body.pair-arriving #stage::after { display:none; }
+}

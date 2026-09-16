@@ -7,6 +7,9 @@ import { createNurseryWindow, createConsoleWindow, createLoungeWindow, broadcast
 import { toggleClaudeHooks } from './hooks/claude';
 import { getCharacter } from './characters';
 import { notifyRoomCharacterChanged } from './rooms/rooms';
+import { weatherTestMenu, onWeatherTestChanged } from './weather';
+
+onWeatherTestChanged(() => { if (tray) void rebuildTray(); });
 
 let tray: Tray | null = null;
 
@@ -111,6 +114,7 @@ export async function connectSection(): Promise<Electron.MenuItemConstructorOpti
 /** 系统：设置 + 退出 */
 export function systemSection(): Electron.MenuItemConstructorOptions[] {
   return [
+    weatherTestMenu(),
     {
       label: '故事小屋…',
       click: () => createConsoleWindow(),

@@ -19,6 +19,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          weather: resolve(__dirname, 'src/renderer/weather/index.html'),
           cozy3d: resolve(__dirname, 'src/renderer/cozy3d/index.html'),
           cozy: resolve(__dirname, 'src/renderer/cozy/index.html'),
           garden: resolve(__dirname, 'src/renderer/garden/index.html'),

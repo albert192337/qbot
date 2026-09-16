@@ -10,7 +10,8 @@ import { isStaleProgress } from './hud-format';
 import { POINTS_PER_BOX } from '../../shared/furniture';
 import { DECOR_BY_ID } from '../room/decor-pack';
 import { DEFAULT_VOICE_SETTINGS, Speaker, type VoiceSettings } from './voice/speak';
-import { VisitOrchestrator, type VisitAction } from './visit';
+import { PairInteraction } from './pair-interaction';
+import { PAIR_INTERACTIONS, pairActions, type PairKind } from '../../shared/pair-interaction';
 import { ActionHold } from './action-hold';
 import { IdleDirector } from '../../shared/idle-plan';
 import { actionDisplayName, type StickerManifest } from '../../shared/sticker-behavior';
@@ -47,8 +48,11 @@ function playIdle():void{
   player.playOnce(idleDirector.next(pool,fallback,llmSpeech,Date.now(),Math.random));
 }
 
-const player = new Player(stage, () => dispatch({ type: 'VIDEO_ENDED' }));
-const visitorPlayer = new Player(visitorStage, () => {});
+const player = new Player(stage, () => {
+  if (pairInteraction.isActive()) pairInteraction.ended('host');
+  else dispatch({ type: 'VIDEO_ENDED' });
+});
+const visitorPlayer = new Player(visitorStage, () => pairInteraction.ended('guest'));
 window.qbot.behaviorAction.onIdlePlan(plan=>{
   if(plan.characterId===currentCharacter?.dirId)idleDirector.accept(plan);
 });
@@ -131,55 +135,66 @@ void window.qbot.progress.get().then((p) => {
   hud.setProgress(p);
 });
 
-// ── 朝向计算 ──────────────────────────────────────────
-/** 根据角色的 talk_happy 动作朝向设置 CSS flip 类。
- *  Host 在左，Visitor 在右，两人应对视：
- *  - Host 应朝右（面朝 visitor）→ facing='left' 时需要翻转
- *  - Visitor 应朝左（面朝 host）→ facing='right' 时需要翻转 */
-function applyVisitFacing(): void {
-  const hostFacing = currentCharacter?.manifest.actions.talk_happy?.facing ?? 'right';
-  const visitorFacing = visitorCharacter?.manifest.actions.talk_happy?.facing ?? 'right';
-  document.body.classList.toggle('flip-host', hostFacing === 'left');
-  document.body.classList.toggle('flip-visitor', visitorFacing === 'right');
-}
-
 /** 清理串门状态：移除 visit-mode + flip 类 + visitor stage + 恢复 host idle。
  *  注意：不隐藏 hostSignboard——牌子与串门无关，独立控制。 */
-function endVisit(): void {
-  if (!document.body.classList.contains('visit-mode')) return;
+function endVisit(): Promise<void> {
+  if (!document.body.classList.contains('visit-mode')) return Promise.resolve();
   document.body.classList.remove('visit-mode', 'flip-host', 'flip-visitor');
   visitorPlayer.dispose();
   visitorStage.replaceChildren();
-  window.qbot.pet.setVisitMode(false);
+  const resized = window.qbot.pet.setVisitMode(false).catch(() => {});
   visitorCharacter = null;
   visitorSignboard.hide();
+  return resized;
 }
 
 // ── 串门编排器 ──────────────────────────────────────────
-const visitOrchestrator = new VisitOrchestrator({
-  onVisitStart(visitor: CharacterMeta) {
+const pairInteraction = new PairInteraction({
+  start(visitor: CharacterMeta) {
     visitorCharacter = visitor;
     visitorPlayer.load(visitor.dirId, visitor.manifest);
     document.body.classList.add('visit-mode');
-    applyVisitFacing();
-    window.qbot.pet.setVisitMode(true);
+    void window.qbot.pet.setVisitMode(true).catch(() => { visitOrchestrator.cancelVisit(); hud.toast('双人窗口打开失败'); });
   },
-  onVisitorPlay(action: VisitAction) {
-    visitorPlayer.playLooping(action);
-  },
-  onHostPlay(action: VisitAction) {
-    player.playLooping(action);
+  play(action, guestAction) {
+    visitorPlayer.playOnce(guestAction);
+    player.playOnce(action);
     state = { kind: 'visit', action, loopsLeft: 99 };
-    dispatch({ type: 'VISIT_START', action, loops: 99 });
+    clearTimer();
   },
-  onVisitEnd() {
-    endVisit();
-    player.play('idle');
-    state = { kind: 'idle' };
+  replay(who, action) {
+    (who === 'host' ? player : visitorPlayer).playOnce(action);
+  },
+  rest(who, action) {
+    (who === 'host' ? player : visitorPlayer).playLooping(action);
+  },
+  end() {
+    const resized = endVisit();
     dispatch({ type: 'VISIT_END' });
-    scheduleTimer();
+    return resized;
   },
 });
+let pairRequest = 0;
+// All previous visit cancellation sites share this adapter, including drag and character replacement.
+const visitOrchestrator = { cancelVisit() { pairRequest++; pairInteraction.cancel(); } };
+async function startPair(kind: PairKind, guestId: string): Promise<void> {
+  const request = ++pairRequest;
+  const host = currentCharacter;
+  if (!host || !PAIR_INTERACTIONS.some(i => i.id === kind)) return;
+  try {
+    const characters = await window.qbot.characters.list();
+    if (request !== pairRequest || host !== currentCharacter || document.hidden) return;
+    const guest = characters.find(c => c.dirId === guestId && c.dirId !== host.dirId && c.manifest);
+    if (!guest || !pairActions(host.manifest).size || !pairActions(guest.manifest).size) {
+      hud.toast('请选择另一个有可用动作的本地角色'); return;
+    }
+    if (gardenPerforming) { hud.toast('请等花园动作完成再互动'); return; }
+    if (state.kind === 'drag' || pointerDown) return;
+    window.qbot.pet.detachPerch(); applyPerch(null);
+    speaker.interrupt(); cancelHold(); stopDesktopWalk(); clearTimer();
+    pairInteraction.start(host, guest, kind);
+  } catch { if (request === pairRequest) hud.toast('读取角色失败，请重试'); }
+}
 
 function voiceSettings(s: {
   voiceEnabled?: boolean;
@@ -414,6 +429,7 @@ function clearTimer(): void {
 
 let gardenPerforming = false;
 window.qbot.garden.onPerformance(action => {
+  visitOrchestrator.cancelVisit();
   if(perched){window.qbot.pet.detachPerch();applyPerch(null);}
   cancelHold();
   stopDesktopWalk();
@@ -444,13 +460,12 @@ function dispatch(event: Parameters<typeof step>[1]): void {
 
   // ── 串门信号处理 ──
   if (result.visiterEnd) {
-    visitOrchestrator.cancelVisit();
-    endVisit();
-    player.play('idle');
-    scheduleTimer();
+    if (pairInteraction.isActive()) visitOrchestrator.cancelVisit();
+    void endVisit();
   }
 
-  if (result.play && !gardenPerforming) {
+  const restoreSticky = result.visiterEnd && (agentActivity !== 'idle' || meetingStatus.inMeeting || musicStatus.playing);
+  if (result.play && !gardenPerforming && !restoreSticky) {
     if(result.play==='idle')playIdle();else player.play(result.play);
     if (result.play === WALK_ACTION) startDesktopWalk();
     else stopDesktopWalk();
@@ -526,6 +541,7 @@ void window.qbot.characters.getActive().then((meta) => {
 // 窗口隐藏期间（角色进小房间）Chromium 会自动暂停 <video> 且不派发 ended，
 // 状态机会卡死在半路 → 恢复可见时整体重置回 idle 循环。
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { visitOrchestrator.cancelVisit(); return; }
   if (document.visibilityState !== 'visible' || available.length === 0) return;
   if(perched){player.play(perched.action);return;}
   speaker.interrupt();
@@ -669,11 +685,19 @@ stage.addEventListener('contextmenu', (e) => {
 });
 
 window.qbot.pet.onMenuCommand((cmd) => {
+  if (cmd.type === 'pair') { void startPair(cmd.kind, cmd.guestId); return; }
+  if (cmd.type === 'pairEnd') { pairRequest++; pairInteraction.finish(); return; }
+  if (cmd.type === 'speak' || cmd.type === 'play') visitOrchestrator.cancelVisit();
   if (cmd.type === 'speak') speaker.forceSpeak();
   else if (cmd.type === 'play') dispatch({ type: 'PLAY_ACTION', action: cmd.action as PlayableId });
   else if (cmd.type === 'signPrompt') showSignPrompt();
   else if (cmd.type === 'signClear') applyUserSign(null);
 });
+visitorStage.addEventListener('contextmenu', e => {
+  e.preventDefault(); window.qbot.pet.popupMenu([]);
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape') visitOrchestrator.cancelVisit(); });
+window.addEventListener('beforeunload', () => visitOrchestrator.cancelVisit());
 
 // ── 手动举牌输入框（当前牌面会通过 refreshSignboard 透明同步到公共房间） ─────
 let signEntry: HTMLInputElement | null = null;

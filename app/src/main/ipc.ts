@@ -38,6 +38,8 @@ import {
   openBox,
 } from './progress';
 import { rebuildTray } from './tray';
+import { weatherTestMenu } from './weather';
+import { PAIR_INTERACTIONS, pairActions } from '../shared/pair-interaction';
 import { getAgentStatus } from './agent-server';
 import { getMusicStatus } from './music-monitor';
 import { getMeetingStatus } from './meeting-monitor';
@@ -158,7 +160,9 @@ export function registerIpc(): void {
   ipcMain.handle('pet:getPerch', ev => ev.sender === getPetWindow()?.webContents ? getPerchState() : null);
   ipcMain.on('pet:detachPerch', ev => { if(ev.sender === getPetWindow()?.webContents)detachPerch(); });
   ipcMain.on('pet:move', (_ev, x: number, y: number) => movePetWindow(x, y));
-  ipcMain.on('pet:setVisitMode', (_ev, enter: boolean) => setPetVisitMode(enter));
+  ipcMain.handle('pet:setVisitMode', (ev, enter: boolean) => {
+    if (ev.sender === getPetWindow()?.webContents && typeof enter === 'boolean') setPetVisitMode(enter);
+  });
 
   // ── 手动举牌（纯本地记账）────────────────────────────────
   onPetMessageChanged(message => sendToWindows('sign:message', message));
@@ -288,9 +292,19 @@ export function registerIpc(): void {
     const win = BrowserWindow.fromWebContents(ev.sender);
     if (!win) return;
     const send = (cmd: PetMenuCommand) => ev.sender.send('pet:menuCommand', cmd);
+    const active = (await getSettings()).activeCharacter;
+    const guests = (await listCharacters()).filter(c => c.dirId !== active && c.manifest && pairActions(c.manifest).size);
+    if (win.isDestroyed()) return;
     const menu = Menu.buildFromTemplate([
       // ── 玩宠（最高频，一级直达）─────────────────────────
       { label: '说句话', click: () => send({ type: 'speak' }) },
+      { label: '双人互动（本地试演）', submenu: [
+        ...PAIR_INTERACTIONS.map(({ id, label }) => ({ label, submenu: guests.length
+          ? guests.map(c => ({ label: c.manifest.name, click: () => send({ type: 'pair', kind: id, guestId: c.dirId }) }))
+          : [{ label: '请先下载或创建另一个角色', enabled: false }] })),
+        { label: '结束互动', click: () => send({ type: 'pairEnd' }) },
+      ] },
+      weatherTestMenu(win.getBounds()),
       {
         label: '播放动作',
         submenu: (Array.isArray(actions) ? actions : []).map((a) => ({

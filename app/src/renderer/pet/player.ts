@@ -157,7 +157,7 @@ export class Player {
         start(true);
       } else {
         this.failed.add(id);
-        this.playImpl(action, forceLoop);
+        this.playImpl(action, forceLoop, forceOnce);
       }
     };
     const reveal = () => {

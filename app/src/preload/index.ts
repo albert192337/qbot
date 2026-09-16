@@ -65,7 +65,7 @@ const api: QBotApi = {
     onPerch: cb => { const fn=(_ev:unknown,state:Parameters<typeof cb>[0])=>cb(state); ipcRenderer.on('pet:perch',fn); return ()=>ipcRenderer.removeListener('pet:perch',fn); },
     // 高频拖拽走 send（不等待回包）
     move: (x, y) => ipcRenderer.send('pet:move', x, y),
-    setVisitMode: (enter) => ipcRenderer.send('pet:setVisitMode', enter),
+    setVisitMode: (enter) => ipcRenderer.invoke('pet:setVisitMode', enter),
     popupMenu: (actions) => ipcRenderer.send('pet:popupMenu', actions),
     previewAction: (action) => ipcRenderer.send('pet:previewAction', action),
     onMenuCommand: (cb) => {

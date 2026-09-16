@@ -28,3 +28,12 @@ export function petTargetSize(
   const size = Math.round(PET_SIZE * clampPetScale(scale));
   return { width: visitMode ? size * 2 : size, height: size };
 }
+
+/** Fit the pair canvas on the same display, including negative-coordinate monitors. */
+export function pairWindowBounds(scale: number, origin: { x: number; y: number }, area: { x: number; y: number; width: number; height: number }) {
+  const wanted = petTargetSize(scale, true);
+  const factor = Math.min(1, area.width / wanted.width, area.height / wanted.height);
+  const width = Math.floor(wanted.width * factor), height = Math.floor(wanted.height * factor);
+  return { width, height, x: Math.max(area.x, Math.min(origin.x, area.x + area.width - width)),
+    y: Math.max(area.y, Math.min(origin.y, area.y + area.height - height)) };
+}

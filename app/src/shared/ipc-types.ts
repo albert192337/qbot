@@ -236,6 +236,8 @@ export type PerceptionInteractKind = 'click' | 'drag_start' | 'drag_end' | 'sign
 
 /** 原生右键菜单点选后回渲染端执行的命令 */
 export type PetMenuCommand =
+  | { type: 'pair'; kind: import('./pair-interaction').PairKind; guestId: string }
+  | { type: 'pairEnd' }
   | { type: 'speak' }
   | { type: 'play'; action: string }
   /** 弹举牌输入框（纯本地的牌子） */
@@ -457,7 +459,7 @@ export interface QBotApi {
     /** 高频拖拽移动（send，不走 invoke） */
     move(screenX: number, screenY: number): void;
     /** 串门模式：拓宽/恢复窗口 */
-    setVisitMode(enter: boolean): void;
+    setVisitMode(enter: boolean): Promise<void>;
     /**
      * 右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
      * 动作列表由渲染端传入，说话/播动作的执行经 onMenuCommand 回渲染端。

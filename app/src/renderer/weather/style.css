@@ -1,0 +1,14 @@
+html, body, #sky { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; pointer-events: none; }
+.scene { position: absolute; inset: 0; opacity: 0; overflow: hidden; }
+.meteor { background: radial-gradient(ellipse at 68% 100%, #797395 0%, #303c61 24%, #111e39 55%, #070e21 100%); }
+.aurora { background: radial-gradient(ellipse at 45% 100%, #275264 0%, #122c40 38%, #071824 75%, #050e1b 100%); }
+.haze { position: absolute; inset: -25%; opacity: .45; transform: rotate(-28deg); background: radial-gradient(ellipse at center, #9693c532 0%, #8099c518 15%, transparent 52%); filter: blur(24px); }
+.moon { position: absolute; left: 76%; top: 17%; width: 2.1vw; aspect-ratio: 1; border-radius: 50%; background: #f0ecd7; box-shadow: 0 0 2vw #e6e4dd60, 0 0 8vw #c8d4ed25; opacity: .85; }
+.aurora .moon { opacity: .32; }
+.curtain { position: absolute; left: -18%; top: 1%; width: 136%; height: 54%; border-radius: 50%; background: conic-gradient(from 165deg at 50% 0%, transparent 0deg, #6df2c500 8deg, #81f7d581 20deg, #49ddb052 28deg, #7087e76e 43deg, transparent 61deg); filter: blur(32px); transform: rotate(-16deg) skewX(-18deg); mix-blend-mode: screen; animation: drift 19s ease-in-out infinite alternate; }
+.curtain.second { top: 13%; left: -28%; opacity: .65; transform: rotate(8deg) skewX(22deg); animation-duration: 27s; animation-direction: alternate-reverse; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mountains { position: absolute; inset: 0; background: #070f20; clip-path: polygon(0 87%, 7% 82%, 13% 85%, 23% 74%, 31% 81%, 39% 77%, 47% 86%, 54% 80%, 65% 87%, 73% 77%, 82% 84%, 89% 79%, 100% 87%, 100% 100%, 0 100%); }
+.mountains.front { background: #040b16; clip-path: polygon(0 94%, 10% 91%, 19% 95%, 28% 90%, 36% 92%, 46% 87%, 56% 94%, 66% 91%, 76% 95%, 87% 88%, 95% 92%, 100% 89%, 100% 100%, 0 100%); }
+@keyframes drift { to { transform: translate(5%, 8%) rotate(-6deg) skewX(10deg) scaleY(1.2); opacity: .7; } }
+@media (prefers-reduced-motion: reduce) { .curtain { animation: none; } }

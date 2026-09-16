@@ -38,7 +38,7 @@ app.whenReady().then(async () => {
     ipcMain.on('perception:report', (_e, kind) => events.push(kind));
     ipcMain.on('bubble:say', (_e, msg) => speech.push(msg));
     ipcMain.on('pet:move', (_e, x, y) => moves.push([x, y]));
-    ipcMain.on('pet:setVisitMode', (_e, mode) => visits.push(mode));
+    ipcMain.handle('pet:setVisitMode', (_e, mode) => visits.push(mode));
     const win = new BrowserWindow({ width: 360, height: 360, show: false, webPreferences: { preload: path.join(root, 'app/out/preload/index.js'), backgroundThrottling: false, offscreen: true } });
     await win.loadFile(path.join(root, 'app/out/renderer/pet/index.html'));
     await win.webContents.executeJavaScript(`window.pointerLog=[];for(const type of ['pointerdown','pointermove','pointerup','lostpointercapture'])document.addEventListener(type,e=>window.pointerLog.push({type,id:e.pointerId,primary:e.isPrimary,x:e.screenX,y:e.screenY,clientX:e.clientX,clientY:e.clientY}),true);`);

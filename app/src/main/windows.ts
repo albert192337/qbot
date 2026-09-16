@@ -3,7 +3,7 @@ import { BrowserWindow, app, screen, shell } from 'electron';
 import path from 'node:path';
 import type { CharacterMeta, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
 import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset, resolveRoomSceneSize } from './rooms/rooms-rules';
-import { clampPetScale, petTargetSize } from './pet-geometry';
+import { clampPetScale, petTargetSize, pairWindowBounds } from './pet-geometry';
 import { attachPetWindowRecovery } from './pet-window-recovery';
 import { aboveBubbleLayout } from './bubble-layout';
 import { attachGarden } from './garden/windows';
@@ -43,6 +43,7 @@ let bubbleSide: 'above' | 'below' = 'above';
 let petScale = 1;
 /** 桌宠是否处于串门（双人宽）模式——权威尺寸的一部分，移动时要重申 */
 let petVisitMode = false;
+let beforeVisit: { x: number; y: number } | null = null;
 let roomWindowBoundsChanged: (() => void) | null = null;
 let roomWindowClosed: (() => void) | null = null;
 let roomSizePreset: RoomSizePreset = 'large';
@@ -68,6 +69,10 @@ let roomSizePreset: RoomSizePreset = 'large';
 export function setPetScale(scale: number): void {
   petScale = clampPetScale(scale);
   if (!petWindow || petWindow.isDestroyed()) return;
+  if (petVisitMode) {
+    const b = pairWindowBounds(petScale, petWindow.getBounds(), screen.getDisplayMatching(petWindow.getBounds()).workArea);
+    moveFixedSize(petWindow, b.x, b.y, b, true); return;
+  }
   const size = petTargetSize(petScale, petVisitMode);
   const [x, y] = petWindow.getPosition();
   const [w, h] = petWindow.getSize();
@@ -212,6 +217,7 @@ export function createPetWindow(): BrowserWindow {
   if (petWindow && !petWindow.isDestroyed()) return petWindow;
   const { workArea } = screen.getPrimaryDisplay();
   petVisitMode = false;
+  beforeVisit = null;
   const { width: size } = petTargetSize(petScale);
   petWindow = new BrowserWindow({
     width: size,
@@ -238,6 +244,7 @@ export function createPetWindow(): BrowserWindow {
   petWindow.on('move', syncBubbleBounds);
   petWindow.on('resize', syncBubbleBounds);
   const win = petWindow;
+  win.webContents.on('did-start-loading', () => setPetVisitMode(false));
   attachGarden(win);
   attachPetWindowRecovery(win, () => !isRoomOpen());
   win.once('ready-to-show', () => { if (!isRoomOpen()) win.showInactive(); });
@@ -452,6 +459,10 @@ function closeBubbleWindow(): void {
 
 /** 拖拽移动（高频调用，走 moveFixedSize：分数 DPI 下 setPosition 会胀窗） */
 export function movePetWindow(x: number, y: number): void {
+  if (petVisitMode && petWindow && !petWindow.isDestroyed()) {
+    const b = pairWindowBounds(petScale, { x, y }, screen.getDisplayMatching(petWindow.getBounds()).workArea);
+    moveFixedSize(petWindow, b.x, b.y, b); return;
+  }
   moveFixedSize(petWindow, x, y, petTargetSize(petScale, petVisitMode));
 }
 
@@ -461,7 +472,17 @@ export function setPetVisitMode(enter: boolean): void {
   petVisitMode = enter;
   if (!petWindow || petWindow.isDestroyed()) return;
   const [x, y] = petWindow.getPosition();
-  moveFixedSize(petWindow, x, y, petTargetSize(petScale, enter), true);
+  const area = screen.getDisplayMatching(petWindow.getBounds()).workArea;
+  if (enter) {
+    beforeVisit = { x, y };
+    const b = pairWindowBounds(petScale, { x, y }, area);
+    moveFixedSize(petWindow, b.x, b.y, b, true);
+  } else {
+    const origin = beforeVisit ?? { x, y }; beforeVisit = null;
+    const size = petTargetSize(petScale);
+    moveFixedSize(petWindow, Math.max(area.x, Math.min(origin.x, area.x + area.width - size.width)),
+      Math.max(area.y, Math.min(origin.y, area.y + area.height - size.height)), size, true);
+  }
 }
 
 export function moveRoomWindow(x: number, y: number): void {
