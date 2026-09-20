@@ -29,6 +29,7 @@ export default defineConfig({
           room: resolve(__dirname, 'src/renderer/room/index.html'),
           bubble: resolve(__dirname, 'src/renderer/bubble/index.html'),
           console: resolve(__dirname, 'src/renderer/console/index.html'),
+          social: resolve(__dirname, 'src/renderer/social/index.html'),
           lounge: resolve(__dirname, 'src/renderer/lounge/index.html'),
         },
       },

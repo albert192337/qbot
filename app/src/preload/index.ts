@@ -134,6 +134,25 @@ const api: QBotApi = {
     download: (hash) => ipcRenderer.invoke('market:download', hash),
     remove: (hash) => ipcRenderer.invoke('market:remove', hash),
   },
+  social: {
+    prepareJoin: () => ipcRenderer.invoke('social:prepareJoin'),
+    profile: () => ipcRenderer.invoke('social:profile'),
+    pose: (action) => ipcRenderer.invoke('social:pose', action),
+    openChat: () => ipcRenderer.send('social:openChat'),
+    copyCode: () => ipcRenderer.invoke('social:copyCode'),
+    pin: (pin) => ipcRenderer.invoke('social:pin', pin),
+    close: () => ipcRenderer.send('social:close'),
+    send: (text, world) => ipcRenderer.invoke('social:send', text, world),
+    world: (sub) => ipcRenderer.invoke('social:world', sub),
+    onWorld: (cb) => { const fn = (_e: unknown, data: RoomChatMsg[]) => cb(data); ipcRenderer.on('social:world', fn); return () => ipcRenderer.removeListener('social:world', fn); },
+    moderate: (id, action, world) => ipcRenderer.invoke('social:moderate', id, action, world),
+    guests: () => ipcRenderer.invoke('social:guests'),
+    startTest: () => ipcRenderer.invoke('social:startTest'),
+    inviteTest: (id) => ipcRenderer.invoke('social:inviteTest', id),
+    removeTest: (id) => ipcRenderer.invoke('social:removeTest', id),
+    replyTest: (id, text) => ipcRenderer.invoke('social:replyTest', id, text),
+    interactTest: (id, kind) => ipcRenderer.invoke('social:interactTest', id, kind),
+  },
   rooms: {
     open: () => ipcRenderer.send('rooms:open'),
     getDisplayMode: () => ipcRenderer.invoke('rooms:getDisplayMode'),
@@ -322,6 +341,7 @@ const api: QBotApi = {
     },
   },
   roomPet: {
+    move: (x, y) => ipcRenderer.send('roomPet:move', x, y),
     onHello: (cb) => {
       const listener = (_ev: unknown, info: { nickname: string }) => cb(info);
       ipcRenderer.on('roomPet:hello', listener);

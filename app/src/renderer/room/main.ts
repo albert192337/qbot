@@ -1,3 +1,4 @@
+import { mountLocalNameplate } from '../pet/nameplate';
 /** room 渲染进程入口：内置房间背景 + 角色漫游驱动 + 点角色互动 + 语音 + 贴纸窗交互 + 装饰 */
 import type { ActionId } from '@qbot/pipeline';
 import type { RoomSizePreset } from '../../shared/ipc-types';
@@ -16,6 +17,8 @@ const stage = document.getElementById('stage')!;
 const bg = document.getElementById('bg') as HTMLImageElement;
 const char = document.getElementById('char')!;
 const charScale = document.getElementById('charScale')!;
+mountLocalNameplate(charScale);
+charScale.addEventListener('contextmenu', e => { e.preventDefault(); window.qbot.rooms.open(); });
 const charStage = document.getElementById('charStage')!;
 const closeBtn = document.getElementById('closeBtn')!;
 const menu = document.getElementById('menu')!;

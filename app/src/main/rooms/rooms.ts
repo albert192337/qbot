@@ -35,7 +35,10 @@ import {
 } from './rooms-rules';
 import * as RoomPets from './room-pets';
 import { ROOMS } from '../../shared/config';
-import { withTimeout, withRetry } from '../../shared/timeout';
+import { getCharacter } from '../characters';
+import { pairActions } from '../../shared/pair-interaction';
+import { listTestGuests } from './test-guests';
+import type { TestGuest } from '../../shared/social';
 
 /**
  * 房间服务地址，**按顺序尝试**：域名 wss 为主，IP 明文为兜底。
@@ -62,17 +65,6 @@ const MAX_CONNECT_RETRIES_BEFORE_JITTER = 3; // 连续3次失败后才启用抖�
 let reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let connectFailCount = 0; // 连接失败计数器
-
-// 消息队列缓存：断线期间缓存待发送的消息
-interface QueuedMessage {
-  frame: Frame;
-  expect?: string;
-  retryCount: number;
-  timestamp: number;
-}
-const messageQueue: QueuedMessage[] = [];
-const MAX_QUEUE_SIZE = 100; // 最大队列大小，避免内存溢出
-const MAX_MESSAGE_RETRIES = 3; // 消息最大重试次数
 
 /** Node ≥22 内置全局 WebSocket；@types/node 旧版缺声明 → 本地补最小类型 */
 interface WsLike {
@@ -109,6 +101,12 @@ let localSign: string | null = null;
 let lastPresence: string | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let closedByUs = false;
+let socialSupported = false;
+let worldCache: RoomChatMsg[] = [];
+let worldSubscribed = false;
+let connectPromise: Promise<WsLike> | null = null;
+let requestSequence = 0;
+let connectionGeneration = 0;
 /**
  * 最近一次收到服务端任何帧的时间。心跳超时的判定依据：
  * Node 内置全局 WebSocket 是 undici 的 WHATWG 实现，**没有 `.ping()` 方法、
@@ -121,10 +119,10 @@ let lastAliveAt = 0;
 /** 实际连上的地址（决定 isSecureTransport 的答案；未连接时为 null） */
 let activeUrl: string | null = null;
 
-/** 在飞的请求（一次一个类型；create/join/list 各自等自己的应答帧） */
+/** Requests are correlated by ID; a legacy peer permits one request per response type. */
 const pending = new Map<
   string,
-  { resolve: (f: Frame) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
+  { expect: string; resolve: (f: Frame) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
 >();
 
 export function setRoomsStatusListener(cb: () => void): void {
@@ -151,7 +149,7 @@ export function isSecureTransport(): boolean {
 }
 
 function setStatus(next: RoomsStatus): void {
-  status = next;
+  status = { ...next, socialReady: socialSupported || !!next.room?.testing };
   statusListener?.();
   push('rooms:status', status);
 }
@@ -177,9 +175,15 @@ function url(): string {
 let fastReconnectMode = false;
 
 async function connect(useFastReconnect = false): Promise<WsLike> {
+  if (connectPromise) return connectPromise;
+  connectPromise = connectOnce(useFastReconnect);
+  try { return await connectPromise; } finally { connectPromise = null; }
+}
+async function connectOnce(useFastReconnect = false): Promise<WsLike> {
   if (ws && ws.readyState === WS_OPEN) return ws;
   if (!WebSocketCtor) throw new Error('WebSocket unavailable (need Electron with Node >= 22)');
   closedByUs = false;
+  const generation = connectionGeneration;
   setStatus({ phase: 'connecting' });
 
   // 连接失败计数，用于抖动缓冲
@@ -201,10 +205,12 @@ async function connect(useFastReconnect = false): Promise<WsLike> {
   const errors: string[] = [];
   for (const candidate of candidates()) {
     try {
+      if (generation !== connectionGeneration) throw new Error('连接已取消');
       const socket = await open(candidate);
+      if (generation !== connectionGeneration) { socket.close(); throw new Error('连接已取消'); }
       ws = socket;
       activeUrl = candidate;
-      await hello();
+      await hello(generation);
       // 连接成功，重置状态
       connectFailCount = 0;
       reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
@@ -213,9 +219,10 @@ async function connect(useFastReconnect = false): Promise<WsLike> {
         reconnectTimer = null;
       }
       // 连接成功后发送队列中的消息
-      flushMessageQueue();
+      startHeartbeat();
       return socket;
     } catch (err) {
+      if (generation !== connectionGeneration) throw new Error('连接已取消');
       errors.push(`${candidate}: ${err instanceof Error ? err.message : String(err)}`);
       // 半开的连接要收掉，否则它稍后 onclose 会污染下一次尝试的状态
       if (ws) { const stale = ws; ws = null; activeUrl = null; try { stale.close(); } catch { /* 已经死了 */ } }
@@ -248,6 +255,7 @@ function open(target: string): Promise<WsLike> {
     s.addEventListener('open', () => done(() => resolve(s)));
     s.addEventListener('error', () => done(() => reject(new Error('连接失败'))));
     s.addEventListener('message', (ev) => {
+      if (ws !== s) return; // A superseded connection cannot mutate the current room.
       // 任何入帧都证明链路活着（pong / 聊天 / 在场广播一视同仁），
       // 心跳超时判定吃的就是这个时间戳
       lastAliveAt = Date.now();
@@ -267,6 +275,10 @@ function handleClosed(): void {
   activeUrl = null;
   currentRoomId = null;
   roomCache = null;
+  chatCache = [];
+  worldCache = [];
+  worldSubscribed = false;
+  socialSupported = false;
   stopHeartbeat();
   RoomPets.onLeftRoom(); // 连接掉了：宠上屏跟着收场
   // 清理所有pending请求
@@ -313,71 +325,17 @@ function scheduleReconnect(roomId: string | null): void {
   }, delay);
 }
 
-// 刷新消息队列：发送所有缓存的消息
-function flushMessageQueue(): void {
-  if (messageQueue.length === 0) return;
-  console.log(`[rooms] 重连成功，刷新消息队列，共 ${messageQueue.length} 条待发送消息`);
-
-  // 逐个发送队列中的消息
-  for (const queued of [...messageQueue]) {
-    // 超过重试次数的消息直接丢弃
-    if (queued.retryCount >= MAX_MESSAGE_RETRIES) {
-      messageQueue.splice(messageQueue.indexOf(queued), 1);
-      if (queued.expect) {
-        const p = pending.get(queued.expect);
-        if (p) {
-          p.reject(new Error('消息重试次数过多，已放弃发送'));
-          pending.delete(queued.expect);
-        }
-      }
-      continue;
-    }
-
-    try {
-      // 重新发送消息
-      if (queued.expect) {
-        // 有期望应答的请求，使用request函数
-        // 注意：这里会重新设置超时和重试计数
-        void request(queued.frame, queued.expect).then(
-          (frame) => {
-            if (queued.expect) {
-              const p = pending.get(queued.expect);
-              if (p) p.resolve(frame);
-            }
-          },
-          (err) => {
-            // 发送失败，增加重试计数
-            queued.retryCount++;
-            queued.timestamp = Date.now();
-          }
-        );
-      } else {
-        // 普通消息，直接发送
-        send(queued.frame);
-      }
-      // 发送成功，从队列中移除
-      messageQueue.splice(messageQueue.indexOf(queued), 1);
-    } catch (err) {
-      // 发送失败，增加重试计数
-      queued.retryCount++;
-      queued.timestamp = Date.now();
-    }
-  }
-
-  // 如果还有剩余消息，设置定时器稍后重试
-  if (messageQueue.length > 0) {
-    setTimeout(() => flushMessageQueue(), 1000);
-  }
-}
-
-async function hello(): Promise<void> {
+async function hello(generation: number): Promise<void> {
   const settings = await getSettings();
+  if (generation !== connectionGeneration) throw new Error('连接已取消');
   const nickname =
     clampText(settings.nickname ?? settings.marketNickname, NICK_MAX) || '匿名';
   const ack = await request(
     { t: 'hello', protoVer: PROTO_VER, nickname, memberId: settings.roomsMemberId },
     'hello:ack',
   );
+  if (generation !== connectionGeneration) throw new Error('连接已取消');
+  socialSupported = ack.social === 1;
   memberId = String(ack.memberId ?? '');
   // 服务端分配的 memberId 存本地复用（零账号体系：下次连上还是同一个人）
   if (memberId && memberId !== settings.roomsMemberId) {
@@ -387,63 +345,19 @@ async function hello(): Promise<void> {
 }
 
 /** 发一帧并等指定类型的应答（error 帧一律 reject） */
-const MAX_REQUEST_RETRIES = 3;
-function request(frame: Frame, expect: string, retries = 0): Promise<Frame> {
-  return new Promise<Frame>((resolve, reject) => {
-    if (!ws || ws.readyState !== WS_OPEN) {
-      // 连接断开，将请求加入队列
-      if (messageQueue.length >= MAX_QUEUE_SIZE) {
-        // 队列已满，移除最旧的消息
-        messageQueue.shift();
-      }
-      messageQueue.push({
-        frame,
-        expect,
-        retryCount: retries,
-        timestamp: Date.now()
-      });
-      reject(new Error('房间服务未连接，消息已加入队列'));
-      return;
-    }
-    const timer = setTimeout(() => {
-      pending.delete(expect);
-      if (retries < MAX_REQUEST_RETRIES) {
-        // 重试请求
-        const queued = messageQueue.find(q => q.frame === frame && q.expect === expect);
-        if (queued) {
-          queued.retryCount++;
-        }
-        resolve(request(frame, expect, retries + 1));
-      } else {
-        // 移除队列中的失败请求
-        const index = messageQueue.findIndex(q => q.frame === frame && q.expect === expect);
-        if (index !== -1) {
-          messageQueue.splice(index, 1);
-        }
-        reject(new Error('房间服务无响应'));
-      }
-    }, ROOMS.REQUEST_TIMEOUT_MS);
-    pending.set(expect, { resolve, reject, timer });
-    ws.send(JSON.stringify(frame));
+function request(frame: Frame, expect: string): Promise<Frame> {
+  if (!ws || ws.readyState !== WS_OPEN) return Promise.reject(new Error('房间服务未连接，请重连后再试'));
+  if (!socialSupported && [...pending.values()].some(p => p.expect === expect)) return Promise.reject(new Error('请求正在处理中，请稍候'));
+  const requestId = String(++requestSequence);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('房间服务无响应，请确认当前状态后再试')); }, ROOMS.REQUEST_TIMEOUT_MS);
+    pending.set(requestId, {expect, resolve, reject, timer});
+    try { ws!.send(JSON.stringify({...frame, requestId})); }
+    catch { clearTimeout(timer); pending.delete(requestId); reject(new Error('连接已断开')); }
   });
 }
-
 function send(frame: Frame): void {
-  if (ws && ws.readyState === WS_OPEN) {
-    ws.send(JSON.stringify(frame));
-  } else {
-    // 连接断开，将消息加入队列
-    if (messageQueue.length >= MAX_QUEUE_SIZE) {
-      // 队列已满，移除最旧的消息
-      messageQueue.shift();
-    }
-    messageQueue.push({
-      frame,
-      retryCount: 0,
-      timestamp: Date.now()
-    });
-    console.debug('[rooms] 连接断开，消息已加入队列，当前队列大小：', messageQueue.length);
-  }
+  if (ws?.readyState === WS_OPEN && !roomCache?.testing) ws.send(JSON.stringify(frame));
 }
 
 // room-pets 不持连接（避免循环 import），出帧借这个口子；注入一次即可，
@@ -451,10 +365,12 @@ function send(frame: Frame): void {
 RoomPets.setRoomsSend(send);
 
 function settle(type: string, frame: Frame, err?: Error): void {
-  const p = pending.get(type);
+  const key = typeof frame.requestId === 'string' ? frame.requestId : (!socialSupported ? [...pending].find(([,p]) => p.expect === type)?.[0] : undefined);
+  if (!key) return;
+  const p = pending.get(key);
   if (!p) return;
   clearTimeout(p.timer);
-  pending.delete(type);
+  pending.delete(key);
   if (err) p.reject(err);
   else p.resolve(frame);
 }
@@ -469,7 +385,22 @@ function handleMessage(data: unknown): void {
     console.debug('rooms: 收到非JSON消息', data);
     return; // 非 JSON 帧直接丢
   }
+  if (typeof frame.requestId === 'string' && frame.t === 'error') {
+    settle('', frame, new Error(errorText(String(frame.code)))); return;
+  }
+  if (frame.roomId && ['chat','chat:deleted','member:in','member:out','member:pack','presence','wave','kicked'].includes(frame.t) && frame.roomId !== currentRoomId) return;
   switch (frame.t) {
+    case 'social:ack': settle(frame.t, frame); break;
+    case 'world:history':
+      worldCache = Array.isArray(frame.messages) ? frame.messages as RoomChatMsg[] : [];
+      push('social:world', worldCache); settle(frame.t, frame); break;
+    case 'world:chat': {
+      const msg = frame.msg as RoomChatMsg;
+      if (worldSubscribed && msg && !worldCache.some(m => m.id === msg.id)) worldCache = [...worldCache, msg].slice(-50);
+      push('social:world', worldCache); break;
+    }
+    case 'world:deleted':
+      worldCache = worldCache.filter(m => m.id !== frame.id); push('social:world', worldCache); break;
     // ── 请求应答 ──
     case 'hello:ack':
     case 'rooms':
@@ -488,13 +419,14 @@ function handleMessage(data: unknown): void {
         RoomPets.handlePackError(code);
         break;
       }
+      if (socialSupported) { push('rooms:error', errorText(code)); break; }
       // 旧版服务端不认识应用层 ping 帧，回了 bad_frame：这帧本身证明链路活着
       // （心跳吃的就是它），且不是任何在飞请求的应答，往下走会误杀 pending
       if (code === 'bad_frame') break;
       // 应答类错误：转给在等的那个请求（谁在等就给谁）
       const waiting = [...pending.keys()][0];
       if (waiting) {
-        settle(waiting, frame, new Error(errorText(code)));
+        settle('', { ...frame, requestId: waiting }, new Error(errorText(code)));
       } else {
         push('rooms:error', errorText(code)); // 无人等待的错误（如发言被限流）
       }
@@ -676,7 +608,13 @@ async function sendPresence(force: boolean): Promise<void> {
           ? 'music'
           : 'idle';
   // 经白名单函数出帧：能出本机的字段由 buildPresenceFrame 一处说了算（有测试守着）
-  const frame = buildPresenceFrame({ activity: mode, signText: localSign });
+  const settings = await getSettings();
+  const active = settings.activeCharacter;
+  const wanted = active && settings.socialPoses?.[active];
+  const character = wanted && active ? await getCharacter(active) : null;
+  const action = character?.manifest && wanted && pairActions(character.manifest).has(wanted) ? wanted : undefined;
+  if (!currentRoomId || roomCache?.testing || ws?.readyState !== WS_OPEN) return;
+  const frame = buildPresenceFrame({ activity: action ? 'idle' : mode, signText: localSign }, action || undefined);
   const snapshot = JSON.stringify(frame);
   if (!force && snapshot === lastPresence) return;
   lastPresence = snapshot;
@@ -711,54 +649,53 @@ export function pushLocalSign(text: string | null): void {
 
 /** 拉房间列表（未连接则先连）。kind/q 交服务端筛一道，客户端还会本地再筛 */
 export async function listRooms(kind?: RoomKind, q?: string): Promise<RoomBrief[]> {
+  if (roomCache?.testing) throw new Error('请先退出本地试演，再连接世界广场');
   await connect();
-  return withRetry(async () => {
-    const frame = await request({ t: 'list', kind, q }, 'rooms');
-    return Array.isArray(frame.rooms) ? (frame.rooms as RoomBrief[]) : [];
-  }, 3, 1000);
+  const frame = await request({ t: 'list', kind, q }, 'rooms');
+  return Array.isArray(frame.rooms) ? frame.rooms as RoomBrief[] : [];
 }
-
-/** 开房：成功后把房主管理码存本地（改设置/踢人要用），并自动进房 */
 export async function createRoom(input: CreateRoomInput): Promise<string> {
+  if (roomCache?.testing) throw new Error('请先退出本地试演');
   const normalized = normalizeCreateInput(input);
   if (!normalized) throw new Error('房间名不能为空');
   await connect();
-  return withRetry(async () => {
-    const frame = await request({ t: 'create', ...normalized }, 'room');
-    const roomId = String(frame.roomId ?? '');
-    const ownerToken = String(frame.ownerToken ?? '');
-    if (!roomId) throw new Error('开房失败');
-    const settings = await getSettings();
-    await setSettings({
-      roomsOwnerTokens: { ...settings.roomsOwnerTokens, [roomId]: ownerToken },
-    });
-    await joinRoom(roomId);
-    return roomId;
-  }, 3, 1000);
+  if (!socialSupported && (input.description || input.language && input.language !== 'all' || input.chatEnabled === false)) throw new Error('房间服务需更新后才能保存扩展设置');
+  const frame = await request({t:'create', ...normalized, description:input.description, language:input.language, chatEnabled:input.chatEnabled}, 'room');
+  const roomId = String(frame.roomId ?? '');
+  if (!roomId) throw new Error('开房失败');
+  const settings = await getSettings();
+  await setSettings({ roomsOwnerTokens: {...settings.roomsOwnerTokens, [roomId]:String(frame.ownerToken ?? '')} });
+  await joinRoom(roomId);
+  await setSettings({socialLastRoom: input});
+  return roomId;
 }
-
 export async function joinRoom(roomId: string): Promise<RoomSnapshot> {
+  if (roomCache?.testing) throw new Error('请先退出本地试演');
+  const code = roomId.trim().toUpperCase();
+  if (!/^[0-9A-Z]{8}$/.test(code)) throw new Error('请输入八位字母或数字房间码');
   await connect();
-  return withRetry(async () => {
-    const frame = await request({ t: 'join', roomId: roomId.trim().toUpperCase() }, 'joined');
-    return frame.room as RoomSnapshot;
-  }, 3, 1000);
+  const frame = await request({ t:'join', roomId:code }, 'joined');
+  return frame.room as RoomSnapshot;
 }
 
 export function leaveRoom(): void {
   if (!currentRoomId) return;
+  const wasTest = roomCache?.testing;
   send({ t: 'leave', roomId: currentRoomId });
+  testGuests.clear();
   currentRoomId = null;
   roomCache = null;
   chatCache = [];
   stopHeartbeat();
   RoomPets.onLeftRoom();
-  setStatus({ phase: 'online', memberId: memberId ?? undefined });
+  setStatus({ phase: wasTest ? 'off' : 'online', memberId: memberId ?? undefined });
+  if (!wasTest) startHeartbeat();
 }
 
 /** 角色切换钩子（IPC/托盘的激活入口调用）：在房就把新形象重新报给房友 */
 export function notifyRoomCharacterChanged(): void {
-  RoomPets.notifyRoomCharacterChanged();
+  if (!roomCache?.testing) RoomPets.notifyRoomCharacterChanged();
+  void sendPresence(true);
 }
 
 /**
@@ -767,12 +704,14 @@ export function notifyRoomCharacterChanged(): void {
  * 也不许有「一键分享结论到房间」这类便利入口（spec §5.3，有测试守着）。
  */
 export function sendChat(text: string): void {
+  if (roomCache?.testing) { void sendSocialChat(text).catch(e => push('rooms:error', e.message)); return; }
   if (!currentRoomId) return;
   const frame = buildChatFrame(text);
   if (frame) send(frame);
 }
 
 export function deleteChat(id: string): void {
+  if (roomCache?.testing) { chatCache = chatCache.filter(m => m.id !== id || m.memberId !== memberId); push('rooms:history', chatCache); return; }
   if (!currentRoomId) return;
   send({ t: 'chat:delete', id });
 }
@@ -787,21 +726,29 @@ export function reportChat(id: string): void {
 }
 
 export function waveAt(targetMemberId: string): void {
+  if (roomCache?.testing) { replyTestGuest(targetMemberId, '嗨！见到你真好（模拟回应）'); return; }
   if (!currentRoomId) return;
   send({ t: 'wave', targetMemberId });
 }
 
 /** 改房间设置（房主，token 从本地取） */
-export async function updateRoom(patch: {
-  name?: string;
-  kind?: RoomKind;
-  listed?: boolean;
-}): Promise<void> {
-  if (!currentRoomId) throw new Error('不在房间里');
+export async function updateRoom(patch: Partial<CreateRoomInput>): Promise<void> {
+  if (!currentRoomId || !roomCache) throw new Error('不在房间里');
+  if (roomCache.ownerId !== memberId) throw new Error('只有房主可以设置房间');
+  if (patch.capacity !== undefined && (!Number.isInteger(patch.capacity) || patch.capacity < Math.max(2,roomCache.members.filter(m=>m.online).length) || patch.capacity > 12)) throw new Error('人数上限不能小于当前人数，且须为 2–12');
+  if (roomCache.testing) {
+    const safe = normalizeCreateInput({...roomCache, ...patch});
+    if (!safe) throw new Error('房名不能为空');
+    roomCache = {...roomCache, ...safe, description:clampText(patch.description ?? roomCache.description,200), language:patch.language ?? roomCache.language, chatEnabled:patch.chatEnabled ?? roomCache.chatEnabled, listed:false};
+    publishTest(); return;
+  }
+  if (!socialSupported) throw new Error('房间服务需更新后才能确认保存设置');
   const settings = await getSettings();
-  const token = settings.roomsOwnerTokens?.[currentRoomId];
-  if (!token) throw new Error('没有这个房间的管理码（不是你开的房？）');
-  send({ t: 'room:update', ...patch, token });
+  const roomId = currentRoomId;
+  const token = settings.roomsOwnerTokens?.[roomId];
+  if (!token) throw new Error('没有这个房间的管理码');
+  await request({ t:'room:update', ...patch, roomId, token }, 'social:ack');
+  if (roomCache?.roomId === roomId) await setSettings({socialLastRoom: {...roomCache}});
 }
 
 export async function kickMember(targetMemberId: string): Promise<void> {
@@ -837,6 +784,7 @@ export function getRoomsCache(): {
 
 /** 主动断开（关 lounge 窗不断开——房间是常驻的，用户可能只是收起窗口） */
 export function disconnectRooms(): void {
+  connectionGeneration++;
   closedByUs = true;
   leaveRoom();
 
@@ -860,7 +808,102 @@ export function disconnectRooms(): void {
   pending.clear();
   for (const [, p] of pendingCopy) {
     clearTimeout(p.timer);
+    p.reject(new Error('连接已断开'));
   }
-
+  socialSupported = false;
+  worldSubscribed = false;
+  worldCache = [];
   setStatus({ phase: 'off' });
+}
+
+export function supportsSocial(): boolean { return socialSupported || !!roomCache?.testing; }
+export async function prepareSocialConnection(): Promise<void> {
+  if (roomCache?.testing) throw new Error('请先退出本地试演');
+  await connect();
+}
+export async function refreshSocialPose(): Promise<void> { await sendPresence(true); }
+export async function subscribeWorld(subscribe: boolean): Promise<RoomChatMsg[]> {
+  if (roomCache?.testing) { if (!subscribe) return []; throw new Error('本地试演不连接世界频道'); }
+  if (!subscribe && !ws) { worldSubscribed = false; return []; }
+  await connect();
+  if (!socialSupported) throw new Error('房间服务尚未更新，世界聊天暂不可用');
+  worldSubscribed = subscribe;
+  const frame = await request({t:'world:subscribe', subscribe}, 'world:history');
+  return frame.messages as RoomChatMsg[];
+}
+export async function sendSocialChat(text: string, world = false): Promise<void> {
+  const clean = clampText(text, 200);
+  if (!clean) throw new Error('请输入消息');
+  if (roomCache?.testing) {
+    if (world) throw new Error('本地试演不能向世界发送消息');
+    if (roomCache.chatEnabled === false) throw new Error('房主关闭了聊天');
+    appendTestChat(memberId!, clean); return;
+  }
+  if (!socialSupported) throw new Error('房间服务尚未更新，无法确认发送结果');
+  if (!world && !currentRoomId) throw new Error('请先加入房间');
+  if (world && !worldSubscribed) throw new Error('请先打开世界广场');
+  await request({t:world ? 'world:send' : 'chat', text:clean, ...(world ? {} : {roomId:currentRoomId})}, 'social:ack');
+}
+export async function moderateSocial(id: string, action: 'delete' | 'report', world: boolean): Promise<void> {
+  if (action !== 'delete' && action !== 'report') throw new Error('未知操作');
+  if (roomCache?.testing) {
+    if (world) throw new Error('不在世界频道');
+    if (action === 'delete') deleteChat(id);
+    else throw new Error('本地试演消息不提交举报');
+    return;
+  }
+  if (!socialSupported) throw new Error('房间服务尚未更新');
+  if (world) await request({t: action === 'delete' ? 'world:delete' : 'world:report', id}, 'social:ack');
+  else await request({t:action === 'delete' ? 'chat:delete' : 'report', id, roomId:currentRoomId}, 'social:ack');
+}
+
+const testGuests = new Map<string, TestGuest>();
+function publishTest(): void {
+  setStatus({phase:'in-room', memberId:memberId!, room:roomCache!});
+  push('rooms:history', chatCache);
+}
+export async function startTestRoom(): Promise<void> {
+  if (currentRoomId) throw new Error('请先退出当前房间，再开始本地试演');
+  disconnectRooms();
+  const settings = await getSettings();
+  memberId = 'test:me'; currentRoomId = 'LOCAL';
+  roomCache = {roomId:'LOCAL', name:'我的试演小屋', description:'本地试演 · 不会向任何玩家发送邀请', kind:'idle', capacity:6, listed:false, chatEnabled:true, language:'zh', testing:true,
+    ownerId:memberId, members:[{memberId, nickname:settings.nickname || settings.marketNickname || '我', joinedAt:Date.now(), online:true}]};
+  chatCache = []; testGuests.clear();
+  RoomPets.startLocalTest(memberId);
+  publishTest();
+}
+export async function inviteTestGuest(id: string): Promise<void> {
+  if (!roomCache?.testing) throw new Error('请先开始本地试演');
+  const room = roomCache;
+  const guest = (await listTestGuests()).find(g => g.id === id);
+  if (roomCache !== room) throw new Error('试演已经结束');
+  if (!guest) throw new Error('这个角色的素材已不可用');
+  if (testGuests.has(id)) throw new Error('这个角色已经在房间里了');
+  if (room.members.length >= room.capacity) throw new Error('试演房已满，请先调整人数上限');
+  const member = {memberId:`test:${id}`, nickname:guest.name, joinedAt:Date.now(), online:true, testing:true};
+  testGuests.set(id, guest); room.members.push(member);
+  RoomPets.addLocalTestGuest(member, guest.character);
+  publishTest();
+}
+export function getTestGuest(member: string): TestGuest | undefined {
+  return roomCache?.testing && member.startsWith('test:') ? testGuests.get(member.slice(5)) : undefined;
+}
+export function removeTestGuest(id: string): void {
+  if (!getTestGuest(id) || !roomCache) throw new Error('测试访客不存在');
+  testGuests.delete(id.slice(5)); roomCache.members = roomCache.members.filter(m => m.memberId !== id);
+  RoomPets.onMemberOut(id); publishTest();
+}
+function appendTestChat(id: string, text: string): void {
+  const member = roomCache?.members.find(m => m.memberId === id);
+  if (!roomCache?.testing || !member) throw new Error('测试成员不存在');
+  const msg = {id:`local-${++requestSequence}`, memberId:id, nickname:member.nickname + (member.testing ? ' · 模拟' : ''), text:clampText(text,200), at:Date.now()};
+  chatCache = [...chatCache, msg].slice(-50);
+  RoomPets.onChat(id, msg.nickname, msg.text); push('rooms:chat', msg);
+}
+export function replyTestGuest(id: string, text: string): void {
+  if (!getTestGuest(id)) throw new Error('测试访客不存在');
+  if (roomCache?.chatEnabled === false) throw new Error('房主关闭了聊天');
+  if (!clampText(text,200)) throw new Error('请输入模拟回复');
+  appendTestChat(id, text);
 }

@@ -1,3 +1,4 @@
+import type { SocialApi } from './social';
 /** 渲染进程与主进程共享的 IPC 类型（preload 契约） */
 import type {
   ActionId,
@@ -27,6 +28,8 @@ export interface CharacterMeta {
 export interface CloudAccount { connected: boolean; unlimited?: boolean; credits: number; providers: ImageProvider[] }
 
 export interface Settings {
+  socialPoses?: Record<string, string>;
+  socialLastRoom?: CreateRoomInput;
   generationMode?: 'cloud' | 'local';
   onboardingDismissed?: boolean;
   onboardingSeen?: boolean;
@@ -280,6 +283,9 @@ export type RoomKind = 'idle' | 'study' | 'night' | 'coop';
 
 /** 房间列表条目（不含聊天/成员详情/token） */
 export interface RoomBrief {
+  description?: string;
+  language?: string;
+  chatEnabled?: boolean;
   roomId: string;
   name: string;
   kind: RoomKind;
@@ -292,6 +298,8 @@ export interface RoomBrief {
 
 /** 房内成员（含当前在场状态） */
 export interface RoomMember {
+  title?: string;
+  testing?: boolean;
   memberId: string;
   nickname: string;
   avatarHash?: string;
@@ -308,6 +316,10 @@ export interface RoomMember {
 
 /** 房内快照（进房时拿到） */
 export interface RoomSnapshot {
+  testing?: boolean;
+  description?: string;
+  language?: string;
+  chatEnabled?: boolean;
   roomId: string;
   name: string;
   kind: RoomKind;
@@ -329,6 +341,7 @@ export interface RoomChatMsg {
 
 /** 房间链路状态（lounge 窗 + 托盘消费） */
 export interface RoomsStatus {
+  socialReady?: boolean;
   phase: 'off' | 'connecting' | 'online' | 'in-room';
   /** 自己的成员 ID（hello:ack 后有） */
   memberId?: string;
@@ -344,6 +357,9 @@ export type RoomSizePreset = 'small' | 'medium' | 'large';
 
 /** 开房参数 */
 export interface CreateRoomInput {
+  description?: string;
+  language?: string;
+  chatEnabled?: boolean;
   name: string;
   kind: RoomKind;
   capacity: number;
@@ -495,6 +511,7 @@ export interface QBotApi {
    * 主进程按窗口定向推送（不带 memberId——一个窗只服务一个成员，天然隔离）。
    */
   roomPet: {
+    move(x: number, y: number): void;
     onHello(cb: (info: { nickname: string }) => void): () => void;
     onCharacter(cb: (meta: LinkPeerCharacter) => void): () => void;
     onProgress(cb: (p: LinkAssetProgress) => void): () => void;
@@ -525,6 +542,7 @@ export interface QBotApi {
     remove(hash: string): Promise<void>;
   };
   /** 公共房间（spec 2026-08-21）：联机唯一链路（原 1v1 已退役） */
+  social: SocialApi;
   rooms: {
     open(): void;
     getDisplayMode(): Promise<RoomsDisplayMode>;
@@ -548,7 +566,7 @@ export interface QBotApi {
     /** 举报一条发言（服务端只记计数，不自动处置） */
     report(id: string): void;
     wave(memberId: string): void;
-    update(patch: { name?: string; kind?: RoomKind; listed?: boolean }): Promise<void>;
+    update(patch: Partial<CreateRoomInput>): Promise<void>;
     kick(memberId: string): Promise<void>;
     toggleFavorite(roomId: string): Promise<string[]>;
     disconnect(): Promise<void>;

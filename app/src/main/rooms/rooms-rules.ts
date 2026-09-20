@@ -116,7 +116,7 @@ export function layoutRoomScenePets(
 export const NAME_MAX = 24;
 export const NICK_MAX = 16;
 export const CHAT_MAX = 200;
-export const CAPACITY_MIN = 4;
+export const CAPACITY_MIN = 2;
 export const CAPACITY_MAX = 12;
 export const CAPACITY_DEFAULT = 8;
 
@@ -238,6 +238,11 @@ export function errorText(code: string): string {
     case 'too_many_rooms': return '你开的房太多了（上限 3 个）';
     case 'proto_mismatch': return 'QBot 版本太旧，请升级后再进房';
     case 'not_in_room': return '你不在房间里';
+    case 'chat_disabled': return '房主关闭了聊天，仍然可以安静陪伴';
+    case 'bad_capacity': return '人数上限不能小于当前人数，且须为 2–12';
+    case 'not_subscribed': return '请先打开世界广场';
+    case 'empty_message': return '请输入消息';
+    case 'message_not_found': return '这条消息已不在最近记录中';
     case 'need_hello': return '连接未就绪，请重试';
     // ── 角色包（上屏）──
     case 'pack:not_found': return '房友的角色包还没就绪';

@@ -1,3 +1,4 @@
+import { mountLocalNameplate } from './nameplate';
 /** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 + 串门 + 调试面板 */
 import '../error-handler';
 import type { ActionId, PlayableId } from '@qbot/pipeline';
@@ -17,6 +18,7 @@ import { IdleDirector } from '../../shared/idle-plan';
 import { actionDisplayName, type StickerManifest } from '../../shared/sticker-behavior';
 
 const stage = document.getElementById('stage')!;
+mountLocalNameplate(stage);
 const visitorStage = document.getElementById('visitor-stage')!;
 const rng = { random: () => Math.random() };
 

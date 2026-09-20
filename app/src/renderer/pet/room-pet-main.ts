@@ -1,9 +1,10 @@
+import { createNameplate } from './nameplate';
 /**
  * 公共房间宠上屏入口（?roomPet=1，spec 2026-08-24）：一个窗只服务一个房友，
  * 主进程按窗定向推送（帧里不带 memberId）。复用本地宠 Player + 联机
  * NetworkDriver + Signboard，去掉 1v1 remote-main 里跟对端语义相关的部分。
  *
- * 名牌常驻显示昵称；同步牌面会替代昵称，聊天广播临时顶掉牌面 8s 后回落。
+ * 名牌常驻显示昵称；聊天与临时牌面独立，8s 后回落，不替代名字。
  */
 import { NetworkDriver } from './network-driver';
 import { Player } from './player';
@@ -13,14 +14,16 @@ import { Signboard } from './signboard';
 const stage = document.getElementById('stage')!;
 const menu = document.getElementById('menu')!;
 const signboard = new Signboard('stage');
+const setNameplate = createNameplate(stage);
 
 const player = new Player(stage, () => driver.onVideoEnded());
 const driver = new NetworkDriver({
   play: (action, loop) => (loop ? player.playLooping(action) : player.play(action)),
 });
 
-/** 牌子优先级：离线 > 传输进度 > 聊天气泡（8s）> 同步牌面 > 常驻昵称牌 */
+/** 临时牌子优先级：离线 > 传输进度 > 聊天气泡（8s）> 同步牌面。 */
 let nickname = '房友';
+let latestState: import('../../shared/ipc-types').LinkPeerState = {mode:'idle'};
 let transferText: string | null = null;
 let chatClearTimer: ReturnType<typeof setTimeout> | null = null;
 let chatText: string | null = null;
@@ -31,8 +34,9 @@ const CHAT_BUBBLE_MS = 8_000;
 const CHAT_BUBBLE_MAX = 60;
 
 function refreshSignboard(): void {
-  signboard.setText(resolveRoomPetSign({ nickname, gone, transferText, chatText, presenceSign }));
-  signboard.show();
+  setNameplate(nickname, gone ? '暂时离开' : '');
+  const text = resolveRoomPetSign({ nickname, gone, transferText, chatText, presenceSign });
+  if(text) { signboard.setText(text); signboard.show(); } else signboard.hide();
 }
 
 window.qbot.roomPet.onHello(({ nickname: n }) => {
@@ -45,6 +49,7 @@ window.qbot.roomPet.onCharacter((meta) => {
   transferText = null;
   const available = player.load(meta.dirId, meta.manifest);
   driver.setCharacter(available, meta.manifest.agentActions);
+  driver.applyState(latestState);
   refreshSignboard();
 });
 
@@ -56,7 +61,8 @@ window.qbot.roomPet.onProgress(({ received, total }) => {
 window.qbot.roomPet.onState((s) => {
   gone = false;
   presenceSign = s.sign?.trim() || null;
-  driver.applyState({ mode: s.mode ?? 'idle', action: s.action });
+  latestState = { mode: s.mode ?? 'idle', action: s.action };
+  driver.applyState(latestState);
   refreshSignboard();
 });
 
@@ -94,7 +100,8 @@ void window.qbot.roomPet.getCache().then((snap) => {
   }
   if (snap.state) {
     presenceSign = snap.state.sign?.trim() || null;
-    driver.applyState({ mode: snap.state.mode ?? 'idle', action: snap.state.action });
+    latestState = { mode: snap.state.mode ?? 'idle', action: snap.state.action };
+    driver.applyState(latestState);
   }
   refreshSignboard();
 });
@@ -142,7 +149,7 @@ stage.addEventListener('pointermove', (e) => {
       rafPending = false;
       if (dragStarted) {
         // 移动当前远程角色窗口
-        window.moveTo(
+        window.qbot.roomPet.move(
           Math.round(lastScreenX - offsetX),
           Math.round(lastScreenY - offsetY)
         );
@@ -182,11 +189,13 @@ stage.addEventListener('contextmenu', (e) => {
   e.preventDefault();
   menu.replaceChildren();
   addMenuItem('打招呼', () => window.qbot.roomPet.wave());
+  addMenuItem('一起玩', () => window.qbot.rooms.open());
+  addMenuItem('房间聊天', () => window.qbot.social.openChat());
   addMenuItem('退出房间', () => window.qbot.roomPet.leaveRoom());
   menu.style.display = 'block';
   const mw = 120;
   menu.style.left = `${Math.min(e.clientX, window.innerWidth - mw - 4)}px`;
-  menu.style.top = `${Math.min(e.clientY, window.innerHeight - 74)}px`;
+  menu.style.top = `${Math.max(0,Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 4))}px`;
 });
 
 document.addEventListener('click', (e) => {

@@ -10,8 +10,8 @@ describe('resolveRoomPetSign', () => {
     presenceSign: null,
   };
 
-  it('默认显示昵称', () => {
-    expect(resolveRoomPetSign(base)).toBe('小明');
+  it('昵称由独立名牌展示，没有临时文字时收牌', () => {
+    expect(resolveRoomPetSign(base)).toBe('');
   });
 
   it('同步牌面高于昵称', () => {

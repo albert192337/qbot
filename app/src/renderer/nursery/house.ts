@@ -45,7 +45,7 @@ export const AREAS: Record<
     story: '集市上交换模样，留言桌旁和朋友坐一会儿。',
     objects: [
       ['market', '逛逛集市', '下载 · 分享 · 管理作品'],
-      ['lounge', '朋友留言桌', '找房 · 开房 · 聊天'],
+      ['lounge', '一起玩', '朋友 · 世界 · 本地试演'],
       ['claude', '接通工作信号', 'Claude Code · 连接状态'],
     ],
   },
