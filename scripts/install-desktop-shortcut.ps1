@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $desktopDirectory = [Environment]::GetFolderPath('Desktop')
 $shortcutPath = Join-Path $desktopDirectory 'QBot.lnk'
