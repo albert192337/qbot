@@ -695,6 +695,10 @@ function createSocialWindow(compact: boolean): BrowserWindow {
 
 /** 房间事件推送口（rooms.ts 通过 setLoungePush 注入这个） */
 export function pushToLounge(channel: string, payload: unknown): void {
+  if (channel.startsWith('steam:')) {
+    for (const win of [loungeWindow, roomChatWindow]) if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+    return;
+  }
   if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.webContents.send(channel,payload);
   for (const win of [roomChatWindow, petWindow, roomWindow]) if(win && !win.isDestroyed()) win.webContents.send(channel,payload);
   if(nurseryWindow && !nurseryWindow.isDestroyed()) nurseryWindow.webContents.send(channel,payload);

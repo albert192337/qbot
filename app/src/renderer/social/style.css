@@ -4,3 +4,5 @@
 
 button.selected:hover{background:#587d60;color:#fff}
 
+
+.steam-card>p{font-size:12px;color:#817f70;margin:8px 0;overflow-wrap:anywhere}.steam-self{margin:12px 0;font-size:13px}.steam-friends{max-height:300px;overflow:auto;margin-top:12px}.steam-friend{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #ece7d9}.steam-friend>img{width:32px;height:32px;border-radius:9px}.steam-friend-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.steam-friend-info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.steam-friend button{font-size:12px;padding:6px 12px}.steam-card .section-heading{gap:8px}.steam-card h3{margin:0}.steam-card .section-heading button{font-size:12px;white-space:nowrap}#steam-join{margin:12px 28px 0;padding:14px 18px;border:1px solid #becdac;border-radius:14px;background:#edf2e3}#steam-join p{font-size:12px;margin:5px 0 8px}#steam-join button{margin-right:8px}@media(max-width:760px){.home-grid{grid-template-columns:1fr}.steam-card .section-heading{flex-wrap:wrap}}

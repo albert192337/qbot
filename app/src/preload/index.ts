@@ -139,6 +139,14 @@ const api: QBotApi = {
     remove: (hash) => ipcRenderer.invoke('market:remove', hash),
   },
   social: {
+    steam: {
+      get: () => ipcRenderer.invoke('steam:get'),
+      refresh: () => ipcRenderer.invoke('steam:refresh'),
+      invite: id => ipcRenderer.invoke('steam:invite', id),
+      accept: id => ipcRenderer.invoke('steam:accept', id),
+      dismiss: id => ipcRenderer.invoke('steam:dismiss', id),
+      onChanged: cb => { const fn = (_e: unknown, state: import('../shared/steam').SteamSnapshot) => cb(state); ipcRenderer.on('steam:changed', fn); return () => ipcRenderer.removeListener('steam:changed', fn); },
+    },
     prepareJoin: () => ipcRenderer.invoke('social:prepareJoin'),
     profile: () => ipcRenderer.invoke('social:profile'),
     pose: (action) => ipcRenderer.invoke('social:pose', action),

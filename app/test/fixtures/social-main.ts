@@ -1,3 +1,6 @@
+import { SteamService } from '../../src/main/steam/service';
+import { roomRealm } from '../../src/main/steam/rules';
+import { getSteam, startSteam, stopSteam } from '../../src/main/steam/runtime';
 /** Isolated native QA with production rooms/social/window code and real loopback server. */
 import { app, ipcMain, protocol, session, BrowserWindow } from 'electron';
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -26,7 +29,25 @@ app.whenReady().then(async()=>{
     if(!file.startsWith(chars+path.sep))return new Response(null,{status:403});
     try{return new Response(await readFile(file),{headers:{'Content-Type':file.endsWith('.webm')?'video/webm':'image/png'}});}catch{return new Response(null,{status:404});}
   });
-  registerSocialIpc();Rooms.setLoungePush(Windows.pushToLounge);wireRoomPetDisplay();
+  Rooms.setLoungePush(Windows.pushToLounge);wireRoomPetDisplay();
+  let fakeSteam: SteamService | undefined;
+  if (process.env.QBOT_QA_STEAM === 'fake') {
+    let pending = '';
+    const realm = roomRealm(process.env.QBOT_ROOMS_URL!);
+    fakeSteam = new SteamService({config:{appId:480,demo:true},realm,
+      room:()=>{const {room,status}=Rooms.getRoomsCache();return room?{roomId:room.roomId,testing:room.testing,online:status.phase==='in-room'}:null;},
+      native:()=>({init:()=>{},shutdown:()=>{},launchCommand:()=>'',setConnect:()=>{},
+        read:()=>({online:true,self:{steamId:'76561198000000001',name:'界面测试账号'},friends:[
+          {steamId:'76561198000000002',name:'小岛来客（模拟好友）',state:1},
+          {steamId:'76561198000000003',name:'<img src=x onerror=alert(1)>（转义测试）',state:0},
+        ]}),
+        invite:(_id,command)=>{pending=command;console.log('FAKE_STEAM_INVITE');return true;},
+        pump:cb=>{if(pending){const value=pending;pending='';cb(value,'76561198000000002');}},
+      }),changed:state=>Windows.pushToLounge('steam:changed',state),incoming:()=>Windows.createLoungeWindow()});
+    fakeSteam.start();
+    app.on('before-quit',()=>fakeSteam!.stop());
+  } else if (process.env.QBOT_QA_STEAM === 'live') { startSteam(); app.on('before-quit',stopSteam); }
+  registerSocialIpc(fakeSteam ? () => fakeSteam! : getSteam);
   const handlers:Record<string,(...args:any[])=>unknown>={
     'rooms:getCache':()=>Rooms.getRoomsCache(),'rooms:getStatus':()=>Rooms.getRoomsStatus(),
     'rooms:list':(_e,kind,q)=>Rooms.listRooms(kind,q),'rooms:create':(_e,input)=>Rooms.createRoom(input),'rooms:join':(_e,id)=>Rooms.joinRoom(id),
@@ -40,8 +61,8 @@ app.whenReady().then(async()=>{
   ipcMain.on('roomPet:leaveRoom',()=>Rooms.leaveRoom());
   ipcMain.on('roomPet:move',(event,x,y)=>{const win=BrowserWindow.fromWebContents(event.sender);if(win)Windows.moveRoomPetWindow(win,x,y);});
   (globalThis as any).qa={Rooms,Windows,Pets};
-  Windows.createLoungeWindow();
+  const socialWindow = Windows.createLoungeWindow();
+  if (process.env.QBOT_QA_WIDTH) socialWindow.setSize(Number(process.env.QBOT_QA_WIDTH), 620);
 });
 app.on('window-all-closed',()=>app.quit());
 app.on('before-quit',()=>Rooms.disconnectRooms());
-

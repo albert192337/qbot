@@ -8,6 +8,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin({ exclude: ['@qbot/pipeline'] })],
     build: {
       rollupOptions: {
+        input: { index: resolve(__dirname, 'src/main/index.ts'), 'steam-worker': resolve(__dirname, 'src/main/steam/worker.ts') },
         external: ['ffmpeg-static'],
       },
     },

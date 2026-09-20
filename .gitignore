@@ -24,3 +24,5 @@ rooms/data/
 # 本机依赖缓存、下载备份与运行记录
 .pnpm-store/
 work/
+.local/
+steam_appid.txt

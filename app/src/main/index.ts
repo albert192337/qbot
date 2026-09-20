@@ -1,3 +1,4 @@
+import { startSteam, stopSteam, handleSteamArgs } from './steam/runtime';
 import { recoverCloudJobs } from './cloud-generation';
 import { initUserMemory, flushUserMemory } from './user-memory';
 /** 主进程入口：协议注册（必须在 ready 前）→ 预置角色 → 窗口/托盘/IPC */
@@ -54,6 +55,10 @@ if (process.env.QBOT_USER_DATA) {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 }
+
+app.on('second-instance', (_event, argv) => {
+  void app.whenReady().then(() => handleSteamArgs(argv));
+});
 
 app.whenReady().then(async () => {
   // 初始化全局错误处理
@@ -136,6 +141,7 @@ app.whenReady().then(async () => {
   await seedPresets();
   // 房间事件 → lounge 窗（rooms.ts 不直接持有窗口引用，同 link ↔ tray 的解耦）
   setLoungePush(pushToLounge);
+  startSteam();
   // dev 自动进/建公共房间（QBOT_USER_DATA 双/三实例验证宠上屏用；正常入口是托盘/右键菜单）
   if (process.env.QBOT_ROOMS_AUTOJOIN) {
     void joinRoom(process.env.QBOT_ROOMS_AUTOJOIN)
@@ -203,6 +209,7 @@ app.on('window-all-closed', () => {
 let quitFlushed = false;
 app.on('before-quit', (ev) => {
   if (quitFlushed) return; // 下面 app.quit() 会二次进来
+  stopSteam();
   stopMusicMonitor();
   stopMeetingMonitor();
   stopInputMonitor();

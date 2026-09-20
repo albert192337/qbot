@@ -15,7 +15,9 @@
     "dev": "npm run dev -w app",
     "dev:social": "node scripts/dev-social.cjs",
     "build": "npm run build -w pipeline && npm run build -w app",
-    "check": "npm run build -w pipeline && npm test -w pipeline && npm test -w app && npm test -w generation && npx tsc --noEmit -p app"
+    "check": "npm run build -w pipeline && npm test -w pipeline && npm test -w app && npm test -w generation && npx tsc --noEmit -p app",
+    "dev:steam": "node scripts/dev-steam.cjs",
+    "test:steam": "node scripts/steam-smoke.cjs"
   },
   "devDependencies": {
     "typescript": "^5.5.0"

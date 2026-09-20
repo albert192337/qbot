@@ -1,5 +1,6 @@
 import './style.css';
 import { ChatView } from './chat';
+import { mountSteam } from './steam';
 import { DEFAULT_ROOM } from '../room/rooms/default';
 import type { CreateRoomInput, RoomBrief, RoomSnapshot, RoomsStatus } from '../../shared/ipc-types';
 import type { SocialProfile, TestGuest } from '../../shared/social';
@@ -26,7 +27,7 @@ let busy=false;
 root.innerHTML=`<header><div><span class="eyebrow">QBOT · LITTLE COMPANY</span><h1>${compact?'房间聊天':'一起玩'} <span class="leaf">❧</span></h1></div><div class="header-actions">${compact?'<button id="pin" title="保持在其他窗口上方">置顶</button><button id="open-main">一起玩</button>':'<span id="connection" class="badge">尚未连接</span>'}<button id="close" aria-label="关闭窗口">×</button></div></header>
 <div id="room-strip"><span id="room-summary">一个人也很自在，有朋友更热闹。</span><div><button id="copy-code" hidden>复制房间码</button>${!compact?'<button id="open-chat">聊天小窗 ↗</button>':''}<button id="leave" hidden>退出房间</button></div></div>
 ${!compact?`<nav><button data-page="home" class="selected">一起玩</button><button data-page="world">世界广场</button><button data-page="room">当前房间</button><button data-page="test" class="test-tab">本地试演</button></nav>
-<main><section id="home-page" class="page"><div class="welcome"><span class="eyebrow">留一把椅子，给你的朋友</span><h2>来我的小屋，坐一会儿。</h2><p>各自忙碌，也能安静地待在一起。</p><div class="entry-grid"><button id="invite" class="entry"><span class="entry-icon">✉</span><strong>邀请朋友来玩</strong><small>开一间会客房，分享房间码</small><span>一起坐坐 →</span></button><button id="publish" class="entry public"><span class="entry-icon">⌂</span><strong>公开我的房间</strong><small>让世界广场的朋友找到你</small><span>打开小屋的门 →</span></button></div></div><div class="home-grid"><article class="card"><h3>我的联机形象</h3><div id="my-character"></div><label>来做点什么<select id="pose"><option value="">随当前状态</option></select></label><p class="muted">只使用这个角色已有的动作。</p></article><article class="card"><h3>Steam 好友 <span class="badge">等待连接</span></h3><div class="empty friends-empty"><span class="round-icon">♧</span><strong>Steam 尚未连接</strong><p id="steam-reason"></p></div></article></div></section>
+<aside id="steam-join" hidden></aside><main><section id="home-page" class="page"><div class="welcome"><span class="eyebrow">留一把椅子，给你的朋友</span><h2>来我的小屋，坐一会儿。</h2><p>各自忙碌，也能安静地待在一起。</p><div class="entry-grid"><button id="invite" class="entry"><span class="entry-icon">✉</span><strong>邀请朋友来玩</strong><small>开一间会客房，分享房间码</small><span>一起坐坐 →</span></button><button id="publish" class="entry public"><span class="entry-icon">⌂</span><strong>公开我的房间</strong><small>让世界广场的朋友找到你</small><span>打开小屋的门 →</span></button></div></div><div class="home-grid"><article class="card"><h3>我的联机形象</h3><div id="my-character"></div><label>来做点什么<select id="pose"><option value="">随当前状态</option></select></label><p class="muted">只使用这个角色已有的动作。</p></article><article class="card steam-card" id="steam-card"></article></div></section>
 <section id="world-page" class="page" hidden><div class="world-grid"><article class="card discover"><div class="section-heading"><h2>逛逛大家的小屋</h2><button id="refresh">刷新</button></div><form id="join-form" class="join-row"><input id="room-code" maxlength="8" placeholder="输入八位房间码" aria-label="房间码"><button class="primary">敲门加入</button></form><div class="filters"><input id="search" placeholder="找一间小屋…" aria-label="搜索房名"><select id="kind" aria-label="房间类型"><option value="">全部类型</option>${options(kinds)}</select><select id="language" aria-label="首选语言">${options(languages)}</select><select id="chat-filter" aria-label="聊天筛选"><option value="">聊天不限</option><option value="yes">允许聊天</option><option value="no">安静陪伴</option></select><select id="sort" aria-label="排序"><option value="active">活跃优先</option><option value="recent">最近活动</option><option value="quiet">人少优先</option></select><label class="check"><input id="space" type="checkbox" checked>只看有空位</label><label class="check"><input id="favorite-only" type="checkbox">我的收藏</label></div><div id="room-list"></div></article><article class="card world-chat"><h3>世界闲聊 <span class="badge">公开频道</span></h3><div id="world-chat"></div></article></div></section>
 <section id="room-page" class="page" hidden><div id="room-details"></div></section>
 <section id="test-page" class="page" hidden><article class="test-banner"><span class="eyebrow">试演一下，随时散场</span><h2>把角色们请到同一间小屋</h2><p>邀请的是本机素材，不是玩家本人。所有回应均为模拟，不会发送邀请，也不写入真实互动记录。</p><button id="start-test" class="primary">开始本地试演</button></article><div class="section-heading"><h3>可邀请的角色</h3><button id="reload-guests">刷新角色</button></div><p class="muted">包括自己的其他角色、已下载的装扮角色和仍保留素材的房友缓存。</p><div id="guest-list" class="guest-grid"></div><div id="test-members"></div></section></main>`:`<div class="compact-tabs"><button id="show-chat" class="selected">聊天</button><button id="show-members">成员</button></div><div id="compact-chat"></div><div id="compact-members" hidden></div>`}
@@ -81,7 +82,7 @@ async function loadProfile():Promise<void>{
  const c=profile.character;
  $('my-character').innerHTML=c?`<img class="portrait" src="qbot-asset://${encodeURIComponent(c.dirId)}/${esc(c.coverImage||c.manifest.sourceImage)}" alt=""><div><strong>${esc(profile.nickname)}</strong><p>${esc(c.manifest.name)}</p></div>`:'<p class="muted">先在角色库选择一个角色吧。</p>';
  $('pose').innerHTML='<option value="">随当前状态</option>'+profile.actions.map(a=>`<option value="${esc(a.id)}">${esc(a.label)}</option>`).join('');
- ($('pose') as HTMLSelectElement).value=profile.pose;$('steam-reason').textContent=profile.platform.reason;
+ ($('pose') as HTMLSelectElement).value=profile.pose;
 }
 async function showPage(next:string):Promise<void>{
  const previous=page;page=next;
@@ -166,6 +167,10 @@ api.rooms.onHistory(messages=>roomChat?.set(messages));api.rooms.onChat(msg=>roo
 api.rooms.onError(toast);api.rooms.onWave(w=>toast(`${w.fromNickname} 向你打了个招呼`));api.social.onWorld(messages=>{if(page==='world')worldChat?.set(messages);});
 api.rooms.onKicked(()=>toast('你已离开这个房间'));
 api.characters.onActivated(()=>void run(loadProfile));
+if (!compact) {
+ const offSteam = mountSteam($('steam-card'), $('steam-join'), api.social.steam, toast, async () => { await sync(); await showPage('room'); api.social.openChat(); });
+ window.addEventListener('beforeunload', offSteam, {once:true});
+}
 void run(async()=>{await loadProfile();await sync();});
 
 

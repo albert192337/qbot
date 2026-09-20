@@ -1,3 +1,4 @@
+import type { SteamApi } from './steam';
 import type { CharacterMeta, CreateRoomInput, RoomChatMsg } from './ipc-types';
 
 export interface SocialProfile {
@@ -18,6 +19,7 @@ export interface TestGuest {
   character: CharacterMeta;
 }
 export interface SocialApi {
+  steam: SteamApi;
   prepareJoin(): Promise<boolean>;
   profile(): Promise<SocialProfile>;
   pose(action: string): Promise<void>;

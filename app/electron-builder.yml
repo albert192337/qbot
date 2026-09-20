@@ -6,6 +6,8 @@ directories:
   output: release
 files:
   - out/**
+  - '!out/main/steam-preview.cjs'
+  - '!out/main/steam-smoke.cjs'
 extraResources:
   - from: resources/presets
     to: presets
@@ -13,6 +15,9 @@ extraResources:
     to: tray-win.png
 asarUnpack:
   - "**/node_modules/ffmpeg-static/**"
+  - "**/node_modules/steamworks.js/dist/**"
+  - "**/node_modules/koffi/**"
+  - "**/node_modules/@koromix/**"
 mac:
   category: public.app-category.entertainment
   target:

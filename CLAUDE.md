@@ -1,9 +1,16 @@
 # QBot — AI 桌宠
 
+## 2026-09-20：Steam 好友与房间邀请
+
+- `npm run dev:steam` 用显式 SpaceWar 480 测试模式接真实桌面 Steam；普通启动默认关闭，发行包禁止 480。银行/税务尚未完成不阻塞本地开发。
+- `main/steam/` 的 Koffi flat API adapter + service 在独立 utility process 接生命周期、真实身份/好友/头像、rich presence、邀请与加入请求；main 通过 bridge 通信，renderer 只走 typed IPC。原生 Steam 管道断开可能 fatal assert，绝不能把 SDK 放回桌宠主进程。固定使用 `steamworks.js@0.4.0` 的原生 redistributable，不初始化其 JS 包装器；可用 `QBOT_STEAM_SDK` 指定官方 SDK。
+- 现有 WebSocket 房间保留，Steam 身份未作为服务端已验证身份；邀请仅传 AppID/服务标识/房号，显式确认加入。本地试演不发真实邀请，离房/断线/退出清除 rich presence。
+- `npm run test:steam` 为隔离真实 SDK 只读探测；`scripts/preview-steam.cjs` 默认模拟好友与邀请、回环服务和临时存档。开发说明、测试证据、双机和冷启动限制见 `docs/steam-development.md`。
+
 ## 2026-09-20：一起玩与本地试演
 
 - 右键/托盘「一起玩」独立社交主窗；公开房间设置、世界列表与聊天、可置顶的独立房内聊天小窗。奶油纸面与叶绿配色，关闭窗口不退出房间，复制房号以主进程当前房为准。
-- 本地试演可邀请其他角色库素材和房友缓存，标明测试角色；模拟回复/动作、单个离场，不发网络邀请、不改真实互动或经济。Steam 明确未连接，真实好友/邀请待 AppID 与 SDK 接入。
+- 本地试演可邀请其他角色库素材和房友缓存，标明测试角色；模拟回复/动作、单个离场，不发网络邀请、不改真实互动或经济。Steam 后续接入见上方说明，普通启动默认未连接。
 - 名字从举牌分离，预留称号；实际动作姿态、缓存窗口初始化与 idle 心跳去重。服务增加元信息、世界频道、请求 ID/发送确认，修复满员先退旧房与断线旧消息重发。
 - 新协议需配套新版 rooms 服务，未部署线上。测试入口 `npm run dev:social`；说明 `docs/play-together.md`，隔离服务与原生窗口回归 `scripts/test-social-server.cjs` / `scripts/test-social-ui.cjs`。
 

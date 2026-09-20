@@ -1,4 +1,6 @@
 import { BrowserWindow, clipboard, dialog, ipcMain } from 'electron';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { getSettings, setSettings } from './config';
 import { getCharacter } from './characters';
 import { createRoomChatWindow, getPetWindow } from './windows';
@@ -7,10 +9,11 @@ import * as RoomPets from './rooms/room-pets';
 import { listTestGuests } from './rooms/test-guests';
 import { choosePairAction, pairActions, type PairKind } from '../shared/pair-interaction';
 import type { SocialProfile } from '../shared/social';
+import { getSteam } from './steam/runtime';
 
-/** Steam stays an explicit unavailable platform until a real SDK/verified identity is configured. */
-export function registerSocialIpc(): void {
-  ipcMain.handle('social:prepareJoin', async event => {
+/** Steam SDK identity is separate from legacy room authentication. */
+export function registerSocialIpc(steamService: () => Pick<ReturnType<typeof getSteam>, 'snapshot'|'refresh'|'invite'|'dismiss'|'accept'> | import('./steam/service').SteamService = getSteam): void {
+  const prepareJoin = async (event: Electron.IpcMainInvokeEvent) => {
     await Rooms.prepareSocialConnection();
     if ((await getSettings()).roomsChatConsent) return true;
     const win=BrowserWindow.fromWebContents(event.sender);if(!win)return false;
@@ -19,13 +22,39 @@ export function registerSocialIpc(): void {
       buttons:['知道了，继续','暂不加入'],defaultId:0,cancelId:1});
     if(result.response!==0)return false;
     await setSettings({roomsChatConsent:true});return true;
-  });
+  };
+  ipcMain.handle('social:prepareJoin', prepareJoin);
+  const steamSender = (event: Electron.IpcMainInvokeEvent) => {
+    const url = new URL(event.sender.getURL());
+    url.search = ''; url.hash = '';
+    const expected = process.env.ELECTRON_RENDERER_URL
+      ? `${process.env.ELECTRON_RENDERER_URL}/social/index.html`
+      : pathToFileURL(path.join(__dirname, '../renderer/social/index.html')).href;
+    if (url.href !== expected || event.senderFrame !== event.sender.mainFrame) throw new Error('Steam 操作只允许来自一起玩窗口');
+    return steamService();
+  };
+  ipcMain.handle('steam:get', event => steamSender(event).snapshot());
+  ipcMain.handle('steam:refresh', event => steamSender(event).refresh());
+  ipcMain.handle('steam:invite', (event, id) => steamSender(event).invite(id));
+  ipcMain.handle('steam:dismiss', (event, id) => steamSender(event).dismiss(id));
+  ipcMain.handle('steam:accept', (event, id) => steamSender(event).accept(id, async () => {
+    const pending = steamService().snapshot().pendingJoin;
+    const current = Rooms.getRoomsCache().room;
+    if (current && pending && current.roomId !== pending.roomId) {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win) return false;
+      const answer = await dialog.showMessageBox(win, {type:'question',title:'前往朋友的小屋',message:'加入后会离开当前房间，继续吗？',buttons:['前往','留在这里'],defaultId:1,cancelId:1});
+      if (answer.response !== 0) return false;
+    }
+    return prepareJoin(event);
+  }, code => Rooms.joinRoom(code)));
   ipcMain.handle('social:profile', async (): Promise<SocialProfile> => {
     const settings = await getSettings();
     const character = settings.activeCharacter ? await getCharacter(settings.activeCharacter) : null;
     const actions = character?.manifest ? [...pairActions(character.manifest)].map(([id,clip]) => ({id, label:clip.sourceName || id})) : [];
     const wanted = character && settings.socialPoses?.[character.dirId];
-    return {platform:{available:false, label:'Steam 尚未连接', reason:'接入 Steam 后，这里会显示在线好友和邀请入口。现在可用房间码一起玩，或用本地角色试演。'},
+    const steam = steamService().snapshot();
+    return {platform:{available:steam.phase === 'ready', label:steam.label, reason:steam.reason},
       nickname:settings.nickname || settings.marketNickname || '我', character, actions, pose:actions.some(a => a.id === wanted) ? wanted! : '',
       lastRoom:settings.socialLastRoom, favorites:settings.roomsFavorites || [], extended:Rooms.supportsSocial()};
   });
