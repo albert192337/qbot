@@ -17,16 +17,34 @@ const legacy: Partial<Record<Species,string>> = {
   lotus: new URL('./assets/lotus.png', import.meta.url).href,
   sunflower: new URL('./assets/sunflower.png', import.meta.url).href,
 };
+// Approved painted pineapple: keep the full foliage on the plant, only the crown on harvested fruit.
+const pineappleArt = {
+  plant: new URL('./assets/pineapple-plant.png', import.meta.url).href,
+  fruit: new URL('./assets/pineapple-fruit.png', import.meta.url).href,
+};
+// The same painted item is reused in inventory, collection and packet emblems.
+const painted: Record<Species, { plant: string; fruit: string }> = {
+    strawberry: { plant: new URL('./assets/botanical/strawberry-plant.png', import.meta.url).href, fruit: new URL('./assets/botanical/strawberry-fruit.png', import.meta.url).href },
+    lotus: { plant: new URL('./assets/botanical/lotus-plant.png', import.meta.url).href, fruit: new URL('./assets/botanical/lotus-fruit.png', import.meta.url).href },
+    sunflower: { plant: new URL('./assets/botanical/sunflower-plant.png', import.meta.url).href, fruit: new URL('./assets/botanical/sunflower-fruit.png', import.meta.url).href },
+    carrot: { plant: new URL('./assets/botanical/carrot-plant.png', import.meta.url).href, fruit: new URL('./assets/botanical/carrot-fruit.png', import.meta.url).href },
+    tomato: { plant: new URL('./assets/botanical/tomato-plant.png', import.meta.url).href, fruit: new URL('./assets/botanical/tomato-fruit.png', import.meta.url).href },
+    blueberry: { plant: new URL('./assets/botanical/blueberry-plant.png', import.meta.url).href, fruit: new URL('./assets/botanical/blueberry-fruit.png', import.meta.url).href },
+    apple: { plant: new URL('./assets/botanical/apple-plant.png', import.meta.url).href, fruit: new URL('./assets/botanical/apple-fruit.png', import.meta.url).href },
+    tulip: { plant: new URL('./assets/botanical/tulip-plant.png', import.meta.url).href, fruit: new URL('./assets/botanical/tulip-fruit.png', import.meta.url).href },
+    pineapple: pineappleArt,
+};
 function svg(content: string, box = '0 0 160 200'): string {
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box}"><g stroke="#56533c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${content}</g></svg>`);
 }
 export function botanicalArt(sp: Species, mode: 'fruit'|'plant'|'seed' = 'fruit', ripe = true): string {
   if (mode === 'seed') {
-    return svg(`<path d="M47 18h66l-8 22q23 40 20 125-45 22-90 0-3-85 20-125Z" fill="#f3dfae"/><path d="M51 40h58" stroke="#b38c60" stroke-width="6"/><g transform="translate(80 107) scale(.55)">${fruit[sp]}</g>`);
+    return svg('<path d="M47 18h66l-8 22q23 40 20 125-45 22-90 0-3-85 20-125Z" fill="#f3dfae"/><path d="M51 40h58" stroke="#b38c60" stroke-width="6"/><path d="M42 61q-7 56-3 91m76-91q7 56 3 91" fill="none" stroke="#dcc496"/><ellipse cx="80" cy="107" rx="35" ry="43" fill="#fff8e6" stroke="#d8bd89"/>');
   }
+  if (mode === 'fruit' || ripe) return painted[sp][mode];
   if (legacy[sp]) return legacy[sp]!;
   const f = fruit[sp]!;
-  if (mode === 'fruit' || sp === 'tulip') return svg(`<g transform="translate(80 96) scale(1.25)">${f}</g>`);
+  if (sp === 'tulip') return svg(`<g transform="translate(80 96) scale(1.25)">${f}</g>`);
   const woody = sp === 'apple';
   const pineapple = sp === 'pineapple';
   let body = woody

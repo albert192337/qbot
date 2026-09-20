@@ -13,12 +13,16 @@ app.whenReady().then(async () => {
     const chat = new BrowserWindow({ width: 380, height: 130, show: false, frame: false, webPreferences });
     const bubbles = new BrowserWindow({ width: 340, height: 500, show: false, frame: false, webPreferences });
     ipcMain.handle('bubble:idleSeconds', () => 60);
-    let calls = [], fail = false;
+    let calls = [], fail = false, finishReply;
     ipcMain.handle('petChat:send', async (_e, text) => {
-      calls.push(text); await wait(100);
+      calls.push(text);
+      bubbles.webContents.send('bubble:thinking', true);
+      await new Promise(resolve => { finishReply = resolve; });
+      try {
       if (fail) return { ok: false, error: '测试网络失败' };
       for (const line of ['当然记得你，小刘。', '忙了一天，歇一会儿吧。', '要不要看我跳个新舞？']) bubbles.webContents.send('behavior:say', { source: 'chat', text: line, durationMs: 20000 });
       return { ok: true };
+      } finally { bubbles.webContents.send('bubble:thinking', false); }
     });
     await chat.loadFile(path.join(root, 'app/out/renderer/chat/index.html'));
     assert.equal(await chat.webContents.executeJavaScript(`document.querySelector('footer,#close')`),null);
@@ -32,7 +36,28 @@ app.whenReady().then(async () => {
     assert.equal(calls.length, 0, '中文输入确认与换行不能发送');
     await key({ key: 'Enter', bubbles: true });
     await key({ key: 'Enter', bubbles: true });
+    await wait(300);
+    const thinking = () => bubbles.webContents.executeJavaScript(`!!document.querySelector('.thinking-bubble')`);
+    assert.equal(await thinking(), true);
+    assert.equal(await chat.webContents.executeJavaScript(`document.querySelector('#status').textContent`), '');
+    const dotStyle = () => bubbles.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.thinking-dots i')).transform`);
+    const firstFrame = await dotStyle();
+    await wait(200);
+    assert.notEqual(await dotStyle(), firstFrame, '省略点随时间跳动');
+    await fs.mkdir(path.join(root, '.superpowers/chat-preview'), { recursive: true });
+    await fs.writeFile(path.join(root, '.superpowers/chat-preview/thinking.png'), (await bubbles.webContents.capturePage()).toPNG());
+    bubbles.webContents.send('bubble:anchor', 'above', 0);
+    await wait(80);
+    assert.ok(await bubbles.webContents.executeJavaScript(`document.querySelector('.thinking-bubble').getBoundingClientRect().top >= 0`));
+    bubbles.webContents.send('bubble:anchor', 'above', 500);
+    bubbles.webContents.debugger.attach('1.3');
+    await bubbles.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    assert.equal(await bubbles.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.thinking-dots i')).animationName`), 'none');
+    await bubbles.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
+    bubbles.webContents.debugger.detach();
+    finishReply();
     await wait(500);
+    assert.equal(await thinking(), false, '回复出现后收起思考');
     assert.deepEqual(calls, ['你好，记得我吗？']);
     const count = () => bubbles.webContents.executeJavaScript(`document.querySelectorAll('.bubble').length`);
     assert.equal(await count(), 3);
@@ -49,10 +74,18 @@ app.whenReady().then(async () => {
     await fs.writeFile(path.join(root, '.superpowers/chat-preview/bubbles.png'), (await bubbles.webContents.capturePage()).toPNG());
     fail = true;
     await key({ key: 'Enter', bubbles: true });
+    await wait(100);
+    assert.equal(await thinking(), true);
+    finishReply();
     await wait(300);
+    assert.equal(await thinking(), false, '失败后收起思考');
     assert.equal(await chat.webContents.executeJavaScript(`document.querySelector('#message').value`), '你好呀，阿呱～');
     assert.equal(await chat.webContents.executeJavaScript(`document.querySelector('#status').textContent`), '测试网络失败');
-    console.log('PASS: chat Enter/IME/duplicate-submit/error retention; 3 protected bubbles; new styles.');
+    bubbles.webContents.send('bubble:thinking', true);
+    bubbles.webContents.send('bubble:clear');
+    await wait(100);
+    assert.equal(await thinking(), false, '隐藏窗口时清空思考');
+    console.log('PASS: chat Enter/IME/duplicate-submit/error retention; animated thinking/edge/reduced motion/cleanup; 3 protected bubbles.');
     app.exit(0);
   } catch (e) { console.error(e); app.exit(1); }
 });

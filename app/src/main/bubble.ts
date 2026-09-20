@@ -4,7 +4,35 @@
  * 要清气泡就成环——所以 bubble:clear 由 windows.ts 的 hideBubbleWindow 自己发）。
  */
 import type { AgentMessage } from '../shared/ipc-types';
-import { isRoomOpen, showBubbleWindow } from './windows';
+import { getPetWindow, isRoomOpen, showBubbleWindow } from './windows';
+
+/** 请求拥有自己的清理函数，隐藏或尚未加载就结束时不补发过期状态。 */
+export function beginChatThinking(): () => void {
+  const pet = getPetWindow();
+  if (isRoomOpen() || !pet || pet.isDestroyed() || !pet.isVisible()) return () => {};
+  const win = showBubbleWindow();
+  let active = true;
+  const show = () => {
+    if (active && !win.isDestroyed() && win.isVisible()) win.webContents.send('bubble:thinking', true);
+  };
+  const stop = () => {
+    if (!active) return;
+    active = false;
+    win.removeListener('hide', stop);
+    win.removeListener('closed', stop);
+    pet.removeListener('hide', stop);
+    if (!win.isDestroyed()) {
+      win.webContents.removeListener('did-finish-load', show);
+      win.webContents.send('bubble:thinking', false);
+    }
+  };
+  win.once('hide', stop);
+  win.once('closed', stop);
+  pet.once('hide', stop);
+  if (win.webContents.isLoading()) win.webContents.once('did-finish-load', show);
+  else show();
+  return stop;
+}
 
 /** 窗口还在加载时的暂存上限 */
 const PENDING_MAX = 5;

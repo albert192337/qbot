@@ -9,7 +9,7 @@ export class Signboard {
   private visible = false;
   private pendingTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(containerId: string) {
+  constructor(containerId: string, private displayExternal?: (text: string | null) => void) {
     const container = document.getElementById(containerId);
     if (!container) throw new Error(`Signboard container #${containerId} not found`);
     this.el = document.createElement('div');
@@ -25,11 +25,12 @@ export class Signboard {
     post.className = 'signboard-post';
     this.el.appendChild(post);
 
-    container.appendChild(this.el);
+    if (!displayExternal) container.appendChild(this.el);
   }
 
   setText(text: string): void {
     this.board.textContent = text || '';
+    if (this.visible) this.displayExternal?.(this.getText());
   }
 
   getText(): string {
@@ -41,6 +42,7 @@ export class Signboard {
     this.clearPending();
     if (this.visible) return;
     this.visible = true;
+    this.displayExternal?.(this.getText());
     this.el.classList.add('show');
     // 触发弹出动画
     this.el.classList.remove('poof-in');
@@ -51,6 +53,7 @@ export class Signboard {
   /** 立即隐藏，并清空文字（避免 onDragEnd 因残留文字又弹出来） */
   hide(): void {
     this.clearPending();
+    this.displayExternal?.(null);
     this.board.textContent = '';
     if (!this.visible) return;
     this.visible = false;
@@ -60,6 +63,7 @@ export class Signboard {
   /** 拖拽时调用：临时藏起（不丢文字，松手后自动弹回） */
   onDragStart(): void {
     this.clearPending();
+    this.displayExternal?.(null);
     this.visible = false;
     this.el.classList.remove('show', 'poof-in');
   }

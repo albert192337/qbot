@@ -9,6 +9,10 @@
 import type { Progress } from '../../../shared/ipc-types';
 import { toast } from './_studio-shared';
 import { mountMemoryPanel } from './memory-panel';
+import { mountJournalPrompts } from './journal-prompts';
+import { hasDirtyControls } from './_studio-shared';
+export function hasUnsavedChanges():boolean { return hasDirtyControls(root); }
+export async function discardChanges():Promise<void> {const host=root?.querySelector<HTMLElement>('[data-journal-editor]');if(host)await mountJournalPrompts(host);}
 let memoryPanel: ReturnType<typeof mountMemoryPanel> | undefined;
 
 let root: HTMLElement | null = null;
@@ -111,6 +115,8 @@ export async function mount(host: HTMLElement): Promise<void> {
       : '保持原有陪伴频率；LLM 脑开启时，台词仍由模型生成。';
   };
   renderMode(await window.qbot.settings.get());
+  const journalHost=document.createElement('div');journalHost.className='conn-card';journalHost.dataset.journalEditor='';
+  host.querySelector('.studio-body')!.prepend(journalHost);await mountJournalPrompts(journalHost);
   const memoryHost = document.createElement('div');
   host.querySelector('.studio-body')!.prepend(memoryHost);
   memoryPanel?.dispose();

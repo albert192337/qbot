@@ -1,10 +1,11 @@
+import { editManifest } from './manifest-store';
 /**
  * 角色资产包管理：扫描 userData/characters/、首启复制预置角色。
  * 预置与用户创角走同一加载路径，无特例（spec §1）。
  */
 import { app } from 'electron';
 import { existsSync } from 'node:fs';
-import { cp, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Manifest } from '@qbot/pipeline';
 import type { CharacterMeta } from '../shared/ipc-types';
@@ -63,18 +64,19 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
       continue;
     }
     try {
-      const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest;
+      let manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest;
       if(enrichStickerBehavior(manifest)) {
         const backup=`${manifestPath}.before-sticker-semantics`;
         if(!existsSync(backup))await cp(manifestPath,backup);
-        await writeManifest(manifestPath,manifest);
+        manifest = await editManifest(manifestPath, latest => { enrichStickerBehavior(latest); });
       }
       if (!manifest.voice) {
         // 声线懒迁移：老角色首次被列出时按 id 哈希分配并写回，之后永久稳定
-        manifest.voice = assignVoice(manifest.id);
-        await writeManifest(manifestPath, manifest);
+        manifest = await editManifest(manifestPath, latest => { latest.voice ??= assignVoice(latest.id); });
       }
-      out.push({ dirId: entry.name, coverImage: existsSync(path.join(charDir,'cover.png')) ? 'cover.png' : undefined, manifest, hasUnfinishedJob: cloudPending, taskDismissed });
+      let localPending = false;
+      try { const state=JSON.parse(await readFile(path.join(charDir,'.job/state.json'),'utf8')); localPending=!existsSync(path.join(charDir,'.cloud-job.json')) && typeof state.stage==='string' && state.stage!=='done'; } catch {}
+      out.push({ dirId: entry.name, coverImage: existsSync(path.join(charDir,'cover.png')) ? 'cover.png' : undefined, manifest, hasUnfinishedJob: cloudPending || localPending, taskDismissed });
     } catch {
       /* 损坏的包跳过 */
     }
@@ -87,19 +89,10 @@ export async function getCharacter(dirId: string): Promise<CharacterMeta | null>
   return all.find((c) => c.dirId === dirId) ?? null;
 }
 
-/** 原子写 manifest（避免读到半截 JSON） */
-async function writeManifest(manifestPath: string, manifest: Manifest): Promise<void> {
-  const tmp = `${manifestPath}.tmp`;
-  await writeFile(tmp, JSON.stringify(manifest, null, 2));
-  await rename(tmp, manifestPath);
-}
-
 /** 改名：写回 manifest.json（原子写，避免读到半截 JSON） */
 export async function renameCharacter(dirId: string, name: string): Promise<void> {
   const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest;
-  manifest.name = name.trim() || manifest.name;
-  await writeManifest(manifestPath, manifest);
+  await editManifest(manifestPath, manifest => { manifest.name = name.trim() || manifest.name; });
 }
 
 /** 删除角色目录及所有资产 */

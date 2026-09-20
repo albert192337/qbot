@@ -62,7 +62,7 @@ export async function characterSection(): Promise<Electron.MenuItemConstructorOp
   const characters = (await listCharacters()).filter((c) => c.manifest);
   const settings = await getSettings();
   return [
-    { label: '故事小屋…', click: () => createNurseryWindow() },
+    { label: '角色管理…', click: () => createNurseryWindow() },
     {
       label: '切换角色',
       submenu: [
@@ -85,7 +85,7 @@ export async function characterSection(): Promise<Electron.MenuItemConstructorOp
             }))
           : [{ label: '（暂无角色）', enabled: false }]),
         { type: 'separator' as const },
-        { label: '孵化新角色…', click: () => createNurseryWindow(true) },
+        { label: '创建角色…', click: () => createNurseryWindow(true) },
       ],
     },
   ];
@@ -116,7 +116,7 @@ export function systemSection(): Electron.MenuItemConstructorOptions[] {
   return [
     weatherTestMenu(),
     {
-      label: '故事小屋…',
+      label: '角色管理…',
       click: () => createConsoleWindow(),
     },
     {

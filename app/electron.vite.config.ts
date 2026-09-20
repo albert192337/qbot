@@ -24,6 +24,7 @@ export default defineConfig({
           cozy: resolve(__dirname, 'src/renderer/cozy/index.html'),
           garden: resolve(__dirname, 'src/renderer/garden/index.html'),
           chat: resolve(__dirname, 'src/renderer/chat/index.html'),
+          sign: resolve(__dirname, 'src/renderer/sign/index.html'),
           nursery: resolve(__dirname, 'src/renderer/nursery/index.html'),
           pet: resolve(__dirname, 'src/renderer/pet/index.html'),
           room: resolve(__dirname, 'src/renderer/room/index.html'),

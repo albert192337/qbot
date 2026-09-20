@@ -9,13 +9,14 @@ form.addEventListener('submit', async e => {
   if (busy || !input.value.trim()) return;
   const text = input.value;
   busy = true; send.disabled = true; input.readOnly = true;
-  status.className = ''; status.textContent = '正在想怎么回复你…';
+  status.className = ''; status.textContent = ''; status.title = '';
+  form.setAttribute('aria-busy', 'true');
   try {
     const result = await window.qbot.bubble.sendChat(text);
     if (!result.ok) throw new Error(result.error || '发送失败，请重试');
     input.value = ''; status.textContent = '';
   } catch (error) { status.className = 'error'; status.textContent = String(error instanceof Error ? error.message : error); status.title = status.textContent; }
-  finally { busy = false; send.disabled = false; input.readOnly = false; input.focus(); }
+  finally { busy = false; form.setAttribute('aria-busy', 'false'); send.disabled = false; input.readOnly = false; input.focus(); }
 });
 input.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); form.requestSubmit(); }

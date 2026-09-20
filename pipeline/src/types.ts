@@ -4,7 +4,7 @@
  * 铁律：本模块（整个 pipeline/）不得 import 任何 Electron API。
  */
 
-/** 新角色默认生成的 10 个动作 ID。 */
+/** 新角色默认生成的 11 个动作 ID。 */
 export const ACTION_IDS = [
   'idle',
   'drag',
@@ -16,6 +16,7 @@ export const ACTION_IDS = [
   'stretch',
   'perch_sit',
   'perch_lie',
+  'writing',
 ] as const;
 
 export type ActionId = (typeof ACTION_IDS)[number];
@@ -116,6 +117,8 @@ export interface ManifestAction {
   poseDesc?: string;
   /** 自定义动作描述（覆盖默认 actionSpec.motionDesc） */
   motionDesc?: string;
+  /** Explicitly saved generation text, distinct from legacy imported sticker labels. */
+  motionDescSource?: 'user';
   /**
    * 首帧 prompt 全文覆盖：非空时**完全取代**模板拼装结果（含"保持发型/绿幕背景"等外层措辞）。
    * 只影响之后的生成；已产出的 webm/gif 不受影响，需重新生成才生效。
@@ -164,6 +167,8 @@ export interface ManifestVoice {
 
 /** 角色资产包 manifest.json（spec §4，两模块唯一接口） */
 export interface Manifest {
+  resourceAnnotations?: Record<string, { name: string; meaning: string; tags: string[] }>;
+  scenePools?: Record<string, string[]>;
   /** Preserve imported artwork without anatomy/style assumptions. */
   generationMode?: 'original';
   id: string;
@@ -245,6 +250,8 @@ export interface ActionState {
   videoPath?: string;
   /** 抠像 key 色（1 个或漂移超标时 2 个） */
   keyColors?: string[];
+  /** Local colour restoration selected from the original transparent reference. */
+  colorCorrection?: 'reference-white';
   error?: string;
 }
 

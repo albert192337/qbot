@@ -1,3 +1,4 @@
+import { scenePool } from '../shared/action-resources';
 import { initUserMemory } from './user-memory';
 import { getPerchObservation } from './perch-observation';
 /**
@@ -267,7 +268,7 @@ export async function buildInput(memoryMode?: 'chat' | 'auto', query = ''): Prom
         personaName = meta.manifest.name || personaName;
         personaTraits = meta.manifest.persona || undefined;
         actionDescriptions = brainActions(meta.manifest).filter(a=>a.id!=='perch_sit'&&a.id!=='perch_lie');
-        const pool=(meta.manifest as StickerManifest).stickerLibrary?.idleCandidates??['idle'];
+        const pool=scenePool(meta.manifest,'idle');
         idleCandidates=actionDescriptions.filter(a=>pool.includes(a.id));
       }
     }

@@ -23,18 +23,19 @@ async function refresh(): Promise<void> {
   const characters = taskCharacters(await window.qbot.characters.list());
   const statuses = await Promise.all(characters.map((c) => window.qbot.hatch.getStatus(c.dirId).catch(() => null)));
   if (turn !== revision || host.querySelector('.studio-confirm-mask') || host.querySelector('button:disabled')) return;
-  host.innerHTML = `<div class="studio-body"><div class="page-heading"><div><p class="eyebrow">后台任务</p><h2>生成任务</h2><p class="page-summary">离开页面不会中断生成。查看进度、确认形象，或继续未完成的任务。</p></div><button class="btn" id="tasks-refresh">刷新</button></div>
+  host.innerHTML = `<div class="studio-body"><div class="page-heading"><div><p class="eyebrow">后台任务</p><h2>生成任务</h2><p class="page-summary">显示进行中或需处理的任务。完成的新增动作保存在角色库，表情包角色可到“管理表情 → 新版本”查看。</p></div><button class="btn" id="tasks-refresh">刷新</button></div>
     ${characters.length ? '<div class="task-list"></div>' : '<div class="pane-placeholder"><b>当前没有待处理的生成任务</b><p>完成的角色都在角色库中。</p><div class="btn-row"><button class="btn primary" data-go="characters">打开角色库</button><button class="btn" data-go="hatch">创建角色</button></div></div>'}</div>`;
   characters.forEach((character, index) => {
     const status = statuses[index];
     const additions = [...Object.values(character.manifest?.customActions ?? {}), ...Object.values(character.manifest?.expressionActions ?? {})];
-    const isCreation = character.hasUnfinishedJob || Object.values(character.manifest?.actions ?? {}).some((a) => a.status === 'failed');
+    const isCreation = !status?.regenerating && (character.hasUnfinishedJob || Object.values(character.manifest?.actions ?? {}).some((a) => a.status === 'failed'));
     const actionStates = Object.values(status?.actions ?? {});
     const failed = actionStates.filter((a) => a.status === 'failed').length;
     const done = actionStates.filter((a) => a.status === 'done').length;
-    const label = status?.error ? status.error : status?.cloudPhase === 'queued' ? `云端排队中（第 ${status.queuePosition || 1} 位）` : !isCreation ? `${additions.filter((a) => a.status === 'pending').length} 个生成中 · ${additions.filter((a) => a.status === 'failed').length} 个需重试` : status?.stage === 'awaiting_pick' ? '等待确认形象' : failed ? `${failed} 个动作需要重试` : status?.running ? '正在生成' : status?.stage === 'done' ? '查看生成结果' : '已暂停，可继续';
+    const awaiting=actionStates.filter(a=>a.needsFrameApproval).length;
+    const label = status?.regenerating ? `${done}/${actionStates.length} 个动作完成${awaiting?` · ${awaiting} 个首帧待确认`:''}${failed?` · ${failed} 个失败`:''}${status.running?' · 生成中':''}` : status?.error ? status.error : status?.cloudPhase === 'queued' ? `云端排队中（第 ${status.queuePosition || 1} 位）` : !isCreation ? `${additions.filter((a) => a.status === 'pending').length} 个生成中 · ${additions.filter((a) => a.status === 'failed').length} 个需重试` : status?.stage === 'awaiting_pick' ? '等待确认形象' : failed ? `${failed} 个动作需要重试` : status?.running ? '正在生成' : status?.stage === 'done' ? '查看生成结果' : '已暂停，可继续';
     const row = document.createElement('article'); row.className = 'task-row';
-    row.innerHTML = `<div><h3>${esc(character.manifest?.name || '创建中的角色')}</h3><p>${esc(label)}${isCreation && actionStates.length ? ` · 已完成 ${done}/${actionStates.length}` : ''}</p></div><div class="btn-row"><button class="btn primary" data-view>${isCreation ? '查看任务' : '管理动作'}</button>${isCreation && !status?.running && status?.stage !== 'done' ? '<button class="btn" data-resume>继续生成</button>' : ''}<button class="btn danger" data-delete>删除</button></div>`;
+    row.innerHTML = `<div><h3>${esc(character.manifest?.name || '创建中的角色')}</h3><p>${esc(label)}${isCreation && actionStates.length ? ` · 已完成 ${done}/${actionStates.length}` : ''}</p></div><div class="btn-row"><button class="btn primary" data-view>${isCreation ? '查看任务' : '管理动作'}</button>${(isCreation || status?.regenerating && !awaiting) && !status?.running && status?.stage !== 'done' ? '<button class="btn" data-resume>继续生成</button>' : ''}<button class="btn danger" data-delete>删除</button></div>`;
     row.querySelector('[data-view]')!.addEventListener('click', () => navigate(isCreation ? { pane: 'hatch', taskId: character.dirId } : { pane: 'persona', dirId: character.dirId }));
     row.querySelector<HTMLButtonElement>('[data-resume]')?.addEventListener('click', (event) => {
       const button = event.currentTarget as HTMLButtonElement;
@@ -42,7 +43,7 @@ async function refresh(): Promise<void> {
         if (!(await confirmBox(host, '继续这个任务？将从已保存的进度继续，后续生成会调用已配置的模型服务。'))) return;
         await guard(host, button, '继续中…', async () => {
           await window.qbot.hatch.resume(character.dirId);
-          navigate({ pane: 'hatch', taskId: character.dirId });
+          navigate(status?.regenerating ? {pane:'persona',dirId:character.dirId} : { pane: 'hatch', taskId: character.dirId });
         });
       })();
     });

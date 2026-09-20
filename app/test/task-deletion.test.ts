@@ -36,3 +36,12 @@ it('keeps a completed cloud character discoverable until claimed, without losing
   await writeFile(path.join(dir, '.cloud-job.json'), JSON.stringify({phase:'done',acknowledged:true}));
   expect((await listCharacters())[0]).toMatchObject({hasUnfinishedJob:false,manifest:{name:'Cloud pet'}});
 });
+
+it('lists a local action job even when the old character remains playable', async () => {
+  const dir=path.join(state.dir,'characters','pet');
+  await writeFile(path.join(dir,'manifest.json'),JSON.stringify({id:'pet',name:'Existing',actions:{},voice:{pack:'soft',pitchScale:1,rateScale:1}}));
+  await writeFile(path.join(dir,'.job/state.json'),JSON.stringify({stage:'actions',regenerateActions:['idle']}));
+  expect((await listCharacters())[0].hasUnfinishedJob).toBe(true);
+  await writeFile(path.join(dir,'.job/state.json'),JSON.stringify({stage:'done',regenerateActions:['idle']}));
+  expect((await listCharacters())[0].hasUnfinishedJob).toBe(false);
+});

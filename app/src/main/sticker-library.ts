@@ -44,7 +44,7 @@ export async function saveLibraryManifest(file: string, manifest: LibraryManifes
   await writeFile(tmp, JSON.stringify(manifest, null, 2));
   await rename(tmp, file);
 }
-export function bindLibraryScenes(m: LibraryManifest, scenes: Record<string,string>): void {
+export function bindLibraryScenes(m: LibraryManifest, scenes: Record<string,string>, candidates?: Record<string,string[]>): void {
   if (!m.stickerLibrary) throw new Error('不是表情包角色');
   const allowed = new Set(STICKER_SCENES.map(([id]) => id as string));
   for (const [scene,id] of Object.entries(scenes)) {
@@ -57,6 +57,17 @@ export function bindLibraryScenes(m: LibraryManifest, scenes: Record<string,stri
     if (id) m.actions[scene as keyof typeof m.actions] = { ...m.customActions![id] };
   }
   m.stickerLibrary.scenes = { ...scenes };
+  if (candidates) {
+    const pools: Record<string,string[]> = {};
+    for (const [scene,ids] of Object.entries(candidates)) {
+      if (!allowed.has(scene) || !Array.isArray(ids) || ids.some(id=>m.customActions?.[id]?.status!=='done')) throw new Error('场景只能选已完成的动作');
+      pools[scene] = [...new Set(ids)];
+      if(pools[scene].length) { m.stickerLibrary.scenes[scene] = pools[scene][0]; m.actions[scene as keyof typeof m.actions] = {...m.customActions![pools[scene][0]]}; }
+      else { delete m.stickerLibrary.scenes[scene]; delete m.actions[scene as keyof typeof m.actions]; }
+    }
+    if (!pools.idle?.length) pools.idle=[scenes.idle];
+    m.scenePools={...m.scenePools,...pools};m.stickerLibrary.sceneCandidates=pools;m.stickerLibrary.idleCandidates=pools.idle;
+  }
 }
 export async function createStickerCharacter(baseDir: string, req: StickerCreateRequest,
   progress: (p: StickerProgress) => void = () => {}): Promise<{ dirId: string; failed: string[] }> {
@@ -86,17 +97,17 @@ export async function createStickerCharacter(baseDir: string, req: StickerCreate
     let completed = 0;
     for (const item of req.items) {
       const file = draft.files.get(item.id)!;
-      const name = path.basename(file, path.extname(file)).replace(/^\d+/, '');
+      const name = item.name?.trim().slice(0,80) || path.basename(file, path.extname(file)).replace(/^\d+/, '');
+      const meaning = item.meaning?.trim().slice(0,500) || '';
       const raw = `imported/_raw/${item.id}.gif`;
       const tags = [...new Set(item.tags.map(t => String(t).trim()).filter(Boolean))].slice(0,20).map(t => t.slice(0,40));
-      const entry = { id:item.id, name, tags, enabled:!!item.enabled, raw, error:undefined as string|undefined };
+      const entry = { id:item.id, name, meaning, tags, enabled:!!item.enabled, raw, error:undefined as string|undefined };
       try {
         await copyFile(file, path.join(out,raw));
         const webm = `actions/${item.id}.webm`;
         await gifToWebm(path.join(out,raw), path.join(out,webm), ffmpeg, 384, true);
         m.customActions![item.id] = { webm, gif:raw, status:'done',
-          durationSec:await probeDurationSec(path.join(out,webm),ffmpeg) ?? 5,
-          motionDesc:[name,...tags].join('；') };
+          durationSec:await probeDurationSec(path.join(out,webm),ffmpeg) ?? 5 };
       } catch (e) { entry.error = e instanceof Error ? e.message : String(e); failed.push(name); }
       library.items.push(entry);
       await saveLibraryManifest(path.join(out,'manifest.json'),m);
@@ -106,7 +117,8 @@ export async function createStickerCharacter(baseDir: string, req: StickerCreate
     const scenes = Object.fromEntries(Object.entries(req.scenes).filter(([,id]) => m.customActions?.[id]?.status === 'done'));
     scenes.idle ||= Object.keys(m.customActions!)[0];
     if (!scenes.idle) throw new Error('所有素材均转码失败；原件已保留，可重新导入。');
-    bindLibraryScenes(m,scenes);
+    const candidates=req.sceneCandidates?Object.fromEntries(Object.entries(req.sceneCandidates).map(([scene,ids])=>[scene,ids.filter(id=>m.customActions?.[id]?.status==='done')])):undefined;
+    bindLibraryScenes(m,scenes,candidates);
     await saveLibraryManifest(path.join(out,'manifest.json'),m);
     draft.result = dirId;
     return { dirId, failed };

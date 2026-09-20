@@ -6,6 +6,7 @@ import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset, resolveRo
 import { clampPetScale, petTargetSize, pairWindowBounds } from './pet-geometry';
 import { attachPetWindowRecovery } from './pet-window-recovery';
 import { aboveBubbleLayout } from './bubble-layout';
+import { createDesktopSign } from './desktop-sign';
 import { attachGarden } from './garden/windows';
 import { moveFixedSize } from './fixed-window';
 import { attachPetWindowLayer, raisePetWindowGroup } from './pet-window-layer';
@@ -39,6 +40,8 @@ let consoleWindow: BrowserWindow | null = null;
 let nurseryWindow: BrowserWindow | null = null;
 let loungeWindow: BrowserWindow | null = null;
 let bubbleWindow: BrowserWindow | null = null;
+let desktopSign: ReturnType<typeof createDesktopSign> | null = null;
+export function displayDesktopSign(text: string | null): void { desktopSign?.setText(text); }
 let bubbleSide: 'above' | 'below' = 'above';
 let petScale = 1;
 /** 桌宠是否处于串门（双人宽）模式——权威尺寸的一部分，移动时要重申 */
@@ -80,7 +83,7 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds();
 }
 
-type RendererPage = 'pet' | 'room' | 'cozy' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat';
+type RendererPage = 'pet' | 'room' | 'cozy' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat' | 'sign';
 
 /** A local, framed preview: never changes room membership or the active desktop pet. */
 export function openCozyPreview(): BrowserWindow {
@@ -102,7 +105,7 @@ export function openCozyPreview(): BrowserWindow {
 }
 
 let chatWindow: BrowserWindow | null = null;
-const desktopWindowGroup = () => [petWindow, bubbleWindow, chatWindow];
+const desktopWindowGroup = () => [petWindow, desktopSign?.getWindow() ?? null, bubbleWindow, chatWindow];
 function syncChatBounds(): void {
   if (!chatWindow || chatWindow.isDestroyed() || !petWindow) return;
   const pet = petWindow.getBounds();
@@ -184,6 +187,8 @@ export function syncBubbleBounds(): void {
 let activePlayables: string[] = [];
 
 export function broadcastCharacterActivated(meta: CharacterMeta): void {
+  desktopSign?.setText(null);
+  hideBubbleWindow(); // 旧角色的台词和思考状态不挂到新角色头上。
   // 主进程侧同步一份可用动作（行为引擎的动作解析要用；与 player.load 同口径：
   // 生成动作看 status，贴纸落盘即可用；可选预设动作也按 status 判断）
   const m = meta.manifest;
@@ -244,11 +249,14 @@ export function createPetWindow(): BrowserWindow {
   petWindow.on('move', syncBubbleBounds);
   petWindow.on('resize', syncBubbleBounds);
   const win = petWindow;
+  desktopSign = createDesktopSign(win, desktopWindowGroup, path.join(__dirname, '../preload/index.js'), sign => load(sign, 'sign'),
+    () => win.webContents.send('pet:menuCommand', { type: 'signDismiss' }));
   win.webContents.on('did-start-loading', () => setPetVisitMode(false));
   attachGarden(win);
   attachPetWindowRecovery(win, () => !isRoomOpen());
   win.once('ready-to-show', () => { if (!isRoomOpen()) win.showInactive(); });
   petWindow.on('closed', () => {
+    desktopSign = null;
     chatWindow?.close();
     petWindow = null;
     closeBubbleWindow();
@@ -601,7 +609,7 @@ export type ConsolePane =
   | 'market'
   | 'claude'
   | 'settings'
-  | 'devtools' | 'rewards' | 'furnish' | 'memory';
+  | 'devtools' | 'rewards' | 'furnish' | 'memory' | 'lounge' | 'sticker-create';
 
 export function getConsoleWindow(): BrowserWindow | null {
   return consoleWindow;
@@ -627,7 +635,25 @@ export function sendToWindows(channel: string, payload: unknown): void {
  * dock 协调：mac 上 dock 隐藏时常规窗聚焦行为异常，所以开窗前 show、关窗后按需 hide。
  */
 export function createConsoleWindow(pane?: ConsolePane): BrowserWindow {
-  return createNurseryWindow(false, pane ?? 'home');
+  if (consoleWindow && !consoleWindow.isDestroyed()) {
+    const win = consoleWindow;
+    if (win.isMinimized()) win.restore();
+    win.show(); win.focus();
+    const show = () => win.webContents.send('ui:showScreen', pane ?? 'home');
+    if (win.webContents.isLoadingMainFrame()) win.webContents.once('did-finish-load', show); else show();
+    return win;
+  }
+  if (process.platform === 'darwin') void app.dock?.show();
+  const { workArea } = screen.getPrimaryDisplay();
+  const win = new BrowserWindow({ width: Math.min(1180,workArea.width), height: Math.min(820,workArea.height),
+    minWidth: Math.min(760,workArea.width), minHeight: Math.min(560,workArea.height), title: 'QBot', backgroundColor: '#f7f7f8', show: false,
+    webPreferences: { preload: path.join(__dirname,'../preload/index.js'), contextIsolation:true, sandbox:false } });
+  consoleWindow = win; win.setMenuBarVisibility(false);
+  win.webContents.setWindowOpenHandler(({url}) => { if(/^https?:/.test(url)) void shell.openExternal(url); return {action:'deny'}; });
+  win.once('ready-to-show', () => win.show());
+  win.on('closed', () => { consoleWindow = null; });
+  load(win, 'console', { pane: pane ?? 'home' });
+  return win;
 }
 
 /**
@@ -635,11 +661,12 @@ export function createConsoleWindow(pane?: ConsolePane): BrowserWindow {
  * 要输入文字、要滚动、要长时间停留，透明窗那套约束（血泪坑 5/18）全是负担。
  */
 export function createLoungeWindow(): BrowserWindow {
-  return createNurseryWindow(false, 'lounge');
+  return createConsoleWindow('lounge');
 }
 
 /** 房间事件推送口（rooms.ts 通过 setLoungePush 注入这个） */
 export function pushToLounge(channel: string, payload: unknown): void {
+  if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.webContents.send(channel,payload);
   if(nurseryWindow && !nurseryWindow.isDestroyed()) nurseryWindow.webContents.send(channel,payload);
   if (loungeWindow && !loungeWindow.isDestroyed()) {
     loungeWindow.webContents.send(channel, payload);
@@ -647,40 +674,7 @@ export function pushToLounge(channel: string, payload: unknown): void {
 }
 
 /** Game surface is a normal resizable window; the desktop pet keeps its existing renderer. */
+/** Compatibility for saved links and IPC; the story-house renderer is retired. */
 export function createNurseryWindow(create = false, pane?: string): BrowserWindow {
-  if (nurseryWindow && !nurseryWindow.isDestroyed()) {
-    if (nurseryWindow.isMinimized()) nurseryWindow.restore();
-    nurseryWindow.show();
-    nurseryWindow.focus();
-    if (create || pane) {
-      const target = create ? 'nursery:create' : pane!;
-      const win = nurseryWindow;
-      if (win.webContents.isLoadingMainFrame()) win.webContents.once('did-finish-load', () => win.webContents.send('ui:showScreen', target));
-      else win.webContents.send('ui:showScreen', target);
-    }
-    return nurseryWindow;
-  }
-  if (process.platform === 'darwin') void app.dock?.show();
-  const { workArea } = screen.getPrimaryDisplay();
-  nurseryWindow = new BrowserWindow({
-    width: Math.min(1120, workArea.width), height: Math.min(760, workArea.height),
-    minWidth: Math.min(840, workArea.width), minHeight: Math.min(570, workArea.height),
-    title: 'QBot · 故事小屋', backgroundColor: '#ded6c1', show: false,
-    webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false },
-  });
-  const win = nurseryWindow;
-  win.setMenuBarVisibility(false);
-  win.webContents.setWindowOpenHandler(({url})=>{if(/^https?:/.test(url))void shell.openExternal(url);return {action:'deny'};});
-  const pushVisibility = () => win.webContents.send('ui:nurseryVisibility', win.isVisible() && !win.isMinimized());
-  win.on('show', pushVisibility);
-  win.on('hide', pushVisibility);
-  win.on('minimize', pushVisibility);
-  win.on('restore', pushVisibility);
-  win.once('ready-to-show', () => win.show());
-  win.on('closed', () => {
-    nurseryWindow = null;
-    if (process.platform === 'darwin' && !consoleWindow && !roomWindow && !loungeWindow) app.dock?.hide();
-  });
-  load(win, 'nursery', create ? { create: '1' } : pane ? { pane } : undefined);
-  return win;
+  return createConsoleWindow((create ? 'hatch' : pane ?? 'home') as ConsolePane);
 }

@@ -145,3 +145,14 @@ it('preserves one-shot completion when a looping idle clip fails and falls back'
  expect(visible()).toEqual([video('tea')]); expect(video('tea').loop).toBe(false);
  video('tea').emit('ended'); expect(ended).toHaveBeenCalledOnce();
 });
+
+it('selects scene variants on entry, keeps the loop stable, and honors an explicit idle-director choice', async () => {
+  const m=manifest(['idle','drag','tea']);m.scenePools={drag:['idle','tea'],idle:['idle','tea']};
+  const random=vi.spyOn(Math,'random').mockReturnValue(0.99);
+  player.load('pet',m);player.play('drag');await flush();
+  expect(visible()).toEqual([video('tea')]);expect(video('tea').loop).toBe(true);
+  random.mockReturnValue(0);player.play('drag');await flush();
+  expect(visible()).toEqual([video('tea')]);
+  random.mockReturnValue(0.99);player.playOnce('idle');await flush();
+  expect(visible()).toEqual([video('idle')]);expect(video('idle').loop).toBe(false);
+});

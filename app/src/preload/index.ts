@@ -9,6 +9,10 @@ const api: QBotApi = {
     edit: (command, character) => ipcRenderer.invoke('memory:edit', command, character),
   },
   garden: {
+    saveRehearsal: request => ipcRenderer.invoke('garden:saveRehearsal',request),
+    journalStatus: () => ipcRenderer.invoke('garden:journalStatus'),
+    rewriteDiary: request => ipcRenderer.invoke('garden:rewriteDiary',request),
+    generateMoment: requestId => ipcRenderer.invoke('garden:generateMoment',requestId),
     closeTravel: () => ipcRenderer.send('garden:closeTravel'),
     onSpeechBounds: cb => { const fn = (_ev: unknown, bounds: Parameters<typeof cb>[0]) => cb(bounds); ipcRenderer.on('garden:speechBounds', fn); return () => ipcRenderer.removeListener('garden:speechBounds', fn); },
     onPerformance: cb => { const fn = (_ev: unknown, action: string | null) => cb(action); ipcRenderer.on('garden:performance', fn); return () => ipcRenderer.removeListener('garden:performance', fn); },
@@ -226,6 +230,8 @@ const api: QBotApi = {
     },
   },
   studio: {
+    saveResourceAnnotation: (dir,id,value) => ipcRenderer.invoke('studio:saveResourceAnnotation',dir,id,value),
+    saveScenePools: (dir,pools) => ipcRenderer.invoke('studio:saveScenePools',dir,pools),
     imageChoices: id => ipcRenderer.invoke('studio:imageChoices',id),
     previewImage: (id,selection) => ipcRenderer.invoke('studio:previewImage',id,selection),
     saveCover: (id,selection) => ipcRenderer.invoke('studio:saveCover',id,selection),
@@ -291,6 +297,11 @@ const api: QBotApi = {
     openChat: () => ipcRenderer.send('petChat:open'),
     closeChat: () => ipcRenderer.send('petChat:close'),
     sendChat: (text) => ipcRenderer.invoke('petChat:send', text),
+    onThinking: cb => {
+      const listener = (_ev: unknown, thinking: boolean) => cb(thinking);
+      ipcRenderer.on('bubble:thinking', listener);
+      return () => ipcRenderer.removeListener('bubble:thinking', listener);
+    },
     say: (text, durationMs) => ipcRenderer.send('bubble:say', { text, durationMs }),
     getIdleSeconds: () => ipcRenderer.invoke('bubble:idleSeconds'),
     reportEmpty: () => ipcRenderer.send('bubble:empty'),
@@ -363,6 +374,19 @@ const api: QBotApi = {
   },
   /** 举牌：手动牌记账 + 当前实际牌面同步 */
   sign: {
+    dismiss: () => ipcRenderer.send('sign:dismiss'),
+    reportBounds: bounds => ipcRenderer.send('sign:bounds', bounds),
+    onHover: cb => {
+      const listener = (_ev: unknown, hovered: boolean) => cb(hovered);
+      ipcRenderer.on('sign:hover', listener);
+      return () => ipcRenderer.removeListener('sign:hover', listener);
+    },
+    display: text => ipcRenderer.send('sign:display', text),
+    onDisplay: cb => {
+      const listener = (_ev: unknown, text: string | null) => cb(text);
+      ipcRenderer.on('sign:display', listener);
+      return () => ipcRenderer.removeListener('sign:display', listener);
+    },
     getMessage: () => ipcRenderer.invoke('sign:getMessage'),
     onMessage: (cb: (message: import('../shared/pet-message').PetMessage | null) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, message: import('../shared/pet-message').PetMessage | null) => cb(message);

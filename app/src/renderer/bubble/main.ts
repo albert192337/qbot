@@ -3,6 +3,7 @@
  * 栈的增删逻辑全在 stack.ts（纯函数），这里只管 DOM 与定时器。
  */
 import type { AgentMessage } from '../../shared/ipc-types';
+import './thinking.css';
 import { advanceReading } from './reading';
 import { supplyArt } from '../garden/supply-art';
 import { FERTILIZERS, type Fertilizer } from '../../shared/garden';
@@ -14,6 +15,27 @@ import {
 } from './stack';
 
 const stackEl = document.getElementById('stack') as HTMLDivElement;
+let thinkingNode: HTMLElement | null = null;
+
+function setThinking(thinking: boolean): void {
+  if (thinking === Boolean(thinkingNode)) return;
+  if (thinking) {
+    thinkingNode = document.createElement('div');
+    thinkingNode.className = 'thinking-bubble';
+    thinkingNode.setAttribute('role', 'status');
+    thinkingNode.setAttribute('aria-label', '正在思考');
+    thinkingNode.innerHTML = `<svg class="thinking-cloud" viewBox="0 0 144 100" aria-hidden="true">
+      <path d="M32 68C12 69 6 54 15 40C12 24 26 12 41 16C49 2 67 2 78 12C95 2 114 11 116 24C139 26 145 49 131 60C128 77 108 82 94 74C80 84 61 79 55 73C46 77 36 75 32 68Z"/>
+      <circle cx="28" cy="81" r="8"/><circle cx="15" cy="95" r="4"/>
+    </svg><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>`;
+    stackEl.append(thinkingNode);
+  } else {
+    thinkingNode?.remove();
+    thinkingNode = null;
+  }
+  syncHeight();
+  if (!thinking) reportIfEmpty();
+}
 let anchorHeight = 500;
 function syncHeight(): void {
   const nodes = [...stackEl.children] as HTMLElement[];
@@ -95,7 +117,7 @@ function dropNode(key: string, immediate = false): void {
 }
 
 function reportIfEmpty(): void {
-  if (items.length === 0 && fading.size === 0) {
+  if (items.length === 0 && fading.size === 0 && !thinkingNode) {
     stopTick();
     window.qbot.bubble.reportEmpty();
   }
@@ -169,11 +191,13 @@ function clearAll(): void {
   items = [];
   nodes.clear();
   fading.clear();
+  thinkingNode = null;
   stackEl.replaceChildren();
   // 不发 reportEmpty：主进程正在隐藏本窗，回环没意义
 }
 
 window.qbot.agent.onMessage(onMessage);
+window.qbot.bubble.onThinking(setThinking);
 document.addEventListener('mousemove', e => {
   const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest('.reward-close');
   window.qbot.bubble.ignoreMouse(!hit);
@@ -199,5 +223,7 @@ window.qbot.behaviorSay.onSay(({ text, durationMs, source, traceId }) => {
     at: Date.now(),
     durationMs,
   });
+  // 先放入回复再移除思考，避免空栈通知把刚到的回复窗口隐藏。
+  if (source === 'chat') setThinking(false);
   if (traceId) requestAnimationFrame(() => window.qbot.behavior.reportTrace(traceId, '气泡已渲染'));
 });

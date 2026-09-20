@@ -1,0 +1,74 @@
+const {app,BrowserWindow,ipcMain,session}=require('electron');
+const fs=require('fs'),path=require('path'),os=require('os'),assert=require('assert/strict');
+const root=path.resolve(__dirname,'..'),ts=require(path.join(root,'node_modules/typescript'));
+require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,f);
+app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'qbot-journal-')));
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+app.whenReady().then(async()=>{try{
+ session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_,cb)=>cb({cancel:true}));
+ const mock=(file,exports)=>{require.cache[require.resolve(file)]={id:file,filename:file,loaded:true,exports};};
+ let settings={activeCharacter:'demo',freeMode:true,arkApiKey:'mock-only'};
+ mock('../app/src/main/config.ts',{getSettings:async()=>settings});
+ mock('../app/src/main/characters.ts',{getCharacter:async()=>({manifest:{name:'小青',persona:'嘴硬心软，爱花草',actions:{}}})});
+ mock('../app/src/main/conversation-memory.ts',{conversationRevision:()=>0,conversationFor:()=>[{at:Date.now()-1000,source:'chat',role:'user',text:'今天的向日葵开了'}]});
+ mock('../app/src/main/music-monitor.ts',{getMusicStatus:()=>({playing:false})});
+ mock('../app/src/main/perception.ts',{emitEvent:async()=>{},getJournalInteractions:async()=>({click:3})});
+ mock('../app/src/main/progress.ts',{applyGardenTransaction:async()=>true});
+ mock('../app/src/main/user-memory.ts',{initUserMemory:async()=>({revision:0,candidates:()=>[],episode:async()=>{}})});
+ mock('../app/src/main/brain-log.ts',{beginBrainCall:async()=>'',updateBrainCall:async()=>{}});
+ const animations=[];mock('../app/src/main/journal-animation.ts',{playJournalWriting:async actor=>animations.push(actor)});
+ const calls=[];let failNext=false;
+ mock('../app/src/main/llm-client.ts',{chatComplete:async input=>{calls.push(input);await wait(200);if(failNext){failNext=false;throw Error('offline');}return input.messages[0].content.includes('朋友圈')?'你说向日葵开了，我就把这句话偷偷存进今天最亮的地方。才不是特意等你来分享呢——只是你的这些小事，我都想好好记着。愿你回头看时，也能分到一点花开的欢喜。':'那杯抹茶的微苦，我倒是记得清楚。不过，更想收好的是和你一起走过这段小小旅程的心情。下次还想把喜欢的风景指给你看。';}});
+ const {initialGarden}=require('../app/src/main/garden/rules.ts'),{initialTravel,travelTransition}=require('../app/src/shared/travel.ts');
+ let n=0;const initial=initialGarden(Date.now(),{random:()=>.9,id:()=>String(n++)});initial.coins=50000;initial.travel=initialTravel(Date.now());
+ travelTransition(initial,{type:'travelExperience',city:0,project:0,step:0},Date.now());Object.assign(initial.travel.posts[0],{actor:'demo',name:'小青'});
+ fs.writeFileSync(path.join(app.getPath('userData'),'garden-demo.json'),JSON.stringify({state:initial}));
+ const {getGarden,gardenAction}=require('../app/src/main/garden/service.ts'),journal=require('../app/src/main/garden/journal-service.ts');
+ ipcMain.handle('garden:get',getGarden);ipcMain.handle('garden:act',(_,c)=>gardenAction(c));
+ ipcMain.handle('garden:journalStatus',journal.journalStatus);ipcMain.handle('garden:rewriteDiary',(_,r)=>journal.rewriteDiary(r));ipcMain.handle('garden:generateMoment',(_,id)=>journal.generateMoment(id));
+ ipcMain.handle('garden:saveRehearsal',(_,r)=>require('../app/src/main/garden/rehearsal-store.ts').saveRehearsal(r));
+ ipcMain.handle('settings:get',()=>settings);ipcMain.handle('settings:set',(_,patch)=>{settings={...settings,...patch};for(const w of BrowserWindow.getAllWindows())w.webContents.send('settings:changed',settings);});
+ const errors=[],w=new BrowserWindow({width:540,height:760,show:false,frame:false,webPreferences:{preload:path.join(root,'app/out/preload/index.js'),offscreen:true,backgroundThrottling:false}});
+ w.webContents.on('console-message',e=>{if(e.level==='error')errors.push(e.message);});
+ const js=s=>w.webContents.executeJavaScript(s),until=async f=>{for(let i=0;i<100;i++){if(await f())return;await wait(60);}throw Error('timeout');};
+ const pointer=async(sel,win=w)=>{const run=s=>win.webContents.executeJavaScript(s);await run(`document.querySelector(${JSON.stringify(sel)}).scrollIntoView({block:'center'})`);await wait(70);const p=await run(`(()=>{const b=document.querySelector(${JSON.stringify(sel)}),r=b.getBoundingClientRect(),x=Math.round(r.x+r.width/2),y=Math.round(r.y+r.height/2);return{x,y,hit:b.contains(document.elementFromPoint(x,y))}})()`);assert.ok(p.hit,sel+' hit');for(const type of ['mouseMove','mouseDown','mouseUp'])win.webContents.sendInputEvent({type,x:p.x,y:p.y,button:'left',clickCount:1});await wait(110);};
+ const out=path.join(root,'.superpowers/journal');fs.mkdirSync(out,{recursive:true});const shot=async(name,win=w)=>{await wait(120);fs.writeFileSync(path.join(out,name+'.png'),(await win.webContents.capturePage()).toPNG());};
+ await w.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'moments'}});
+ await until(async()=>(await getGarden()).travel.diaries[0]?.generated);
+ await until(()=>js('document.querySelector(".city-diary")?.textContent.includes("抹茶")'));
+ assert.ok(calls[0].messages[1].content.includes('嘴硬心软'));await shot('persona-diary');
+ await pointer('.journal-generate');await until(async()=>(await getGarden()).travel.moments?.length===1);
+ await until(()=>js('document.querySelectorAll(".daily-moment").length===1'));assert.equal((await getGarden()).coins,initial.coins);
+ await pointer('.daily-moment .moment-like');assert.equal((await getGarden()).travel.moments[0].liked,true);
+ await shot('daily-moment');
+ failNext=true;await pointer('.journal-generate');await until(()=>js('document.querySelector(".journal-status")?.textContent.includes("失败")'));
+ assert.equal((await getGarden()).travel.moments.length,1);
+ await pointer('.journal-generate');await until(async()=>(await getGarden()).travel.moments.length===2);
+ w.reload();await until(()=>js('document.querySelectorAll(".daily-moment").length===2'));
+ for(const [width,height] of [[360,480],[540,760]]){w.setSize(width,height);await wait(100);await js('document.querySelector(".journal-generate").scrollIntoView({block:"center"})');assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));await pointer('.travel-tabs button:first-child');await pointer('.travel-tabs button:nth-child(3)');}
+ // Prompt editor uses its real component and the existing settings IPC, including reload/reset.
+ const {buildSync}=require('esbuild');
+ const bundled=buildSync({entryPoints:[path.join(root,'app/src/renderer/console/panes/journal-prompts.ts')],bundle:true,write:false,format:'iife',globalName:'JournalEditor',platform:'browser'}).outputFiles[0].text;
+ const editor=new BrowserWindow({width:700,height:800,show:false,webPreferences:{preload:path.join(root,'app/out/preload/index.js'),offscreen:true}});
+ const html=path.join(out,'editor.html');fs.writeFileSync(html,'<meta charset="utf-8"><style>body{font:16px Microsoft YaHei;background:#fff6df;padding:24px}textarea{box-sizing:border-box;width:100%;font:14px Microsoft YaHei;line-height:1.6}button{padding:10px;margin:8px}details{margin:20px 0}summary{cursor:pointer}</style><div id="root"></div>');
+ await editor.loadFile(html);const ed=s=>editor.webContents.executeJavaScript(s);await ed(bundled);await ed('JournalEditor.mountJournalPrompts(document.querySelector("#root"))');
+ await ed('document.querySelectorAll("details").forEach(d=>d.open=true)');
+ for(const [key,value] of [['travelDiaryPrompt','用特别俏皮的口吻写旅行'],['dailyMomentPrompt','朋友圈写得像嘴硬心软的小青']]){
+  await ed(`document.querySelector('[data-journal-prompt=${key}] textarea').value=${JSON.stringify(value)}`);await pointer(`[data-journal-prompt=${key}] [data-save]`,editor);assert.equal(settings[key],value);
+ }
+ await ed('JournalEditor.mountJournalPrompts(document.querySelector("#root"))');assert.equal(await ed('document.querySelector("[data-journal-prompt=travelDiaryPrompt] textarea").value'),settings.travelDiaryPrompt);
+ await ed('document.querySelectorAll("details").forEach(d=>d.open=true)');await shot('prompt-editor',editor);
+ await pointer('.journal-generate');await until(async()=>(await getGarden()).travel.moments.length===3);assert.ok(calls.at(-1).messages[0].content.includes('朋友圈写得像嘴硬心软的小青'));
+ await pointer('[data-journal-prompt=travelDiaryPrompt] [data-reset]',editor);assert.equal(settings.travelDiaryPrompt,'');assert.equal(settings.dailyMomentPrompt,'朋友圈写得像嘴硬心软的小青');
+ assert.ok(animations.length>=4);assert.ok(animations.every(actor=>actor==='demo'));
+ // A locked city's test album and generated text survive leaving the map and reopening.
+ await pointer('.travel-tabs button:first-child');await pointer('.map-pin:nth-of-type(2)');await pointer('.travel-test-entry');await pointer('.place-pin:nth-of-type(5)');await pointer('.experience-buy');
+ await pointer('.travel-tabs button:nth-child(3)');await until(async()=>(await getGarden()).travel.rehearsals?.[0].diary?.generated);
+ const testText=(await getGarden()).travel.rehearsals[0].diary.text;
+ await pointer('.test-travel-card .moment-like');assert.equal((await getGarden()).travel.rehearsals[0].liked,true);
+ await pointer('.travel-tabs button:first-child');await w.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'travel'}});await until(()=>js('!!document.querySelector(".world-map")'));await pointer('.travel-tabs button:nth-child(3)');
+ await until(()=>js('document.querySelector(".test-travel-card .city-diary")?.textContent==='+JSON.stringify(testText)));await shot('saved-test-album');
+ assert.equal((await getGarden()).travel.current,0);assert.equal((await getGarden()).travel.posts.length,1);
+ settings.freeMode=false;w.reload();await until(()=>js('document.querySelector(".journal-generate")?.disabled'));assert.equal(errors.length,0,errors.join('\n'));
+ console.log('PASS: persona diary, daily post generation/like/persistence/failure/retry, isolated save, small viewport, prompt edit/reload/reset and mode gate');app.exit(0);
+}catch(e){console.error(e);app.exit(1);}});

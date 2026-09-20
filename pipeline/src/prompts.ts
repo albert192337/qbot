@@ -42,6 +42,10 @@ const PROPORTION_LOCK =
  *   凭空长出一条（写实喝茶动作实测长出猫尾巴）；通用动作也不驱动耳朵，避免给人形角色套用兽耳运动
  */
 export const ACTIONS: Record<ActionId, ActionSpec> = {
+  writing: {
+    poseDesc: '角色安稳坐着，面前抱着一本小巧的奶油白手账，一只原有的手握短铅笔停在纸页上，神情专注而温柔。完整身体和手账都在画面内，沿用参考图原本比例，不增加肢体，不画桌椅、其他人物或多余物品。手账无可辨认文字，不使用绿色物品。',
+    motionDesc: '保持坐姿和身体位置稳定，在手账上小幅写几笔，短暂停顿思考，再继续轻轻书写，偶尔眨眼。纸笔不漂移，身体不位移，首尾姿态一致，可自然循环。', durationSec: 5,
+  },
   perch_sit: {
     poseDesc: '角色坐在想象中的水平窗沿上，臀部为稳定支点，上身直立放松，小腿自然垂在支点下方。只画角色，不画窗口、椅子、桌面或任何支撑物，四肢比例严格保持参考图。',
     motionDesc: '保持坐姿与臀部支点不动，轻轻眨眼和呼吸，小腿小幅晃动，首尾姿势一致，可无缝循环。角色不位移，不站起。',
@@ -116,6 +120,10 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
  * 一律用"整体""姿态""轮廓"级别的措辞，防翻车排除项与人形档保持一致。
  */
 export const ABSTRACT_ACTIONS: Record<ActionId, ActionSpec> = {
+  writing: {
+    poseDesc: '完全保留参考图原本的结构与轮廓，角色安静贴近一本小巧奶油白手账和一支短铅笔，呈现专心记事的姿态。只使用原本已有的结构与纸笔互动，不凭空长出任何部位。画面仅有原角色和纸笔，不画桌椅或其他人物，不出现可辨认文字，不使用绿色物品。',
+    motionDesc: '原有轮廓轻微起伏，纸笔附近出现小幅有节奏的记事动作，短暂停顿后继续。保持角色和纸笔相对位置稳定，不增加任何部位，不位移，首尾一致，可循环。', durationSec: 5,
+  },
   perch_sit: {
     poseDesc: '保持参考图的原本结构，整体收拢，重心稳定停靠在想象中的水平边沿上，轮廓轻松自然。不增加任何部位，不画边沿、窗口或任何支撑物。',
     motionDesc: '整体保持稳定停靠姿态，仅轻微起伏和晃动，支点不移动，首尾一致，可循环。', durationSec: 5,
@@ -178,6 +186,7 @@ export const ABSTRACT_ACTIONS: Record<ActionId, ActionSpec> = {
  * 一律换成头发/衣角级别的自然运动（尾巴已全档禁提，见 ACTIONS 注释）。
  */
 export const FAITHFUL_ACTIONS: Record<ActionId, ActionSpec> = {
+  writing: ACTIONS.writing,
   perch_sit: ACTIONS.perch_sit,
   perch_lie: ACTIONS.perch_lie,
   idle: {

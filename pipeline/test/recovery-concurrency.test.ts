@@ -12,6 +12,7 @@ vi.mock('../src/chroma.js', () => ({
   toGif:async()=>{},toWebm:async()=>{},ALPHA_ERODE_PX:0,RIM_DESPILL_MIX:1,
 }));
 vi.mock('../src/qc.js',()=>({checkGreenFrame:async()=>({pass:true}),checkVideoDrift:async()=>({fail:false}),selectDualKeys:()=>['00ff00']}));
+vi.mock('../src/reference-color.js',()=>({referenceColorFilter:async()=>undefined}));
 let dir:string;
 afterEach(async()=>{if(dir)await rm(dir,{recursive:true,force:true});});
 async function setup(){
@@ -79,4 +80,26 @@ it('snapshots the selected reference and pauses before video until approval, inc
  await runActions(resumed,ark,'/mock',async()=>{},1,['idle']);
  expect(ark.generateImage).toHaveBeenCalledTimes(1);expect(ark.submitVideoTask).toHaveBeenCalledTimes(1);
  expect(resumed.state.actions.idle.status).toBe('done');
+});
+
+it('legacy sticker labels never override idle motion, but explicitly saved prompts still do', async()=>{
+ const job=await setup();job.state.generationMode='original';
+ const manifest={actions:{idle:{motionDesc:'扭呀扭；扭呀扭'}},stickerLibrary:{items:[{name:'扭呀扭',tags:['扭呀扭']}]}};
+ await writeFile(path.join(dir,'manifest.json'),JSON.stringify(manifest));
+ const ark={generateImage:vi.fn(async()=>Buffer.from('frame')),submitVideoTask:vi.fn(async()=>'task'),getVideoTask:vi.fn(async()=>({status:'succeeded',videoUrl:'https://example.test/video'})),downloadVideo:async(_u:string,d:string)=>{await writeFile(d,'mp4');}} as unknown as ArkClient;
+ job.state.actions.idle={status:'pending',attempts:{frame:0,video:0}};
+ await runActions(job,ark,'/mock',async()=>{},1,['idle']);
+ expect(ark.submitVideoTask).toHaveBeenLastCalledWith(expect.objectContaining({prompt:expect.stringContaining('轻微呼吸')}));
+ expect(ark.submitVideoTask).toHaveBeenLastCalledWith(expect.objectContaining({prompt:expect.not.stringContaining('扭呀扭')}));
+ Object.assign(manifest.actions.idle,{motionDescSource:'user'});
+ await writeFile(path.join(dir,'manifest.json'),JSON.stringify(manifest));
+ job.state.actions.idle={status:'pending',attempts:{frame:0,video:0}};
+ await runActions(job,ark,'/mock',async()=>{},1,['idle']);
+ expect(ark.submitVideoTask).toHaveBeenLastCalledWith(expect.objectContaining({prompt:expect.stringContaining('扭呀扭')}));
+ Object.assign(manifest.actions.idle,{videoPromptFull:'只眨眼'});
+ await writeFile(path.join(dir,'manifest.json'),JSON.stringify(manifest));
+ job.state.actions.idle={status:'pending',attempts:{frame:0,video:0}};
+ await runActions(job,ark,'/mock',async()=>{},1,['idle']);
+ expect(ark.submitVideoTask).toHaveBeenLastCalledWith(expect.objectContaining({prompt:expect.stringContaining('只眨眼')}));
+ expect(ark.submitVideoTask).toHaveBeenLastCalledWith(expect.objectContaining({prompt:expect.not.stringContaining('扭呀扭')}));
 });

@@ -1,5 +1,6 @@
 /** @qbot/pipeline 公共出口：app 主进程从这里 import */
 export * from './types.js';
+export { generationMotionDesc, clearLegacyStickerMotionLabels } from './action-prompt.js';
 export { Job } from './job.js';
 export { runPipeline, runTurnaround, pickTurnaround, runActions, runPackage, keyActionVideo } from './stages.js';
 export type { PipelineHooks } from './stages.js';

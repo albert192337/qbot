@@ -1,3 +1,4 @@
+import { resourceText } from '../shared/action-resources';
 import type { Manifest } from '@qbot/pipeline';
 import type { StickerLibrary } from '../shared/sticker-library';
 
@@ -17,7 +18,7 @@ export function brainActions(manifest?: Manifest): Array<{ id: string; descripti
     && a.webm && (!('status' in a) || a.status === 'done'));
   return [...new Map(playable)].map(([id, a]) => ({
     id,
-    description: library?.items.find(i => i.id === id) ? [library.items.find(i=>i.id===id)!.name,...library.items.find(i=>i.id===id)!.tags].join('；').slice(0,180)
+    description: manifest.resourceAnnotations?.[id] ? [resourceText(manifest,id).name,resourceText(manifest,id).meaning,...resourceText(manifest,id).tags].filter(Boolean).join('；').slice(0,500) : library?.items.find(i => i.id === id) ? [library.items.find(i=>i.id===id)!.name,library.items.find(i=>i.id===id)!.meaning??'',...library.items.find(i=>i.id===id)!.tags].join('；').slice(0,180)
       : library?.variants?.[id]?.description || ('motionDesc' in a ? a.motionDesc : undefined)?.slice(0, 180)
       || ('category' in a ? a.category : undefined) || id,
   }));

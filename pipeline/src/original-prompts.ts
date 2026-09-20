@@ -1,8 +1,11 @@
 import type { ActionId, ActionSpec } from './types.js';
+import { ABSTRACT_ACTIONS } from './prompts.js';
 
 /** Imported artwork has no implied anatomy or target illustration style. */
 export const ORIGINAL_IDENTITY = '完全保留参考角色的原画风、线条粗细、颜色、五官、轮廓、身体结构和各部位比例。只使用原图已有部位，不新增或重新设计部位，不强制直立或变成人形，不拉伸变形。';
+const ORIGINAL_COLOR = '角色自身的原始填色保持不变，原图白色保持纯白，不染灰、黄或绿色，不增加立体明暗、环境光染色或纸张纹理。';
 const poses: Record<ActionId, string> = {
+  writing: ABSTRACT_ACTIONS.writing.poseDesc,
   idle: '保持参考图中的原有姿态，自然放松。',
   drag: '保持参考图的身体姿态和结构，整体悬浮，轻微倾斜。没有绳索或外来物体。',
   sleep: '沿用原有身体结构，呈现安静休息的姿态；已有眼睛可以闭合。不添加床或枕头。',
@@ -15,6 +18,7 @@ const poses: Record<ActionId, string> = {
   perch_lie: '沿用原有结构呈放松趴伏姿态，下缘对齐想象中的水平支撑线，不画支撑物。',
 };
 const motions: Record<ActionId, string> = {
+  writing: ABSTRACT_ACTIONS.writing.motionDesc,
   idle: '保持原有姿态，轻微呼吸起伏；已有眼睛偶尔眨动。',
   drag: '保持原有身体姿态，整体缓慢小幅摇晃；不单独驱动或伸长肢体。',
   sleep: '保持休息姿态，轻微缓慢呼吸。',
@@ -30,10 +34,10 @@ export function originalActionSpec(action: ActionId): ActionSpec {
   return { poseDesc: poses[action], motionDesc: motions[action], durationSec: 5 };
 }
 export function originalFramePrompt(pose: string, persona?: string): string {
-  return ORIGINAL_IDENTITY + pose + (persona ? `神态参考人设：${persona}；人设不得改变外形。` : '') +
+  return ORIGINAL_IDENTITY + ORIGINAL_COLOR + pose + (persona ? `神态参考人设：${persona}；人设不得改变外形。` : '') +
     '只画一个完整角色，保留原有线条，不添加贴纸描边、文字、水印、其他人物或阴影。背景为同一绿色色值均匀铺满的纯色绿幕，无渐变无纹理。角色全身完整可见，占画面高度约70%。';
 }
 export function originalVideoPrompt(motion: string, duration = 5): string {
-  return ORIGINAL_IDENTITY + motion + '动作幅度小，镜头固定，角色不位移。首尾保持同一姿态，各部位大小稳定，循环衔接自然。背景始终是同一均匀绿色，无阴影、闪烁或新增物体。' +
+  return ORIGINAL_IDENTITY + ORIGINAL_COLOR + motion + '角色各帧及首尾的亮度、色温和填色一致，不随动作明暗变化。动作幅度小，镜头固定，角色不位移。首尾保持同一姿态，各部位大小稳定，循环衔接自然。背景始终是同一均匀绿色，无阴影、闪烁或新增物体。' +
     ` --resolution 480p --duration ${duration} --camerafixed true`;
 }

@@ -491,11 +491,13 @@ export async function toWebm(
   normVf?: string,
   erodePx: number = ALPHA_ERODE_PX,
   despillMix: number = RIM_DESPILL_MIX,
+  colorVf?: string,
 ): Promise<void> {
   const vf =
     `${keyFilters(keys)},format=yuva420p` +
     rimDespillFilter(despillMix) +
     erodeFilter(erodePx) +
+    `${colorVf ? `,${colorVf}` : ''}` +
     `${normVf ? `,${normVf}` : ''}`;
   await runFfmpeg(ffmpegPath, [
     '-y',
@@ -574,10 +576,12 @@ export async function toGif(
   ffmpegPath: string,
   normVf?: string,
   despillMix: number = RIM_DESPILL_MIX,
+  colorVf?: string,
 ): Promise<void> {
   const vf =
     `${keyFilters(keys)},format=yuva420p` +
     rimDespillFilter(despillMix) +
+    `${colorVf ? `,${colorVf}` : ''}` +
     `${normVf ? `,${normVf}` : ''},` +
     `fps=20,scale=320:-1:flags=lanczos,` +
     `split[a][b];[a]palettegen=reserve_transparent=1:stats_mode=full[p];` +

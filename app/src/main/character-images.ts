@@ -1,9 +1,10 @@
+import { resourceText } from '../shared/action-resources';
 import { readFile, mkdir, writeFile, rename, rm, access } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { resolveFfmpegPath, type Manifest } from '@qbot/pipeline';
+import { resolveFfmpegPath, probeDurationSec, type Manifest } from '@qbot/pipeline';
 import type { StickerManifest } from '../shared/sticker-behavior';
 import type { ImageSelection, ImageChoice } from '../shared/character-images';
 const exec = promisify(execFile);
@@ -21,7 +22,9 @@ export async function imageChoices(dir: string): Promise<ImageChoice[]> {
   if (m.turnaround) try { await access(imageAssetPath(dir, m.turnaround)); choices.push({ selection:{kind:'turnaround-front'}, label:'已选三视图 · 第一幅（左侧正面）' }); } catch {}
   const clips = { ...m.actions, ...m.importedActions, ...m.expressionActions, ...m.customActions };
   for (const [id, clip] of Object.entries(clips)) if (clip.status === 'done' && (clip.gif || clip.webm)) {
-    choices.push({ selection:{kind:'action',actionId:id,seconds:0}, label: m.stickerLibrary?.items.find(i=>i.id===id)?.name ?? m.stickerLibrary?.variants?.[id]?.description ?? id });
+    let duration=clip.durationSec;
+    if(!Number.isFinite(duration)||duration<=0)try{duration=await probeDurationSec(imageAssetPath(dir,clip.webm),await resolveFfmpegPath())??0;}catch{}
+    choices.push({ selection:{kind:'action',actionId:id,seconds:0}, label: resourceText(m,id).name, durationSec: duration });
   }
   return choices;
 }
