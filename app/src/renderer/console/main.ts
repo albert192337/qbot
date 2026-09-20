@@ -1,8 +1,11 @@
+import '@fontsource-variable/nunito';
 import './workspace.css';
+import './theme.css';
 import { getEditingCharacter, getSelectedCharacterId, selectCharacter, taskCharacters, type ConsoleRoute } from './workspace';
 import { icon, type ConsoleIcon } from './icons';
 
 export type PaneId =
+  | 'sticker-create' | 'lounge' | 'rewards' | 'furnish' | 'memory'
   | 'profile'
   | 'tasks'
   | 'home'
@@ -48,18 +51,28 @@ const GROUPS: { label: string; defs: Omit<PaneDef, 'group'>[] }[] = [
     label: '角色',
     defs: [
       { id: 'characters', label: '角色库', icon: 'characters', load: () => import('./panes/characters') },
+      { id: 'sticker-create', label: '导入表情包', icon: 'stickers', load: () => import('./panes/sticker-create') },
       { id: 'hatch', label: '创建角色', icon: 'create', load: () => import('./panes/hatch') },
       { id: 'profile', label: '角色资料', icon: 'persona', load: () => import('./panes/profile'), hiddenFromSidebar: true, navParent: 'characters' },
       { id: 'persona', label: '角色工作台', icon: 'actions', load: () => import('./panes/persona'), hiddenFromSidebar: true, navParent: 'characters' },
       { id: 'tasks', label: '生成任务', icon: 'task', load: () => import('./panes/tasks') },
-      { id: 'scene-actions', label: '场景联动', icon: 'actions', load: () => import('./panes/scene-actions'), hiddenFromSidebar: true, navParent: 'characters' },
+      { id: 'scene-actions', label: '动作配置', icon: 'actions', load: () => import('./panes/scene-actions'), hiddenFromSidebar: true, navParent: 'characters' },
       { id: 'stickers', label: '导入动作', icon: 'stickers', load: () => import('./panes/stickers'), hiddenFromSidebar: true, navParent: 'characters' },
       { id: 'prompts', label: '高级生成', icon: 'prompts', load: () => import('./panes/prompts'), hiddenFromSidebar: true, navParent: 'characters' },
     ],
   },
   {
+    label: '桌面与物品',
+    defs: [
+      { id: 'rewards', label: '物品', icon: 'home', load: () => import('../nursery/rewards') },
+      { id: 'furnish', label: '布置房间', icon: 'room', load: () => import('../nursery/furnish') },
+      { id: 'memory', label: '记忆', icon: 'persona', load: () => import('./panes/memory') },
+    ],
+  },
+  {
     label: '连接与社区',
     defs: [
+      { id: 'lounge', label: '联机房间', icon: 'room', load: () => import('./panes/lounge') },
       { id: 'claude', label: 'Claude Code', icon: 'connection', load: () => import('./panes/claude') },
       { id: 'market', label: '装扮市场', icon: 'market', load: () => import('./panes/market') },
     ],
@@ -101,14 +114,10 @@ function buildSidebar(): void {
   const brand = document.createElement('button');
   brand.className = 'brand';
   brand.type = 'button';
-  brand.innerHTML = `<span class="brand-mark">Q</span><span><b>QBot</b><small>桌宠工坊</small></span>`;
+  brand.innerHTML = `<span class="brand-mark">Q</span><span><b>QBot</b><small>角色管理</small></span>`;
   brand.addEventListener('click', () => void switchPane('home'));
   sidebar.appendChild(brand);
-  const nursery = document.createElement('button');
-  nursery.className = 'side-item';
-  nursery.innerHTML = `${icon('room')}<span>孵化小屋</span>`;
-  nursery.addEventListener('click', () => window.qbot.ui.openNursery());
-  sidebar.appendChild(nursery);
+
 
   for (const group of visibleGroups()) {
     const label = document.createElement('div');
@@ -141,13 +150,13 @@ function syncActiveNavigation(): void {
 const ROLE_WORKSPACE_TABS: { id: PaneId; label: string; description: string }[] = [
   { id: 'profile', label: '角色资料', description: '名字、人设与角色概况' },
   { id: 'persona', label: '动作库', description: '预览、添加与管理动作' },
-  { id: 'scene-actions', label: '场景联动', description: '绑定工作、音乐与会议状态' },
+  { id: 'scene-actions', label: '动作配置', description: '绑定工作、音乐与会议状态' },
   { id: 'prompts', label: '高级生成', description: '精细控制动作生成' },
 ];
 
 function refreshSubnav(): void {
   const isRoleWorkspace = isWorkspace(activePane);
-  if (!isRoleWorkspace) {
+  if (!isRoleWorkspace || activePane === 'sticker-create') {
     subnav.replaceChildren();
     return;
   }
@@ -192,7 +201,7 @@ async function askDiscardChanges(): Promise<boolean> {
 }
 
 function isWorkspace(id: PaneId | null): boolean {
-  return id === 'stickers' || ROLE_WORKSPACE_TABS.some((tab) => tab.id === id);
+  return id === 'sticker-create' || id === 'stickers' || ROLE_WORKSPACE_TABS.some((tab) => tab.id === id);
 }
 let navigation = Promise.resolve();
 function switchPane(id: PaneId, route: ConsoleRoute = { pane: id, fresh: id === 'hatch' }): Promise<void> {
@@ -205,17 +214,13 @@ function switchPane(id: PaneId, route: ConsoleRoute = { pane: id, fresh: id === 
 }
 async function performNavigation(id: PaneId, route: ConsoleRoute): Promise<void> {
   if (!ALL_DEFS.some((definition) => definition.id === id)) return;
-  if (id === 'hatch' && !route.taskId) {
-    window.qbot.ui.openNursery(true);
-    if (!activePane) await performNavigation('home', { pane: 'home' });
-    return;
-  }
   if (route.dirId && route.dirId !== getSelectedCharacterId()) {
     if (!(await askDiscardChanges())) return;
     selectCharacter(route.dirId);
     for (const module of modules.values()) await module.discardChanges?.();
   }
   if (activePane === id && modules.has(id) && !route.taskId && !route.fresh && !route.dirId) return;
+  if(activePane!==id)mounted.get(activePane!)?.querySelectorAll('video').forEach(video=>video.pause());
   activePane = id;
   viewingTask = !!route.taskId;
   syncActiveNavigation();
@@ -232,6 +237,9 @@ async function performNavigation(id: PaneId, route: ConsoleRoute): Promise<void>
   }
   for (const [paneId, element] of mounted) {
     element.classList.toggle('active', paneId === id);
+    // Visibility belongs to the router, never to a lazily loaded pane stylesheet.
+    element.hidden = paneId !== id;
+    element.inert = paneId !== id;
   }
   root.scrollTop = 0;
 
@@ -295,7 +303,9 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+document.addEventListener('visibilitychange',()=>{if(document.hidden)document.querySelectorAll('video').forEach(video=>video.pause());});
 window.qbot.ui.onShowScreen((name) => {
+  if(name==='nursery:create')name='hatch';
   if (ALL_DEFS.some((definition) => definition.id === name)) void switchPane(name as PaneId);
 });
 

@@ -14,7 +14,7 @@
  * 纯状态机风格：网络应答都从 handlePackFrame / handlePackError 回来，不做 await 链。
  */
 import { existsSync, statSync } from 'node:fs';
-import { mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ChunkAssembler, chunkToBase64, packCharacterDir, unpackCharacter } from '../asset-pack';
 import { charactersDir } from '../characters';
@@ -194,6 +194,7 @@ function emitCharacter(hash: string, character: LinkPeerCharacter): void {
   for (const [memberId, m] of memberStates) {
     if (m.hash === hash && !m.character) {
       m.character = character;
+      void writeFile(path.join(peerCacheDir(hash), '.social-origin.json'), JSON.stringify({memberId, nickname:m.nickname}), 'utf8').catch(() => {});
       emit({ kind: 'character', memberId, nickname: m.nickname, character });
     }
   }
@@ -441,6 +442,16 @@ export function onLeftRoom(): void {
   pendingUploadBuffer = null;
   myMemberId = null;
   emit({ kind: 'roomLeft' });
+}
+
+/** Local visitors bypass all upload/download and remote identity paths. */
+export function startLocalTest(self: string): void {
+  onLeftRoom(); myMemberId = self; emit({kind:'roomJoined'});
+}
+export function addLocalTestGuest(member: RoomMember, character: LinkPeerCharacter): void {
+  memberStates.set(member.memberId, {nickname:member.nickname + ' · 测试', character, mode:'idle'});
+  emit({kind:'memberIn', member});
+  emit({kind:'character', memberId:member.memberId, nickname:member.nickname + ' · 测试', character});
 }
 
 /**

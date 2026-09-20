@@ -1,5 +1,5 @@
-@scope ([data-pane="lounge"]) {
-  :root {
+@scope (.pane[data-pane="lounge"]) {
+  :scope {
     --ink: #3a3a3a;
     --sub: #8a8a8a;
     --line: #ececec;
@@ -7,7 +7,6 @@
     --danger: #e07a6a;
     --mine: #eaf5ea;
   }
-  html,
   :scope {
     margin: 0;
     padding: 0;

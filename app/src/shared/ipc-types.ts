@@ -1,3 +1,4 @@
+import type { SocialApi } from './social';
 /** 渲染进程与主进程共享的 IPC 类型（preload 契约） */
 import type {
   ActionId,
@@ -27,6 +28,8 @@ export interface CharacterMeta {
 export interface CloudAccount { connected: boolean; unlimited?: boolean; credits: number; providers: ImageProvider[] }
 
 export interface Settings {
+  socialPoses?: Record<string, string>;
+  socialLastRoom?: CreateRoomInput;
   generationMode?: 'cloud' | 'local';
   onboardingDismissed?: boolean;
   onboardingSeen?: boolean;
@@ -83,6 +86,8 @@ export interface Settings {
    * 关闭/无 key 时纯规则脑，行为完全本地、零 API 花费。
    */
   freeMode?: boolean;
+  travelDiaryPrompt?: string;
+  dailyMomentPrompt?: string;
   /** 主动行为节奏，与 LLM 脑开关独立；默认沿用陪伴节奏。 */
   behaviorMode?: 'companion' | 'free';
   /** 显示控制台中的开发者工具入口（默认 false） */
@@ -100,6 +105,7 @@ export interface HatchProgress extends ProgressEvent {
 
 /** 孵化状态快照（进度屏进入时铺底，之后消费增量事件；见 hatch-progress-ux spec §四） */
 export interface HatchStatus {
+  regenerating?: boolean;
   cloud?: boolean;
   cloudPhase?: string;
   error?: string;
@@ -111,7 +117,7 @@ export interface HatchStatus {
   imageProvider?: ImageProvider;
   /** stage 为 awaiting_pick 时：候选图 qbot-asset URL（中途重开窗口也能直接挑选） */
   candidateUrls?: string[];
-  actions: Record<ActionId, { status: ActionStatus; frameUrl?: string; error?: string }>;
+  actions: Record<ActionId, { status: ActionStatus; frameUrl?: string; error?: string; needsFrameApproval?: boolean }>;
 }
 
 /** Agent 会话合成后的活动状态（优先级 error > waiting > working > thinking > done > idle） */
@@ -244,7 +250,8 @@ export type PetMenuCommand =
   | { type: 'play'; action: string }
   /** 弹举牌输入框（纯本地的牌子） */
   | { type: 'signPrompt' }
-  | { type: 'signClear' };
+  | { type: 'signClear' }
+  | { type: 'signDismiss' };
 
 // ── presence 状态类型（2026-08-24 起由公共房间上屏复用；原 1v1 联机已退役）──
 /** 对端高层状态：agent 活动 + 开会 + 听歌 */
@@ -280,6 +287,9 @@ export type RoomKind = 'idle' | 'study' | 'night' | 'coop';
 
 /** 房间列表条目（不含聊天/成员详情/token） */
 export interface RoomBrief {
+  description?: string;
+  language?: string;
+  chatEnabled?: boolean;
   roomId: string;
   name: string;
   kind: RoomKind;
@@ -292,6 +302,8 @@ export interface RoomBrief {
 
 /** 房内成员（含当前在场状态） */
 export interface RoomMember {
+  title?: string;
+  testing?: boolean;
   memberId: string;
   nickname: string;
   avatarHash?: string;
@@ -308,6 +320,10 @@ export interface RoomMember {
 
 /** 房内快照（进房时拿到） */
 export interface RoomSnapshot {
+  testing?: boolean;
+  description?: string;
+  language?: string;
+  chatEnabled?: boolean;
   roomId: string;
   name: string;
   kind: RoomKind;
@@ -329,6 +345,7 @@ export interface RoomChatMsg {
 
 /** 房间链路状态（lounge 窗 + 托盘消费） */
 export interface RoomsStatus {
+  socialReady?: boolean;
   phase: 'off' | 'connecting' | 'online' | 'in-room';
   /** 自己的成员 ID（hello:ack 后有） */
   memberId?: string;
@@ -344,6 +361,9 @@ export type RoomSizePreset = 'small' | 'medium' | 'large';
 
 /** 开房参数 */
 export interface CreateRoomInput {
+  description?: string;
+  language?: string;
+  chatEnabled?: boolean;
   name: string;
   kind: RoomKind;
   capacity: number;
@@ -485,6 +505,11 @@ export interface QBotApi {
   };
   /** 举牌：set 记录手动牌，sync 将当前实际牌面同步到公共房间 */
   sign: {
+    dismiss(): void;
+    reportBounds(bounds: { left: number; top: number; right: number; bottom: number }): void;
+    onHover(cb: (hovered: boolean) => void): () => void;
+    display(text: string | null): void;
+    onDisplay(cb: (text: string | null) => void): () => void;
     getMessage(): Promise<import('./pet-message').PetMessage | null>;
     onMessage(cb: (message: import('./pet-message').PetMessage | null) => void): () => void;
     set(text: string | null): void;
@@ -495,6 +520,7 @@ export interface QBotApi {
    * 主进程按窗口定向推送（不带 memberId——一个窗只服务一个成员，天然隔离）。
    */
   roomPet: {
+    move(x: number, y: number): void;
     onHello(cb: (info: { nickname: string }) => void): () => void;
     onCharacter(cb: (meta: LinkPeerCharacter) => void): () => void;
     onProgress(cb: (p: LinkAssetProgress) => void): () => void;
@@ -525,6 +551,7 @@ export interface QBotApi {
     remove(hash: string): Promise<void>;
   };
   /** 公共房间（spec 2026-08-21）：联机唯一链路（原 1v1 已退役） */
+  social: SocialApi;
   rooms: {
     open(): void;
     getDisplayMode(): Promise<RoomsDisplayMode>;
@@ -548,7 +575,7 @@ export interface QBotApi {
     /** 举报一条发言（服务端只记计数，不自动处置） */
     report(id: string): void;
     wave(memberId: string): void;
-    update(patch: { name?: string; kind?: RoomKind; listed?: boolean }): Promise<void>;
+    update(patch: Partial<CreateRoomInput>): Promise<void>;
     kick(memberId: string): Promise<void>;
     toggleFavorite(roomId: string): Promise<string[]>;
     disconnect(): Promise<void>;
@@ -612,6 +639,7 @@ export interface QBotApi {
     openChat(): void;
     closeChat(): void;
     sendChat(text: string): Promise<{ ok: boolean; error?: string }>;
+    onThinking(cb: (thinking: boolean) => void): () => void;
     say(text: string, durationMs: number): void;
     getIdleSeconds(): Promise<number>;
     /** 气泡全部消散 → 主进程隐藏气泡窗 */
@@ -645,6 +673,8 @@ export interface QBotApi {
     package(dirId: string): Promise<{ bytes: number; files: number; fitsMarket: boolean }>;
   };
   studio: {
+    saveResourceAnnotation(dirId: string, id: string, value: {name: string; meaning: string; tags: string[]}): Promise<void>;
+    saveScenePools(dirId: string, pools: Record<string,string[]>): Promise<void>;
     imageChoices(dirId: string): Promise<import('./character-images').ImageChoice[]>;
     previewImage(dirId: string, selection: import('./character-images').ImageSelection): Promise<string>;
     saveCover(dirId: string, selection: import('./character-images').ImageSelection): Promise<void>;

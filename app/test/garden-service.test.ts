@@ -26,6 +26,17 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 beforeEach(async () => { vi.resetModules(); vi.spyOn(Math, 'random').mockReturnValue(.8); mock.dir = await mkdtemp(path.join(os.tmpdir(), 'garden-store-')); mock.points = 500; mock.boxes = 1; mock.receipts.clear(); mock.renameCount = 0; mock.failAt = 0; });
 afterEach(async () => { vi.restoreAllMocks(); await rm(mock.dir, { recursive: true, force: true }); });
 describe('garden transaction journal', () => {
+    it('records successful ordinary garden activity with a time and actor, excluding failed clicks',async()=>{
+        const api=await import('../src/main/garden/service');const s=await api.getGarden();
+        expect((await api.gardenAction({type:'plant',plot:0,seed:s.seeds[0].id})).ok).toBe(true);
+        expect((await api.gardenAction({type:'plant',plot:0,seed:s.seeds[1].id})).ok).toBe(false);
+        expect((await api.getGarden()).journalEvents).toHaveLength(1);
+        await api.gardenAction({type:'mature'});expect((await api.gardenAction({type:'harvest',plot:0})).ok).toBe(true);
+        const harvested=await api.getGarden();expect(harvested.journalEvents?.map(e=>e.summary)).toEqual(['种下了莲花','收获了莲花']);
+        expect((await api.gardenAction({type:'sell',id:harvested.produce[0].id})).ok).toBe(true);
+        vi.resetModules();const restarted=await import('../src/main/garden/service');const events=(await restarted.getGarden()).journalEvents!;
+        expect(events).toHaveLength(3);expect(events[2].summary).toBe('出售了莲花');expect(events.every(e=>e.actor==='default'&&Number.isFinite(e.at))).toBe(true);
+    });
     it('serializes simultaneous box clicks without negative balances or duplicate supplies', async () => {
         const api = await import('../src/main/garden/service');
         const s = await api.getGarden();

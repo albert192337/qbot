@@ -86,6 +86,7 @@ export interface Offer {
     stock: number;
 }
 export interface GardenState {
+    journalEvents?: {at:number;actor:string;summary:string}[];
     travel?: TravelState;
     journey?: { bought: number; planted: number; harvested: number; earned: number; appleBought: number };
     boxMisses?: number;
@@ -156,6 +157,10 @@ export type GardenResult = {
     error: string;
 };
 export interface GardenApi {
+    saveRehearsal(request: import('./travel').RehearsalRequest): Promise<import('./travel').JournalResult<import('./travel').TravelRehearsal>>;
+    journalStatus(): Promise<import('./travel').JournalStatus>;
+    rewriteDiary(request: import('./travel').DiaryRequest): Promise<import('./travel').JournalResult<import('./travel').TravelDiary>>;
+    generateMoment(requestId: string): Promise<import('./travel').JournalResult<import('./travel').DailyMoment>>;
     closeTravel(): void;
     onSpeechBounds(cb: (bounds: { left: number; right: number; top: number; bottom: number } | null) => void): () => void;
     onPerformance(cb: (action: string | null) => void): () => void;

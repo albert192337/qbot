@@ -126,6 +126,11 @@ function handle(event: RoomPetEvent): void {
 
     case 'memberOut': {
       if (event.memberId === myMemberId) break;
+      if (event.memberId.startsWith('test:')) {
+        clearGrace(event.memberId);
+        order = order.filter(id => id !== event.memberId);
+        closeRoomPetWindow(event.memberId); memberStates.delete(event.memberId); relayout(); break;
+      }
       push(event.memberId, 'roomPet:left', undefined);
       clearGrace(event.memberId);
       graceTimers.set(

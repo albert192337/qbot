@@ -14,9 +14,23 @@ function particles(host: HTMLElement, kind: string, count: number): void {
     for (let i = 0; i < count; i++) {
         const p = document.createElement('i');
         p.style.setProperty('--i', String(i));
+        // Deliberately scattered positions, with most of the silhouette left unobstructed.
+        const positions = [[9,25],[84,14],[17,68],[88,63],[40,4],[67,88],[55,35],[4,86]];
+        const [x,y] = positions[i % positions.length];
+        p.style.left = x + '%'; p.style.top = y + '%';
+        if (kind === 'note') p.textContent = i % 2 ? '♪' : '♫';
         group.append(p);
     }
     host.append(group);
+}
+
+// Small code-native jewellery follows the approved sheet; it is separate from the painted sprite.
+function accessory(kind: 'punk' | 'classical', copy: number): HTMLElement {
+    const node = layer(`botanical-accessory accessory-${kind}${copy ? ' twin-copy' : ''}`);
+    node.innerHTML = kind === 'punk'
+        ? '<svg viewBox="0 0 100 100"><g stroke="#654052" stroke-width="1.2" stroke-linejoin="round"><path d="M22 64Q50 73 78 64L77 73Q50 81 23 73Z" fill="#69475f"/><path d="M24 66Q50 74 76 66" fill="none" stroke="#b77a9c"/><path d="M31 67l-4 6 8-1Z M49 70l-4 6 8-1Z M68 68l-4 6 8-1Z" fill="#fff2d9"/><path d="M71 26q-3-5-6-1t1 6l8 9q4 3 6-1t-2-6Z" fill="none" stroke="#50394c" stroke-width="3.5"/><path d="M71 26q-3-5-6-1t1 6l8 9q4 3 6-1t-2-6Z" fill="none" stroke="#eddddc" stroke-width="1.8"/></g></svg>'
+        : '<svg viewBox="0 0 100 100"><g stroke="#704267" stroke-width="1.2" stroke-linejoin="round"><path d="M47 76L36 88l-1-7-7 1 9-13M53 76l11 12 1-7 7 1-9-13" fill="#995394"/><path d="M49 70Q27 54 29 69Q28 80 49 74M51 70Q73 54 71 69Q72 80 51 74" fill="#b773b0"/><path d="M32 66l15 6-15 1M68 66l-15 6 15 1" fill="#d59bca" stroke="none"/><ellipse cx="50" cy="76" rx="8" ry="11" fill="#e5bb63" stroke="#a87942"/><ellipse cx="50" cy="76" rx="5.6" ry="8.4" fill="#fff1cf" stroke="#fff7d7"/><path d="M52 69v10q-5 4-5 0 0-2 4-2" fill="none" stroke="#aa7848"/></g></svg>';
+    return node;
 }
 
 // One shared observer pauses off-screen art. Detached nodes are unregistered after renders.
@@ -27,9 +41,13 @@ let sizing: ResizeObserver | undefined;
 function fitEffects(box: HTMLElement): void {
     const image = box.querySelector('img');
     if (!image?.naturalWidth) return;
-    const width = Math.min(box.clientWidth, box.clientHeight * image.naturalWidth / image.naturalHeight);
+    const style = getComputedStyle(box);
+    const availableWidth = box.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const availableHeight = box.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    const width = Math.min(availableWidth, availableHeight * image.naturalWidth / image.naturalHeight);
     box.style.setProperty('--fx-width', `${width}px`);
     box.style.setProperty('--fx-height', `${width * image.naturalHeight / image.naturalWidth}px`);
+    box.style.setProperty('--fx-bottom', style.paddingBottom);
 }
 function watch(box: HTMLElement): void {
     if (!observer) {
@@ -56,18 +74,20 @@ function watch(box: HTMLElement): void {
 
 /** Reuse the actual sprite alpha for every surface, including PNG, SVG and twins. */
 export function attachMutationEffects(box: HTMLElement, src: string, traits: Trait[]): void {
-    if (!traits.some(t => ['rainbow', 'golden', 'frost', 'thunder', 'shiny'].includes(t))) return;
+    if (!traits.length) return;
     box.classList.add('mutation-art');
     box.style.setProperty('--plant-mask', `url(${JSON.stringify(src)})`);
     for (let copy = 0; copy < (traits.includes('twin') ? 2 : 1); copy++) {
         const surface = layer(`mutation-surface${copy ? ' twin-copy' : ''}`);
-        for (const t of ['rainbow', 'golden', 'frost', 'thunder'] as const) {
+        for (const t of ['purple', 'mint', 'coral', 'rainbow', 'golden', 'punk', 'frost', 'thunder'] as const) {
             if (!traits.includes(t)) continue;
             const effect = layer(`surface-${t}`);
             if (t === 'frost') effect.style.setProperty('--ice-cracks', crackImage);
+            if (t === 'rainbow') for (const region of ['a','b','c']) effect.append(layer(`prism-region prism-${region}`));
             surface.append(effect);
         }
         if (surface.childElementCount) box.append(surface);
+        for (const t of ['punk', 'classical'] as const) if (traits.includes(t)) box.append(accessory(t, copy));
     }
     if (traits.includes('frost')) {
         box.append(layer('frost-mist'));
@@ -86,5 +106,8 @@ export function attachMutationEffects(box: HTMLElement, src: string, traits: Tra
         box.append(arcs); particles(box, 'charge', 5);
     }
     if (traits.includes('shiny')) particles(box, 'star', 7);
+    if (traits.includes('firefly')) particles(box, 'firefly', 5);
+    if (traits.includes('petals')) particles(box, 'petal', 7);
+    if (traits.includes('classical')) particles(box, 'note', 3);
     watch(box);
 }

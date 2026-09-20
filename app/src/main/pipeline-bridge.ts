@@ -1,6 +1,8 @@
+import { ActionSessions } from './action-sessions';
+import { editManifest } from './manifest-store';
 import { selectedImage } from './character-images';
 import type { ImageSelection } from '../shared/character-images';
-import { originalActionSpec, originalFramePrompt, originalVideoPrompt } from '@qbot/pipeline';
+import { generationMotionDesc, originalActionSpec, originalFramePrompt, originalVideoPrompt } from '@qbot/pipeline';
 import { isCloudJob, startCloudHatch, cloudOperation, syncCloudJob } from './cloud-generation';
 /**
  * pipeline-bridge：唯一 import @qbot/pipeline 的地方。
@@ -64,6 +66,7 @@ interface ActiveHatch {
 }
 
 const active = new Map<string, ActiveHatch>();
+const preparingWholeJob = new Set<string>();
 
 /** .job/ 内相对路径 → qbot-asset URL（协议服务整个角色目录，含 .job/） */
 function jobAssetUrl(dirId: string, rel: string): string {
@@ -168,16 +171,20 @@ export async function startHatch(
 /** 续跑未完成的孵化（断点续跑） */
 export async function resumeHatch(dirId: string): Promise<void> {
   if (isCloudJob(dirId)) return cloudOperation(dirId, 'resume');
-  if (active.has(dirId) || preparingFrames.has(dirId)) return; // 已在跑或准备参考帧
+  if (active.has(dirId) || actionSessions.has(dirId) || preparingWholeJob.has(dirId)) return; // 已在跑或准备参考帧
+  preparingWholeJob.add(dirId);
+  try {
   const outDir = path.join(charactersDir(), dirId);
   const job = await Job.load(outDir);
   if (job.state.regenerateActions?.length) {
     const pending = job.state.regenerateActions.filter(id => job.state.actions[id]?.status !== 'done');
+    preparingWholeJob.delete(dirId);
     if (pending.length) await rerunActions(dirId, pending, false);
     return;
   }
   await restoreGenerationTask(dirId);
   runJob(dirId, job);
+  } finally { preparingWholeJob.delete(dirId); }
 }
 
 /** 三视图挑选（index=-1 重新生成一轮） */
@@ -212,6 +219,7 @@ export async function getHatchStatus(dirId: string): Promise<HatchStatus | null>
   }
   return {
     stage: state.stage,
+    regenerating: !!state.regenerateActions?.length,
     running: !!entry,
     imageProvider: state.imageProvider,
     candidateUrls:
@@ -219,7 +227,7 @@ export async function getHatchStatus(dirId: string): Promise<HatchStatus | null>
         ? state.turnaround.candidates.map((rel) => jobAssetUrl(dirId, rel))
         : undefined,
     actions: Object.fromEntries(
-      ACTION_IDS.map((id) => {
+      (state.regenerateActions ?? state.baseActionIds ?? ACTION_IDS).map((id) => {
         const a = state.actions[id];
         return [
           id,
@@ -227,6 +235,7 @@ export async function getHatchStatus(dirId: string): Promise<HatchStatus | null>
             status: a?.status ?? 'pending',
             frameUrl: a?.framePath ? jobAssetUrl(dirId, a.framePath) : undefined,
             error: a?.error,
+            needsFrameApproval: !!(a?.needsFrameApproval && a.frameQcPass),
           },
         ];
       }),
@@ -238,8 +247,8 @@ export async function getHatchStatus(dirId: string): Promise<HatchStatus | null>
 export async function redoFailed(dirId: string): Promise<void> {
   if (isCloudJob(dirId)) return cloudOperation(dirId, 'resume');
   const outDir = path.join(charactersDir(), dirId);
-  const job = await Job.load(outDir);
-  const failed = ACTION_IDS.filter((id) => job.state.actions[id]?.status === 'failed');
+  const job: JobState = JSON.parse(await readFile(path.join(outDir,'.job/state.json'),'utf8'));
+  const failed = ACTION_IDS.filter((id) => job.actions[id]?.status === 'failed');
   if (!failed.length) return;
   await rerunActions(dirId, failed);
 }
@@ -262,28 +271,39 @@ export async function regenerateActions(dirId: string, actionIds: ActionId[]): P
 }
 
 /** Two-stage review: an unapproved frame cannot submit a paid video, including after restart. */
-const preparingFrames = new Set<string>();
-export async function prepareActionFrame(dirId: string, id: ActionId, selection: ImageSelection): Promise<string> {
-  if (preparingFrames.has(dirId)) throw new Error('该角色正在准备生成，请稍候');
-  preparingFrames.add(dirId);
-  try { return await prepareActionFrameInner(dirId,id,selection); }
-  finally { preparingFrames.delete(dirId); }
+const actionSessions = new ActionSessions<Job>();
+async function withActionJob<T>(dirId: string, ids: ActionId[], work: (job: Job) => Promise<T>): Promise<T> {
+  if (preparingWholeJob.has(dirId) || active.has(dirId) && !actionSessions.has(dirId)) throw new Error('角色正在完整生成，完成后可单独生成动作');
+  return actionSessions.run(dirId, ids, async () => {
+    const job = await loadExistingCharacterJob(path.join(charactersDir(), dirId));
+    active.set(dirId, { dirId, job, pickResolver: null, lastCandidates: [] });
+    job.on('progress', (ev: ProgressEvent) => broadcast(dirId, ev));
+    return job;
+  }, work, async job => {
+    try {
+      const ids = job.state.regenerateActions ?? [];
+      const states = ids.map(id => job.state.actions[id]);
+      await job.setStage(states.some(a => a.needsFrameApproval && a.status !== 'failed') ? 'actions' : states.some(a => a.status === 'failed') ? 'failed' : 'done');
+    } finally { active.delete(dirId); }
+  });
 }
-async function prepareActionFrameInner(dirId: string, id: ActionId, selection: ImageSelection): Promise<string> {
+export async function prepareActionFrame(dirId: string, id: ActionId, selection: ImageSelection): Promise<string> {
+  if (!ACTION_IDS.includes(id)) throw new Error('无效动作');
+  return withActionJob(dirId, [id], job => prepareActionFrameInner(dirId,id,selection,job));
+}
+async function prepareActionFrameInner(dirId: string, id: ActionId, selection: ImageSelection, job: Job): Promise<string> {
   if (!ACTION_IDS.includes(id)) throw new Error('无效动作');
   if (isCloudJob(dirId)) throw new Error('云端任务请使用原有任务入口');
-  if (active.has(dirId)) throw new Error('该角色已有生成任务');
   const outDir = path.join(charactersDir(), dirId);
   await buildConfig(); // Validate credentials before replacing any resumable action record.
   const reference = await selectedImage(outDir, selection);
-  const job = await loadExistingCharacterJob(outDir);
   const rel = `.job/${id}_reference_${randomUUID()}.png`;
   await writeFile(path.join(outDir,rel),reference);
   job.state.actions[id] = {status:'pending', attempts:{frame:0,video:0}, referenceImage:rel, referenceSelection:selection, needsFrameApproval:true};
-  job.state.regenerateActions = [id];
+  job.state.regenerateActions = [...new Set([...(job.state.regenerateActions ?? []), id])];
   await job.save();
-  await rerunActions(dirId,[id],false);
-  const saved = await Job.load(outDir);
+  await rerunActionsInner(dirId,[id],false,job);
+  const saved = job;
   const a = saved.state.actions[id];
   if (!a.frameQcPass || !a.framePath || a.status === 'failed') throw new Error(a.error || '首帧生成失败');
   return toDataUrl(await readFile(saved.jobPath(a.framePath)));
@@ -304,64 +324,40 @@ export async function pendingActionFrame(dirId: string, id: ActionId): Promise<s
   } catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null; throw e; }
 }
 export async function approveActionFrame(dirId: string, id: ActionId, expectedFrame: string): Promise<void> {
-  if (preparingFrames.has(dirId)) throw new Error('该角色正在准备生成，请稍候');
-  preparingFrames.add(dirId);
-  try { await approveActionFrameInner(dirId,id,expectedFrame); }
-  finally { preparingFrames.delete(dirId); }
-}
-async function approveActionFrameInner(dirId: string, id: ActionId, expectedFrame: string): Promise<void> {
   if (!ACTION_IDS.includes(id)) throw new Error('无效动作');
-  if (active.has(dirId)) throw new Error('该角色已有生成任务');
-  const job = await Job.load(path.join(charactersDir(),dirId)); const a = job.state.actions[id];
+  await withActionJob(dirId, [id], job => approveActionFrameInner(dirId,id,expectedFrame,job));
+}
+async function approveActionFrameInner(dirId: string, id: ActionId, expectedFrame: string, job: Job): Promise<void> {
+  if (!ACTION_IDS.includes(id)) throw new Error('无效动作');
+  const a = job.state.actions[id];
   if ((!a.needsFrameApproval && a.status !== 'failed') || !a.frameQcPass || !a.framePath) throw new Error('没有待确认首帧');
   if (toDataUrl(await readFile(job.jobPath(a.framePath))) !== expectedFrame) throw new Error('首帧已经变化，请重新检查后确认');
   a.needsFrameApproval = false; await job.save();
-  await rerunActions(dirId,[id],false);
+  await rerunActionsInner(dirId,[id],false,job);
 }
 
 /** 重生成所选动作，合并成功结果；导入角色不需要原孵化任务。 */
 async function rerunActions(dirId: string, actionIds: ActionId[], fresh = true): Promise<void> {
-  if (active.has(dirId)) throw new Error('该角色已有生成任务在跑，请等它结束');
+  await withActionJob(dirId, actionIds, job => rerunActionsInner(dirId,actionIds,fresh,job));
+}
+async function rerunActionsInner(dirId: string, actionIds: ActionId[], fresh: boolean, job: Job): Promise<void> {
   const cfg = await buildConfig();
-  const outDir = path.join(charactersDir(), dirId);
-  const job = await loadExistingCharacterJob(outDir);
   for (const id of actionIds) {
-    // Failed actions resume paid upstream IDs; regenerating a successful action is explicitly fresh.
-    if (fresh && job.state.actions[id]?.status !== 'failed') {
-      job.state.actions[id] = { status: 'pending', attempts: { frame: 0, video: 0 } };
-    }
+    if (fresh && job.state.actions[id]?.status !== 'failed') job.state.actions[id] = { status: 'pending', attempts: { frame: 0, video: 0 } };
   }
-  job.state.regenerateActions = actionIds;
+  job.state.regenerateActions = [...new Set([...(job.state.regenerateActions ?? []), ...actionIds])];
   await job.save();
   await restoreGenerationTask(dirId);
-
-  const entry: ActiveHatch = { dirId, job, pickResolver: null, lastCandidates: [] };
-  active.set(dirId, entry);
-  job.on('progress', (ev: ProgressEvent) => broadcast(dirId, ev));
-  try {
-    // 沿用 job 创建时选定的生图后端
-    if (job.state.imageProvider) cfg.imageProvider = job.state.imageProvider;
-    const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
-    await runActions(job, createArkClient(cfg), ffmpegPath, undefined, cfg.concurrency, actionIds);
-    if (actionIds.some(id => job.state.actions[id].needsFrameApproval && job.state.actions[id].status !== 'failed')) { await job.setStage('actions'); return; }
-    await mergeRegeneratedActions(job, actionIds);
-    broadcast(dirId, { jobId: job.state.jobId, stage: 'done' });
-    await rebuildTray();
-    // 新资产落盘 → 让 pet 重建 Player
-    const meta = await getCharacter(dirId);
-    if (meta?.manifest && (await getSettings()).activeCharacter === dirId) {
-      broadcastCharacterActivated(meta);
-    }
-  } catch (err) {
-    broadcast(dirId, {
-      jobId: job.state.jobId,
-      stage: 'failed',
-      error: String(err instanceof Error ? err.message : err),
-    });
-    throw err;
-  } finally {
-    active.delete(dirId);
-  }
+  if (job.state.imageProvider) cfg.imageProvider = job.state.imageProvider;
+  const ffmpegPath = await resolveFfmpegPath(cfg.ffmpegPath);
+  await runActions(job, createArkClient(cfg), ffmpegPath, undefined, cfg.concurrency, actionIds);
+  const ready = actionIds.filter(id => !job.state.actions[id].needsFrameApproval || job.state.actions[id].status === 'failed');
+  if (!ready.length) return;
+  await mergeRegeneratedActions(job, ready, false);
+  for (const id of ready) broadcastCustomAction(dirId, id, 'done');
+  await rebuildTray();
+  const meta = await getCharacter(dirId);
+  if (meta?.manifest && (await getSettings()).activeCharacter === dirId) broadcastCharacterActivated(meta);
 }
 
 /**
@@ -371,7 +367,9 @@ async function rerunActions(dirId: string, actionIds: ActionId[], fresh = true):
  */
 export async function regenerateTurnaround(dirId: string): Promise<void> {
   if (isCloudJob(dirId)) throw new Error('云端角色请在形象确认时更换方案；完整重建需要新建任务');
-  if (active.has(dirId)) throw new Error('该角色已有生成任务在跑，请等它结束');
+  if (active.has(dirId) || actionSessions.has(dirId) || preparingWholeJob.has(dirId)) throw new Error('该角色已有生成任务在跑，请等它结束');
+  preparingWholeJob.add(dirId);
+  try {
   const outDir = path.join(charactersDir(), dirId);
   const job = await Job.load(outDir);
   // 清空已挑选的三视图 + 全部动作回 pending，让 runPipeline 从 Stage 1 重跑
@@ -382,6 +380,7 @@ export async function regenerateTurnaround(dirId: string): Promise<void> {
   await job.save();
   await restoreGenerationTask(dirId);
   runJob(dirId, job); // 内部已挂 pickCandidate hook + 进度广播
+  } finally { preparingWholeJob.delete(dirId); }
 }
 
 // ── studio: prompt 全文编辑 ────────────────────────────────
@@ -394,22 +393,20 @@ export async function saveFullPrompts(
   videoPromptFull: string,
 ): Promise<void> {
   const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
-  const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw) as Manifest;
+  await editManifest(manifestPath, manifest => {
   const a = manifest.actions[actionId as ActionId];
   if (!a) throw new Error(`动作 "${actionId}" 不存在`);
   a.framePromptFull = framePromptFull.trim() || undefined;
   a.videoPromptFull = videoPromptFull.trim() || undefined;
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  });
 }
 
 /** 保存三视图 prompt 全文覆盖（空串 = 清除覆盖） */
 export async function saveTurnaroundPrompt(dirId: string, prompt: string): Promise<void> {
   const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
-  const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw) as Manifest;
+  await editManifest(manifestPath, manifest => {
   manifest.turnaroundPromptFull = prompt.trim() || undefined;
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  });
 }
 
 // ── studio: persona + custom actions ──────────────────────
@@ -417,10 +414,9 @@ export async function saveTurnaroundPrompt(dirId: string, prompt: string): Promi
 /** 保存角色人设到 manifest.json */
 export async function savePersona(dirId: string, persona: string): Promise<void> {
   const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
-  const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw) as Manifest;
+  await editManifest(manifestPath, manifest => {
   manifest.persona = persona || undefined;
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  });
 }
 
 /** 动作名合法字符：字母数字下划线或中文（用作文件名，禁路径分隔符与保留字符） */
@@ -482,8 +478,11 @@ export async function generateExpressionAction(
   const spec = expressionActionSpec(action, 'stickerLibrary' in manifest || manifest.generationMode === 'original' ? 'abstract' : form);
 
   // 写 manifest：标记 pending
-  manifest.expressionActions = {
-    ...manifest.expressionActions,
+  const updated = await editManifest(manifestPath, latest => {
+  if (latest.expressionActions?.[action]?.status === 'pending') throw new Error('这个动作正在生成，请勿重复提交');
+  if (latest.expressionActions?.[action]?.status === 'done') throw new Error('动作已生成，请刷新查看');
+  latest.expressionActions = {
+    ...latest.expressionActions,
     [action]: {
       webm: `actions/${action}.webm`,
       gif: `actions/${action}.gif`,
@@ -491,7 +490,7 @@ export async function generateExpressionAction(
       status: 'pending',
     },
   };
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  });
   await restoreGenerationTask(dirId);
   broadcastCustomAction(dirId, action, 'pending');
 
@@ -501,8 +500,8 @@ export async function generateExpressionAction(
     poseDesc: spec.poseDesc,
     motionDesc: spec.motionDesc,
     durationSec: spec.durationSec,
-    persona: manifest.persona,
-    manifest, cfg,
+    persona: updated.persona,
+    manifest: updated, cfg,
   });
 }
 
@@ -581,22 +580,9 @@ async function generateExpressionActionInner(a: {
 }
 
 /** 回写单个预设动作的状态（重读 manifest 避免覆盖并发改动，同 patchCustomActionStatus） */
-async function patchExpressionActionStatus(
-  manifestPath: string,
-  action: string,
-  status: 'done' | 'failed',
-): Promise<void> {
-  try {
-    const m = JSON.parse(await readFile(manifestPath, 'utf8')) as Manifest;
-    if (m.expressionActions?.[action]) {
-      m.expressionActions[action].status = status;
-      await writeFile(manifestPath, JSON.stringify(m, null, 2));
-    }
-  } catch (err) {
-    console.error(`[expression] 回写状态失败 (${action} → ${status}):`, err);
-  }
+async function patchExpressionActionStatus(manifestPath: string, action: string, status: 'done' | 'failed'): Promise<void> {
+  await editManifest(manifestPath, m => { if(m.expressionActions?.[action]) m.expressionActions[action].status=status; });
 }
-
 
 /** 广播自定义动作生成进度（Studio 页据此刷新） */
 function broadcastCustomAction(
@@ -634,18 +620,20 @@ export async function addCustomAction(
   const cfg = await buildConfig();
 
   // 写 manifest：标记 pending（Studio 显示黄色「生成中」）
-  manifest.customActions = {
-    ...manifest.customActions,
+  const updated = await editManifest(manifestPath, latest => {
+  if (latest.customActions?.[name] || latest.actions[name as ActionId] || latest.expressionActions?.[name as ExpressionActionId] || latest.importedActions?.[name]) throw new Error(`动作 "${name}" 已存在`);
+  latest.customActions = {
+    ...latest.customActions,
     [name]: { webm: `actions/${name}.webm`, gif: `actions/${name}.gif`, durationSec, status: 'pending', poseDesc, motionDesc },
   };
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  });
   await restoreGenerationTask(dirId);
   broadcastCustomAction(dirId, name, 'pending');
 
   // 后台生成，不阻塞 IPC 返回
   void generateCustomAction({
     dirId, outDir, manifestPath, name, poseDesc, motionDesc, durationSec,
-    persona: manifest.persona, manifest, cfg, referenceImage,
+    persona: updated.persona, manifest: updated, cfg, referenceImage,
   });
 }
 
@@ -734,31 +722,24 @@ async function generateCustomAction(a: {
 }
 
 /** 回写单个自定义动作的状态（重读 manifest 避免覆盖并发改动） */
-async function patchCustomActionStatus(
-  manifestPath: string,
-  name: string,
-  status: 'done' | 'failed' | 'pending',
-): Promise<void> {
-  const raw = await readFile(manifestPath, 'utf8');
-  const m = JSON.parse(raw) as Manifest;
-  if (m.customActions?.[name]) {
-    m.customActions[name].status = status;
-    await writeFile(manifestPath, JSON.stringify(m, null, 2));
-  }
+async function patchCustomActionStatus(manifestPath: string, name: string, status: 'done' | 'failed' | 'pending'): Promise<void> {
+  await editManifest(manifestPath, m => { if(m.customActions?.[name]) m.customActions[name].status=status; });
 }
 
 /** 删除自定义动作 */
 export async function deleteCustomAction(dirId: string, name: string): Promise<void> {
   const outDir = path.join(charactersDir(), dirId);
   const manifestPath = path.join(outDir, 'manifest.json');
-  const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw) as Manifest;
+  await editManifest(manifestPath, manifest => {
   if (!manifest.customActions?.[name]) throw new Error(`动作 "${name}" 不存在`);
+  if(manifest.customActions[name].status==='pending')throw new Error('动作正在生成，完成后再删除');
   delete manifest.customActions[name];
+  if(manifest.resourceAnnotations)delete manifest.resourceAnnotations[name];
+  for(const pool of Object.values(manifest.scenePools??{})){const index=pool.indexOf(name);if(index>=0)pool.splice(index,1);}
   if (Object.keys(manifest.customActions).length === 0) {
     manifest.customActions = undefined;
   }
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  });
 }
 
 /** 保存单个动作的自定义 prompt（poseDesc / motionDesc）到 manifest.json */
@@ -769,13 +750,13 @@ export async function saveActionPrompt(
   motionDesc: string,
 ): Promise<void> {
   const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
-  const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw) as Manifest;
+  await editManifest(manifestPath, manifest => {
   const a = manifest.actions[actionId as ActionId];
   if (!a) throw new Error(`动作 "${actionId}" 不存在`);
   a.poseDesc = poseDesc || undefined;
   a.motionDesc = motionDesc || undefined;
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  a.motionDescSource = motionDesc ? 'user' : undefined;
+  });
 }
 
 /** 保存 Claude Code 联动动作配置到 manifest.json */
@@ -784,10 +765,9 @@ export async function saveAgentActions(
   config: AgentActionConfig,
 ): Promise<void> {
   const manifestPath = path.join(charactersDir(), dirId, 'manifest.json');
-  const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw) as Manifest;
+  await editManifest(manifestPath, manifest => {
   manifest.agentActions = Object.keys(config).length > 0 ? config : undefined;
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  });
   const meta=await getCharacter(dirId);
   if(meta&&(await getSettings()).activeCharacter===dirId)broadcastCharacterActivated(meta);
 }
@@ -835,10 +815,11 @@ export async function getPrompts(dirId: string): Promise<PromptData> {
       const spec = original ? originalActionSpec(id) : actionSpec(id, characterForm, characterStyle);
       // 优先使用 manifest 中保存的自定义 prompt，未保存的用默认 actionSpec
       const poseDesc = custom?.poseDesc || spec.poseDesc;
-      const motionDesc = custom?.motionDesc || spec.motionDesc;
+      const customMotionDesc = manifest ? generationMotionDesc(manifest, custom) : undefined;
+      const motionDesc = customMotionDesc || spec.motionDesc;
       // 传入全文覆盖 → 返回的就是实际会用于生成的 prompt（UI 直接展示可编辑）
       const fp = original && !custom?.framePromptFull?.trim() ? originalFramePrompt(poseDesc,persona) : framePrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.poseDesc, custom?.framePromptFull);
-      const vp = original && !custom?.videoPromptFull?.trim() ? originalVideoPrompt(motionDesc) : videoPrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.motionDesc, custom?.videoPromptFull);
+      const vp = original && !custom?.videoPromptFull?.trim() ? originalVideoPrompt(motionDesc) : videoPrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, customMotionDesc, custom?.videoPromptFull);
       return [
         id,
         {

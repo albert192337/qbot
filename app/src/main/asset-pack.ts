@@ -52,7 +52,7 @@ export function sanitizeManifest(manifest: Record<string, unknown>): Record<stri
     if (!entries || typeof entries !== 'object') continue;
     for (const value of Object.values(entries)) {
       if (!value || typeof value !== 'object') continue;
-      for (const key of ['raw','gif','poseDesc','motionDesc','framePromptFull','videoPromptFull','sourceName']) delete value[key];
+      for (const key of ['raw','gif','poseDesc','motionDesc','motionDescSource','framePromptFull','videoPromptFull','sourceName']) delete value[key];
     }
   }
   const library = rest.stickerLibrary as { items?:Array<Record<string,unknown>> }|undefined;

@@ -7,6 +7,7 @@ import { rememberConversation, setChatting } from './conversation-memory';
 import { beginBrainCall, updateBrainCall } from './brain-log';
 import { execute } from './behavior-executor';
 import { buildChatMessages, parseChatReply } from './pet-chat-rules';
+import { beginChatThinking } from './bubble';
 
 let busy = false;
 /** 主动对话独立于自由模式和自动思考冷却；同一时刻仅接受一条。 */
@@ -16,9 +17,11 @@ export async function sendPetChat(text: unknown): Promise<{ ok: boolean; error?:
   busy = true;
   let traceId: string | undefined;
   let character: string | undefined;
+  let stopThinking = () => {};
   try {
     const settings = await getSettings();
     if (!settings.arkApiKey) return { ok: false, error: '请先在设置中配置 LLM API Key。' };
+    stopThinking = beginChatThinking();
     character = settings.activeCharacter ?? 'default';
     setChatting(character, true);
     const input = await buildInput('chat', text.trim());
@@ -49,5 +52,5 @@ export async function sendPetChat(text: unknown): Promise<{ ok: boolean; error?:
     const message = error instanceof Error ? error.message : String(error);
     await updateBrainCall(traceId, '聊天失败', {}, message);
     return { ok: false, error: message };
-  } finally { busy = false; if (character) setChatting(character, false); }
+  } finally { stopThinking(); busy = false; if (character) setChatting(character, false); }
 }

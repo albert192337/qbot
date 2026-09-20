@@ -65,7 +65,7 @@ app.whenReady().then(async () => {
     'ui:returnToDesktop':()=>{qa.calls.push(['desktop']);},
   };
   if(process.env.QBOT_QA_STICKERS==='1') {
-    const names=Array.from({length:255},(_,i)=>({id:`st_${i}`,name:i===0?'开心':`表情${i}`}));
+    const names=Array.from({length:255},(_,i)=>({id:`st_${i}`,name:process.env.QBOT_QA_CONSOLE==='1'&&i<2?['安静陪伴','发呆'][i]:i===0?'开心':`表情${i}`}));
     const pixel='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
     let dog=process.env.QBOT_QA_REAL_STICKERS?JSON.parse(await readFile(path.join(process.env.QBOT_QA_REAL_STICKERS,'manifest.json'),'utf8')):null;
     Object.assign(handlers,{
@@ -75,7 +75,7 @@ app.whenReady().then(async () => {
         qa.calls.push(['sticker-create',req]);
         dog={...manifest,name:req.name,actions:{idle:manifest.actions.idle},
           customActions:Object.fromEntries(req.items.map(i=>[i.id,{...manifest.actions.idle,motionDesc:i.tags.join('；')}])),
-          stickerLibrary:{version:1,referenceId:req.referenceId,scenes:req.scenes,items:req.items.map(i=>({...i,name:names.find(n=>n.id===i.id).name,raw:'source.png'}))}};
+          scenePools:req.sceneCandidates,stickerLibrary:{version:1,referenceId:req.referenceId,scenes:req.scenes,sceneCandidates:req.sceneCandidates,idleCandidates:req.sceneCandidates?.idle,items:req.items.map(i=>({...i,name:i.name||names.find(n=>n.id===i.id).name,raw:'source.png'}))}};
         qa.win.webContents.send('stickerLibrary:progress',{completed:255,total:255,current:'完成',failed:0});
         return {dirId:'white-dog',failed:[]};
       },
@@ -101,6 +101,6 @@ app.whenReady().then(async () => {
   const pushVisibility=()=>win.webContents.send('ui:nurseryVisibility',win.isVisible()&&!win.isMinimized());
   for(const event of ['show','hide','minimize','restore'])win.on(event,pushVisibility);
   qa.push=status=>{qa.status=status;win.webContents.send('hatch:cloudStatus',{dirId:'new-friend',status});};
-  await win.loadFile(path.join(root,'app/out/renderer/nursery/index.html'));
+  await win.loadFile(path.join(root,process.env.QBOT_QA_CONSOLE==='1'?'app/out/renderer/console/index.html':'app/out/renderer/nursery/index.html'), process.env.QBOT_QA_CONSOLE==='1'?{query:{pane:'persona'}}:undefined);
 });
 app.on('window-all-closed',()=>app.quit());

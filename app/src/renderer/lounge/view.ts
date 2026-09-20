@@ -746,7 +746,7 @@ export async function mountView(host: HTMLElement) {
   $('create-btn').addEventListener('click', () => void openCreateSheet());
   $('join-id').addEventListener('click', () => {
     const id = searchInput.value.trim();
-    if (!/^\d{8}$/.test(id)) {
+    if (!/^[0-9A-Z]{8}$/.test(id)) {
       setStatus('在搜索框填入 8 位房号，再敲门。', true);
       return;
     }

@@ -43,7 +43,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
         throw Error('土地不存在'); return s.plots[index]; };
     const parent = (id: string) => s.produce.find(p => p.id === id) ?? s.plots.find(p => p?.id === id && p.readyAt <= now);
     switch (cmd.type) {
-        case 'travelExperience': case 'travelNext': case 'travelLike':
+        case 'travelExperience': case 'travelNext': case 'travelLike': case 'travelMomentLike': case 'travelRehearsalLike':
             travelTransition(s, cmd, now); break;
         case 'buyMany': {
             if (!Array.isArray(cmd.items) || !cmd.items.length || cmd.items.length > 100 || new Set(cmd.items.map(x => x.offer)).size !== cmd.items.length) throw Error('请选择商品');
@@ -262,6 +262,7 @@ export function validateGarden(raw: unknown): GardenState {
         !s.shop || !number(s.shop.refreshAt) || !Array.isArray(s.shop.offers) || !s.shop.offers.every(o => o && typeof o.id === 'string' && number(o.stock) && number(o.price) && (o.kind === 'seed' ? known(o.item) : o.kind === 'fertilizer' && Object.hasOwn(FERTILIZERS, o.item))))
         throw Error('花园存档格式不兼容或已损坏');
     if (s.travel !== undefined) validateTravel(s.travel);
+    if(s.journalEvents!==undefined&&(!Array.isArray(s.journalEvents)||s.journalEvents.some(e=>!e||!Number.isFinite(e.at)||typeof e.actor!=='string'||typeof e.summary!=='string')))throw Error('花园记录已损坏');
     return s;
 }
 

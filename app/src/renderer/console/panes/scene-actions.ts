@@ -1,3 +1,6 @@
+import { pickActions } from './action-picker';
+import { scenePool, resourceText } from '../../../shared/action-resources';
+import { STICKER_SCENES } from '../../../shared/sticker-library';
 /**
  * 场景动作 pane：为每个场景指定桌宠播放哪个动作。
  * 自 renderer/studio/main.ts 的「Claude Code 联动」区块拆出并正名（阶段 4）——
@@ -29,6 +32,7 @@ const SCENES: { key: string; label: string; hint: string }[] = [
 
 let paneRoot: HTMLElement | null = null;
 let boundDirId: string | null = null;
+let poolsDirty = false;
 
 export async function mount(root: HTMLElement): Promise<void> {
   paneRoot = root;
@@ -44,7 +48,7 @@ export async function onVisible(): Promise<void> {
 }
 
 export function hasUnsavedChanges(): boolean {
-  return hasDirtyControls(paneRoot);
+  return poolsDirty || hasDirtyControls(paneRoot);
 }
 
 export async function discardChanges(): Promise<void> {
@@ -58,6 +62,8 @@ async function refresh(force = false): Promise<void> {
   if (!ctx) return;
   if (!force && boundDirId === ctx.dirId && hasUnsavedChanges()) return;
   boundDirId = ctx.dirId;
+  poolsDirty = false;
+  const pools=Object.fromEntries(STICKER_SCENES.map(([id])=>[id,scenePool(ctx.m,id)]));
   const claudeConnected = await window.qbot.claude.getStatus();
 
   const ac = ctx.m.agentActions ?? ({} as AgentActionConfig);
@@ -77,10 +83,11 @@ async function refresh(force = false): Promise<void> {
   };
 
   let html = '<div class="studio-body">';
-  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台</p><h2>场景联动</h2><p class="page-summary">让桌宠根据工作、音乐与会议状态自动切换动作。</p></div></div>`;
+  html += `<div class="page-heading"><div><p class="eyebrow">角色工作台</p><h2>动作配置</h2><p class="page-summary">让桌宠根据工作、音乐与会议状态自动切换动作。</p></div></div>`;
   html += `<p class="studio-hint">桌宠在各场景下播放的动作。只列已生成完成的动作——没生成完的选了也播不出来。</p>`;
   html += `<div class="integration-strip"><span class="status-chip ${claudeConnected ? 'success' : 'muted'}">Claude Code ${claudeConnected ? '已接入' : '未接入'}</span><span class="status-chip ${navigator.platform.toLowerCase().includes('win') ? 'success' : 'muted'}">网易云监听 ${navigator.platform.toLowerCase().includes('win') ? '可用' : '仅 Windows'}</span><button class="text-action" id="open-claude-settings">管理连接</button></div>`;
 
+  html += `<h3>基础场景</h3><p class="studio-hint">每个场景可选多个动作。待机缓慢轮换，其他场景触发时选择一个。</p><div class="scene-pool-list">${STICKER_SCENES.map(([id,label])=>`<article><h3>${label}</h3><p data-pool-summary="${id}">${pools[id].map(v=>esc(resourceText(ctx.m,v).name)).join('、')||'未设置'}</p><button class="btn ghost" data-pool="${id}">选择动作（${pools[id].length}）</button></article>`).join('')}</div><div class="btn-row"><button class="btn primary" data-save-pools>保存基础场景</button><button class="btn ghost" data-reset-pools>撤销修改</button></div>`;
   html += `<h3>Claude Code</h3>`;
   html += '<p class="studio-hint">新增工具失败监听：旧连接请在“管理连接”中断开再接入一次。工作、思考、等待和失败可分别选择不同的表情。</p>';
   html += `<div class="scene-grid">`;
@@ -119,6 +126,18 @@ async function refresh(force = false): Promise<void> {
 
   root.innerHTML = html;
   trackDirtyControls(root);
+  root.querySelectorAll<HTMLButtonElement>('[data-pool]').forEach(b=>b.onclick=async()=>{
+    const scene=b.dataset.pool!;
+    const choices=collectActions(ctx.m,ctx.prompts).filter(a=>a.status==='done').map(a=>({id:a.id,name:a.label,meaning:a.motionDesc,tags:resourceText(ctx.m,a.id).tags,video:`qbot-asset://${ctx.dirId}/${a.webm}`,preview:a.gif?`qbot-asset://${ctx.dirId}/${a.gif}`:undefined}));
+    const ids=await pickActions(root,scene,STICKER_SCENES.find(([id])=>id===scene)![1],choices,pools[scene]);
+    if(ids===null)return;
+    pools[scene]=ids;poolsDirty=true;b.textContent=`选择动作（${ids.length}）`;
+    root.querySelector(`[data-pool-summary="${scene}"]`)!.textContent=ids.map(id=>choices.find(c=>c.id===id)?.name??id).join('、')||'未设置';
+  });
+  root.querySelector<HTMLButtonElement>('[data-reset-pools]')!.onclick=()=>void refresh(true);
+  root.querySelector<HTMLButtonElement>('[data-save-pools]')!.onclick=e=>void guard(root,e.currentTarget as HTMLButtonElement,'保存中…',async()=>{
+    await window.qbot.studio.saveScenePools(ctx.dirId,pools);poolsDirty=false;toast(root,'基础场景已保存');
+  });
 
   root.querySelector<HTMLButtonElement>('#save-scenes')?.addEventListener('click', (e) => {
     const btn = e.currentTarget as HTMLButtonElement;

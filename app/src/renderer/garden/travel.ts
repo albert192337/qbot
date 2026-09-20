@@ -1,6 +1,6 @@
 import './travel.css';
 import { experienceArt } from './travel-experience-art';
-import { DESTINATIONS,initialTravel,travelComplete,travelAlbums,travelTransition,localDay,type TravelPost,type TravelState } from '../../shared/travel';
+import { DESTINATIONS,initialTravel,travelComplete,travelAlbums,travelTransition,localDay,albumDiary,rehearsalTravel,type TravelPost,type TravelState,type JournalStatus } from '../../shared/travel';
 import type { GardenState,GardenCommand } from '../../shared/garden';
 const world=new URL('./assets/travel/world.png',import.meta.url).href;
 const art=[new URL('./assets/travel/kyoto.png',import.meta.url).href,new URL('./assets/travel/paris.png',import.meta.url).href,new URL('./assets/travel/island.png',import.meta.url).href];
@@ -8,8 +8,18 @@ const points=[[25,27],[77,30],[26,53],[76,56],[50,79]];
 const mapPoints=[[82,28],[23,28],[60,72]];
 let selected:number|undefined,local=false,project=0;
 // Renderer-only rehearsal. Never send these purchases or memories to the real save.
-let replay:{coins:number;travel:TravelState}|undefined;
+let replay:{id:string;coins:number;travel:TravelState}|undefined;
+let replaySaving=false;
 let celebration:{city:number;project:number;step:number;until:number}|undefined;
+let journalStatus:JournalStatus|undefined,statusLoading=false,statusVersion=0,momentBusy=false,journalMessage='';
+let redrawJournal:(()=>void)|undefined;
+const diaryPending=new Set<string>(),diaryAttempted=new Set<string>(),diaryErrors=new Map<string,string>();
+window.qbot.settings.onChanged(()=>{journalStatus=undefined;statusVersion++;diaryAttempted.clear();diaryErrors.clear();redrawJournal?.();});
+function loadJournalStatus(redraw:()=>void):void {
+ if(journalStatus||statusLoading)return;statusLoading=true;
+ const version=statusVersion;
+ void window.qbot.garden.journalStatus().then(s=>{if(version===statusVersion)journalStatus=s;}).catch(()=>{journalStatus={enabled:false,configured:false,actor:'',name:'桌宠'};}).finally(()=>{statusLoading=false;redraw();});
+}
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('travel-mode')&&!document.querySelector('.experience-preview[open]'))window.qbot.garden.closeTravel();});
 export function celebrateTravel(city:number,project:number,step:number):void {celebration={city,project,step,until:Date.now()+3400};}
 const e=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',cls='')=>{const n=document.createElement(tag);n.textContent=text;n.className=cls;return n;};
@@ -35,29 +45,39 @@ function photo(p:TravelPost):HTMLElement{
  if(p.portrait?.startsWith('data:image/')){const portrait=e('img','','traveller-seal');portrait.src=p.portrait;portrait.alt=p.name??'旅伴';v.append(portrait);}
  f.append(v,e('figcaption',p.title));return f;
 }
-export function renderTravel(host:HTMLElement,state:GardenState,page:string,act:(c:GardenCommand)=>Promise<void>,go:(s:string)=>void,busy:boolean):void{
+export function renderTravel(host:HTMLElement,state:GardenState,page:string,act:(c:GardenCommand)=>Promise<void>,go:(s:string)=>void,busy:boolean,redraw=()=>go(page)):void{
+ redrawJournal=redraw;
+ loadJournalStatus(redraw);
+ const realMoments=state.travel?.moments??[],realAct=act;
+ const savedRehearsals=state.travel?.rehearsals??[];
  const realCurrent=state.travel?.current??0;
  const startReplay=(city:number)=>{
-  if(busy||city>realCurrent)return;
+  if(busy||!Number.isInteger(city)||!DESTINATIONS[city])return;
   const travel=initialTravel(Date.now());travel.current=city;
   for(let i=0;i<city;i++)travel.progress[i].fill(3);
-  replay={coins:50000,travel};selected=city;local=true;celebration=undefined;go('travel');
+  replay={id:crypto.randomUUID(),coins:50000,travel};selected=city;local=true;celebration=undefined;go('travel');
  };
  if(replay){
-  const session=replay;state={...state,...session};busy=false;
+  const session=replay;state={...state,...session};busy=replaySaving;
   act=async command=>{
-   if(replay!==session||!(command.type==='travelExperience'||command.type==='travelLike'))return;
+   if(replaySaving||replay!==session||command.type!=='travelExperience')return;
    const next=structuredClone(session);
    try{travelTransition(next,command,Date.now());}catch{return;}
-   replay=next;
-   if(command.type==='travelExperience')celebrateTravel(command.city,command.project,command.step);
-   go(page);
+   replaySaving=true;redraw();
+   try{
+    const saved=await window.qbot.garden.saveRehearsal({id:session.id,city:command.city,progress:next.travel.progress[command.city]});
+    if(!saved.ok){journalMessage=saved.error;return;}
+    if(replay!==session)return;
+    next.travel.posts=saved.value.posts;replay=next;
+   if(command.type==='travelExperience'){next.travel.diaries=next.travel.diaries.filter(d=>d.city!==command.city);celebrateTravel(command.city,command.project,command.step);}
+   }catch{journalMessage='测试手账保存失败，请再试一次';}finally{replaySaving=false;redraw();}
   };
  }
  const journalScroll=document.querySelector('.journal-pages')?.scrollTop??0;
  const navigate=(next:string)=>{go(next);window.scrollTo({top:0,behavior:'instant'});};
  const t=state.travel??initialTravel(Date.now());
- if(selected===undefined||selected>t.current)selected=t.current;
+ if(replay&&journalStatus)for(const post of t.posts){post.actor=journalStatus.actor;post.name=journalStatus.name;}
+ if(selected===undefined||!DESTINATIONS[selected])selected=t.current;
  const city=selected,d=DESTINATIONS[city],total=t.progress[city].reduce((a,b)=>a+b,0);
  const day=Math.max(1,Math.floor((Date.now()-t.startedAt)/86400000)+1);
  host.className='travel-shell '+(page==='moments'?'journal-shell':local?'local-shell':'atlas-shell');
@@ -65,32 +85,65 @@ export function renderTravel(host:HTMLElement,state:GardenState,page:string,act:
  head.append(e('span',replay?'测试中':'DAY '+day,'travel-day'),e('strong',page==='moments'?'旅行手账':local?d.name:'世界旅行'),e('span',(replay?'测试币 ':'◉ ')+state.coins.toLocaleString(),'travel-wallet'));
  const close=btn('×',()=>window.qbot.garden.closeTravel(),'travel-close');close.title='收起旅行 · Esc';close.setAttribute('aria-label','收起旅行');head.append(close);head.title='拖动这里移动旅行面板';host.append(head);
  const nav=e('nav','','travel-tabs');
- nav.append(btn('世界地图',()=>{replay=undefined;celebration=undefined;local=false;navigate('travel');},page==='travel'&&!local?'active':''),btn('当地体验',()=>{local=true;navigate('travel');},page==='travel'&&local?'active':''),btn('旅行手账',()=>navigate('moments'),page==='moments'?'active':''),btn('花园',()=>{window.qbot.garden.open('shop');window.qbot.garden.closeTravel();}));
+ nav.append(btn('世界地图',()=>{replay=undefined;celebration=undefined;local=false;navigate('travel');},page==='travel'&&!local?'active':''),btn('当地体验',()=>{local=true;navigate('travel');},page==='travel'&&local?'active':'',city>t.current),btn('旅行手账',()=>navigate('moments'),page==='moments'?'active':''),btn('花园',()=>{window.qbot.garden.open('shop');window.qbot.garden.closeTravel();}));
  if(page==='moments'){
   const cover=e('div','','journal-cover');cover.style.backgroundImage='url("'+art[t.current]+'")';cover.append(e('span','我们的旅行'),e('h1','把日子，过成风景。'),e('small','第 '+day+' 天 · '+travelAlbums(t).length+' 个目的地'));host.append(cover);
-  const albums=travelAlbums(t);
-  for(const album of albums){
+  const writing=e('div','','journal-writing');
+  const canWrite=!!journalStatus?.enabled&&!!journalStatus.configured;
+  writing.append(btn(momentBusy?'正在写今日朋友圈…':'测试：写今日朋友圈',()=>{
+   if(momentBusy)return;momentBusy=true;journalMessage='正在回看今天的小事…';redraw();
+   void window.qbot.garden.generateMoment(crypto.randomUUID()).then(result=>{journalMessage=result.ok?'今日朋友圈已加入手账。':result.error;}).catch(()=>{journalMessage='生成失败，请重试';}).finally(()=>{momentBusy=false;redraw();});
+  },'journal-generate',!canWrite||momentBusy));
+  writing.append(e('small',!journalStatus?'读取 LLM 状态…':!journalStatus.enabled?'开启 LLM 模式后，可按人设写手账和朋友圈。':!journalStatus.configured?'请先配置 LLM API Key。':'根据今日真实记录生成并保存；测试重玩的经历不计入今日朋友圈。'));
+  if(journalMessage){const message=e('p',journalMessage,'journal-status');message.setAttribute('role','status');writing.append(message);}host.append(writing);
+  for(const moment of [...realMoments].sort((a,b)=>b.at-a.at)){
+   const card=e('article','','moment-card daily-moment');card.dataset.momentId=moment.id;
+   const title=e('div','','moment-heading');title.append(e('small',moment.name+'的今日朋友圈'),e('h2',moment.day));
+   const footer=e('div','','moment-footer');footer.append(e('span',new Date(moment.at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})),btn(moment.liked?'♥ 喜欢':'♡ 喜欢',()=>void realAct({type:'travelMomentLike',id:moment.id}),'moment-like',busy));
+   card.append(title,e('p',moment.text,'city-diary'),footer);host.append(card);
+  }
+  const sources=[{travel:t,rehearsalId:replay?.id,liked:savedRehearsals.find(e=>e.id===replay?.id)?.liked??false},...savedRehearsals.filter(e=>e.id!==replay?.id).map(e=>({travel:rehearsalTravel(e),rehearsalId:e.id,liked:e.liked}))];
+  const albums=sources.flatMap(source=>travelAlbums(source.travel).map(album=>({...source,album})));
+  for(const {travel:albumTravel,rehearsalId,liked,album} of albums){
    const last=album.posts.at(-1)!,first=album.posts[0],post=e('article','','moment-card');
    post.dataset.city=String(album.city);
+   if(rehearsalId){post.dataset.rehearsalId=rehearsalId;post.classList.add('test-travel-card');}
    const date=new Date(last.at),badge=e('div','','date-ticket');badge.append(e('strong',String(date.getDate())),e('small',(date.getMonth()+1)+'月'));post.append(badge);
-   const title=e('div','','moment-heading');title.append(e('small',(last.name??'旅伴')+'的旅行日记'),e('h2',DESTINATIONS[album.city].name+' · '+DESTINATIONS[album.city].subtitle));post.append(title);
+   const title=e('div','','moment-heading');title.append(e('small',(last.name??'旅伴')+'的旅行日记'+(rehearsalId?' · 测试旅行':'')),e('h2',DESTINATIONS[album.city].name+' · '+DESTINATIONS[album.city].subtitle));post.append(title);
    const photos=e('div','','album-photos');for(const p of album.photos)photos.append(photo(p));post.append(photos);
-   const diary=t.diaries.find(x=>x.day===localDay(last.at)&&x.actor===last.actor);
-   const sameCity=t.posts.filter(p=>localDay(p.at)===localDay(last.at)&&p.actor===last.actor).every(p=>p.city===album.city);
-   post.append(e('p',diary&&sameCity?diary.text:'这一路，我们'+album.photos.map(p=>p.title).join('、')+'。想把这些小小的快乐，都留在这一页。','city-diary'));
-   const foot=e('div','','moment-footer');foot.append(e('span',travelComplete(t,album.city)?'✓ 本站已集齐':'已收藏 '+album.photos.length+' / 5 段风景'),btn(first.liked?'♥ 喜欢':'♡ 喜欢',()=>void act({type:'travelLike',id:album.likeId}),'moment-like',busy));post.append(foot);host.append(post);
+   const diary=albumDiary(albumTravel,album.city);
+   post.append(e('p',diary?.text??'这一路，我们'+album.photos.map(p=>p.title).join('、')+'。想把这些小小的快乐，都留在这一页。','city-diary'));
+   if(canWrite&&last.actor===journalStatus?.actor){
+    const key=[statusVersion,rehearsalId??'real',last.actor,album.city,localDay(last.at),...album.posts.map(p=>p.id)].join('|');
+    const rewrite=()=>{
+     if(diaryPending.has(key))return;diaryPending.add(key);diaryAttempted.add(key);diaryErrors.delete(key);
+     const session=replay,version=statusVersion;redraw();
+     void window.qbot.garden.rewriteDiary({city:album.city,...(rehearsalId?{rehearsalId}:{})}).then(result=>{
+      if(version!==statusVersion||replay!==session)return;
+      if(result.ok){const next=result.value;albumTravel.diaries=albumTravel.diaries.filter(d=>d.city!==next.city||d.actor!==next.actor||d.day!==next.day);albumTravel.diaries.push(next);}else diaryErrors.set(key,result.error);
+     }).catch(()=>{diaryErrors.set(key,'生成失败，可点击重试');}).finally(()=>{diaryPending.delete(key);redraw();});
+    };
+    const tools=e('div','','diary-writing');tools.append(btn(diaryPending.has(key)?'正在按人设写…':'按人设重写',rewrite,'diary-rewrite',diaryPending.has(key)||busy));
+    if(diaryErrors.has(key))tools.append(e('small',diaryErrors.get(key)!));post.append(tools);
+    if(!diary?.generated&&!diaryAttempted.has(key)&&!busy)queueMicrotask(rewrite);
+   }
+   const foot=e('div','','moment-footer');foot.append(e('span',travelComplete(albumTravel,album.city)?'✓ 本站已集齐':'已收藏 '+album.photos.length+' / 5 段风景'),btn((rehearsalId?liked:first.liked)?'♥ 喜欢':'♡ 喜欢',()=>void realAct(rehearsalId?{type:'travelRehearsalLike',id:rehearsalId}:{type:'travelLike',id:album.likeId}),'moment-like',busy));post.append(foot);host.append(post);
   }
-  if(!albums.length)host.append(e('div','手账的第一页，等你一起出发。','travel-empty'));
+  if(!albums.length&&!realMoments.length)host.append(e('div','手账的第一页，等你一起出发，也可以先写下今天的小事。','travel-empty'));
  }else if(!local){
   const map=e('div','','world-map');const image=e('img');image.src=world;image.alt='手绘世界旅行路线';map.append(image);
   const route=document.createElementNS('http://www.w3.org/2000/svg','svg');route.setAttribute('viewBox','0 0 100 150');route.classList.add('atlas-route');route.setAttribute('aria-hidden','true');
   route.innerHTML='<path d="M82 48V66H23V48M23 48V92H60V114" fill="none" stroke="#345f58" stroke-width="1.2" stroke-dasharray="1 1" opacity=".65"/><path d="'+(t.current===0?'M82 48':t.current===1?'M82 48V66H23V48':'M82 48V66H23V48V92H60V114')+'" fill="none" stroke="#fff1c0" stroke-width="1.2"/>';
   map.append(route);
   DESTINATIONS.forEach((dest,i)=>{
-   const marker=btn((i<t.current?'✓ ':i>t.current?'⌑ ':'')+dest.name,()=>{selected=i;local=true;project=0;navigate('travel');},'map-pin '+(i===t.current?'current':''),i>t.current);
-   marker.style.left=mapPoints[i][0]+'%';marker.style.top=mapPoints[i][1]+'%';marker.title=i>t.current?'完成前一站后开放':dest.region;map.append(marker);
+   const marker=btn((i<t.current?'✓ ':i>t.current?'⌑ ':'')+dest.name,()=>{selected=i;project=0;navigate('travel');},'map-pin '+(i===t.current?'current':'')+(i===city?' selected':''));
+   marker.setAttribute('aria-pressed',String(i===city));
+   marker.style.left=mapPoints[i][0]+'%';marker.style.top=mapPoints[i][1]+'%';marker.title=i>t.current?'尚未解锁，可选中后进入测试':dest.region;map.append(marker);
   });
-  const ticket=e('div','','departure-ticket');ticket.append(e('small','下一段风景'),e('h2',DESTINATIONS[t.current].name),btn('出发 →',()=>{selected=t.current;local=true;project=0;navigate('travel');},'depart'));map.append(ticket);host.append(map);
+  const ticket=e('div','','departure-ticket');ticket.append(e('small',city>t.current?'尚未解锁 · 可直接测试':city<t.current?'已到访 · 可回看或测试':'当前目的地'),e('h2',d.name));
+  const actions=e('div','','destination-actions');
+  actions.append(btn(city>t.current?'尚未解锁':city<t.current?'回看 →':'出发 →',()=>{local=true;project=0;navigate('travel');},'depart',busy||city>t.current),btn('进入测试',()=>{project=0;startReplay(city);},'travel-test-entry',busy));
+  ticket.append(actions);map.append(ticket);host.append(map);
  }else{
   const vista=scene(city,'destination-view');
   const label=e('div','','destination-heading');label.append(e('span',d.region+' / '+d.name),e('strong',total+' / 15'));vista.append(label);
@@ -133,11 +186,12 @@ export function renderTravel(host:HTMLElement,state:GardenState,page:string,act:
   host.append(card);
   const next=e('div','','travel-next');next.append(btn('查看本站手账 →',()=>go('moments')));
   const test=btn(replay?'重新测试':'测试重玩',()=>startReplay(city),'travel-replay',busy);test.title='仅测试：重新体验本站，不扣真实金币、不修改旅行进度';next.append(test);
-  if(replay)next.append(btn('退出测试',()=>{replay=undefined;celebration=undefined;go('travel');},'travel-replay-exit'));
+  if(replay)next.append(btn('退出测试',()=>{replay=undefined;celebration=undefined;if(city>realCurrent)local=false;go('travel');},'travel-replay-exit'));
   else if(city===t.current&&city<DESTINATIONS.length-1)next.append(btn('下一站 · '+DESTINATIONS[city+1].name,()=>{celebration=undefined;void act({type:'travelNext',city}).then(()=>{selected=undefined;project=0;go('travel');});},'depart',busy||!travelComplete(t,city)));
   else if(city===DESTINATIONS.length-1&&travelComplete(t,city))next.append(e('span','这一程，圆满收进手账。'));
   host.append(next);
  }
  if(page==='moments'){const pages=e('div','','journal-pages');for(const child of [...host.children])if(child!==head)pages.append(child);host.append(pages);requestAnimationFrame(()=>{if(host.isConnected)pages.scrollTop=journalScroll;});}
  host.append(nav);
+ if(journalMessage.includes('保存失败'))host.append(e('p',journalMessage,'journal-status'));
 }

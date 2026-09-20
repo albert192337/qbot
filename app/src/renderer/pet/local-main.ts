@@ -1,3 +1,5 @@
+import { scenePool } from '../../shared/action-resources';
+import { mountLocalNameplate } from './nameplate';
 /** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 + 串门 + 调试面板 */
 import '../error-handler';
 import type { ActionId, PlayableId } from '@qbot/pipeline';
@@ -17,6 +19,7 @@ import { IdleDirector } from '../../shared/idle-plan';
 import { actionDisplayName, type StickerManifest } from '../../shared/sticker-behavior';
 
 const stage = document.getElementById('stage')!;
+mountLocalNameplate(stage);
 const visitorStage = document.getElementById('visitor-stage')!;
 const rng = { random: () => Math.random() };
 
@@ -40,7 +43,7 @@ const actionHold=new ActionHold();
 let holdTimeout:ReturnType<typeof setTimeout>|null=null;
 const idleDirector=new IdleDirector();
 function cancelHold():void{actionHold.cancel();if(holdTimeout)clearTimeout(holdTimeout);holdTimeout=null;}
-function idlePool():string[]{return ((currentCharacter?.manifest as StickerManifest|undefined)?.stickerLibrary?.idleCandidates??[]).filter(id=>available.includes(id));}
+function idlePool():string[]{return currentCharacter?.manifest && (currentCharacter.manifest.scenePools?.idle || (currentCharacter.manifest as StickerManifest).stickerLibrary?.idleCandidates) ? scenePool(currentCharacter.manifest,'idle').filter(id=>available.includes(id)) : [];}
 function playIdle():void{
   const pool=idlePool();
   if(!pool.length){player.play('idle');return;}
@@ -58,7 +61,7 @@ window.qbot.behaviorAction.onIdlePlan(plan=>{
 });
 
 // ── 举牌 ──────────────────────────────────────────────
-const hostSignboard = new Signboard('stage');
+const hostSignboard = new Signboard('stage', text => window.qbot.sign.display(text));
 const visitorSignboard = new Signboard('visitor-stage');
 
 let llmSpeech = true; // 设置加载完成前不抢发规则台词。
@@ -221,9 +224,11 @@ window.qbot.settings.onChanged(applySpeechSettings);
 let signboardOneShot: string | null = null;
 /** 手动举牌（右键菜单输入；收牌前一直举着） */
 let userSign: string | null = null;
+let signDismissed = false;
 let petMessage: import('../../shared/pet-message').PetMessage | null = null;
 let messageRevision = 0;
 window.qbot.sign.onMessage(message => {
+  if (message) signDismissed = false;
   messageRevision++;
   petMessage = message;
   refreshSignboard();
@@ -256,6 +261,7 @@ function hideAndSyncSign(): void {
 }
 
 function refreshSignboard(): void {
+  if (signDismissed) { hideAndSyncSign(); return; }
   if (userSign) {
     showAndSyncSign(userSign);
     return;
@@ -287,6 +293,7 @@ function refreshSignboard(): void {
 
 // ── agent 联动 ───────────────────────────────────────────
 function onAgentStatus(activity: AgentActivity): void {
+  if (activity !== agentActivity) signDismissed = false;
   // done 一次性庆祝：记忆位立即归 idle，庆祝播完自然回 idle 不再重触发
   agentActivity = activity === 'done' ? 'idle' : activity;
   if (available.length === 0) return; // 角色未加载完不驱动
@@ -302,6 +309,7 @@ void window.qbot.agent.getStatus().then((s) => onAgentStatus(s.activity));
 
 // ── meeting 联动 ──────────────────────────────────────────
 function onMeetingStatus(status: MeetingStatus): void {
+  if (status.inMeeting !== meetingStatus.inMeeting) signDismissed = false;
   meetingStatus = status;
   if (available.length === 0) return;
   refreshSignboard();
@@ -313,6 +321,7 @@ void window.qbot.meeting.getStatus().then(onMeetingStatus);
 
 // ── music 联动 ────────────────────────────────────────────
 function onMusicStatus(status: MusicStatus): void {
+  if (status.playing !== musicStatus.playing || status.title !== musicStatus.title || status.artist !== musicStatus.artist) signDismissed = false;
   musicStatus = status;
   if (available.length === 0) return;
   refreshSignboard();
@@ -668,6 +677,7 @@ window.addEventListener('blur', cancelPointer);
 const ACTION_LABELS: Record<string, string | undefined> = {
   perch_sit: '坐窗沿',
   perch_lie: '趴窗沿',
+  writing: '写手账',
   sleep: '睡觉',
   tea: '喝茶',
   talk_happy: '聊天·开心',
@@ -692,6 +702,11 @@ window.qbot.pet.onMenuCommand((cmd) => {
   else if (cmd.type === 'play') dispatch({ type: 'PLAY_ACTION', action: cmd.action as PlayableId });
   else if (cmd.type === 'signPrompt') showSignPrompt();
   else if (cmd.type === 'signClear') applyUserSign(null);
+  else if (cmd.type === 'signDismiss') {
+    signDismissed = true;
+    signboardOneShot = null;
+    applyUserSign(null);
+  }
 });
 visitorStage.addEventListener('contextmenu', e => {
   e.preventDefault(); window.qbot.pet.popupMenu([]);
@@ -703,6 +718,7 @@ window.addEventListener('beforeunload', () => visitOrchestrator.cancelVisit());
 let signEntry: HTMLInputElement | null = null;
 
 function applyUserSign(text: string | null): void {
+  if (text) signDismissed = false;
   if (!text) petMessage = null;
   userSign = text?.trim() ? text.trim().slice(0, 60) : null;
   refreshSignboard();

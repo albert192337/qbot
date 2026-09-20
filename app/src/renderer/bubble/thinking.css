@@ -1,0 +1,49 @@
+.thinking-bubble {
+  position: relative;
+  order: 1;
+  flex: 0 0 62px;
+  width: 88px;
+  height: 62px;
+  align-self: center;
+  margin-left: 50px;
+  pointer-events: none;
+  animation: thought-appear 240ms ease-out;
+}
+.thinking-cloud {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 2px 1px #59423524);
+}
+.thinking-cloud path, .thinking-cloud circle { fill: #fff3df; }
+.thinking-dots {
+  position: absolute;
+  left: 29px;
+  top: 21px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.thinking-dots i {
+  display: block;
+  width: 6px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a99dac;
+  animation: thought-dot 1400ms ease-in-out infinite;
+}
+.thinking-dots i:nth-child(2) { animation-delay: 160ms; }
+.thinking-dots i:nth-child(3) { animation-delay: 320ms; }
+@keyframes thought-dot {
+  0%, 55%, 100% { transform: translateY(0) scale(.9); opacity: .55; }
+  25% { transform: translateY(-4px) scale(1); opacity: 1; }
+}
+@keyframes thought-appear {
+  from { opacity: 0; transform: translate(-4px, 6px) scale(.85); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-bubble, .thinking-dots i { animation: none; }
+}

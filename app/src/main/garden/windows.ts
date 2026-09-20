@@ -143,6 +143,10 @@ export function openGardenPanel(page: string): void {
     }
 }
 export function registerGardenIpc(): void {
+    ipcMain.handle('garden:saveRehearsal', async (_ev,request) => (await import('./rehearsal-store')).saveRehearsal(request));
+    ipcMain.handle('garden:journalStatus', async () => (await import('./journal-service')).journalStatus());
+    ipcMain.handle('garden:rewriteDiary', async (_ev,request) => (await import('./journal-service')).rewriteDiary(request));
+    ipcMain.handle('garden:generateMoment', async (_ev,requestId) => (await import('./journal-service')).generateMoment(requestId));
     ipcMain.handle('garden:get', () => getGarden());
     ipcMain.handle('garden:act', async (_ev, command) => {
         const result = await gardenAction(command);

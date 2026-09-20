@@ -20,8 +20,23 @@ export const DESTINATIONS = [
   {name:'纪念铺',icon:'craft',steps:['挑贝壳','串贝壳手链','寄一张海岛明信片']}],costs:[400,650,950]},
 ] as const;
 export interface TravelPost { id:string; at:number; city:number; project:number; step:number; title:string; text:string; liked:boolean; actor?:string; name?:string; portrait?:string }
-export interface TravelDiary { day:string; actor:string; name:string; text:string; signature:string; updatedAt:number; generated?:boolean }
-export interface TravelState { current:number; startedAt:number; progress:number[][]; posts:TravelPost[]; diaries:TravelDiary[] }
+export interface TravelDiary { city?:number; day:string; actor:string; name:string; text:string; signature:string; updatedAt:number; generated?:boolean }
+export interface DailyMoment { id:string; at:number; day:string; actor:string; name:string; text:string; liked:boolean }
+export interface TravelRehearsal { id:string; city:number; actor:string; name:string; at:number; progress:number[]; posts:TravelPost[]; diary?:TravelDiary; liked:boolean }
+export interface RehearsalRequest { id:string; city:number; progress:number[] }
+export interface TravelState { current:number; startedAt:number; progress:number[][]; posts:TravelPost[]; diaries:TravelDiary[]; moments?:DailyMoment[]; rehearsals?:TravelRehearsal[] }
+export interface JournalStatus { enabled:boolean; configured:boolean; actor:string; name:string }
+export type JournalResult<T> = {ok:true;value:T}|{ok:false;error:string};
+export interface DiaryRequest { city:number; rehearsal?:number[]; rehearsalId?:string }
+export function rehearsalTravel(entry:TravelRehearsal):TravelState {
+ const t=initialTravel(entry.at);t.current=entry.city;
+ for(let i=0;i<entry.city;i++)t.progress[i].fill(3);
+ t.progress[entry.city]=[...entry.progress];t.posts=entry.posts;t.diaries=entry.diary?[entry.diary]:[];return t;
+}
+export function albumDiary(t:TravelState,city:number):TravelDiary|undefined {
+ const last=t.posts.filter(p=>p.city===city).at(-1);if(!last)return;
+ return t.diaries.find(d=>d.city===city&&d.actor===last.actor&&d.day===localDay(last.at));
+}
 /** Keep every paid experience in storage, but present one album per destination. */
 export function travelAlbums(t:TravelState):{city:number;posts:TravelPost[];photos:TravelPost[];likeId:string}[] {
  return DESTINATIONS.map((_,city)=>{
@@ -30,7 +45,7 @@ export function travelAlbums(t:TravelState):{city:number;posts:TravelPost[];phot
   return {city,posts,photos,likeId:posts[0]?.id??''};
  }).filter(a=>a.posts.length).sort((a,b)=>b.posts.at(-1)!.at-a.posts.at(-1)!.at);
 }
-export type TravelCommand = {type:'travelExperience';city:number;project:number;step:number}|{type:'travelNext';city:number}|{type:'travelLike';id:string};
+export type TravelCommand = {type:'travelExperience';city:number;project:number;step:number}|{type:'travelNext';city:number}|{type:'travelLike';id:string}|{type:'travelMomentLike';id:string}|{type:'travelRehearsalLike';id:string};
 export function initialTravel(now:number):TravelState {return {current:0,startedAt:now,progress:DESTINATIONS.map(d=>d.projects.map(()=>0)),posts:[],diaries:[]};}
 export function travelComplete(t:TravelState,city=t.current):boolean {return t.progress[city].every(n=>n===3);}
 export function localDay(at:number):string {const d=new Date(at);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -40,9 +55,17 @@ export function validateTravel(t:TravelState):void {
  for(const p of t.posts)if(!p||typeof p.id!=='string'||!Number.isFinite(p.at)||!Number.isInteger(p.city)||!DESTINATIONS[p.city]||!Number.isInteger(p.project)||!DESTINATIONS[p.city].projects[p.project]||!Number.isInteger(p.step)||p.step<0||p.step>2||typeof p.title!=='string'||typeof p.text!=='string'||typeof p.liked!=='boolean'||(p.portrait!==undefined&&typeof p.portrait!=='string'))throw Error('旅行回忆已损坏');
  if(new Set(t.posts.map(p=>p.id)).size!==t.posts.length)throw Error('旅行回忆重复');
  for(const d of t.diaries)if(!d||typeof d.day!=='string'||typeof d.actor!=='string'||typeof d.name!=='string'||typeof d.text!=='string'||typeof d.signature!=='string'||!Number.isFinite(d.updatedAt))throw Error('旅行日记已损坏');
+ for(const d of t.diaries)if(d.city!==undefined&&(!Number.isInteger(d.city)||!DESTINATIONS[d.city]))throw Error('旅行日记地点无效');
+ if(t.moments!==undefined&&(!Array.isArray(t.moments)||t.moments.some(m=>!m||typeof m.id!=='string'||!Number.isFinite(m.at)||typeof m.day!=='string'||typeof m.actor!=='string'||typeof m.name!=='string'||typeof m.text!=='string'||typeof m.liked!=='boolean')||new Set(t.moments.map(m=>m.id)).size!==t.moments.length))throw Error('朋友圈记录已损坏');
+ if(t.rehearsals!==undefined){
+  if(!Array.isArray(t.rehearsals)||new Set(t.rehearsals.map(e=>e.id)).size!==t.rehearsals.length)throw Error('测试旅行记录已损坏');
+  for(const e of t.rehearsals){if(!e||typeof e.id!=='string'||typeof e.actor!=='string'||typeof e.name!=='string'||typeof e.liked!=='boolean'||!Number.isFinite(e.at)||!Number.isInteger(e.city)||!DESTINATIONS[e.city]||!Array.isArray(e.progress)||e.progress.length!==5||!e.progress.every(n=>Number.isInteger(n)&&n>=0&&n<=3))throw Error('测试旅行记录已损坏');validateTravel(rehearsalTravel(e));}
+ }
 }
 export function travelTransition(s:{coins:number;travel?:TravelState},cmd:TravelCommand,now:number):void {
  const t=s.travel??=initialTravel(now);validateTravel(t);
+ if(cmd.type==='travelRehearsalLike'){const e=t.rehearsals?.find(e=>e.id===cmd.id);if(!e)throw Error('这条测试旅行不存在');e.liked=!e.liked;return;}
+ if(cmd.type==='travelMomentLike'){const m=t.moments?.find(m=>m.id===cmd.id);if(!m)throw Error('这条朋友圈不存在');m.liked=!m.liked;return;}
  if(cmd.type==='travelLike'){const p=t.posts.find(p=>p.id===cmd.id);if(!p)throw Error('这条回忆不存在');p.liked=!p.liked;return;}
  if(cmd.city!==t.current)throw Error('请在当前目的地继续旅行');
  if(cmd.type==='travelNext'){if(!travelComplete(t))throw Error('完成本站体验后再出发');if(t.current===DESTINATIONS.length-1)throw Error('新的目的地正在准备中');t.current++;return;}

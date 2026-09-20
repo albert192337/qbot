@@ -1,3 +1,4 @@
+import { resourceText } from '../../../shared/action-resources';
 /**
  * studio 系 pane 的共享件（人设与动作 / 场景动作 / 生成 Prompt 三个 pane 共用）。
  *
@@ -13,6 +14,7 @@ import { actionDisplayName, type StickerManifest } from '../../../shared/sticker
  *  口径统一：原先 hatch 叫「呼吸/悬空」、studio 叫「待机/拖拽」，收进同一窗会同屏出现。 */
 export const STD_LABELS: Partial<Record<ActionId, string>> = {
   perch_sit: '坐窗沿', perch_lie: '趴窗沿',
+  writing: '写手账',
   idle: '待机', drag: '拖拽', sleep: '睡觉', tea: '喝茶',
   talk_happy: '聊天·开心', talk_annoyed: '聊天·嫌弃',
   wave: '挥手问候', stretch: '伸懒腰',
@@ -143,10 +145,12 @@ export function collectActions(m: Manifest, prompts?: PromptData): ActionInfo[] 
   }
   const lib=(m as StickerManifest).stickerLibrary;
   for(const action of actions){
-    const name=actionDisplayName(m,action.id);
+    const resource=resourceText(m,action.id);
+    const name=resource.name;
     if(name!==action.id)action.label=STD_LABELS[action.id as ActionId]?`${STD_LABELS[action.id as ActionId]} · ${name}`:name;
     const item=lib?.items.find(i=>i.id===action.id);
     if(item){action.motionDesc=item.tags.join(' · ');action.isImported=true;}
+    if(resource.meaning || resource.tags.length) action.motionDesc=[resource.meaning,...resource.tags].filter(Boolean).join(' · ');
   }
   return [...new Map(actions.map((action) => [action.id, action])).values()];
 }

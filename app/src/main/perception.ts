@@ -204,6 +204,12 @@ export async function getSnapshot(): Promise<PerceptionSnapshot> {
     foregroundMonitor: { ...foregroundMonitor },
   };
 }
+/** Only aggregate pet interactions for the requested local day; never expose raw app/title events. */
+export async function getJournalInteractions(now:number):Promise<Record<string,number>> {
+  const s=await load(),day=todayKey(new Date(now)),counts:Record<string,number>={};
+  for(const event of s.events)if(event.type==='interact'&&event.at<=now&&todayKey(new Date(event.at))===day)counts[event.kind]=(counts[event.kind]??0)+1;
+  return counts;
+}
 
 // ── 应用前台追踪：当前聚焦的窗口应用 + 停留时长 ──────────────
 /** 原生查询本身会起短命子进程，3 秒兼顾切换可见度与常驻开销。 */

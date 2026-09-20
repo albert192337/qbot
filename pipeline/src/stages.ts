@@ -23,6 +23,8 @@ import {
 import { framePrompt, turnaroundPrompt, videoPrompt, ACTIONS } from './prompts.js';
 import { checkGreenFrame, checkVideoDrift, selectDualKeys } from './qc.js';
 import { Job } from './job.js';
+import { generationMotionDesc } from './action-prompt.js';
+import { referenceColorFilter } from './reference-color.js';
 import {
   ACTION_IDS,
   ArkApiError,
@@ -142,8 +144,13 @@ export async function keyActionVideo(
   const normVf = stats ? normalizeFilter(stats, size.width, size.height) : undefined;
   const webmAbs = path.join(job.outDir, 'actions', `${action}.webm`);
   const gifAbs = path.join(job.outDir, 'actions', `${action}.gif`);
-  await toWebm(videoAbs, webmAbs, keys, ffmpegPath, normVf, erodePx, despillMix);
-  await toGif(videoAbs, gifAbs, keys, ffmpegPath, normVf, despillMix);
+  const colorVf = job.state.generationMode === 'original'
+    ? await referenceColorFilter(path.join(job.outDir, a.referenceImage ?? job.state.refImage), ffmpegPath)
+    : undefined;
+  await toWebm(videoAbs, webmAbs, keys, ffmpegPath, normVf, erodePx, despillMix, colorVf);
+  await toGif(videoAbs, gifAbs, keys, ffmpegPath, normVf, despillMix, colorVf);
+  a.colorCorrection = colorVf ? 'reference-white' : undefined;
+  await job.save();
 }
 
 /** 单动作完整链：frame → qc → video 提交 → 轮询 → 下载 → keying → 资产落盘 */
@@ -178,7 +185,7 @@ async function runAction(
     persona = manifest.persona;
     const custom = manifest.actions[action];
     customPoseDesc = custom?.poseDesc;
-    customMotionDesc = custom?.motionDesc;
+    customMotionDesc = generationMotionDesc(manifest, custom);
     framePromptFull = custom?.framePromptFull;
     videoPromptFull = custom?.videoPromptFull;
   } catch {

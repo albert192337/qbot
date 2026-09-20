@@ -91,6 +91,9 @@ body.travel-mode:not(.strip) #app{width:100%;max-width:none;height:100%;margin:0
 .travel-mode .departure-ticket{padding:10px 14px;left:8%;top:48%}
 .travel-mode .departure-ticket h2{font-size:23px!important;margin:3px 0 8px!important}.travel-mode .departure-ticket small{font-size:10px}
 .travel-mode .departure-ticket .depart{padding:7px 15px!important}
+.travel-mode .travel-shell .map-pin.selected{outline:3px solid #fff1b9;outline-offset:4px;background:#a14e43;color:#fff3d3}
+.travel-mode .destination-actions{display:flex;gap:8px}
+.travel-mode .travel-shell .travel-test-entry{padding:7px 15px;border:1px dashed #9b7859;border-radius:25px;background:#f5e0b8;color:#624e38;font-size:13px}
 .travel-mode .experience-card{position:relative;bottom:auto;min-height:82px;height:82px;flex-shrink:0;flex-wrap:nowrap;width:100%;padding:10px 16px;gap:8px;box-shadow:none}
 .travel-mode .experience-card h2{font-size:17px!important;margin:4px 0 0!important}.travel-mode .experience-card small{font-size:11px}
 .travel-mode .experience-buy{padding:10px 14px;font-size:13px!important}
@@ -130,3 +133,11 @@ body.travel-mode:not(.strip) #app{width:100%;max-width:none;height:100%;margin:0
 @media(prefers-reduced-motion:reduce){.travel-photo-reveal .revealed-postcard{animation-name:memory-shade}.photo-collected{animation:none}}
 @media(max-width:420px){.travel-photo-reveal figcaption{font-size:16px!important}}
 .travel-photo-reveal:not(.playing) .revealed-postcard,.travel-photo-reveal:not(.playing)::before{animation:none}
+.journal-writing{margin:18px 20px;padding:16px;background:#fffaf0;border:1px dashed #c7ab7d;border-radius:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.travel-mode .journal-generate,.travel-mode .diary-rewrite{padding:9px 14px;background:#a65a4a;color:#fff5dc;border-radius:20px;font-size:12px}
+.journal-writing small{flex:1;min-width:180px;font-size:12px;color:#867054;line-height:1.6}
+.journal-status{width:100%;margin:0;font-size:12px;color:#84613d}
+.diary-writing{display:flex;gap:10px;align-items:center;margin:10px 0;flex-wrap:wrap}
+.diary-writing small{color:#9e5546;font-size:12px}
+.daily-moment .city-diary{white-space:pre-wrap;overflow-wrap:anywhere}
+.travel-mode .journal-shell .travel-heading{position:relative;width:100%;flex-shrink:0;background:#416e69}

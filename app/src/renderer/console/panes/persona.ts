@@ -1,3 +1,5 @@
+import { resourceText, scenePool } from '../../../shared/action-resources';
+import './action-picker.css';
 import { regenerateWithReference } from './character-image-picker';
 import { navigate } from '../workspace';
 /**
@@ -26,6 +28,7 @@ import {
 let unsubCustomAction: (() => void) | null = null;
 let paneRoot: HTMLElement | null = null;
 let boundDirId: string | null = null;
+let generationRequests=0;
 
 export async function mount(root: HTMLElement): Promise<void> {
   paneRoot = root;
@@ -72,9 +75,10 @@ async function refresh(force = false): Promise<void> {
     boundDirId = null;
     return;
   }
-  if (!force && boundDirId === ctx.dirId && (hasUnsavedChanges() || root.querySelector('.studio-confirm-mask'))) return;
+  if (!force && boundDirId === ctx.dirId && (generationRequests>0 || hasUnsavedChanges() || root.querySelector('.studio-confirm-mask'))) return;
   boundDirId = ctx.dirId;
   const actions = collectActions(ctx.m, ctx.prompts);
+  const jobStatus = await window.qbot.hatch.getStatus(ctx.dirId).catch(()=>null);
 
   let html = '<div class="studio-body">';
   html += `<div class="page-heading"><div><p class="eyebrow">角色工作台</p><h2>动作库</h2><p class="page-summary">预览已有动作，为角色添加更多表达。</p></div><button class="btn primary" id="action-add-menu" aria-expanded="false">添加动作</button></div>`;
@@ -101,7 +105,10 @@ async function refresh(force = false): Promise<void> {
     if (frameUrl) html += `<video src="${frameUrl}" poster="qbot-asset://${ctx.dirId}/${esc(a.gif ?? ctx.m.sourceImage)}" aria-label="${esc(a.label)}动作预览" muted controls loop playsinline preload="none"></video>`;
     html += `<p class="studio-hint">${a.isImported ? '导入 GIF' : a.isCustom ? '自定义动作' : a.isExpression ? '预设动作' : '随角色生成'}</p>`;
     if (a.status === 'done') html += `<button class="preview-action btn ghost" data-id="${esc(a.id)}">${root.closest('#house-book') ? '上台练习' : '在桌面播放'}</button>`;
-    if (!a.isImported && !a.isCustom && !a.isExpression && a.status !== 'pending') html += `<button class="regenerate-action btn" data-id="${esc(a.id)}">${a.status === 'failed' ? '重试生成' : '重新生成'}</button>`;
+    if (!a.isImported && !a.isCustom && !a.isExpression && a.status !== 'pending') html += `<button class="regenerate-action btn" data-id="${esc(a.id)}">${jobStatus?.regenerating && jobStatus.actions[a.id as keyof typeof jobStatus.actions]?.needsFrameApproval ? '继续确认首帧' : a.status === 'failed' ? '重试生成' : '重新生成'}</button>`;
+    const annotation=resourceText(ctx.m,a.id);
+    if(scenePool(ctx.m,'idle').includes(a.id))html+='<span class="status-chip muted">待机候选</span>';
+    html+=`<details class="resource-annotation"><summary>名称与含义</summary><label>名称<input type="text" data-resource-name maxlength="80" value="${esc(annotation.name===a.id?a.label:annotation.name)}"></label><label>含义说明<textarea data-resource-meaning maxlength="500" placeholder="描述这个动作表达什么，适合什么情况">${esc(annotation.meaning)}</textarea></label><label>标签<input type="text" data-resource-tags value="${esc(annotation.tags.join('，'))}"></label><button class="btn ghost" data-save-resource="${esc(a.id)}">保存标注</button></details>`;
     if (a.isCustom && a.status === 'failed') html += `<p class="studio-hint">删除失败项后，可在下方重新描述并创建。</p>`;
     html += `</div>`;
   }
@@ -154,6 +161,16 @@ async function refresh(force = false): Promise<void> {
 }
 
 function bind(root: HTMLElement, dirId: string): void {
+  root.querySelectorAll<HTMLButtonElement>('[data-save-resource]').forEach(b=>b.onclick=()=>void guard(root,b,'保存中…',async()=>{
+    const card=b.closest<HTMLElement>('[data-action]')!;
+    const name=card.querySelector<HTMLInputElement>('[data-resource-name]')!.value;
+    const meaning=card.querySelector<HTMLTextAreaElement>('[data-resource-meaning]')!.value;
+    const tags=card.querySelector<HTMLInputElement>('[data-resource-tags]')!.value.split(/[,，、]/).map(t=>t.trim()).filter(Boolean);
+    await window.qbot.studio.saveResourceAnnotation(dirId,b.dataset.saveResource!,{name,meaning,tags});
+    card.querySelectorAll<HTMLInputElement|HTMLTextAreaElement>('input,textarea').forEach(c=>markControlsClean(c));
+    card.querySelector('b')!.textContent=name; card.dataset.label=`${name} ${meaning} ${tags.join(' ')}`.toLowerCase();
+    toast(root,'标注已保存');
+  }));
   const filterActions = (): void => {
     const query = root.querySelector<HTMLInputElement>('#action-search')?.value.trim().toLowerCase() ?? '';
     const status = root.querySelector<HTMLSelectElement>('#action-status-filter')?.value ?? '';
@@ -177,7 +194,7 @@ function bind(root: HTMLElement, dirId: string): void {
     section.open = true; section.scrollIntoView({ block: 'start', behavior: 'smooth' });
     section.querySelector<HTMLElement>('summary')?.focus();
   }));
-  root.querySelector('#import-actions')?.addEventListener('click', () => navigate({ pane: 'stickers' }));
+  root.querySelector('#import-actions')?.addEventListener('click', () => navigate({ pane: 'sticker-create' }));
   root.querySelectorAll<HTMLInputElement | HTMLSelectElement>('#action-search, #action-status-filter, #action-type-filter').forEach((control) => {
     control.addEventListener('input', filterActions);
     control.addEventListener('change', filterActions);
@@ -198,11 +215,12 @@ function bind(root: HTMLElement, dirId: string): void {
   root.querySelectorAll<HTMLButtonElement>('.regenerate-action').forEach((button) => button.addEventListener('click', () => {
     void (async () => {
       if (!(await confirmBox(root, '重新生成这个动作？会生成新的首帧和视频并产生模型费用，完成后替换当前动作。'))) return;
-      await guard(root, button, '生成中…', async () => {
+      generationRequests++;
+      try { await guard(root, button, '生成中…', async () => {
         if (!await regenerateWithReference(root, dirId, button.dataset.id!)) return;
         if (!hasUnsavedChanges()) await refresh();
         else toast(root, '动作已更新，当前输入已保留。');
-      });
+      }); } finally { generationRequests--; if(!generationRequests&&!hasUnsavedChanges()&&boundDirId===dirId)await refresh(); }
     })();
   }));
   // 生成可选预设动作

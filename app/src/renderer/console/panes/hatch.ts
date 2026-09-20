@@ -10,6 +10,7 @@ import { confirmBox } from './_studio-shared';
 const ACTION_LABELS: Record<ActionId, string> = {
   perch_sit: '坐窗沿',
   perch_lie: '趴窗沿',
+  writing: '写手账',
   idle: '待机',
   drag: '拖拽',
   sleep: '睡觉',
@@ -182,10 +183,10 @@ async function startHatch(file: File): Promise<void> {
     }
     const confirmed = await confirmBox(
       root!,
-      `开始创建「${name}」？\n\n将先生成 1 个角色方案；确认后，再生成${cloud ? '一套基础动作' : ' 10 个常用动作'}。\n` +
+      `开始创建「${name}」？\n\n将先生成 1 个角色方案；确认后，再生成${cloud ? '一套基础动作' : ' 11 个常用动作'}。\n` +
         `模型：${provider === 'gpt-image-2' ? 'gpt-image-2' : 'Seedream'}\n` +
         `预计时间：${provider === 'gpt-image-2' ? '约 45–80 分钟' : '约 35–60 分钟'}\n` +
-        (cloud ? '有效邀请码可不限次数创建、换方案和失败重试。\n角色图片会上传至 QBot 服务器并交给模型服务生成；只上传所选图片、角色名字和形象选项。关闭客户端后任务仍会继续，完成后回来领取。' : '预计消耗：1 张角色方案 + 10 个动作。任务提交后，已发出的 API 请求无法撤回。'),
+        (cloud ? '有效邀请码可不限次数创建、换方案和失败重试。\n角色图片会上传至 QBot 服务器并交给模型服务生成；只上传所选图片、角色名字和形象选项。关闭客户端后任务仍会继续，完成后回来领取。' : '预计消耗：1 张角色方案 + 11 个动作。任务提交后，已发出的 API 请求无法撤回。'),
     );
     if (!confirmed) return;
 
@@ -889,7 +890,7 @@ const TEMPLATE = `
       <p>从一张角色图开始，确认形象后生成常用动作，完成后可直接放到桌面。</p>
     </div>
     <div class="creation-outcome" aria-label="创建结果说明">
-      <span><b>8</b> 个常用动作</span>
+      <span><b>基础动作</b> 确认形象后生成</span>
       <span><b>分步确认</b>形象与动作</span>
       <span><b>可后台</b>继续运行</span>
     </div>
@@ -1119,7 +1120,7 @@ const TEMPLATE = `
 </div>
 
 <style>
-@scope ([data-pane="hatch"]) {
+@scope (.pane[data-pane="hatch"]) {
 :scope {
   --primary-hover: #aeea00;
   --text-primary: var(--tertiary);

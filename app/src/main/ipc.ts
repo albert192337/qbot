@@ -1,3 +1,6 @@
+import { saveResourceAnnotation, saveScenePools } from './resource-settings';
+import { registerSocialIpc } from './social-ipc';
+import { moveRoomPetWindow } from './windows';
 import { imageChoices, selectedImage, saveCover } from './character-images';
 import { prepareActionFrame, approveActionFrame, pendingActionFrame, actionReference } from './pipeline-bridge';
 import { cloudAccount, acknowledgeCloudJob, forgetCloudJob } from './cloud-generation';
@@ -8,7 +11,7 @@ import { BrowserWindow, Menu, dialog, ipcMain, powerMonitor } from 'electron';
 import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
-import { showBubbleWindow, getBubbleWindow, openCozyPreview } from './windows';
+import { showBubbleWindow, getBubbleWindow, openCozyPreview, displayDesktopSign } from './windows';
 import { getBrainLog, updateBrainCall } from './brain-log';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
@@ -65,6 +68,7 @@ import { registerStickerLibraryIpc } from './sticker-library-ipc';
 import { getIdlePlan } from './idle-plan';
 
 export function registerIpc(): void {
+  registerSocialIpc();
   ipcMain.handle('behavior:getIdlePlan',(_ev,id:string)=>getIdlePlan(id));
   ipcMain.handle('memory:retry', async () => {
     if (!(await getSettings()).developerMode) throw new Error('请先开启开发者模式');
@@ -169,6 +173,11 @@ export function registerIpc(): void {
   // ── 手动举牌（纯本地记账）────────────────────────────────
   onPetMessageChanged(message => sendToWindows('sign:message', message));
   ipcMain.handle('sign:getMessage', () => getPetMessage());
+  ipcMain.on('sign:display', (ev, text: unknown) => {
+    if (ev.sender !== getPetWindow()?.webContents) return;
+    if (text !== null && typeof text !== 'string') return;
+    displayDesktopSign(typeof text === 'string' ? text.replace(/\s+/g, ' ').trim().slice(0, 60) || null : null);
+  });
   ipcMain.on('sign:set', (_ev, text: string | null) => {
     setLocalSign(typeof text === 'string' ? text : null);
     if (!text) clearPetMessage();
@@ -281,10 +290,15 @@ export function registerIpc(): void {
     if (memberId) waveAt(memberId);
   });
   ipcMain.on('roomPet:leaveRoom', () => leaveRoom());
+  ipcMain.on('roomPet:move', (event, x: number, y: number) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) moveRoomPetWindow(win, x, y);
+  });
   ipcMain.handle('roomPet:getCache', (ev) => {
     const win = BrowserWindow.fromWebContents(ev.sender);
     const memberId = win && findRoomPetMemberId(win);
-    return memberId ? getMemberSnapshot(memberId) : null;
+    const snap = memberId ? getMemberSnapshot(memberId) : null;
+    return snap ? {hello:{nickname:snap.nickname}, character:snap.character, state:{mode:snap.mode,action:snap.action,sign:snap.sign}} : null;
   });
 
   // 桌宠右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
@@ -322,8 +336,8 @@ export function registerIpc(): void {
       ...(getLocalSign() || getPetMessage() ? [{ label: '收牌 / 收起留言', click: () => send({ type: 'signClear' as const }) }] : []),
       { type: 'separator' },
       // ── 去处（角色能去的地方 + 控制台）──────────────────
-      { label: '联机空间…', click: () => createLoungeWindow() },
-      { label: '故事小屋…', click: () => createConsoleWindow() },
+      { label: '一起玩…', click: () => createLoungeWindow() },
+      { label: '角色管理…', click: () => createConsoleWindow() },
       { label: '工具抽屉（日志）…', click: async () => {
         await setSettings({ developerMode: true });
         createConsoleWindow('devtools');
@@ -363,6 +377,16 @@ export function registerIpc(): void {
     await saveTurnaroundPrompt(dirId, prompt);
   });
   // 下面两个会调 API 花钱，渲染层已做二次确认
+  const notifyResources = async (dirId: string) => {
+    const meta = await getCharacter(dirId);
+    if (meta && (await getSettings()).activeCharacter === dirId) broadcastCharacterActivated(meta);
+  };
+  ipcMain.handle('studio:saveResourceAnnotation', async (_ev, dirId: string, id: string, value) => {
+    await saveResourceAnnotation(path.join(charactersDir(),checkedImageDir(dirId)),id,value); await notifyResources(dirId);
+  });
+  ipcMain.handle('studio:saveScenePools', async (_ev, dirId: string, pools) => {
+    await saveScenePools(path.join(charactersDir(),checkedImageDir(dirId)),pools); await notifyResources(dirId);
+  });
   ipcMain.handle('studio:imageChoices', async (_ev, dirId: string) => imageChoices(path.join(charactersDir(),checkedImageDir(dirId))));
   ipcMain.handle('studio:previewImage', async (_ev, dirId: string, selection) => `data:image/png;base64,${(await selectedImage(path.join(charactersDir(),checkedImageDir(dirId)),selection)).toString('base64')}`);
   ipcMain.handle('studio:saveCover', async (_ev, dirId: string, selection) => saveCover(path.join(charactersDir(),checkedImageDir(dirId)),selection));

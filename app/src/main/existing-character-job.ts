@@ -1,8 +1,8 @@
+import { editManifest } from './manifest-store';
 import { readFile, mkdir, writeFile, access } from 'node:fs/promises';
 import path from 'node:path';
 import { Job, ACTION_IDS, actionSpec, type ActionId, type JobState, type Manifest } from '@qbot/pipeline';
 import type { StickerManifest } from '../shared/sticker-behavior';
-import { saveLibraryManifest } from './sticker-library';
 
 /** Imported/shared characters have assets, but intentionally no original generation job. */
 export async function loadExistingCharacterJob(outDir: string): Promise<Job> {
@@ -28,10 +28,10 @@ export async function loadExistingCharacterJob(outDir: string): Promise<Job> {
 }
 
 /** Re-generation is a patch, not initial packaging: keep unselected aliases and metadata. */
-export async function mergeRegeneratedActions(job: Job, selected: ActionId[]): Promise<void> {
+export async function mergeRegeneratedActions(job: Job, selected: ActionId[], finalize = true): Promise<void> {
   const file = path.join(job.outDir, 'manifest.json');
-  const m: StickerManifest = JSON.parse(await readFile(file, 'utf8'));
   const failed: string[] = [];
+  await editManifest(file, async m => {
   for (const id of selected) {
     if (job.state.actions[id]?.status !== 'done') { failed.push(id); continue; }
     await access(path.join(job.outDir, 'actions', `${id}.webm`));
@@ -45,14 +45,16 @@ export async function mergeRegeneratedActions(job: Job, selected: ActionId[]): P
         description: `${({idle:'待机',drag:'拖拽',sleep:'睡觉',tea:'放松',wave:'招呼',talk_happy:'开心',talk_annoyed:'不高兴'} as Record<string,string>)[id] ?? id} · 重新生成`, enabled: true,
       } };
       m.stickerLibrary.scenes[id] = key;
+      if (m.scenePools?.[id]) m.scenePools[id] = [key, ...m.scenePools[id].filter(v => v !== previous && v !== key)];
+      if (m.stickerLibrary.sceneCandidates?.[id]) m.stickerLibrary.sceneCandidates[id] = [key, ...m.stickerLibrary.sceneCandidates[id].filter(v => v !== previous && v !== key)];
       if (id === 'idle') m.stickerLibrary.idleCandidates = [...new Set([key, ...(m.stickerLibrary.idleCandidates ?? []).filter(v => v !== previous)])];
     }
   }
-  await saveLibraryManifest(file, m);
+  });
   if (failed.length) {
     const error = `这些动作未生成成功，原动作已保留，可重试：${failed.join('、')}`;
-    await job.setStage('failed', { error });
+    if (finalize) await job.setStage('failed', { error });
     throw new Error(error);
   }
-  await job.setStage('done');
+  if (finalize) await job.setStage('done');
 }

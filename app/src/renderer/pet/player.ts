@@ -1,3 +1,4 @@
+import { scenePool } from '../../shared/action-resources';
 /**
  * WebM 播放器：每个已生成动作一个 <video> 预创建堆叠，新动作开始播放后才切 visibility（保留上一帧）。
  * idle/drag 循环播放；auto 动作不 loop，靠 ended 事件计数。
@@ -8,6 +9,9 @@ import type { Manifest, ManifestAction, PlayableId } from '@qbot/pipeline';
 const LOOPING: ReadonlySet<string> = new Set(['idle', 'drag', 'perch_sit', 'perch_lie']);
 
 export class Player {
+  private manifest: Manifest | null = null;
+  private requested: string | null = null;
+  private selected: string | null = null;
   private videos = new Map<string, HTMLVideoElement>();
   private current: string | null = null;
   /** 非循环动作的安全超时：防止 ended 不触发导致状态机卡死 */
@@ -32,6 +36,7 @@ export class Player {
     }
     this.videos.clear();
     this.current = null;
+    this.requested = null; this.selected = null;
     this.fallback?.remove();
     this.fallback = null;
   }
@@ -45,6 +50,7 @@ export class Player {
   load(dirId: string, manifest: Manifest): PlayableId[] {
     this.dispose();
     this.failed.clear();
+    this.manifest = manifest;
     // 只清理 video + poof 元素，保留 signboard 等其他 DOM
     for (const el of Array.from(this.container.querySelectorAll('video,.stage-poof'))) {
       el.remove();
@@ -115,15 +121,20 @@ export class Player {
 
   /** Let the idle director reconsider only after a complete clip, including the idle alias. */
   playOnce(action: PlayableId): void {
-    this.playImpl(action, false, true);
+    this.playImpl(action, false, true, false);
   }
 
-  private playImpl(action: PlayableId, forceLoop: boolean, forceOnce = false): void {
+  private playImpl(action: PlayableId, forceLoop: boolean, forceOnce = false, usePool = true): void {
     const generation = ++this.generation;
     this.cancelAttempt?.();
     this.cancelAttempt = null;
     this.clearSafetyTimer();
-    const id = [action, 'idle', ...this.videos.keys()]
+    const pool = usePool && this.manifest?.scenePools?.[action] ? scenePool(this.manifest, action).filter(id=>!this.failed.has(id)) : [];
+    if (!usePool || this.requested !== action || !this.selected || this.failed.has(this.selected)) {
+      this.requested = action;
+      this.selected = pool.length ? pool[Math.floor(Math.random()*pool.length)] : action;
+    }
+    const id = [this.selected, action, 'idle', ...this.videos.keys()]
       .find((candidate) => this.videos.has(candidate) && !this.failed.has(candidate));
     if (!id) return; // Leave the last good frame / source image in place.
     const next = this.videos.get(id)!;
@@ -157,7 +168,7 @@ export class Player {
         start(true);
       } else {
         this.failed.add(id);
-        this.playImpl(action, forceLoop, forceOnce);
+        this.playImpl(action, forceLoop, forceOnce, usePool);
       }
     };
     const reveal = () => {

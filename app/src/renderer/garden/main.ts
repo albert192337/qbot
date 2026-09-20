@@ -60,21 +60,23 @@ function tags(ts: Trait[]): HTMLElement {
 function art(sp: Species, ts: Trait[] = [], ratio = 1, mode: 'fruit'|'plant'|'seed' = 'fruit', regrowing = false, baseTraits: Trait[] = []): HTMLElement {
     const shown = regrowing && ratio < .8 ? baseTraits : ratio < .55 ? [] : ts;
     const box = el('div', undefined, `art ${shown.join(' ')} quality-${ratio >= .8 ? tier(shown) : 'normal'}`);
+    box.dataset.species = sp;
+    box.dataset.artMode = mode;
+    if (mode === 'seed') {
+        // The paper packet stays neutral; its emblem carries the actual inherited appearance.
+        box.className = 'art seed-art';
+        const packet = el('img');
+        packet.src = botanicalArt(sp, 'seed'); packet.alt = SPECIES[sp].name + '种子'; packet.draggable = false;
+        const emblem = art(sp, ts, 1, 'fruit');
+        emblem.classList.add('seed-emblem');
+        box.append(packet, emblem);
+        return box;
+    }
     const img = el('img');
     img.src = mode === 'plant' && ratio < .55 && !regrowing ? sprout : botanicalArt(sp, mode, ratio >= .8);
     img.alt = SPECIES[sp].name;
     img.draggable = false;
     box.append(img);
-    for (const t of shown.filter(t => ['punk', 'classical', 'firefly', 'petals'].includes(t))) {
-        const layer = el('div', undefined, `accessory-layer fx-${t}`);
-        layer.setAttribute('aria-hidden', 'true');
-        const symbols = t === 'punk' ? ['ϟ', '♪', 'ϟ', '♫'] : t === 'classical' ? ['♬', '♪', '♫', '♩'] : t === 'petals' ? ['❀', '✿', '❀', '✿'] : ['•', '•', '•', '•'];
-        symbols.forEach((symbol, i) => {
-            const particle = el('span', symbol);
-            particle.style.setProperty('--i', String(i)); layer.append(particle);
-        });
-        box.append(layer);
-    }
     if (shown.includes('twin')) {
         const other = img.cloneNode() as HTMLImageElement;
         other.className = 'twin-copy';
@@ -293,7 +295,7 @@ function render(): void {
     }
     if (page === 'travel' || page === 'moments') {
         const content = el('section');
-        renderTravel(content,state,page,act,go,busy);
+        renderTravel(content,state,page,act,go,busy,render);
         root.replaceChildren(content);
         return;
     }

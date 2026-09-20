@@ -85,7 +85,7 @@ async function refresh(force = false): Promise<void> {
   html += `<button id="reset-turnaround" class="btn ghost">恢复默认</button>`;
   html += `<button id="regen-turnaround" class="btn danger">保存并重生三视图（约 ¥6）</button>`;
   html += `</details>`;
-  html += `<p class="studio-hint">三视图是所有动作的参考图 —— 换了它必须连带重新生成全部 10 个动作，`;
+  html += `<p class="studio-hint">三视图是所有动作的参考图 —— 换了它必须连带重新生成全部 11 个动作，`;
   html += `否则新旧风格对不上。生成后会切到「生成任务」确认新的角色方案。</p>`;
 
   // ── 每个动作的 prompt ──
@@ -148,7 +148,7 @@ function bind(root: HTMLElement, dirId: string): void {
     void (async () => {
       const ok = await confirmBox(
         root,
-        '这会重新生成一张三视图，并连带重新生成全部 10 个动作。\n\n' +
+        '这会重新生成一张三视图，并连带重新生成全部 11 个动作。\n\n' +
           '预计消耗：1 张三视图 + 8 张首帧 + 8 条视频。\n' +
           '过程中会切到「生成任务」让你确认新的角色方案。\n\n确定继续？',
       );

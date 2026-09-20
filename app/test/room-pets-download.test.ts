@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({ unpack: vi.fn(async () => {}) }));
 vi.mock('node:fs', () => ({ existsSync: () => false, statSync: vi.fn() }));
 vi.mock('node:fs/promises', () => ({
   mkdtemp: vi.fn(async (prefix: string) => `${prefix}unique`),
+  writeFile: vi.fn(async () => {}),
   rm: vi.fn(async () => {}), rename: vi.fn(async () => {}),
   readFile: vi.fn(async () => '{"name":"Peer"}'), readdir: vi.fn(async () => []),
 }));

@@ -60,7 +60,7 @@ export class NetworkDriver {
     if (this.available.length === 0) return;
 
     // 检查是否是重复帧
-    if (state.mode === this.lastMode && state.action === this.lastAction && state.mode !== 'idle') {
+    if (state.mode === this.lastMode && state.action === this.lastAction) {
       // 心跳/重复帧：music 曲名变化由 UI 层处理，动作不重启
       return;
     }

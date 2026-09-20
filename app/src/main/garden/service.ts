@@ -1,4 +1,5 @@
 import { prepareTravelMemory, writeTravelDiary } from './travel-memory';
+import { gardenJournalSummary } from './journal-events';
 import { app, BrowserWindow } from 'electron';
 import { readFile, writeFile, mkdir, rename, copyFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -88,6 +89,15 @@ export function getGarden(): Promise<GardenState> {
         return state;
     });
 }
+/** Merge generated writing into the latest save without holding the queue during a model call. */
+export function updateGardenJournal<T>(change:(state:GardenState)=>T|Promise<T>):Promise<T> {
+    return serial(async()=>{
+        const state=structuredClone(await recover());
+        const result=await change(state);validateGarden(state);await save({state});
+        for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');
+        return result;
+    });
+}
 export function gardenAction(command: GardenCommand): Promise<GardenResult> {
     return serial(async () => {
         try {
@@ -96,6 +106,8 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
             const participant = (command.type === 'harvest' || command.type === 'harvestMany') ? (await getSettings()).activeCharacter ?? 'default' : undefined;
             const state = await recover();
             const result = transition(state, command, Date.now(), rng, { musicPlaying: getMusicStatus().playing });
+            const summary=gardenJournalSummary(state,result.state,command,result.reveal);
+            if(summary){const at=Date.now(),actor=participant??(await getSettings()).activeCharacter??'default';result.state.journalEvents=[...(result.state.journalEvents??[]).filter(e=>at-e.at<7*86400000),{at,actor,summary:summary.slice(0,500)}].slice(-300);}
             const travelMemory = command.type === 'travelExperience' && result.state.travel ? await prepareTravelMemory(result.state.travel) : undefined;
             if (result.points !== undefined) {
                 await save({ state, pending: { id: randomUUID(), points: result.points, boxes: result.boxes ?? 0, next: result.state } });
@@ -119,7 +131,7 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
                 // Persist payment and factual diary first. A slow model cannot block clicks or roll back a paid experience.
                 void writeTravelDiary(travelMemory).then(text => { if (!text) return; return serial(async () => {
                     const latest = structuredClone(await recover());
-                    const diary = latest.travel?.diaries.find(d => d.day === travelMemory.diary.day && d.actor === travelMemory.diary.actor);
+                    const diary = latest.travel?.diaries.find(d => d.city === travelMemory.diary.city && d.day === travelMemory.diary.day && d.actor === travelMemory.diary.actor);
                     if (!diary || diary.signature !== travelMemory.diary.signature) return;
                     diary.text = text; diary.generated = true;
                     await save({state:latest});

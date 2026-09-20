@@ -13,7 +13,7 @@ describe('console UI invariants', () => {
 
   it('keeps hatch styles scoped to the hatch pane', () => {
     const source = read('../src/renderer/console/panes/hatch.ts');
-    expect(source).toContain('@scope ([data-pane="hatch"])');
+    expect(source).toContain('@scope (.pane[data-pane="hatch"])');
     expect(source).not.toContain('\n:root {');
   });
 
@@ -35,7 +35,7 @@ describe('console UI invariants', () => {
     const source = read('../src/renderer/console/main.ts');
     expect(source).toContain("label: '创建角色'");
     expect(source).toContain("label: '角色工作台'");
-    expect(source).toContain("id: 'scene-actions', label: '场景联动'");
+    expect(source).toContain("id: 'scene-actions', label: '动作配置'");
     expect(source).toContain("hiddenFromSidebar: true, navParent: 'characters'");
     expect(source).toContain('ROLE_WORKSPACE_TABS');
   });
@@ -47,15 +47,15 @@ describe('console UI invariants', () => {
     expect(source).toContain('selectedSourceFile');
     expect(source).toContain('高级生成设置');
     expect(source).toContain('开始后先生成 1 个角色方案供你确认');
-    expect(source).toContain('10 个常用动作');
+    expect(source).toContain('11 个常用动作');
     expect(source).not.toContain('表现力动作（M 档）');
   });
 
   it('uses one online-space entry instead of separate room actions', () => {
     const ipcSource = read('../src/main/ipc.ts');
     const traySource = read('../src/main/tray.ts');
-    expect(ipcSource).toContain("label: '联机空间…'");
-    expect(traySource).toContain("label: '联机空间…'");
+    expect(ipcSource).toContain("label: '一起玩…'");
+    expect(traySource).toContain("label: '一起玩…'");
     expect(ipcSource).not.toMatch(/label:\s*'小房间/);
     expect(ipcSource).not.toMatch(/label:\s*'公共房间/);
     expect(traySource).not.toMatch(/label:\s*'小房间/);
