@@ -14,7 +14,7 @@
  * 纯状态机风格：网络应答都从 handlePackFrame / handlePackError 回来，不做 await 链。
  */
 import { existsSync, statSync } from 'node:fs';
-import { mkdir, readFile, readdir, rename, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { ChunkAssembler, chunkToBase64, packCharacterDir, unpackCharacter } from '../asset-pack';
 import { charactersDir } from '../characters';
@@ -24,9 +24,10 @@ import { PACK_HASH_RE, selectPruneTargets } from './rooms-rules';
 
 /** .peer- 缓存目录保留的包数上限（~12MB/个，超了删最旧的；在用包永不删） */
 const PEER_CACHE_KEEP = 4;
-/** pack:not_found 重试（对端可能还没传完自己的包） */
-const NOT_FOUND_RETRY_MAX = 5;
-const NOT_FOUND_RETRY_MS = 3_000;
+/** 无进展 / 服务端尚未就绪：最多重试 5 次，重新进房可再尝试。 */
+const DOWNLOAD_RETRY_MAX = 5;
+const DOWNLOAD_IDLE_MS = 30_000;
+const DOWNLOAD_RETRY_MS = 3_000;
 /** 上传块间限速（同 1v1 老链路：别把小 VPS 冲爆） */
 const PUT_DELAY_MS = 5;
 /** 进度推送节流：每收 N 块推一次（64KB/块 -> 约每 0.5MB 一次） */
@@ -158,6 +159,7 @@ interface DownloadState {
   assembler: ChunkAssembler;
   /** pack:begin 带回的总块数（chunk 帧不带，靠这里补全） */
   total: number;
+  completing: boolean;
   retries: number;
   retryTimer: ReturnType<typeof setTimeout> | null;
   timeoutTimer: ReturnType<typeof setTimeout> | null;
@@ -233,13 +235,9 @@ function pumpDownloadQueue(): void {
     // 排队期间可能已无人需要它（成员退房）
     if (![...memberStates.values()].some((m) => m.hash === hash)) continue;
     activeDownloadHash = hash;
-    const timeoutTimer = setTimeout(() => {
-      console.error('[room-pets] 下载超时', hash);
-      finishDownload(hash);
-      if (!downloadQueue.includes(hash)) downloadQueue.push(hash);
-      pumpDownloadQueue();
-    }, 30000);
-    downloads.set(hash, { assembler: new ChunkAssembler(hash), total: 0, retries: 0, retryTimer: null, timeoutTimer });
+    const dl: DownloadState = { assembler: new ChunkAssembler(hash), total: 0, completing: false, retries: 0, retryTimer: null, timeoutTimer: null };
+    downloads.set(hash, dl);
+    armDownloadTimeout(hash, dl);
     sendFrame?.({ t: 'pack:get', hash });
     for (const [memberId, m] of memberStates) {
       if (m.hash === hash && !m.character) {
@@ -248,6 +246,41 @@ function pumpDownloadQueue(): void {
     }
     return;
   }
+}
+
+/** 只计算没有收到新块的时间；慢速大包不因总耗时超过 30 秒重头下载。 */
+function armDownloadTimeout(hash: string, dl: DownloadState): void {
+  if (dl.timeoutTimer) clearTimeout(dl.timeoutTimer);
+  dl.timeoutTimer = setTimeout(() => {
+    if (downloads.get(hash) !== dl) return;
+    console.error(`[room-pets] 下载无进展超时 ${hash} (${dl.assembler.received}/${dl.total} 块，重试 ${dl.retries}/${DOWNLOAD_RETRY_MAX})`);
+    retryDownload(hash, dl);
+  }, DOWNLOAD_IDLE_MS);
+}
+
+/** 同一次下载保留重试计数，退避期间占住队列，避免服务端单下载流 busy 风暴。 */
+function retryDownload(hash: string, dl: DownloadState): void {
+  if (downloads.get(hash) !== dl || dl.completing || dl.retryTimer) return;
+  if (dl.timeoutTimer) clearTimeout(dl.timeoutTimer);
+  dl.timeoutTimer = null;
+  dl.total = 0; // 等下一次 begin，丢弃上一轮残留块
+  if (dl.retries >= DOWNLOAD_RETRY_MAX) {
+    finishDownload(hash);
+    emitPackFailed(hash);
+    return;
+  }
+  dl.retries++;
+  dl.retryTimer = setTimeout(() => {
+    if (downloads.get(hash) !== dl) return;
+    dl.retryTimer = null;
+    if (![...memberStates.values()].some((m) => m.hash === hash && !m.character)) {
+      finishDownload(hash);
+      return;
+    }
+    dl.assembler = new ChunkAssembler(hash);
+    armDownloadTimeout(hash, dl);
+    sendFrame?.({ t: 'pack:get', hash });
+  }, DOWNLOAD_RETRY_MS * dl.retries);
 }
 
 /** 下载收尾（成功/放弃）：清状态、继续队列 */
@@ -260,26 +293,29 @@ function finishDownload(hash: string): void {
   pumpDownloadQueue();
 }
 
-async function completeDownload(hash: string, buffer: Buffer): Promise<void> {
+async function completeDownload(hash: string, buffer: Buffer, dl: DownloadState): Promise<void> {
   // 临时目录解包 -> rename 原子就位（同 1v1 老链路，崩溃不留半包缓存）
   const dir = peerCacheDir(hash);
-  const tmp = `${dir}.tmp`;
+  let tmp: string | undefined;
   try {
-    await rm(tmp, { recursive: true, force: true });
-    await mkdir(tmp, { recursive: true });
+    tmp = await mkdtemp(`${dir}.tmp-`);
     await unpackCharacter(buffer, tmp);
+    if (downloads.get(hash) !== dl) return;
     await rm(dir, { recursive: true, force: true });
     await rename(tmp, dir);
     await prunePeerCache();
     const manifest = JSON.parse(await readFile(path.join(dir, 'manifest.json'), 'utf8'));
+    if (downloads.get(hash) !== dl) return;
     finishDownload(hash);
     emitCharacter(hash, { dirId: `${PEER_CACHE_PREFIX}${hash}`, manifest });
     console.log(`[room-pets] pack ready: ${hash}`);
   } catch (err) {
     console.error('[room-pets] unpack failed:', err);
-    await rm(tmp, { recursive: true, force: true });
+    if (downloads.get(hash) !== dl) return;
     finishDownload(hash);
     emitPackFailed(hash);
+  } finally {
+    if (tmp) await rm(tmp, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -287,12 +323,6 @@ function emitPackFailed(hash: string): void {
   for (const [memberId, m] of memberStates) {
     if (m.hash === hash && !m.character) {
       emit({ kind: 'packFailed', memberId, nickname: m.nickname });
-      // 失败后一段时间后重新尝试下载
-      setTimeout(() => {
-        if (memberStates.has(memberId) && m.hash === hash && !m.character) {
-          ensureMemberPack(memberId, m.nickname, hash);
-        }
-      }, 5_000);
     }
   }
 }
@@ -401,6 +431,7 @@ export function onChat(memberId: string, nickname: string, text: string): void {
 export function onLeftRoom(): void {
   for (const dl of downloads.values()) {
     if (dl.retryTimer) clearTimeout(dl.retryTimer);
+    if (dl.timeoutTimer) clearTimeout(dl.timeoutTimer);
   }
   downloads.clear();
   downloadQueue.length = 0;
@@ -444,20 +475,25 @@ export function handlePackFrame(frame: Record<string, unknown>): void {
     }
     case 'pack:begin': {
       const dl = downloads.get(hash);
-      if (!dl || hash !== activeDownloadHash) return; // 已放弃/过期
+      if (!dl || hash !== activeDownloadHash || dl.retryTimer || dl.completing) return; // 已放弃/过期
       dl.total = Number(frame.total);
+      armDownloadTimeout(hash, dl);
       break;
     }
     case 'pack:chunk': {
       const dl = downloads.get(hash);
-      if (!dl || !dl.total) return; // 没等 begin 的野块：丢
+      if (!dl || !dl.total || dl.retryTimer || dl.completing) return; // 没等 begin 的野块：丢
       try {
         const done = dl.assembler.add(Number(frame.seq), dl.total, String(frame.data));
         if (dl.assembler.received % PROGRESS_EVERY === 0 || done) emitProgress(hash);
         if (done) {
           const buffer = dl.assembler.assemble();
-          activeDownloadHash = null;
-          void completeDownload(hash, buffer);
+          dl.completing = true;
+          if (dl.timeoutTimer) clearTimeout(dl.timeoutTimer);
+          dl.timeoutTimer = null;
+          void completeDownload(hash, buffer, dl);
+        } else {
+          armDownloadTimeout(hash, dl);
         }
       } catch (err) {
         console.error('[room-pets] chunk rejected:', err);
@@ -478,33 +514,8 @@ export function handlePackFrame(frame: Record<string, unknown>): void {
 export function handlePackError(code: string): void {
   const hash = activeDownloadHash;
   const dl = hash ? downloads.get(hash) : undefined;
-  if (code === 'pack:not_found') {
-    if (!dl || !hash) return;
-    if (dl.retries < NOT_FOUND_RETRY_MAX) {
-      dl.retries++;
-      dl.retryTimer = setTimeout(() => {
-        if (activeDownloadHash !== hash || !downloads.has(hash)) return;
-        finishDownload(hash);
-        if (!downloadQueue.includes(hash)) downloadQueue.unshift(hash); // 插队重试
-        pumpDownloadQueue();
-      }, NOT_FOUND_RETRY_MS * (dl.retries + 1)); // 指数退避，增加重试间隔
-      return;
-    }
-    finishDownload(hash);
-    emitPackFailed(hash);
-    // 失败后一段时间后重新尝试
-    setTimeout(() => {
-      if (!downloadQueue.includes(hash)) downloadQueue.push(hash);
-      pumpDownloadQueue();
-    }, 10_000);
-    return;
-  }
-  if (code === 'pack:busy') {
-    // 本地是串行下载，busy 只在服务重启等边角出现：排回队尾
-    if (hash) {
-      finishDownload(hash);
-      if (!downloadQueue.includes(hash)) downloadQueue.push(hash);
-    }
+  if (code === 'pack:not_found' || code === 'pack:busy') {
+    if (dl && hash) retryDownload(hash, dl);
     return;
   }
   if (code === 'pack:bad' || code === 'bad_frame') {

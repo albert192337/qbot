@@ -564,3 +564,11 @@ npx tsx scripts/gen-room.mts rekey --out assets/rooms/decor --trim    # 从 raw 
 - 原生 QA：先 `npm run build -w app`，再运行 `scripts/test-nursery.cjs` 和 `scripts/test-house.cjs`（设置 `PLAYWRIGHT_MODULE` 到 Playwright 安装路径）。每次使用临时 userData 和模拟 IPC，阻断 HTTP(S)，不使用真实账户或付费模型。家居保存、开箱和聊天测试只修改 fixture 数据。
 - 已验证：完整孵化、四个空间与全部功能册、草稿保留/切换取消、舞台预览不激活、设置模式与开发者门控、开箱防重复、家具保存失败重试与重读、联机同意取消/加入、展示模式不退房、缓存恢复、中文输入、聊天、退房，以及 840×570 小窗口。截图在 `.superpowers/house-preview/`。`npm run check`：pipeline 123、app 549、generation 2 项测试通过，含 TypeScript 检查；App 构建通过。
 - 验证限度：付费生成、真实服务器上的上传/社交操作、Windows 实机、长时性能和安装包验收尚未执行。当前是功能与交互迁移版本，场景美术使用确定性矢量绘制和现有资产。
+
+## 2026-09-15：联机角色下载超时修复
+
+- `rooms/room-pets.ts` 的 30 秒超时改为无数据进展超时；收到有效分块后续期，慢速大包不再因总耗时被反复丢弃。日志记录已收/总块数与重试次数。
+- 超时、`pack:not_found`、`pack:busy` 共用有界退避（最多 5 次重试），计数不再随重建下载清零；失败显示加载失败，重新进房可再试。队列保持串行，失败后继续下一角色。
+- 退房清理超时与重试定时器；解包期间停网络计时并防重复完成，使用独立临时目录和下载实例检查隔离迟到结果。
+- `room-pets-download.test.ts` 覆盖超过 30 秒的持续传输、无响应/未找到/繁忙的重试上限、退房重进与慢解包。
+- 实测用户报错包 `cc6fd92649585cd1`：14,745,852 字节 / 226 块，在当前网络约 41 秒完整收齐，证实超过旧 30 秒硬截止；诊断只请求缓存包，未加入房间或上传角色。
