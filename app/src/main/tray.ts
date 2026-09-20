@@ -96,7 +96,7 @@ export async function connectSection(): Promise<Electron.MenuItemConstructorOpti
   const settings = await getSettings();
   return [
     {
-      label: '联机空间…',
+      label: '一起玩…',
       click: () => createLoungeWindow(),
     },
     {

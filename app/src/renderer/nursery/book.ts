@@ -38,6 +38,9 @@ const LOADERS: Record<string, () => Promise<Module>> = {
     return {
       mount: async (root) => {
         view = await mountView(root);
+        const open = document.createElement('button'); open.textContent = '打开「一起玩」 · 好友、世界与本地试演 ↗';
+        open.className = 'btn primary'; open.style.cssText = 'margin-bottom:16px;padding:12px 20px';
+        open.onclick = () => window.qbot.rooms.open(); root.prepend(open);
       },
       onVisible: () => view.onVisible(),
       unmount: () => view.unmount(),
@@ -60,7 +63,7 @@ export const BOOK_TITLES: Record<string, string> = {
   settings: '小屋手册',
   claude: '工作信号台',
   devtools: '工具抽屉',
-  lounge: '朋友留言桌',
+  lounge: '一起玩',
   rewards: '陪伴的礼物',
   furnish: '我的小屋',
 };

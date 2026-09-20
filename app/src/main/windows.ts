@@ -34,11 +34,13 @@ const BUBBLE_OVERLAP = 42;
 let petWindow: BrowserWindow | null = null;
 /** 公共房间宠上屏：键控多窗（memberId -> 窗），全员在线上限即窗口数上限 */
 const roomPetWindows = new Map<string, BrowserWindow>();
+const roomPetSizes = new WeakMap<BrowserWindow, number>();
 let roomWindow: BrowserWindow | null = null;
 let cozyPreviewWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let nurseryWindow: BrowserWindow | null = null;
 let loungeWindow: BrowserWindow | null = null;
+let roomChatWindow: BrowserWindow | null = null;
 let bubbleWindow: BrowserWindow | null = null;
 let desktopSign: ReturnType<typeof createDesktopSign> | null = null;
 export function displayDesktopSign(text: string | null): void { desktopSign?.setText(text); }
@@ -83,7 +85,7 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds();
 }
 
-type RendererPage = 'pet' | 'room' | 'cozy' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat' | 'sign';
+type RendererPage = 'social' | 'pet' | 'room' | 'cozy' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat' | 'sign';
 
 /** A local, framed preview: never changes room membership or the active desktop pet. */
 export function openCozyPreview(): BrowserWindow {
@@ -302,6 +304,7 @@ export function ensureRoomPetWindow(memberId: string): BrowserWindow {
     if (roomPetWindows.get(memberId) === win) roomPetWindows.delete(memberId);
   });
   roomPetWindows.set(memberId, win);
+  roomPetSizes.set(win, ROOM_PET_SIZE);
   load(win, 'pet', { roomPet: '1' });
   return win;
 }
@@ -327,6 +330,13 @@ export function findRoomPetMemberId(win: BrowserWindow): string | null {
   return null;
 }
 
+/** Drag only the sending member window, using its last authoritative logical size. */
+export function moveRoomPetWindow(win: BrowserWindow, x: number, y: number): void {
+  if (!findRoomPetMemberId(win)) return;
+  const size = roomPetSizes.get(win) ?? ROOM_PET_SIZE;
+  moveFixedSize(win, x, y, {width:size, height:size});
+}
+
 /**
  * 按当前在线成员顺序重排所有宠窗：屏幕底部居中排开，超一行往上叠
  * （layoutRoomPets 是纯函数，这里只管把结果换算成绝对坐标 + setBounds）。
@@ -342,6 +352,7 @@ export function layoutRoomPetWindows(orderedMemberIds: readonly string[]): void 
   for (const slot of slots) {
     const win = roomPetWindows.get(slot.memberId);
     if (!win || win.isDestroyed()) continue;
+    roomPetSizes.set(win, ROOM_PET_SIZE);
     moveFixedSize(
       win,
       workArea.x + slot.x,
@@ -366,6 +377,7 @@ export function layoutRoomPetWindowsInRoom(orderedMemberIds: readonly string[]):
   for (const slot of slots) {
     const win = roomPetWindows.get(slot.memberId);
     if (!win || win.isDestroyed()) continue;
+    roomPetSizes.set(win, petSize);
     moveFixedSize(
       win,
       roomBounds.x + slot.x,
@@ -661,12 +673,30 @@ export function createConsoleWindow(pane?: ConsolePane): BrowserWindow {
  * 要输入文字、要滚动、要长时间停留，透明窗那套约束（血泪坑 5/18）全是负担。
  */
 export function createLoungeWindow(): BrowserWindow {
-  return createConsoleWindow('lounge');
+  if (loungeWindow && !loungeWindow.isDestroyed()) { loungeWindow.restore(); loungeWindow.show(); loungeWindow.focus(); return loungeWindow; }
+  loungeWindow = createSocialWindow(false);
+  loungeWindow.on('closed', () => { loungeWindow = null; });
+  return loungeWindow;
+}
+export function createRoomChatWindow(): BrowserWindow {
+  if (roomChatWindow && !roomChatWindow.isDestroyed()) { roomChatWindow.restore(); roomChatWindow.show(); roomChatWindow.focus(); return roomChatWindow; }
+  roomChatWindow = createSocialWindow(true);
+  roomChatWindow.on('closed', () => { roomChatWindow = null; });
+  return roomChatWindow;
+}
+function createSocialWindow(compact: boolean): BrowserWindow {
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const win = new BrowserWindow({title:compact ? '房间聊天' : '一起玩', width:Math.min(compact ? 370 : 960, area.width), height:Math.min(compact ? 490 : 740, area.height),
+    minWidth:Math.min(compact ? 300 : 640,area.width), minHeight:Math.min(compact ? 340 : 500, area.height), backgroundColor:'#f5f1e5', autoHideMenuBar:true,
+    webPreferences:{preload:path.join(__dirname,'../preload/index.js'), contextIsolation:true, sandbox:false}});
+  load(win, 'social', compact ? {compact:'1'} : undefined);
+  return win;
 }
 
 /** 房间事件推送口（rooms.ts 通过 setLoungePush 注入这个） */
 export function pushToLounge(channel: string, payload: unknown): void {
   if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.webContents.send(channel,payload);
+  for (const win of [roomChatWindow, petWindow, roomWindow]) if(win && !win.isDestroyed()) win.webContents.send(channel,payload);
   if(nurseryWindow && !nurseryWindow.isDestroyed()) nurseryWindow.webContents.send(channel,payload);
   if (loungeWindow && !loungeWindow.isDestroyed()) {
     loungeWindow.webContents.send(channel, payload);

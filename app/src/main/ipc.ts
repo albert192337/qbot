@@ -1,4 +1,6 @@
 import { saveResourceAnnotation, saveScenePools } from './resource-settings';
+import { registerSocialIpc } from './social-ipc';
+import { moveRoomPetWindow } from './windows';
 import { imageChoices, selectedImage, saveCover } from './character-images';
 import { prepareActionFrame, approveActionFrame, pendingActionFrame, actionReference } from './pipeline-bridge';
 import { cloudAccount, acknowledgeCloudJob, forgetCloudJob } from './cloud-generation';
@@ -66,6 +68,7 @@ import { registerStickerLibraryIpc } from './sticker-library-ipc';
 import { getIdlePlan } from './idle-plan';
 
 export function registerIpc(): void {
+  registerSocialIpc();
   ipcMain.handle('behavior:getIdlePlan',(_ev,id:string)=>getIdlePlan(id));
   ipcMain.handle('memory:retry', async () => {
     if (!(await getSettings()).developerMode) throw new Error('请先开启开发者模式');
@@ -287,10 +290,15 @@ export function registerIpc(): void {
     if (memberId) waveAt(memberId);
   });
   ipcMain.on('roomPet:leaveRoom', () => leaveRoom());
+  ipcMain.on('roomPet:move', (event, x: number, y: number) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) moveRoomPetWindow(win, x, y);
+  });
   ipcMain.handle('roomPet:getCache', (ev) => {
     const win = BrowserWindow.fromWebContents(ev.sender);
     const memberId = win && findRoomPetMemberId(win);
-    return memberId ? getMemberSnapshot(memberId) : null;
+    const snap = memberId ? getMemberSnapshot(memberId) : null;
+    return snap ? {hello:{nickname:snap.nickname}, character:snap.character, state:{mode:snap.mode,action:snap.action,sign:snap.sign}} : null;
   });
 
   // 桌宠右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
@@ -328,7 +336,7 @@ export function registerIpc(): void {
       ...(getLocalSign() || getPetMessage() ? [{ label: '收牌 / 收起留言', click: () => send({ type: 'signClear' as const }) }] : []),
       { type: 'separator' },
       // ── 去处（角色能去的地方 + 控制台）──────────────────
-      { label: '联机空间…', click: () => createLoungeWindow() },
+      { label: '一起玩…', click: () => createLoungeWindow() },
       { label: '角色管理…', click: () => createConsoleWindow() },
       { label: '工具抽屉（日志）…', click: async () => {
         await setSettings({ developerMode: true });

@@ -54,8 +54,8 @@ describe('console UI invariants', () => {
   it('uses one online-space entry instead of separate room actions', () => {
     const ipcSource = read('../src/main/ipc.ts');
     const traySource = read('../src/main/tray.ts');
-    expect(ipcSource).toContain("label: '联机空间…'");
-    expect(traySource).toContain("label: '联机空间…'");
+    expect(ipcSource).toContain("label: '一起玩…'");
+    expect(traySource).toContain("label: '一起玩…'");
     expect(ipcSource).not.toMatch(/label:\s*'小房间/);
     expect(ipcSource).not.toMatch(/label:\s*'公共房间/);
     expect(traySource).not.toMatch(/label:\s*'小房间/);
