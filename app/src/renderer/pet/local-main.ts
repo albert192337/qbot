@@ -437,17 +437,20 @@ function clearTimer(): void {
 }
 
 let gardenPerforming = false;
+let gardenActionPlaying: string | null = null;
 window.qbot.garden.onPerformance(action => {
   visitOrchestrator.cancelVisit();
   if(perched){window.qbot.pet.detachPerch();applyPerch(null);}
   cancelHold();
   stopDesktopWalk();
   gardenPerforming = !!action;
+  gardenActionPlaying = action;
   document.body.classList.toggle('garden-performing', gardenPerforming);
   if (action && available.includes(action as PlayableId)) player.play(action as PlayableId);
   else dispatch({ type: 'PLAY_ACTION', action: 'idle' });
 });
 function dispatch(event: Parameters<typeof step>[1]): void {
+  if(gardenPerforming&&gardenActionPlaying&&event.type==='VIDEO_ENDED'){player.play(gardenActionPlaying as PlayableId);return;}
   if(perched){
     if(event.type==='POINTER_DOWN'){window.qbot.pet.detachPerch();applyPerch(null);}
     else { if(event.type==='VIDEO_ENDED')player.play(perched.action); return; }

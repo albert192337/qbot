@@ -147,7 +147,7 @@ public static class WeatherNative {
   Action close=()=>{timer.Stop();if(incoming!=null){incoming.Dispose();incoming=null;}if(current!=null){current.Dispose();current=null;}context.ExitThread();};
   timer.Tick+=(sender,args)=>{
    try {
-    if(inputClosed||ownerProcess.HasExited||lifetime.ElapsedMilliseconds>240000){close();return;}
+    if(inputClosed||ownerProcess.HasExited||lifetime.ElapsedMilliseconds>3600000){close();return;}
     if(watchdog.ElapsedMilliseconds>1000){
      watchdog.Restart();
      if((current!=null&&!current.Validate())||(incoming!=null&&!incoming.Validate()))throw new Exception("Desktop layer changed");

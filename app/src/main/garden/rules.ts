@@ -1,5 +1,5 @@
 import { travelTransition, validateTravel } from '../../shared/travel';
-import { SPECIES, TRAITS, FERTILIZERS, level, type Species, type Trait, type GardenState, type GardenCommand, type GardenReveal, type Seed, type Produce, type Plant, type Fertilizer } from '../../shared/garden';
+import { SPECIES, TRAITS, FERTILIZERS, level, HARVEST_XP, CULTIVATION_MS, needsReveal, canBreed, cultivationRemaining, mutationMultiplier, type Species, type Trait, type GardenState, type GardenCommand, type GardenReveal, type Seed, type Produce, type Plant, type Fertilizer } from '../../shared/garden';
 export interface Random {
     random(): number;
     id(): string;
@@ -19,12 +19,12 @@ export function refreshShop(s: GardenState, now: number, rng: Random): void {
     ] };
 }
 export function initialGarden(now: number, rng: Random): GardenState {
-    const s: GardenState = { version: 1, coins: 180, plots: Array(6).fill(null), seeds: (['lotus', 'strawberry', 'sunflower'] as Species[]).flatMap(sp => [0, 1].map(() => ({ id: rng.id(), species: sp, genes: [], bred: false }))), produce: [], fertilizers: Object.fromEntries(Object.keys(FERTILIZERS).map(f => [f, FERTILIZERS[f as Fertilizer].grade === 1 ? 2 : 0])) as GardenState['fertilizers'], discovered: [], claimed: [], xp: Object.fromEntries(species.map(sp => [sp, 0])) as GardenState['xp'], journey: { bought: 0, planted: 0, harvested: 0, earned: 0, appleBought: 0 }, boxMisses: 0, shop: { refreshAt: 0, offers: [] } };
+    const s: GardenState = { version: 1, weatherCheckedAt: now, coins: 180, plots: Array(6).fill(null), seeds: (['lotus', 'strawberry', 'sunflower'] as Species[]).flatMap(sp => [0, 1].map(() => ({ id: rng.id(), species: sp, genes: [], bred: false }))), produce: [], fertilizers: Object.fromEntries(Object.keys(FERTILIZERS).map(f => [f, FERTILIZERS[f as Fertilizer].grade === 1 ? 2 : 0])) as GardenState['fertilizers'], discovered: [], claimed: [], xp: Object.fromEntries(species.map(sp => [sp, 0])) as GardenState['xp'], journey: { bought: 0, planted: 0, harvested: 0, earned: 0, appleBought: 0 }, boxMisses: 0, shop: { refreshAt: 0, offers: [] } };
     refreshShop(s, now, rng);
     return s;
 }
-export function value(p: Pick<Produce, 'species' | 'kg' | 'traits' | 'yieldCount'>): number {
-    return Math.round(SPECIES[p.species].price * 2 / (p.yieldCount ?? SPECIES[p.species].harvests) * p.kg / SPECIES[p.species].kg * p.traits.reduce((m, t) => m * TRAITS[t].multiplier, 1));
+export function value(p: Pick<Produce, 'species' | 'kg' | 'traits' | 'yieldCount' | 'growthVersion'>): number {
+    return Math.round(SPECIES[p.species].price * 2 / (p.yieldCount ?? SPECIES[p.species].harvests) * p.kg / SPECIES[p.species].kg * (p.growthVersion === 2 ? mutationMultiplier(p.traits) : p.traits.reduce((m, t) => m * TRAITS[t].multiplier, 1)));
 }
 export function rollTraits(s: GardenState, sp: Species, rng: Random, boost = 1, musicPlaying = false): Trait[] {
     return (Object.keys(TRAITS) as Trait[]).filter(t => TRAITS[t].level <= level(s.xp[sp]) && rng.random() < Math.min(1, TRAITS[t].chance * boost * (musicPlaying && (t === 'punk' || t === 'classical') ? 3 : 1)));
@@ -76,7 +76,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
         }
         case 'harvestMany': {
             let next = s; const harvests: Produce[] = [];
-            for (let i = 0; i < s.plots.length; i++) if (s.plots[i] && s.plots[i]!.readyAt <= now && !s.plots[i]!.keep) {
+            for (let i = 0; i < s.plots.length; i++) if (s.plots[i] && s.plots[i]!.readyAt <= now && !s.plots[i]!.keep && !needsReveal(s.plots[i]!)) {
                 const result = transition(next, { type: 'harvest', plot: i }, now, rng, context);
                 next = result.state; harvests.push(result.reveal!.produce!);
             }
@@ -99,7 +99,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             const seed = s.seeds.splice(i, 1)[0];
             const traits = [...new Set([...seed.genes, ...rollTraits(s, seed.species, rng, 1, context.musicPlaying)])];
             const kg = Math.round(SPECIES[seed.species].kg * (.65 + rng.random() * 1.7) * (traits.includes('giant') ? 4 : 1) * 1000) / 1000;
-            const p: Plant = { id: rng.id(), species: seed.species, traits, kg, value: 0, bred: false, plantedAt: now, readyAt: now + SPECIES[seed.species].minutes * 60000, fertilizers: [], baseTraits: traits.filter(t => TRAITS[t].category === 'body'), harvestsLeft: SPECIES[seed.species].harvests, harvestIndex: 0 };
+            const p: Plant = { growthVersion: 2, id: rng.id(), species: seed.species, traits, kg, value: 0, bred: false, plantedAt: now, readyAt: now + SPECIES[seed.species].minutes * 60000 * (1 - .03 * (level(s.xp[seed.species])-1)), fertilizers: [], baseTraits: traits.filter(t => TRAITS[t].category === 'body'), harvestsLeft: SPECIES[seed.species].harvests, harvestIndex: 0 };
             p.yieldCount = SPECIES[seed.species].harvests;
             p.value = value(p);
             s.plots[cmd.plot] = p;
@@ -130,11 +130,31 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             p.value = value(p);
             break;
         }
+        case 'cultivate': {
+            const p = plot(cmd.plot);
+            if (!p || p.readyAt > now || !needsReveal(p)) throw Error('只有成熟的彩色问号果实需要培育');
+            if (s.plots.some(x => x?.cultivation?.startedAt !== undefined)) throw Error('角色正在照料另一株植物');
+            p.cultivation = { remainingMs: p.cultivation?.remainingMs ?? CULTIVATION_MS, startedAt: now };
+            break;
+        }
+        case 'pauseCultivation': {
+            const p = plot(cmd.plot);
+            if (p?.cultivation?.startedAt !== undefined) p.cultivation = { remainingMs: cultivationRemaining(p,now) };
+            break;
+        }
+        case 'revealPlant': {
+            const p = plot(cmd.plot);
+            if (!p || !needsReveal(p) || p.cultivation?.startedAt === undefined || cultivationRemaining(p,now) > 0) throw Error('请先完成培育读条');
+            p.revealed = true; delete p.cultivation;
+            reveal = { title: '惊喜揭晓！', produce: { ...p }, message: '果实仍留在地里，可以收获或与背包金色以上果实繁育。' };
+            break;
+        }
         case 'harvest': {
             const p = plot(cmd.plot);
             if (!p || p.readyAt > now)
                 throw Error('还没有成熟');
-            const item: Produce = { id: p.id, species: p.species, traits: p.traits, kg: p.kg, value: p.value, bred: p.bred, yieldCount: p.yieldCount };
+            if (needsReveal(p)) throw Error('彩色果实需要先培育揭晓');
+            const item: Produce = { growthVersion: p.growthVersion, revealed: p.revealed, id: p.id, species: p.species, traits: p.traits, kg: p.kg, value: p.value, bred: p.bred, yieldCount: p.yieldCount };
             s.produce.push(item);
             if ((p.harvestsLeft ?? 1) > 1) {
                 const next = nextBatch(s, p, now, rng, !!context.musicPlaying);
@@ -142,6 +162,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
                 s.plots[cmd.plot] = next;
             } else s.plots[cmd.plot] = null;
             j.harvested++;
+            s.xp[p.species] += HARVEST_XP;
             for (const factor of ['base', ...p.traits]) {
                 const key = `${p.species}:${factor}`;
                 if (!s.discovered.includes(key))
@@ -154,9 +175,9 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             if (cmd.first === cmd.second)
                 throw Error('需要两株不同植物');
             const a = parent(cmd.first), b = parent(cmd.second);
-            if (!a || !b || a.bred || b.bred)
-                throw Error('亲本未成熟或已繁育过');
-            const genes = [...new Set([...a.traits, ...b.traits])].filter(() => rng.random() < .5);
+            if (!a || !b || !canBreed(a) || !canBreed(b)) throw Error('双方需要已揭晓、未繁育过的金色或彩色果实');
+            if (!((s.plots.some(p=>p?.id===a.id) && s.produce.some(p=>p.id===b.id)) || (s.plots.some(p=>p?.id===b.id) && s.produce.some(p=>p.id===a.id)))) throw Error('请选择一株地里的植物与一颗背包果实');
+            const genes = [...new Set([...a.traits, ...b.traits])].filter(t => rng.random() < (a.traits.includes(t) && b.traits.includes(t) ? .8 : .4));
             const seed: Seed = { id: rng.id(), species: rng.random() < .5 ? a.species : b.species, genes, bred: true, parents: [a.species, b.species] };
             a.bred = b.bred = true;
             s.seeds.push(seed);
@@ -252,7 +273,7 @@ export function validateGarden(raw: unknown): GardenState {
     const number = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
     const known = (sp: string) => Object.hasOwn(SPECIES, sp);
     const traits = (ts: Trait[]) => Array.isArray(ts) && ts.every(t => Object.hasOwn(TRAITS, t));
-    const produce = (p: Produce) => p && typeof p.id === 'string' && known(p.species) && traits(p.traits) && number(p.kg) && number(p.value) && typeof p.bred === 'boolean' && (p.locked === undefined || typeof p.locked === 'boolean') && (p.yieldCount === undefined || Number.isInteger(p.yieldCount) && p.yieldCount >= 1 && p.yieldCount <= 3);
+    const produce = (p: Produce) => p && typeof p.id === 'string' && known(p.species) && traits(p.traits) && number(p.kg) && number(p.value) && typeof p.bred === 'boolean' && (p.growthVersion === undefined || p.growthVersion === 2) && (p.revealed === undefined || typeof p.revealed === 'boolean') && (p.cultivation === undefined || (p.cultivation && number(p.cultivation.remainingMs) && p.cultivation.remainingMs <= CULTIVATION_MS && (p.cultivation.startedAt === undefined || number(p.cultivation.startedAt)))) && (p.locked === undefined || typeof p.locked === 'boolean') && (p.yieldCount === undefined || Number.isInteger(p.yieldCount) && p.yieldCount >= 1 && p.yieldCount <= 3);
     if (!s || s.version !== 1 || !number(s.boxMisses) || !s.journey || !['bought','planted','harvested','earned','appleBought'].every(k => number(s.journey![k as keyof NonNullable<GardenState['journey']>])) || !number(s.coins) || !Array.isArray(s.plots) || s.plots.length !== 6 ||
         !s.plots.every(p => p === null || (produce(p) && number(p.plantedAt) && number(p.readyAt) && traits(p.baseTraits!) && Number.isSafeInteger(p.harvestsLeft) && p.harvestsLeft! >= 1 && p.harvestsLeft! <= SPECIES[p.species].harvests && Number.isSafeInteger(p.harvestIndex) && p.harvestIndex! >= 0 && (p.keep === undefined || typeof p.keep === 'boolean') && Array.isArray(p.fertilizers) && p.fertilizers.every(f => Object.hasOwn(FERTILIZERS, f)))) ||
         !Array.isArray(s.seeds) || !s.seeds.every(p => p && typeof p.id === 'string' && known(p.species) && traits(p.genes) && typeof p.bred === 'boolean') ||
@@ -261,6 +282,9 @@ export function validateGarden(raw: unknown): GardenState {
         ![...s.discovered, ...s.claimed].every(k => typeof k === 'string' && known(k.split(':')[0]) && (k.split(':')[1] === 'base' || Object.hasOwn(TRAITS, k.split(':')[1]))) ||
         !s.shop || !number(s.shop.refreshAt) || !Array.isArray(s.shop.offers) || !s.shop.offers.every(o => o && typeof o.id === 'string' && number(o.stock) && number(o.price) && (o.kind === 'seed' ? known(o.item) : o.kind === 'fertilizer' && Object.hasOwn(FERTILIZERS, o.item))))
         throw Error('花园存档格式不兼容或已损坏');
+    if(s.weatherCheckedAt!==undefined&&!number(s.weatherCheckedAt))throw Error('天气记录无效');
+    if(s.weatherGuarantees!==undefined&&(!s.weatherGuarantees||typeof s.weatherGuarantees!=='object'||Array.isArray(s.weatherGuarantees)||!Object.values(s.weatherGuarantees).every(r=>r&&number(r.end)&&Array.isArray(r.winners)&&r.winners.every(id=>typeof id==='string')&&new Set(r.winners).size===r.winners.length&&(r.evaluated===undefined||(Array.isArray(r.evaluated)&&r.evaluated.every(id=>typeof id==='string'))))))throw Error('天气保底记录无效');
+    if(s.testWeather){const e=s.testWeather;if(!Array.isArray(e.evaluated)||!e.evaluated.every(id=>typeof id==='string')||typeof e.id!=='string'||!e.id.startsWith('weather-test:')||!['meteor','aurora'].includes(e.kind)||![e.start,e.end,e.checkedAt].every(number)||e.end<=e.start||e.checkedAt<e.start-1||e.checkedAt>e.end)throw Error('测试天气记录无效');}
     if (s.travel !== undefined) validateTravel(s.travel);
     if(s.journalEvents!==undefined&&(!Array.isArray(s.journalEvents)||s.journalEvents.some(e=>!e||!Number.isFinite(e.at)||typeof e.actor!=='string'||typeof e.summary!=='string')))throw Error('花园记录已损坏');
     return s;
@@ -271,7 +295,7 @@ function nextBatch(s: GardenState, p: Plant, now: number, rng: Random, music: bo
     let traits = [...new Set([...p.baseTraits!, ...rollTraits(s, p.species, rng, 1, music)])];
     if (fertilizer?.effect === 'mutation') traits = [...new Set([...traits, ...rollTraits(s,p.species,rng,fertilizer.strength,music)])];
     const kg = Math.round(SPECIES[p.species].kg * (.65+rng.random()*1.7) * (traits.includes('giant')?4:1) * (fertilizer?.effect === 'weight' ? fertilizer.strength : 1) * 1000)/1000;
-    const duration = SPECIES[p.species].minutes * 60000 * (fertilizer?.effect === 'speed' ? 1-fertilizer.strength : 1);
-    const next: Plant = { ...p, id: rng.id(), traits, kg, value: 0, plantedAt: now, readyAt: now+duration, harvestsLeft: p.harvestsLeft!-1, harvestIndex: p.harvestIndex!+1 };
+    const duration = SPECIES[p.species].minutes * 60000 * (p.growthVersion === 2 ? 1-.03*(level(s.xp[p.species])-1) : 1) * (fertilizer?.effect === 'speed' ? 1-fertilizer.strength : 1);
+    const next: Plant = { ...p, revealed: undefined, cultivation: undefined, id: rng.id(), traits, kg, value: 0, plantedAt: now, readyAt: now+duration, harvestsLeft: p.harvestsLeft!-1, harvestIndex: p.harvestIndex!+1 };
     next.value = value(next); return next;
 }

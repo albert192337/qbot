@@ -13,6 +13,7 @@ const api: QBotApi = {
     journalStatus: () => ipcRenderer.invoke('garden:journalStatus'),
     rewriteDiary: request => ipcRenderer.invoke('garden:rewriteDiary',request),
     generateMoment: requestId => ipcRenderer.invoke('garden:generateMoment',requestId),
+    weather: () => ipcRenderer.invoke('garden:weather'),
     closeTravel: () => ipcRenderer.send('garden:closeTravel'),
     onSpeechBounds: cb => { const fn = (_ev: unknown, bounds: Parameters<typeof cb>[0]) => cb(bounds); ipcRenderer.on('garden:speechBounds', fn); return () => ipcRenderer.removeListener('garden:speechBounds', fn); },
     onPerformance: cb => { const fn = (_ev: unknown, action: string | null) => cb(action); ipcRenderer.on('garden:performance', fn); return () => ipcRenderer.removeListener('garden:performance', fn); },

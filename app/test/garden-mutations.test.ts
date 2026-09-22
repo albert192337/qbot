@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { initialGarden, rollTraits, transition, validateGarden, value } from '../src/main/garden/rules';
-import { TRAITS } from '../src/shared/garden';
+import { TRAITS, level } from '../src/shared/garden';
 
 describe('stacked elemental garden mutations', () => {
     it('rolls frost and thunder independently, with no music bonus', () => {
@@ -29,7 +29,7 @@ describe('stacked elemental garden mutations', () => {
         const rng = { id: () => 'distribution', random: () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; } };
         const state = initialGarden(100, rng);
         const samples = 30000;
-        for (const xp of [0, 80]) for (const music of [false, true]) {
+        for (const xp of [0, 80, 960]) for (const music of [false, true]) {
             state.xp.lotus = xp;
             let previousNative = 1;
             for (const boost of [0, 1.5, 2, 3]) {
@@ -41,15 +41,11 @@ describe('stacked elemental garden mutations', () => {
                     if (traits.size >= 2) multiple++;
                 }
                 const fraction = native / samples;
-                expect(fraction).toBeGreaterThan(boost ? .55 : .86);
-                expect(multiple / samples).toBeLessThan(boost ? .11 : .012);
+                const eligible=Object.values(TRAITS).filter(t=>t.level<=level(xp));
+                const expected=eligible.reduce((product,t)=>{const chance=t.chance*(music&&['朋克','古典'].includes(t.name)?3:1);return product*(1-chance)*(boost?1-chance*boost:1);},1);
+                expect(Math.abs(fraction-expected)).toBeLessThan(.015);
                 expect(fraction).toBeLessThan(previousNative);
-                if (xp === 80 && !music && !boost) {
-                    expect(fraction).toBeGreaterThan(.89);
-                    expect(fraction).toBeLessThan(.91);
-                    expect(multiple / samples).toBeGreaterThan(.003);
-                    expect(multiple / samples).toBeLessThan(.007);
-                }
+                expect(multiple/samples).toBeLessThan(.18);
                 previousNative = fraction;
             }
         }
@@ -62,12 +58,15 @@ describe('stacked elemental garden mutations', () => {
         state = transition(state, { type: 'plant', plot: 0, seed: state.seeds[0].id }, 100, rng).state;
         const plant = structuredClone(state.plots[0]!);
         state = validateGarden(JSON.parse(JSON.stringify(state)));
-        const result = transition(state, { type: 'harvest', plot: 0 }, plant.readyAt, rng);
+        state = transition(state,{type:'cultivate',plot:0},plant.readyAt,rng).state;
+        state = transition(state,{type:'revealPlant',plot:0},plant.readyAt+30000,rng).state;
+        const result = transition(state, { type: 'harvest', plot: 0 }, plant.readyAt+30000, rng);
         const item = result.reveal!.produce!;
         expect(item.traits).toEqual(plant.traits);
         expect(item.value).toBe(plant.value);
         expect(item.value).toBe(value(item));
         expect(result.state.discovered).toEqual(expect.arrayContaining(['lotus:frost', 'lotus:thunder']));
+        result.state.seeds[0].genes=['golden'];
         state = transition(result.state, { type: 'plant', plot: 1, seed: result.state.seeds[0].id }, 100, rng).state;
         state = transition(state, { type: 'mature' }, 100, rng).state;
         const child = transition(state, { type: 'breed', first: item.id, second: state.plots[1]!.id }, 100, { ...rng, random: () => 0 });

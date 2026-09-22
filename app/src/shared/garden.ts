@@ -33,10 +33,22 @@ export const TRAITS = {
     petals: { name: '花雨', category: 'accessory', tier: 'blue', level: 1, chance: .008, multiplier: 1.4 },
     frost: { name: '冰冻', category: 'body', tier: 'purple', level: 1, chance: .0045, multiplier: 2 },
     thunder: { name: '雷击', category: 'accessory', tier: 'gold', level: 1, chance: .0025, multiplier: 2.5 },
+    dew: { name: '凝露', category: 'body', tier: 'purple', level: 2, chance: .006, multiplier: 1.6 },
+    striped: { name: '斑纹', category: 'body', tier: 'purple', level: 2, chance: .006, multiplier: 1.6 },
+    honey: { name: '蜜心', category: 'body', tier: 'purple', level: 3, chance: .005, multiplier: 1.8 },
+    breezy: { name: '风铃', category: 'accessory', tier: 'purple', level: 3, chance: .005, multiplier: 1.8 },
+    jade: { name: '玉润', category: 'body', tier: 'gold', level: 4, chance: .003, multiplier: 2.8 },
+    crystal: { name: '晶透', category: 'body', tier: 'gold', level: 4, chance: .003, multiplier: 2.8 },
+    moon: { name: '月华', category: 'accessory', tier: 'gold', level: 5, chance: .0025, multiplier: 3 },
+    amber: { name: '琥珀', category: 'body', tier: 'gold', level: 5, chance: .0025, multiplier: 3 },
+    stardust: { name: '星尘', category: 'accessory', tier: 'rainbow', level: 6, chance: .001, multiplier: 4.5 },
+    prism: { name: '棱光', category: 'body', tier: 'rainbow', level: 6, chance: .001, multiplier: 4.5 },
+    nebula: { name: '星云', category: 'body', tier: 'rainbow', level: 7, chance: .0008, multiplier: 5 },
+    halo: { name: '天光冠', category: 'accessory', tier: 'rainbow', level: 8, chance: .0006, multiplier: 5 },
 } as const;
 export type Trait = keyof typeof TRAITS;
 export type Tier = 'normal' | 'green' | 'blue' | 'purple' | 'gold' | 'rainbow';
-export const TIER_NAMES: Record<Tier, string> = { normal: '普通', green: '优良', blue: '精品', purple: '稀有', gold: '非凡', rainbow: '至臻' };
+export const TIER_NAMES: Record<Tier, string> = { normal: '普通', green: '优良', blue: '精品', purple: '紫色', gold: '金色', rainbow: '彩色' };
 export const FERTILIZERS = {
     speed: { name: '初级加速', description: '生长时间减少 50%', effect: 'speed', strength: .5, grade: 1, price: 25, chance: .85 },
     mutation: { name: '初级变异', description: '每批果实额外一次变异机会', effect: 'mutation', strength: 1.5, grade: 1, price: 35, chance: .8 },
@@ -60,6 +72,9 @@ export interface Seed {
     ];
 }
 export interface Produce {
+    growthVersion?: 2;
+    revealed?: boolean;
+    cultivation?: { remainingMs: number; startedAt?: number };
     locked?: boolean;
     yieldCount?: number;
     id: string;
@@ -87,6 +102,9 @@ export interface Offer {
 }
 export interface GardenState {
     journalEvents?: {at:number;actor:string;summary:string}[];
+    weatherCheckedAt?: number;
+    weatherGuarantees?: Record<string,{end:number;winners:string[];evaluated?:string[]}>;
+    testWeather?: import('./garden-weather').WeatherEvent & {checkedAt:number; evaluated:string[]};
     travel?: TravelState;
     journey?: { bought: number; planted: number; harvested: number; earned: number; appleBought: number };
     boxMisses?: number;
@@ -104,7 +122,7 @@ export interface GardenState {
         offers: Offer[];
     };
 }
-export type GardenCommand = TravelCommand | {
+export type GardenCommand = TravelCommand | { type: 'cultivate' | 'pauseCultivation' | 'revealPlant'; plot: number } | {
     type: 'buyMany'; items: { offer: string; count: number }[];
 } | { type: 'sellMany'; ids: string[];
 } | { type: 'plantMany'; seed: string;
@@ -161,6 +179,7 @@ export interface GardenApi {
     journalStatus(): Promise<import('./travel').JournalStatus>;
     rewriteDiary(request: import('./travel').DiaryRequest): Promise<import('./travel').JournalResult<import('./travel').TravelDiary>>;
     generateMoment(requestId: string): Promise<import('./travel').JournalResult<import('./travel').DailyMoment>>;
+    weather(): Promise<import('./garden-weather').GardenWeatherStatus>;
     closeTravel(): void;
     onSpeechBounds(cb: (bounds: { left: number; right: number; top: number; bottom: number } | null) => void): () => void;
     onPerformance(cb: (action: string | null) => void): () => void;
@@ -180,7 +199,27 @@ export interface GardenApi {
     onChanged(cb: () => void): () => void;
     onPage(cb: (page: string) => void): () => void;
 }
-export function level(xp: number): number { return Math.min(3, 1 + Math.floor(xp / 40)); }
+/** QBot project design, not original-game values. */
+export const LEVEL_XP = [0, 40, 80, 160, 280, 440, 660, 960] as const;
+export const CULTIVATION_MS = 30_000;
+export const HARVEST_XP = 10;
+export function level(xp: number): number { return Math.max(1, LEVEL_XP.filter(n => xp >= n).length); }
+export const SLOT_NAMES = { fruit: '果实', skin: '果皮', accessory: '挂饰' } as const;
+export function traitSlot(t: Trait): keyof typeof SLOT_NAMES {
+    if (TRAITS[t].category === 'accessory') return 'accessory';
+    return (['giant', 'twin', 'honey', 'nebula'] as Trait[]).includes(t) ? 'fruit' : 'skin';
+}
+export function fruitQuality(ts: Trait[]): 'normal' | 'purple' | 'gold' | 'rainbow' {
+    const t = tier(ts); return t === 'blue' || t === 'green' ? 'normal' : t;
+}
+export function needsReveal(p: Produce): boolean { return p.growthVersion === 2 && !p.revealed && fruitQuality(p.traits) === 'rainbow'; }
+export function canBreed(p: Produce): boolean { return !p.bred && !needsReveal(p) && ['gold','rainbow'].includes(fruitQuality(p.traits)); }
+export function cultivationRemaining(p: Produce, now: number): number {
+    const c = p.cultivation; return c ? Math.max(0, c.remainingMs - (c.startedAt === undefined ? 0 : Math.max(0,now-c.startedAt))) : CULTIVATION_MS;
+}
+export function mutationMultiplier(ts: Trait[]): number {
+    return Math.min(15, 1 + [...new Set(ts)].reduce((sum,t)=>sum+TRAITS[t].multiplier-1,0));
+}
 export function tier(traits: Trait[]): Tier {
     const order: Tier[] = ['normal', 'green', 'blue', 'purple', 'gold', 'rainbow'];
     return traits.reduce<Tier>((a, t) => order.indexOf(TRAITS[t].tier) > order.indexOf(a) ? TRAITS[t].tier : a, 'normal');

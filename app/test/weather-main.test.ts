@@ -1,3 +1,4 @@
+vi.mock('../src/main/garden/service',()=>({beginGardenWeatherTest:vi.fn(async()=>{}),endGardenWeatherTest:vi.fn(async()=>{})}));
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocked = vi.hoisted(() => ({ create: vi.fn(), transition: vi.fn(), dispose: vi.fn(), lost: () => {} }));
 vi.mock('electron', async () => {
@@ -8,7 +9,7 @@ vi.mock('electron', async () => {
 });
 vi.mock('../src/main/weather-reaction',()=>({cancelWeatherReaction:vi.fn(),reactToWeather:vi.fn(async()=>{})}));
 vi.mock('../src/main/weather-surface', () => ({createBitmapWeatherSurface: mocked.create}));
-import { changeWeatherTest, stopWeatherTest, weatherTestMenu } from '../src/main/weather';
+import { changeWeatherTest, stopWeatherTest, weatherTestMenu, showScheduledWeather, weatherPreview } from '../src/main/weather';
 import { powerMonitor, screen } from 'electron';
 import { WEATHER_TEST_MS } from '../src/shared/weather';
 beforeEach(() => {
@@ -55,4 +56,10 @@ it('disables unsupported platforms',()=>{
 it('enables Windows presets and marks the active weather',async()=>{
   await changeWeatherTest('meteor');const menu=weatherTestMenu().submenu as Electron.MenuItemConstructorOptions[];
   expect(menu[0].enabled).toBe(true);expect(menu[0].checked).toBe(true);expect(menu[1].checked).toBe(false);
+});
+
+it('keeps scheduled weather for the event duration, independent of three-minute previews',async()=>{
+  await showScheduledWeather('meteor',Date.now()+45*60000);expect(weatherPreview()).toBeNull();
+  await vi.advanceTimersByTimeAsync(3*60000);expect(mocked.dispose).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(42*60000);expect(mocked.dispose).toHaveBeenCalledTimes(1);
 });

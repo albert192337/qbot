@@ -1,3 +1,4 @@
+import { applyWeatherMutations } from './weather-rules';
 import { prepareTravelMemory, writeTravelDiary } from './travel-memory';
 import { gardenJournalSummary } from './journal-events';
 import { app, BrowserWindow } from 'electron';
@@ -54,6 +55,8 @@ async function load(): Promise<RecordFile> {
                 if (typeof r.pending.id !== 'string' || !Number.isFinite(r.pending.points) || !Number.isFinite(r.pending.boxes))
                     throw Error('无效交易');
             }
+            // A saved animation cannot continue while the app is closed.
+            for(const state of [r.state, ...(r.pending?[r.pending.next]:[])])for(const p of state.plots)if(p?.cultivation)delete p.cultivation.startedAt;
             cache = r;
             return r;
         }
@@ -82,10 +85,14 @@ async function recover(): Promise<GardenState> {
 export function getGarden(): Promise<GardenState> {
     return serial(async () => {
         const state = structuredClone(await recover());
-        if (state.shop.refreshAt <= Date.now()) {
+        const oldPlots=JSON.stringify(state.plots);
+        const now=Date.now();
+        const weatherChanged=applyWeatherMutations(state,now);
+        if (state.shop.refreshAt <= now) {
             refreshShop(state, Date.now(), rng);
-            await save({ state });
         }
+        if(weatherChanged || state.shop.refreshAt !== cache!.state.shop.refreshAt) await save({ state });
+        if(oldPlots!==JSON.stringify(state.plots))for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');
         return state;
     });
 }
@@ -104,10 +111,10 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
             if (!command || typeof command !== 'object')
                 throw Error('无效花园操作');
             const participant = (command.type === 'harvest' || command.type === 'harvestMany') ? (await getSettings()).activeCharacter ?? 'default' : undefined;
-            const state = await recover();
+            const state = structuredClone(await recover());
             if((command.type==='plant'||command.type==='plantMany')&&(await getSettings()).gardenRenderMode==='3d'&&state.seeds.find(s=>s.id===command.seed)?.species!=='strawberry')
                 throw Error('3D 模式先支持草莓；其他植物请切回 2D 后播种。');
-
+            applyWeatherMutations(state,Date.now());
             const result = transition(state, command, Date.now(), rng, { musicPlaying: getMusicStatus().playing });
             const summary=gardenJournalSummary(state,result.state,command,result.reveal);
             if(summary){const at=Date.now(),actor=participant??(await getSettings()).activeCharacter??'default';result.state.journalEvents=[...(result.state.journalEvents??[]).filter(e=>at-e.at<7*86400000),{at,actor,summary:summary.slice(0,500)}].slice(-300);}
@@ -152,4 +159,22 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
             return { ok: false, error: e instanceof Error ? e.message : String(e) };
         }
     });
+}
+
+/** Manual test events use real persisted rolls, distinct from the scheduled calendar. */
+export function beginGardenWeatherTest(kind:import('../../shared/weather').WeatherKind,durationMs:number):Promise<void>{
+ return serial(async()=>{
+  const state=structuredClone(await recover()),now=Date.now();applyWeatherMutations(state,now);
+  if(state.testWeather?.kind===kind&&state.testWeather.end>now){await save({state});return;}
+  state.testWeather={id:'weather-test:'+randomUUID(),kind,start:now,end:now+durationMs,checkedAt:now-1,evaluated:[]};
+  applyWeatherMutations(state,now);await save({state});
+  for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');
+ });
+}
+export function endGardenWeatherTest():Promise<void>{
+ return serial(async()=>{
+  const state=structuredClone(await recover());if(!state.testWeather)return;
+  applyWeatherMutations(state,Date.now());delete state.testWeather;await save({state});
+  for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');
+ });
 }

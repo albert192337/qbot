@@ -1,4 +1,7 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import {cultivationRemaining} from '../../shared/garden';
+import { gardenWeather } from '../../shared/garden-weather';
+import { startGardenWeatherClock } from './weather-clock';
+import { app, BrowserWindow, ipcMain, screen, powerMonitor } from 'electron';
 import path from 'node:path';
 import { getGarden, gardenAction } from './service';
 import { getSettings } from '../config';
@@ -22,8 +25,10 @@ function syncSpeechBounds(): void {
 let home: {x:number;y:number} | null = null;
 let performanceTimer: ReturnType<typeof setTimeout> | undefined;
 let performanceVersion = 0;
+let cultivatingPlot: number | null = null;
 function stopPerformance(restore = true): void {
     performanceVersion++;
+    if(cultivatingPlot!==null){const plot=cultivatingPlot;cultivatingPlot=null;void gardenAction({type:'pauseCultivation',plot});}
     clearTimeout(performanceTimer);
     const origin = home; home = null;
     if (!origin) return;
@@ -33,20 +38,26 @@ function stopPerformance(restore = true): void {
     }
     anchor();
 }
-async function perform(plot: number, kind: 'plant' | 'harvest'): Promise<void> {
+async function perform(plot: number, kind: 'plant' | 'harvest' | 'cultivate', duration?:number): Promise<boolean> {
     stopPerformance();
+    if(kind==='cultivate'&&!expanded)toggle();
     const version = performanceVersion;
+    if(kind==='cultivate'&&strip?.webContents.isLoading())await new Promise<void>(resolve=>{const win=strip!;const timer=setTimeout(resolve,3000);win.webContents.once('did-finish-load',()=>{clearTimeout(timer);resolve();});});
     const settings = await getSettings();
     const meta = settings.activeCharacter ? await getCharacter(settings.activeCharacter) : null;
-    if (version !== performanceVersion || !meta?.manifest || !expanded || !strip?.isVisible() || !pet?.isVisible()) return;
+    if (version !== performanceVersion || !meta?.manifest || !expanded || !strip?.isVisible() || !pet?.isVisible()) return false;
     const actions: Record<string, {status?:string;durationSec?:number}> = {...meta.manifest.actions, ...meta.manifest.importedActions, ...meta.manifest.expressionActions, ...meta.manifest.customActions};
-    const action = [kind === 'plant' ? 'garden_sow' : 'garden_harvest', kind === 'plant' ? 'wave' : 'talk_happy', 'idle'].find(id => actions[id] && (!actions[id].status || actions[id].status === 'done'));
-    if (!action) return;
+    const action = [kind === 'cultivate' ? 'garden_sow' : kind === 'plant' ? 'garden_sow' : 'garden_harvest', kind === 'plant' ? 'wave' : 'talk_happy', 'idle'].find(id => actions[id] && (!actions[id].status || actions[id].status === 'done'));
+    if (!action) return false;
     const bounds = pet.getBounds(); home = {x:bounds.x,y:bounds.y};
     const target = plotPetPosition(plot, bounds, strip.getBounds(), screen.getDisplayMatching(bounds).workArea);
     pet.webContents.send('garden:performance', action);
     pet.setPosition(target.x, target.y);
-    performanceTimer = setTimeout(() => stopPerformance(), Math.min(12000, (actions[action].durationSec ?? 5) * 1000 + 600));
+    if(kind==='cultivate'){
+        cultivatingPlot=plot;
+        performanceTimer=setTimeout(()=>{cultivatingPlot=null;void gardenAction({type:'revealPlant',plot}).then(result=>{if(!result.ok)return gardenAction({type:'pauseCultivation',plot});}).finally(()=>stopPerformance());},Math.max(1,duration??30000)+100);
+    } else performanceTimer = setTimeout(() => stopPerformance(), Math.min(12000, (actions[action].durationSec ?? 5) * 1000 + 600));
+    return true;
 }
 function load(win: BrowserWindow, page: string): void {
     if (process.env.ELECTRON_RENDERER_URL)
@@ -73,6 +84,7 @@ function anchor(): void {
 }
 export function attachGarden(p: BrowserWindow): void {
     pet = p;
+    p.webContents.on('did-start-loading',()=>stopPerformance());
     p.on('move', anchor);
     p.on('resize', anchor);
     p.on('hide', () => { stopPerformance(); strip?.hide(); });
@@ -111,8 +123,17 @@ function toggle(): void {
     // 展开方向由左右剩余空间决定，不再强制把桌宠挪到屏幕中间。
     anchor();
 }
+let weatherPanel: BrowserWindow | null=null;
 export function openGardenPanel(page: string): void {
-    const allowed = /^(travel|moments|bag|shop|book|plots|sow|plot:[0-5])$/.test(page) ? page : 'bag';
+    const allowed = /^(weather|travel|moments|bag|shop|book|plots|sow|plot:[0-5])$/.test(page) ? page : 'bag';
+    if(allowed==='weather'){
+        if(weatherPanel&&!weatherPanel.isDestroyed()){weatherPanel.show();weatherPanel.focus();return;}
+        const wa=screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+        const width=Math.min(420,wa.width),height=Math.min(620,wa.height);
+        const petBounds=pet?.getBounds();
+        const win=new BrowserWindow({title:'花园气象台',width,height,x:Math.max(wa.x,Math.min((petBounds?.x??wa.x)+ (petBounds?.width??0),wa.x+wa.width-width)),y:Math.max(wa.y,Math.min(petBounds?.y??wa.y,wa.y+wa.height-height)),resizable:false,backgroundColor:'#f4efe5',show:false,webPreferences:{preload:path.join(__dirname,'../preload/index.js'),contextIsolation:true,sandbox:false}});
+        weatherPanel=win;win.setMenuBarVisibility(false);win.setAlwaysOnTop(true,'floating');win.on('closed',()=>{if(weatherPanel===win)weatherPanel=null;});win.once('ready-to-show',()=>win.show());load(win,'weather');return;
+    }
     if (allowed === 'travel' || allowed === 'moments') {
         if (!travelPanel || travelPanel.isDestroyed()) {
             const wa = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
@@ -147,9 +168,18 @@ export function registerGardenIpc(): void {
     ipcMain.handle('garden:journalStatus', async () => (await import('./journal-service')).journalStatus());
     ipcMain.handle('garden:rewriteDiary', async (_ev,request) => (await import('./journal-service')).rewriteDiary(request));
     ipcMain.handle('garden:generateMoment', async (_ev,requestId) => (await import('./journal-service')).generateMoment(requestId));
+    ipcMain.handle('garden:weather', async () => {const state=await getGarden(),status=gardenWeather();const test=state.testWeather&&state.testWeather.start<=status.now&&state.testWeather.end>status.now?state.testWeather:null;return {...status,current:test??status.current,test};});
+    startGardenWeatherClock();
+    powerMonitor.on('suspend',()=>stopPerformance());
     ipcMain.handle('garden:get', () => getGarden());
     ipcMain.handle('garden:act', async (_ev, command) => {
         const result = await gardenAction(command);
+        if(result.ok && command.type==='cultivate'){
+            const p=result.state.plots[command.plot]!;
+            let playing=false;try{playing=await perform(command.plot,'cultivate',cultivationRemaining(p,Date.now()));}catch{stopPerformance();}
+            if(!playing){await gardenAction({type:'pauseCultivation',plot:command.plot});return {ok:false,error:'请先显示桌宠并选择可播放动作的角色，再继续培育'};}
+        }
+        if(result.ok && command.type==='pauseCultivation')stopPerformance();
         if (result.ok && (command.type === 'plant' || command.type === 'harvest'))
             void perform(command.plot, command.type).catch(() => stopPerformance());
         return result;
@@ -161,5 +191,5 @@ export function registerGardenIpc(): void {
     ipcMain.on('garden:closeTravel', ev => {if(travelPanel && ev.sender === travelPanel.webContents) travelPanel.close();});
     ipcMain.on('garden:ignore', (ev, ignore) => { if (strip && ev.sender === strip.webContents)
         strip.setIgnoreMouseEvents(ignore !== false, { forward: true }); });
-    app.on('before-quit', () => { strip?.destroy(); panel?.destroy(); travelPanel?.destroy(); });
+    app.on('before-quit', () => { stopPerformance(); weatherPanel?.destroy(); strip?.destroy(); panel?.destroy(); travelPanel?.destroy(); });
 }

@@ -70,6 +70,7 @@ describe('garden rules', () => {
     it('cross-species breeding selects one parent species, consumes both qualifications across land/bag', () => {
         let s = planted(0);
         const seed = s.seeds.find(x => x.species === 'strawberry')!;
+        seed.genes = ['giant'];
         s = run(s, { type: 'plant', plot: 1, seed: seed.id });
         s = run(s, { type: 'mature' });
         s = run(s, { type: 'harvest', plot: 0 });
@@ -114,7 +115,7 @@ describe('garden rules', () => {
         s = run(s, { type: 'harvest', plot: 0 });
         const result = transition(s, { type: 'claim' }, now, rng());
         expect(result.points).toBe(260); // 原生 + 十二种 Lv.1 词条，各 20 分。
-        expect(level(result.state.xp.lotus)).toBe(3);
+        expect(level(result.state.xp.lotus)).toBe(4);
         expect(() => run(result.state, { type: 'claim' })).toThrow();
         const advanced = run(result.state, { type: 'plant', plot: 0, seed: result.state.seeds[0].id }, now, rng(0));
         expect(advanced.plots[0]!.traits).toContain('rainbow');

@@ -874,6 +874,15 @@ body:not(.strip) .batch-bar { position:fixed; bottom:12px; left:50%; transform:t
 .content:has(.batch-bar) { padding-bottom:100px!important; }
 body:not(.strip) .tag,.strip .tag { border-radius:14px 3px 14px 3px; }
 
+/* Numerical growth placeholders; preserve existing painted assets. */
+.mystery-fruit{display:flex!important;align-items:center;justify-content:center;background:linear-gradient(135deg,#f9bdc7,#ecd0fa,#a9dcfa,#c8efcc,#ffe9ac);color:#fff!important;text-shadow:0 2px 8px #956caa;font-size:72px!important;font-weight:900;border:3px solid #fff8;border-radius:45%;box-shadow:0 0 22px #c29ade88;min-height:70px;animation:mystery-breathe 2.2s ease-in-out infinite}
+@keyframes mystery-breathe{50%{box-shadow:0 0 32px #a6dfe7;filter:brightness(1.08)}}
+.quick-list progress,.plant-detail progress{display:block;width:100%;accent-color:#b787d0;height:12px;margin:8px 0}
+.tag{border:1px solid #ffffff88;padding:4px 8px;border-radius:9px;font-weight:700}
+.tag.normal{background:#eee7da;color:#655b50}.tag.purple{background:#ead9f6;color:#704796}.tag.gold{background:#ffe5a1;color:#886011}.tag.rainbow{background:linear-gradient(110deg,#ffd2de,#e2d6ff,#cae8ff,#d2f0ce,#ffe8ad);color:#694777}
+.quick-list .muted{display:block}.trait-group{flex-wrap:wrap}.factor .tag{display:inline-block}.weather-symbol{font-size:1.4em}
+@media(prefers-reduced-motion:reduce){.mystery-fruit{animation:none}}
+
 /* 3D is an optional appearance layer. The original images remain as WebGL fallback. */
 .art.art-3d{filter:none!important;animation:none!important;background:none!important;overflow:visible}
 .art.art-3d>img,.art.art-3d>.mutation-surface,.art.art-3d>.accessory-layer,.art.art-3d>.mutation-art{visibility:hidden!important}
@@ -882,3 +891,6 @@ body:not(.strip) .tag,.strip .tag { border-radius:14px 3px 14px 3px; }
 .art.art-3d{position:relative}.strip .plot>.art.art-3d{position:absolute;bottom:-8px;pointer-events:auto}
 .strip .plot-3d:has(.art-3d)>.soil{visibility:hidden}.strip .plot>.soil-3d{width:112px;height:135px!important;pointer-events:none!important}
 .strip .plot-3d .empty-plot{z-index:3;bottom:8px}.garden-3d .plant-detail>.art{min-height:240px}
+
+
+.mystery-fruit{padding:0!important;text-align:center;line-height:1;overflow:visible}.strip .plot>.mystery-fruit{font-size:48px!important;min-height:70px}.weather-back{margin:12px}.book-heading progress{width:100%;accent-color:#82ac93}

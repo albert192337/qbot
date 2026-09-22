@@ -1,3 +1,4 @@
+import { attachWeatherButton } from './weather-button';
 /**
  * 桌宠窗底部 HUD —— 点数药丸 + 宝箱按钮。
  * 纯 DOM 构造，不依赖 Player / StateMachine。
@@ -101,6 +102,8 @@ export class ProgressHud {
       const b=document.createElement('button');b.className='hud-chat';b.title=label;b.setAttribute('aria-label',label);b.innerHTML=`<svg viewBox="0 0 32 32">${svg}</svg>`;
       b.addEventListener('pointerdown',e=>e.stopPropagation());b.addEventListener('click',e=>{e.stopPropagation();window.qbot.garden.open(page);});this.root.append(b);
     }
+    const stopWeather=attachWeatherButton(this.root,window.qbot.garden);
+    window.addEventListener('pagehide',stopWeather,{once:true});
     const stopGardenHint = attachGardenHint(garden, window.qbot.garden);
     window.addEventListener('pagehide', stopGardenHint, { once: true });
     this.root.appendChild(this.floatEl);

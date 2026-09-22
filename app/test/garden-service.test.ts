@@ -39,7 +39,6 @@ describe('garden transaction journal', () => {
         expect((await api.gardenAction({type:'plant',plot:1,seed:lotus.id})).ok).toBe(true);
         const after=await api.getGarden();expect(after.plots[0]?.species).toBe('strawberry');expect(after.plots[1]?.species).toBe('lotus');
     });
-
     it('records successful ordinary garden activity with a time and actor, excluding failed clicks',async()=>{
         const api=await import('../src/main/garden/service');const s=await api.getGarden();
         expect((await api.gardenAction({type:'plant',plot:0,seed:s.seeds[0].id})).ok).toBe(true);
@@ -96,4 +95,25 @@ describe('garden transaction journal', () => {
         await expect(api.getGarden()).rejects.toThrow('存档');
         expect(await readFile(path.join(mock.dir, 'garden-demo.json'), 'utf8')).toBe('broken');
     });
+});
+it('persists real test events and deduplicates repeated activation until restore',async()=>{
+ const api=await import('../src/main/garden/service');
+ await api.beginGardenWeatherTest('meteor',180000);const first=(await api.getGarden()).testWeather!;
+ expect(first.id).toMatch(/^weather-test:/);await api.beginGardenWeatherTest('meteor',180000);
+ expect((await api.getGarden()).testWeather!.id).toBe(first.id);
+ vi.resetModules();const restarted=await import('../src/main/garden/service');
+ expect((await restarted.getGarden()).testWeather!.id).toBe(first.id);
+ await restarted.endGardenWeatherTest();expect((await restarted.getGarden()).testWeather).toBeUndefined();
+ await restarted.beginGardenWeatherTest('meteor',180000);expect((await restarted.getGarden()).testWeather!.id).not.toBe(first.id);
+});
+
+it('restart pauses a saved cultivation instead of counting closed-app time',async()=>{
+ const api=await import('../src/main/garden/service');const state=await api.getGarden();
+ const {transition}=await import('../src/main/garden/rules');let id=0;const rng={random:()=>.99,id:()=>String(id++)};
+ state.seeds[0].genes=['rainbow'];let s=transition(state,{type:'plant',plot:0,seed:state.seeds[0].id},Date.now(),rng).state;
+ s.plots[0]!.readyAt=Date.now()-60000;s=transition(s,{type:'cultivate',plot:0},Date.now()-60000,rng).state;
+ await writeFile(path.join(mock.dir,'garden-demo.json'),JSON.stringify({state:s}));vi.resetModules();
+ const restarted=await import('../src/main/garden/service');const restored=await restarted.getGarden();
+ expect(restored.plots[0]!.cultivation).toEqual({remainingMs:30000});
+ expect((await restarted.gardenAction({type:'revealPlant',plot:0})).ok).toBe(false);
 });
