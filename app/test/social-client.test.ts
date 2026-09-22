@@ -1,10 +1,11 @@
+vi.mock('../src/main/rooms/contact-cache',()=>({readContactCache:()=>({}),saveContactCache:vi.fn()}));
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const data=vi.hoisted(()=>({settings:{activeCharacter:'host',nickname:'我'} as Record<string,unknown>, guests:[] as any[]}));
 vi.mock('../src/main/config',()=>({getSettings:async()=>data.settings,setSettings:async(p:object)=>Object.assign(data.settings,p)}));
 vi.mock('../src/main/characters',()=>({getCharacter:async()=>null}));
 vi.mock('../src/main/rooms/test-guests',()=>({listTestGuests:async()=>data.guests}));
-vi.mock('../src/main/rooms/room-pets',()=>({setRoomsSend:vi.fn(),onLeftRoom:vi.fn(),onJoinedRoom:vi.fn(),startLocalTest:vi.fn(),addLocalTestGuest:vi.fn(),onMemberOut:vi.fn(),onMemberIn:vi.fn(),onPresence:vi.fn(),onChat:vi.fn(),onMemberPack:vi.fn(),handlePackError:vi.fn(),handlePackFrame:vi.fn(),notifyRoomCharacterChanged:vi.fn()}));
+vi.mock('../src/main/rooms/room-pets',()=>({setContactRealm:vi.fn(),setRoomsSend:vi.fn(),onLeftRoom:vi.fn(),onJoinedRoom:vi.fn(),startLocalTest:vi.fn(),addLocalTestGuest:vi.fn(),onMemberOut:vi.fn(),onMemberIn:vi.fn(),onPresence:vi.fn(),onChat:vi.fn(),onMemberPack:vi.fn(),handlePackError:vi.fn(),handlePackFrame:vi.fn(),notifyRoomCharacterChanged:vi.fn()}));
 class Socket {
   static all:Socket[]=[];
   static enhanced=true;

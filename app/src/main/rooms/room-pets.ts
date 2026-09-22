@@ -39,6 +39,8 @@ const PEER_CACHE_PREFIX = '.peer-';
 type OutFrame = { t: string } & Record<string, unknown>;
 
 /** rooms.ts 注入的出帧口（room-pets 不持连接，避免与 rooms.ts 循环依赖） */
+let contactRealm = '';
+export function setContactRealm(realm: string): void { contactRealm = realm; }
 let sendFrame: ((frame: OutFrame) => void) | null = null;
 
 export function setRoomsSend(fn: (frame: OutFrame) => void): void {
@@ -194,7 +196,7 @@ function emitCharacter(hash: string, character: LinkPeerCharacter): void {
   for (const [memberId, m] of memberStates) {
     if (m.hash === hash && !m.character) {
       m.character = character;
-      void writeFile(path.join(peerCacheDir(hash), '.social-origin.json'), JSON.stringify({memberId, nickname:m.nickname}), 'utf8').catch(() => {});
+      void writeFile(path.join(peerCacheDir(hash), '.social-origin.json'), JSON.stringify({memberId, nickname:m.nickname, realm:contactRealm}), 'utf8').catch(() => {});
       emit({ kind: 'character', memberId, nickname: m.nickname, character });
     }
   }

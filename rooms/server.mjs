@@ -22,6 +22,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
+import { Contacts } from './contacts.mjs';
 
 const PORT = Number(process.env.PORT || 24252);
 /**
@@ -124,7 +125,7 @@ function clampText(v, max) {
 }
 
 function send(ws, obj) {
-  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(['hello:ack','rooms','room','joined','error','social:ack','world:history','reported'].includes(obj.t) && ws.requestId ? {...obj, requestId:ws.requestId} : obj));
+  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(['hello:ack','rooms','room','joined','error','social:ack','world:history','reported','contacts:snapshot','contacts:ack'].includes(obj.t) && ws.requestId ? {...obj, requestId:ws.requestId} : obj));
 }
 
 function fail(ws, code) {
@@ -524,15 +525,47 @@ const handlers = {
     send(ws, {t:'social:ack'});
   },
   hello(ws, f) {
+    if (ws.hello) { fail(ws, 'already_connected'); return; }
     if (f.protoVer !== PROTO_VER) { fail(ws, 'proto_mismatch'); ws.close(); return; }
-    // memberId 由服务端分配后由客户端存本地复用（零账号体系，同市场的 token 思路）
-    ws.memberId = typeof f.memberId === 'string' && /^[0-9A-Z]{12}$/.test(f.memberId)
-      ? f.memberId
-      : genId(12);
+    let identity;
+    try { identity = contacts.login(f.memberId, f.contactToken, f.nickname, f.character); }
+    catch (e) { fail(ws, e.message === 'identity_invalid' ? e.message : 'server_error'); ws.close(); return; }
+    ws.memberId = identity.id;
     ws.nickname = clampText(f.nickname, NICK_MAX) || '匿名';
     ws.avatarHash = typeof f.avatarHash === 'string' ? f.avatarHash.slice(0, 32) : undefined;
     ws.hello = true;
-    send(ws, { t: 'hello:ack', social: 1, memberId: ws.memberId, serverTime: Date.now() });
+    send(ws, {t:'hello:ack', social:1, contacts:1, memberId:ws.memberId, contactToken:identity.token, serverTime:Date.now()});
+    notifyContacts();
+  },
+  'contacts:get'(ws, f) { if (typeof f.character === 'string' && contacts.people[ws.memberId].character !== clampText(f.character,32)) { contacts.transaction(()=>{contacts.people[ws.memberId].character=clampText(f.character,32);}); notifyContacts(); } ws.contactsSubscribed = true; send(ws, {t:'contacts:snapshot', ...contactSnapshot(ws)}); },
+  'contacts:change'(ws, f) {
+    if (!contactRate(ws)) return;
+    try { contacts.change(ws.memberId, f.id, f.action); }
+    catch(e) { fail(ws, /^contact|^request|^already|^bad_frame/.test(e.message) ? e.message : 'server_error'); return; }
+    send(ws, {t:'contacts:ack'}); notifyContacts();
+  },
+  'contacts:invite'(ws, f) {
+    if (!contactRate(ws)) return;
+    const room = rooms.get(ws.roomId);
+    if (!room || !contacts.areFriends(ws.memberId, f.id)) { fail(ws, 'invite_unavailable'); return; }
+    const targets = [...wss.clients].filter(p => p.memberId === f.id && p.hello && p.readyState === p.OPEN);
+    if (!targets.length) { fail(ws, 'contact_offline'); return; }
+    if (onlineCount(room.roomId) >= room.capacity) { fail(ws, 'room_full'); return; }
+    for (const [id, invite] of contactInvites) if (invite.expiresAt < Date.now() || invite.from === ws.memberId && invite.to === f.id) contactInvites.delete(id);
+    const id = randomBytes(16).toString('hex');
+    contactInvites.set(id, {from:ws.memberId, to:f.id, roomId:room.roomId, expiresAt:Date.now()+120000});
+    send(ws, {t:'contacts:ack'}); notifyContacts();
+  },
+  'contacts:invitation'(ws, f) {
+    const invitation = contactInvites.get(f.id);
+    if (!invitation || invitation.to !== ws.memberId) { fail(ws, 'invite_expired'); return; }
+    if (f.action === 'dismiss') { contactInvites.delete(f.id); send(ws, {t:'contacts:ack'}); notifyContacts(); return; }
+    const inviter = [...wss.clients].find(p => p.memberId === invitation.from && p.roomId === invitation.roomId && p.readyState === p.OPEN);
+    if (f.action !== 'accept' || !inviter || invitation.expiresAt < Date.now() || !contacts.areFriends(invitation.from, ws.memberId)) { fail(ws, 'invite_expired'); return; }
+    const room = rooms.get(invitation.roomId);
+    if (!room || room.banned.includes(ws.memberId) || onlineCount(room.roomId) >= room.capacity && ws.roomId !== room.roomId) { fail(ws, 'invite_unavailable'); return; }
+    // Joining is explicit; normal join enforces capacity and bans again on arrival.
+    send(ws, {t:'contacts:ack', roomId:room.roomId});
   },
 
   list(ws, f) {
@@ -599,6 +632,9 @@ const handlers = {
     if (!online.has(room.roomId)) online.set(room.roomId, new Set());
     online.get(room.roomId).add(ws);
     const member = upsertMember(room, ws);
+    ws.hasChatted = false;
+    contacts.transaction(() => { for (const p of online.get(room.roomId)) contacts.meet(ws.memberId, p.memberId); });
+    notifyContacts();
     // 进房带回最近 50 条聊天（spec §5.1「能看到最近的」）
     send(ws, { t: 'joined', room: roomSnapshot(room), chat: room.chat });
     broadcast(room.roomId, {
@@ -752,6 +788,9 @@ const handlers = {
       text,
       at: Date.now(), // 服务端时间：不信客户端时钟
     };
+    ws.hasChatted = true;
+    contacts.transaction(() => { for (const p of online.get(ws.roomId) || []) if (p.hasChatted) contacts.meet(ws.memberId, p.memberId, true); });
+    notifyContacts();
     room.chat.push(msg);
     if (room.chat.length > CHAT_KEEP) room.chat = room.chat.slice(-CHAT_KEEP);
     room.lastActiveAt = msg.at;
@@ -810,6 +849,8 @@ const handlers = {
     if (!peers) return;
     for (const p of peers) {
       if (p.memberId === target) {
+        if (!contactRate(ws)) return;
+        contacts.transaction(() => contacts.meet(ws.memberId, p.memberId, true)); notifyContacts();
         send(p, { t: 'wave', roomId: ws.roomId, fromMemberId: ws.memberId, fromNickname: ws.nickname });
         break;
       }
@@ -860,6 +901,24 @@ const handlers = {
 
 // ── WS 服务器 ──────────────────────────────────────────────
 
+const contacts = new Contacts(path.join(DATA_DIR, 'contacts.json'));
+const contactInvites = new Map();
+function contactRate(ws) {
+  const now=Date.now(); ws.contactTimes=(ws.contactTimes||[]).filter(t=>now-t<60000);
+  if(ws.contactTimes.length>=30){fail(ws,'rate_limited');return false;}
+  ws.contactTimes.push(now);return true;
+}
+function contactSnapshot(ws) {
+  const onlineIds=new Set([...wss.clients].filter(p=>p.hello&&p.readyState===p.OPEN).map(p=>p.memberId));
+  const invitations=[...contactInvites].filter(([,v])=>v.to===ws.memberId&&v.expiresAt>Date.now()&&contacts.areFriends(v.from,v.to)).map(([id,v])=>({id, nickname:contacts.people[v.from]?.nickname||'朋友', expiresAt:v.expiresAt}));
+  return {people:contacts.snapshot(ws.memberId,onlineIds), invitations};
+}
+function notifyContacts() {
+  for(const p of wss.clients) if(p.hello&&p.contactsSubscribed&&p.readyState===p.OPEN) {
+    // Push events must not inherit a previous request's correlation id.
+    p.send(JSON.stringify({t:'contacts:snapshot',...contactSnapshot(p)}));
+  }
+}
 load();
 loadPacks();
 
@@ -893,8 +952,10 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    ws.contactsSubscribed = false;
     worldPeers.delete(ws);
     leaveRoom(ws);
+    notifyContacts();
     abortPackUpload(ws); // 半截上传不留垃圾 tmp
   });
   ws.on('error', () => ws.close());

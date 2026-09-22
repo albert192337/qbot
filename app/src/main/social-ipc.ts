@@ -24,6 +24,21 @@ export function registerSocialIpc(steamService: () => Pick<ReturnType<typeof get
     await setSettings({roomsChatConsent:true});return true;
   };
   ipcMain.handle('social:prepareJoin', prepareJoin);
+  ipcMain.handle('social:rehearseContact', async (_event, id) => { await Rooms.rehearseContact(id); createRoomChatWindow(); });
+  ipcMain.handle('social:contacts', (_event, refresh) => Rooms.getContacts(refresh === true));
+  ipcMain.handle('social:contactAction', (_event, id, action) => Rooms.changeContact(id, action));
+  ipcMain.handle('social:contactInvitation', async (event, id, accept) => {
+    if (accept !== true) { await Rooms.resolveContactInvitation(id, false); return; }
+    const current = Rooms.getRoomsCache().room;
+    if (current) {
+      const win=BrowserWindow.fromWebContents(event.sender); if(!win)return;
+      const answer=await dialog.showMessageBox(win,{type:'question',title:'前往朋友的小屋',message:'接受邀请会离开当前房间，继续吗？',buttons:['前往','留在这里'],defaultId:1,cancelId:1});
+      if(answer.response!==0)return;
+    }
+    if(!(await prepareJoin(event)))return;
+    const code = await Rooms.resolveContactInvitation(id, true);
+    if(code) { await Rooms.joinRoom(code); await Rooms.resolveContactInvitation(id, false); }
+  });
   const steamSender = (event: Electron.IpcMainInvokeEvent) => {
     const url = new URL(event.sender.getURL());
     url.search = ''; url.hash = '';

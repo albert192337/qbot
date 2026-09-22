@@ -1,3 +1,4 @@
+import type { ContactSnapshot } from '../shared/social';
 /** preload：contextBridge 暴露 QBotApi（契约见 shared/ipc-types.ts） */
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
@@ -140,6 +141,11 @@ const api: QBotApi = {
     remove: (hash) => ipcRenderer.invoke('market:remove', hash),
   },
   social: {
+    rehearseContact: id => ipcRenderer.invoke('social:rehearseContact', id),
+    contacts: refresh => ipcRenderer.invoke('social:contacts', refresh),
+    contactAction: (id, action) => ipcRenderer.invoke('social:contactAction', id, action),
+    contactInvitation: (id, accept) => ipcRenderer.invoke('social:contactInvitation', id, accept),
+    onContacts: cb => { const fn=(_e:unknown, value:ContactSnapshot)=>cb(value); ipcRenderer.on('social:contacts',fn); return ()=>ipcRenderer.removeListener('social:contacts',fn); },
     steam: {
       get: () => ipcRenderer.invoke('steam:get'),
       refresh: () => ipcRenderer.invoke('steam:refresh'),

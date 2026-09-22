@@ -56,6 +56,7 @@ app.whenReady().then(async()=>{
     'roomPet:getCache':event=>{const w=BrowserWindow.fromWebContents(event.sender);const id=w&&Windows.findRoomPetMemberId(w);const s=id&&Pets.getMemberSnapshot(id);return s?{hello:{nickname:s.nickname},character:s.character,state:{mode:s.mode,action:s.action,sign:s.sign}}:null;},
   };
   for(const [name,handler] of Object.entries(handlers))ipcMain.handle(name,handler);
+  ipcMain.on('rooms:wave',(_event,id)=>Rooms.waveAt(id));
   ipcMain.on('rooms:open',()=>Windows.createLoungeWindow());
   ipcMain.on('roomPet:wave',event=>{const w=BrowserWindow.fromWebContents(event.sender);const id=w&&Windows.findRoomPetMemberId(w);if(id)Rooms.waveAt(id);});
   ipcMain.on('roomPet:leaveRoom',()=>Rooms.leaveRoom());

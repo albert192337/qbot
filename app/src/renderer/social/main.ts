@@ -1,9 +1,10 @@
+import { mountContacts } from './contacts';
 import './style.css';
 import { ChatView } from './chat';
 import { mountSteam } from './steam';
 import { DEFAULT_ROOM } from '../room/rooms/default';
 import type { CreateRoomInput, RoomBrief, RoomSnapshot, RoomsStatus } from '../../shared/ipc-types';
-import type { SocialProfile, TestGuest } from '../../shared/social';
+import type { ContactSnapshot, SocialProfile, TestGuest } from '../../shared/social';
 
 const api = window.qbot;
 const compact = new URLSearchParams(location.search).get('compact') === '1';
@@ -16,6 +17,7 @@ const options=(values:Record<string,string>)=>Object.entries(values).map(([v,l])
 let status: RoomsStatus={phase:'off'};
 let room:RoomSnapshot|null=null;
 let profile:SocialProfile|null=null;
+let contacts:ContactSnapshot={available:false,reason:'',people:[],invitations:[]};
 let rooms:RoomBrief[]=[];
 let guests:TestGuest[]=[];
 let page='home';
@@ -26,9 +28,9 @@ let busy=false;
 
 root.innerHTML=`<header><div><span class="eyebrow">QBOT · LITTLE COMPANY</span><h1>${compact?'房间聊天':'一起玩'} <span class="leaf">❧</span></h1></div><div class="header-actions">${compact?'<button id="pin" title="保持在其他窗口上方">置顶</button><button id="open-main">一起玩</button>':'<span id="connection" class="badge">尚未连接</span>'}<button id="close" aria-label="关闭窗口">×</button></div></header>
 <div id="room-strip"><span id="room-summary">一个人也很自在，有朋友更热闹。</span><div><button id="copy-code" hidden>复制房间码</button>${!compact?'<button id="open-chat">聊天小窗 ↗</button>':''}<button id="leave" hidden>退出房间</button></div></div>
-${!compact?`<nav><button data-page="home" class="selected">一起玩</button><button data-page="world">世界广场</button><button data-page="room">当前房间</button><button data-page="test" class="test-tab">本地试演</button></nav>
+${!compact?`<nav><button data-page="home" class="selected">一起玩</button><button data-page="friends">朋友</button><button data-page="world">世界广场</button><button data-page="room">当前房间</button><button data-page="test" class="test-tab">本地试演</button></nav>
 <aside id="steam-join" hidden></aside><main><section id="home-page" class="page"><div class="welcome"><span class="eyebrow">留一把椅子，给你的朋友</span><h2>来我的小屋，坐一会儿。</h2><p>各自忙碌，也能安静地待在一起。</p><div class="entry-grid"><button id="invite" class="entry"><span class="entry-icon">✉</span><strong>邀请朋友来玩</strong><small>开一间会客房，分享房间码</small><span>一起坐坐 →</span></button><button id="publish" class="entry public"><span class="entry-icon">⌂</span><strong>公开我的房间</strong><small>让世界广场的朋友找到你</small><span>打开小屋的门 →</span></button></div></div><div class="home-grid"><article class="card"><h3>我的联机形象</h3><div id="my-character"></div><label>来做点什么<select id="pose"><option value="">随当前状态</option></select></label><p class="muted">只使用这个角色已有的动作。</p></article><article class="card steam-card" id="steam-card"></article></div></section>
-<section id="world-page" class="page" hidden><div class="world-grid"><article class="card discover"><div class="section-heading"><h2>逛逛大家的小屋</h2><button id="refresh">刷新</button></div><form id="join-form" class="join-row"><input id="room-code" maxlength="8" placeholder="输入八位房间码" aria-label="房间码"><button class="primary">敲门加入</button></form><div class="filters"><input id="search" placeholder="找一间小屋…" aria-label="搜索房名"><select id="kind" aria-label="房间类型"><option value="">全部类型</option>${options(kinds)}</select><select id="language" aria-label="首选语言">${options(languages)}</select><select id="chat-filter" aria-label="聊天筛选"><option value="">聊天不限</option><option value="yes">允许聊天</option><option value="no">安静陪伴</option></select><select id="sort" aria-label="排序"><option value="active">活跃优先</option><option value="recent">最近活动</option><option value="quiet">人少优先</option></select><label class="check"><input id="space" type="checkbox" checked>只看有空位</label><label class="check"><input id="favorite-only" type="checkbox">我的收藏</label></div><div id="room-list"></div></article><article class="card world-chat"><h3>世界闲聊 <span class="badge">公开频道</span></h3><div id="world-chat"></div></article></div></section>
+<section id="friends-page" class="page" hidden><article class="card" id="friends-card"></article></section><section id="world-page" class="page" hidden><div class="world-grid"><article class="card discover"><div class="section-heading"><h2>逛逛大家的小屋</h2><button id="refresh">刷新</button></div><form id="join-form" class="join-row"><input id="room-code" maxlength="8" placeholder="输入八位房间码" aria-label="房间码"><button class="primary">敲门加入</button></form><div class="filters"><input id="search" placeholder="找一间小屋…" aria-label="搜索房名"><select id="kind" aria-label="房间类型"><option value="">全部类型</option>${options(kinds)}</select><select id="language" aria-label="首选语言">${options(languages)}</select><select id="chat-filter" aria-label="聊天筛选"><option value="">聊天不限</option><option value="yes">允许聊天</option><option value="no">安静陪伴</option></select><select id="sort" aria-label="排序"><option value="active">活跃优先</option><option value="recent">最近活动</option><option value="quiet">人少优先</option></select><label class="check"><input id="space" type="checkbox" checked>只看有空位</label><label class="check"><input id="favorite-only" type="checkbox">我的收藏</label></div><div id="room-list"></div></article><article class="card world-chat"><h3>世界闲聊 <span class="badge">公开频道</span></h3><div id="world-chat"></div></article></div></section>
 <section id="room-page" class="page" hidden><div id="room-details"></div></section>
 <section id="test-page" class="page" hidden><article class="test-banner"><span class="eyebrow">试演一下，随时散场</span><h2>把角色们请到同一间小屋</h2><p>邀请的是本机素材，不是玩家本人。所有回应均为模拟，不会发送邀请，也不写入真实互动记录。</p><button id="start-test" class="primary">开始本地试演</button></article><div class="section-heading"><h3>可邀请的角色</h3><button id="reload-guests">刷新角色</button></div><p class="muted">包括自己的其他角色、已下载的装扮角色和仍保留素材的房友缓存。</p><div id="guest-list" class="guest-grid"></div><div id="test-members"></div></section></main>`:`<div class="compact-tabs"><button id="show-chat" class="selected">聊天</button><button id="show-members">成员</button></div><div id="compact-chat"></div><div id="compact-members" hidden></div>`}
 <div id="toast" role="status" hidden></div><dialog id="room-dialog"><form id="room-form"><div class="section-heading"><h2 id="form-title">公开我的房间</h2><button type="button" id="cancel-form" aria-label="关闭设置">×</button></div><div class="room-preview"><span>⌂</span><div><strong>当前小屋</strong><p>朋友将以你选定的角色姿态入场</p></div></div><button type="button" id="last-settings">使用上次设置</button><label>房间名称<input name="name" maxlength="24" required placeholder="给小屋起个名字"></label><label>介绍<textarea name="description" maxlength="200" rows="3" placeholder="例如：一起赶稿，偶尔聊两句。"></textarea></label><div class="form-grid"><label>房间类型<select name="kind">${options(kinds)}</select></label><label>最多几个人<input name="capacity" type="number" min="2" max="12" value="6" required></label><label>可见性<select name="listed"><option value="true">公开 · 世界可见</option><option value="false">房间码访问</option></select></label><label>首选语言<select name="language">${options(languages)}</select></label><label>聊天<select name="chatEnabled"><option value="true">可以聊天</option><option value="false">安静陪伴</option></select></label></div><p class="muted">Steam 文本过滤尚未接入。房间码访问不上世界列表，持有码的人可以加入。</p><div class="form-actions"><button type="button" id="cancel-settings">取消</button><button class="primary" id="save-room">打开小屋的门</button></div></form></dialog>`;
@@ -66,6 +68,7 @@ function renderMembers(host:HTMLElement):void {
    const wave=document.createElement('button');wave.textContent=m.testing?'模拟招呼':'打招呼';wave.onclick=()=>void run(()=>m.testing?api.social.interactTest(m.memberId,'wave'):api.rooms.wave(m.memberId));row.append(wave);
    if(room.ownerId===status.memberId){const remove=document.createElement('button');remove.textContent=m.testing?'离场':'移出';remove.onclick=()=>void run(async()=>{if(m.testing)await api.social.removeTest(m.memberId);else if(confirm(`将 ${m.nickname} 移出房间？`))await api.rooms.kick(m.memberId);await sync();});row.append(remove);}
   }
+  if(!m.testing&&!room.testing&&m.memberId!==status.memberId){const relation=contacts.people.find(p=>p.id===m.memberId)?.relation;const add=document.createElement('button');add.textContent=relation==='friend'?'已是好友':relation==='outgoing'?'已申请':relation==='incoming'?'接受好友':'加好友';add.disabled=relation==='friend'||relation==='outgoing';add.onclick=()=>void run(async()=>{await api.social.contacts(true);await api.social.contactAction(m.memberId,relation==='incoming'?'accept':'request');toast(relation==='incoming'?'已成为游戏好友':'好友申请已发送');});row.append(add);}
   host.append(row);
  }
 }
@@ -86,7 +89,7 @@ async function loadProfile():Promise<void>{
 }
 async function showPage(next:string):Promise<void>{
  const previous=page;page=next;
- for(const p of ['home','world','room','test'])$(`${p}-page`).hidden=p!==next;
+ for(const p of ['home','friends','world','room','test'])$(`${p}-page`).hidden=p!==next;
  document.querySelectorAll<HTMLButtonElement>('nav button').forEach(b=>b.classList.toggle('selected',b.dataset.page===next));
  if(previous==='world'&&next!=='world'){worldVersion++;void api.social.world(false).catch(()=>{});worldChat?.configure('world','世界频道已收起',false);}
  if(next==='world')await refreshWorld();
@@ -166,8 +169,12 @@ api.rooms.onStatus(s=>{if(s.phase==='off'||s.phase==='connecting')worldChat?.con
 api.rooms.onHistory(messages=>roomChat?.set(messages));api.rooms.onChat(msg=>roomChat?.add(msg));api.rooms.onChatDeleted(id=>roomChat?.remove(id));
 api.rooms.onError(toast);api.rooms.onWave(w=>toast(`${w.fromNickname} 向你打了个招呼`));api.social.onWorld(messages=>{if(page==='world')worldChat?.set(messages);});
 api.rooms.onKicked(()=>toast('你已离开这个房间'));
-api.characters.onActivated(()=>void run(loadProfile));
+api.social.onContacts(value=>{contacts=value;const count=value.people.filter(p=>p.relation==='incoming').length+value.invitations.length;const entry=document.querySelector('[data-page=friends]');if(entry)entry.textContent=count?`朋友 · ${count}`:'朋友';void run(sync);});
+api.characters.onActivated(()=>void run(async()=>{await loadProfile();if(contacts.available&&!room?.testing)await api.social.contacts(true);}));
 if (!compact) {
+ const friends=mountContacts($('friends-card'),$('steam-card'),api.social,toast,()=>!!room&&!room.testing,()=>{void run(sync);});
+ const entry=document.createElement('article');entry.className='card';entry.innerHTML='<h3>朋友们</h3><p class="muted">游戏好友、最近见过的人和 Steam 好友，都在这里。</p><button id="find-friends">打开朋友列表 →</button>';$('home-page').querySelector('.home-grid')!.append(entry);click('find-friends',()=>showPage('friends'));
+ api.rooms.onStatus(()=>friends.refresh());window.addEventListener('beforeunload',()=>friends.dispose(),{once:true});
  const offSteam = mountSteam($('steam-card'), $('steam-join'), api.social.steam, toast, async () => { await sync(); await showPage('room'); api.social.openChat(); });
  window.addEventListener('beforeunload', offSteam, {once:true});
 }

@@ -20,6 +20,7 @@ export async function listTestGuests(): Promise<TestGuest[]> {
       const origin = peer ? await readFile(path.join(base, '.social-origin.json'), 'utf8').then(JSON.parse).catch(() => null) : null;
       out.push({id:entry.name, name:manifest.name || entry.name, source:peer ? '房友缓存' : '角色库',
         owner:peer ? origin?.nickname || '来源未记录' : undefined,
+        ownerId:peer ? origin?.memberId : undefined, ownerRealm:peer ? origin?.realm : undefined,
         character:{dirId:entry.name, manifest, hasUnfinishedJob:false}});
     } catch { /* Missing or incomplete cached assets cannot be invited. */ }
   }

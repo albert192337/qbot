@@ -6,7 +6,7 @@ const root=path.resolve(__dirname,'..');
  const data=await mkdtemp(path.join(os.tmpdir(),'qbot-social-ui-'));const output=path.join(root,'.superpowers/social-preview');await mkdir(output,{recursive:true});
  const listener=net.createServer();await new Promise(r=>listener.listen(0,'127.0.0.1',r));const port=listener.address().port;await new Promise(r=>listener.close(r));
  const proc=spawn(process.execPath,['rooms/server.mjs'],{cwd:root,env:{...process.env,PORT:String(port),HOST:'127.0.0.1',DATA_DIR:path.join(data,'server')},stdio:['ignore','pipe','pipe'],windowsHide:true});let log='';proc.stdout.on('data',b=>log+=b);proc.stderr.on('data',b=>log+=b);
- let app;
+ let app, friendSocket;
  try{
   await new Promise((resolve,reject)=>{const end=Date.now()+5000;const timer=setInterval(()=>{if(log.includes('listening')){clearInterval(timer);resolve();}else if(Date.now()>end){clearInterval(timer);reject(Error(log));}},30);});
   await require('esbuild').build({entryPoints:[path.join(root,'app/test/fixtures/social-main.ts')],outfile:path.join(root,'app/out/main/social-qa.cjs'),bundle:true,platform:'node',format:'cjs',external:['electron','ffmpeg-static']});
@@ -54,6 +54,25 @@ const root=path.resolve(__dirname,'..');
   await page.locator('#edit-room').click();await page.locator('[name=description]').fill('修改后仍是同一间房');await page.locator('#save-room').click();await page.waitForFunction(()=>!document.querySelector('dialog').open);assert.equal((await page.evaluate(()=>window.qbot.rooms.getCache())).room.roomId,code);
   await reopened.locator('.composer textarea').fill('房内留言');await reopened.locator('.composer button').click();await reopened.locator('.message p').filter({hasText:'房内留言'}).waitFor();
   await reopened.locator('.composer textarea').fill('发送失败保留这段草稿');await reopened.locator('.composer button').click();await reopened.waitForFunction(()=>!document.querySelector('#toast').hidden);assert.equal(await reopened.locator('.composer textarea').inputValue(),'发送失败保留这段草稿');await reopened.locator('.composer textarea').fill('');
+  // A second real person joins: merely seen first, then actually greeted, then friends.
+  friendSocket=new WebSocket('ws://127.0.0.1:'+port);await new Promise((r,j)=>{friendSocket.addEventListener('open',r,{once:true});friendSocket.addEventListener('error',j,{once:true});});
+  let friendSeq=0;const friendPending=new Map();friendSocket.addEventListener('message',e=>{const f=JSON.parse(e.data);const p=friendPending.get(f.requestId);if(p){friendPending.delete(f.requestId);clearTimeout(p.timer);p.resolve(f);}});
+  const friendReq=f=>new Promise((resolve,reject)=>{const requestId='friend-'+(++friendSeq);const timer=setTimeout(()=>reject(Error('friend timeout '+f.t)),4000);friendPending.set(requestId,{resolve,timer});friendSocket.send(JSON.stringify({...f,requestId}));});
+  const friendHello=await friendReq({t:'hello',protoVer:2,nickname:'午后小鹿',character:'森林来客'});
+  await friendReq({t:'join',roomId:code});
+  await page.locator('[data-page=friends]').click();await page.locator('#refresh-contacts').click();await page.locator('[data-contact-tab=recent]').click();
+  const friendRow=page.locator('[data-contact-id="'+friendHello.memberId+'"]');await friendRow.waitFor();assert.equal(await friendRow.locator('.interaction-badge').count(),0);
+  await page.evaluate(id=>window.qbot.rooms.wave(id),friendHello.memberId);await friendRow.locator('.interaction-badge').waitFor();assert.equal(await friendRow.locator('.interaction-badge').innerText(),'最近互动过');
+  await friendRow.getByRole('button',{name:'加好友',exact:true}).click();await friendRow.getByRole('button',{name:'取消申请'}).waitFor();
+  const hostId=(await page.evaluate(()=>window.qbot.rooms.getCache())).status.memberId;
+  const identityStore=JSON.parse(await readFile(path.join(data,'room-contacts.json'),'utf8'));const identity=identityStore['ws://127.0.0.1:'+port];assert.equal(identity.id,hostId);assert.ok(identity.token);assert.equal(JSON.stringify(await page.evaluate(()=>window.qbot.social.contacts())).includes(identity.token),false);
+  await friendReq({t:'contacts:change',id:hostId,action:'accept'});await page.locator('[data-contact-tab=friends]').click();await friendRow.getByRole('button',{name:'邀请来玩'}).waitFor();
+  await friendRow.getByRole('button',{name:'邀请来玩'}).click();assert.equal((await friendReq({t:'contacts:get'})).invitations.length,1);
+  await page.screenshot({path:path.join(output,'07-friends.png')});
+  // Incoming requests are accepted in the actual renderer too.
+  await friendReq({t:'contacts:change',id:hostId,action:'remove'});await friendReq({t:'contacts:change',id:hostId,action:'request'});
+  await friendRow.getByRole('button',{name:'接受',exact:true}).click();await friendRow.getByRole('button',{name:'邀请来玩'}).waitFor();
+  await page.locator('[data-contact-tab=steam]').click();await page.locator('#steam-card').waitFor();await page.locator('[data-contact-tab=recent]').click();
   await page.locator('[data-page=world]').click();await page.locator('.room-card').waitFor();await page.waitForFunction(()=>!document.querySelector('#world-chat textarea').disabled);
   // Shared main-process connection handles simultaneous windows/queries without overwriting requests.
   const lists=await page.evaluate(()=>Promise.all([window.qbot.rooms.list(),window.qbot.rooms.list(),window.qbot.rooms.list()]));assert.equal(lists.length,3);
@@ -63,20 +82,14 @@ const root=path.resolve(__dirname,'..');
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('social/index.html')&&!w.webContents.getURL().includes('compact=1')).setSize(680,560));
   await page.screenshot({path:path.join(output,'06-narrow.png')});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await page.locator('#world-chat .composer').evaluate(el=>el.getBoundingClientRect().bottom<=innerHeight),true);
+  await page.locator('[data-page=friends]').click();await page.locator('[data-contact-tab=recent]').click();
+  await page.screenshot({path:path.join(output,'08-recent-narrow.png')});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await friendRow.locator('.interaction-badge').waitFor();
+  await page.locator('[data-page=world]').click();
   // A rejected send preserves its draft.
   await page.evaluate(()=>window.qbot.rooms.update({chatEnabled:false}));await reopened.waitForFunction(()=>document.querySelector('.composer textarea').disabled);
   await page.locator('[data-page=room]').click();await page.locator('#leave').click();await reopened.waitForFunction(()=>document.querySelector('.composer textarea').disabled);
   const config=JSON.parse(await readFile(path.join(data,'config.json'),'utf8'));assert.equal(config.activeCharacter,'host');assert.equal(config.progress,undefined);
-  assert.deepEqual(errors,[]);console.log('PASS: native home/form/world, local invite/reply/remove, nameplate, independent chat/pin/reopen, IME, copy code, same-room edits, simultaneous requests, channel isolation, narrow window, untouched character selection');
- }finally{if(app)await app.close();proc.kill();await new Promise(r=>proc.exitCode!==null?r():proc.once('exit',r));await rm(data,{recursive:true,force:true});}
+  assert.deepEqual(errors,[]);console.log('PASS: friends/recent-interaction/request/accept/invite/Steam/narrow, native home/form/world, local invite/reply/remove, nameplate, independent chat/pin/reopen, IME, copy code, same-room edits, simultaneous requests, channel isolation, narrow window, untouched character selection');
+ }finally{if(friendSocket)friendSocket.close();if(app)await app.close();proc.kill();await new Promise(r=>proc.exitCode!==null?r():proc.once('exit',r));await rm(data,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1});
-
-
-
-
-
-
-
-
-
-

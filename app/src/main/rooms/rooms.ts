@@ -38,6 +38,8 @@ import { ROOMS } from '../../shared/config';
 import { getCharacter } from '../characters';
 import { pairActions } from '../../shared/pair-interaction';
 import { listTestGuests } from './test-guests';
+import { readContactCache, saveContactCache } from './contact-cache';
+import type { ContactSnapshot, ContactAction } from '../../shared/social';
 import type { TestGuest } from '../../shared/social';
 
 /**
@@ -102,6 +104,8 @@ let lastPresence: string | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let closedByUs = false;
 let socialSupported = false;
+let contactsSupported = false;
+let contactSnapshot: ContactSnapshot = {available:false, reason:'点击刷新连接朋友列表', people:[], invitations:[]};
 let worldCache: RoomChatMsg[] = [];
 let worldSubscribed = false;
 let connectPromise: Promise<WsLike> | null = null;
@@ -279,6 +283,9 @@ function handleClosed(): void {
   worldCache = [];
   worldSubscribed = false;
   socialSupported = false;
+  contactsSupported = false;
+  contactSnapshot = {...contactSnapshot, available:false, reason:'连接已断开，显示上次记录', invitations:[], people:contactSnapshot.people.map(p=>({...p,online:false}))};
+  push('social:contacts', contactSnapshot);
   stopHeartbeat();
   RoomPets.onLeftRoom(); // 连接掉了：宠上屏跟着收场
   // 清理所有pending请求
@@ -330,18 +337,25 @@ async function hello(generation: number): Promise<void> {
   if (generation !== connectionGeneration) throw new Error('连接已取消');
   const nickname =
     clampText(settings.nickname ?? settings.marketNickname, NICK_MAX) || '匿名';
+  const identity = readContactCache(activeUrl!);
+  const character = settings.activeCharacter ? await getCharacter(settings.activeCharacter) : null;
   const ack = await request(
-    { t: 'hello', protoVer: PROTO_VER, nickname, memberId: settings.roomsMemberId },
+    { t: 'hello', protoVer: PROTO_VER, nickname, memberId: identity.id || settings.roomsMemberId, contactToken: identity.token, character: character?.manifest.name },
     'hello:ack',
   );
   if (generation !== connectionGeneration) throw new Error('连接已取消');
   socialSupported = ack.social === 1;
+  contactsSupported = ack.contacts === 1;
+  RoomPets.setContactRealm(activeUrl!);
+  contactSnapshot = {...(readContactCache(activeUrl!).snapshot || {people:[],invitations:[]}),available:false,reason:'正在读取朋友列表'};
+  if (contactsSupported && typeof ack.contactToken === 'string') saveContactCache(activeUrl!, {id:String(ack.memberId), token:ack.contactToken});
   memberId = String(ack.memberId ?? '');
   // 服务端分配的 memberId 存本地复用（零账号体系：下次连上还是同一个人）
   if (memberId && memberId !== settings.roomsMemberId) {
     await setSettings({ roomsMemberId: memberId });
   }
   setStatus({ phase: 'online', memberId });
+  if (contactsSupported) void request({t:'contacts:get'}, 'contacts:snapshot').catch(()=>{});
 }
 
 /** 发一帧并等指定类型的应答（error 帧一律 reject） */
@@ -390,6 +404,12 @@ function handleMessage(data: unknown): void {
   }
   if (frame.roomId && ['chat','chat:deleted','member:in','member:out','member:pack','presence','wave','kicked'].includes(frame.t) && frame.roomId !== currentRoomId) return;
   switch (frame.t) {
+    case 'contacts:ack': settle(frame.t, frame); break;
+    case 'contacts:snapshot': {
+      contactSnapshot = {available:true, reason:'', people:Array.isArray(frame.people) ? frame.people as ContactSnapshot['people'] : [], invitations:Array.isArray(frame.invitations) ? frame.invitations as ContactSnapshot['invitations'] : []};
+      try { if(activeUrl) saveContactCache(activeUrl, {snapshot:contactSnapshot}); } catch { contactSnapshot.reason='记录暂未保存到本机，请检查磁盘空间'; }
+      push('social:contacts', contactSnapshot); settle(frame.t, frame); break;
+    }
     case 'social:ack': settle(frame.t, frame); break;
     case 'world:history':
       worldCache = Array.isArray(frame.messages) ? frame.messages as RoomChatMsg[] : [];
@@ -811,6 +831,9 @@ export function disconnectRooms(): void {
     p.reject(new Error('连接已断开'));
   }
   socialSupported = false;
+  contactsSupported = false;
+  contactSnapshot = {...contactSnapshot,available:false,reason:'连接已断开，显示上次记录',invitations:[],people:contactSnapshot.people.map(p=>({...p,online:false}))};
+  push('social:contacts',contactSnapshot);
   worldSubscribed = false;
   worldCache = [];
   setStatus({ phase: 'off' });
@@ -906,4 +929,44 @@ export function replyTestGuest(id: string, text: string): void {
   if (roomCache?.chatEnabled === false) throw new Error('房主关闭了聊天');
   if (!clampText(text,200)) throw new Error('请输入模拟回复');
   appendTestChat(id, text);
+}
+
+/** Friend data is scoped to the room service, never inferred from a character cache. */
+export async function getContacts(refresh = false): Promise<ContactSnapshot> {
+  if (refresh) {
+    await prepareSocialConnection();
+    if (!contactsSupported) return {available:false, reason:'当前房间服务尚未支持朋友列表，请更新房间服务', people:[], invitations:[]};
+    const settings = await getSettings();
+    const character = settings.activeCharacter ? await getCharacter(settings.activeCharacter) : null;
+    await request({t:'contacts:get', character:character?.manifest.name || ''}, 'contacts:snapshot');
+    return contactSnapshot;
+  }
+  if (contactsSupported && ws?.readyState === WS_OPEN) return contactSnapshot;
+  const realm = activeUrl || process.env.QBOT_ROOMS_URL || ROOMS.URL_CHAIN[0];
+  const cached = readContactCache(realm).snapshot;
+  return {...(cached || contactSnapshot), available:false, reason:'离线记录 · 点击刷新连接', invitations:[], people:(cached?.people || []).map(p=>({...p, online:false}))};
+}
+export async function changeContact(id: string, action: ContactAction): Promise<void> {
+  if (!contactsSupported || !ws || ws.readyState !== WS_OPEN) throw new Error('请先刷新并连接朋友列表');
+  if (roomCache?.testing) throw new Error('请先退出本地试演，再操作真实好友');
+  if (!/^[0-9A-Z]{12}$/.test(id) || !['request','accept','reject','cancel','remove','invite'].includes(action)) throw new Error('无效的好友操作');
+  await request({t:action === 'invite' ? 'contacts:invite' : 'contacts:change', id, action}, 'contacts:ack');
+  await request({t:'contacts:get'}, 'contacts:snapshot');
+}
+export async function resolveContactInvitation(id: string, accept: boolean): Promise<string | undefined> {
+  if (!contactsSupported || roomCache?.testing) throw new Error('请连接朋友列表并退出本地试演');
+  if (typeof id !== 'string' || !/^[0-9a-f]{32}$/.test(id)) throw new Error('无效的邀请');
+  const frame = await request({t:'contacts:invitation', id, action:accept ? 'accept' : 'dismiss'}, 'contacts:ack');
+  return typeof frame.roomId === 'string' ? frame.roomId : undefined;
+}
+
+export async function rehearseContact(id: string): Promise<void> {
+  const realm = activeUrl || process.env.QBOT_ROOMS_URL || ROOMS.URL_CHAIN[0];
+  const snapshot = await getContacts();
+  if (!snapshot.people.some(p=>p.id===id)) throw new Error('这位玩家不在朋友记录里');
+  const guest = (await listTestGuests()).find(g=>g.ownerId===id && g.ownerRealm===realm);
+  if (!guest) throw new Error('这位朋友没有可用的角色缓存，可以等下次同房时获取素材');
+  if (roomCache && !roomCache.testing) throw new Error('请先退出当前房间，再邀请缓存角色进行本地试演');
+  if (!roomCache) await startTestRoom();
+  await inviteTestGuest(guest.id);
 }

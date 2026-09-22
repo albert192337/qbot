@@ -228,6 +228,16 @@ export function mergeChat(
 /** 错误码 → 人话（服务端只回 code，文案在客户端） */
 export function errorText(code: string): string {
   switch (code) {
+    case 'identity_invalid': return '朋友身份验证失败，请检查是否使用了正确的本机存档和房间服务';
+    case 'contact_not_found': return '找不到这位玩家';
+    case 'contact_not_seen': return '只能向实际见过的玩家申请好友';
+    case 'already_friends': return '你们已经是好友了';
+    case 'request_waiting': return '对方已申请好友，请接受或拒绝';
+    case 'request_missing': return '这条好友申请已经失效';
+    case 'contacts_limit': return '好友或待处理申请已达上限，请先整理列表';
+    case 'invite_unavailable': return '暂时无法邀请，请检查房间和好友关系';
+    case 'contact_offline': return '朋友现在不在线，邀请未发送';
+    case 'invite_expired': return '邀请已失效，请朋友重新邀请';
     case 'room_not_found': return '房间不存在（可能已被回收）';
     case 'room_full': return '房间满员了';
     case 'banned': return '你已被这个房间移出';
