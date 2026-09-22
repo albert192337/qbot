@@ -37,7 +37,7 @@ npm run dev:steam
 QBOT_STEAM_SDK=/absolute/path/steamworks/sdk npm run dev:steam
 ```
 
-原生库路径：macOS `redistributable_bin/osx/libsteam_api.dylib`、Windows x64 `win64/steam_api64.dll`、Linux x64 `linux64/libsteam_api.so`。Linux arm64 需要自行提供包含 `linuxarm64/libsteam_api.so` 的 SDK。库和 Koffi 在打包时解包到 `app.asar.unpacked`。只在本机 macOS arm64 做了实际运行验证；Windows/Linux 尚需对应机器验证。
+原生库路径：macOS `redistributable_bin/osx/libsteam_api.dylib`、Windows x64 `win64/steam_api64.dll`、Linux x64 `linux64/libsteam_api.so`。Linux arm64 需要自行提供包含 `linuxarm64/libsteam_api.so` 的 SDK。库和 Koffi 在打包时解包到 `app.asar.unpacked`。已在 macOS arm64 和 Windows x64 的未打包版本做了实际运行验证；Linux 和各平台发行包仍需验证。
 
 ## 可重复验证
 
@@ -64,6 +64,15 @@ UI fixture 需要先完成 App 构建；关闭所有 fixture 窗口或 Ctrl-C �
 2026-09-20 验证：管线 135、App 803、generation 2 项测试通过（另有 7 项原有跳过），类型检查与 App 构建通过。故障隔离 smoke 验证子进程被强制结束后主进程仍存活，重建后的子进程能正常响应；当时 Steam 客户端已退出，返回离线状态，因此不将其描述为重新登录成功。640px 窄窗检查了单列卡片与离线提示。双账号真实邀请投递和各平台发布包运行仍待验证。
 
 ## 后续联调与正式 AppID
+
+### Windows x64 实机补验（2026-09-22）
+
+- 登录桌面 Steam 后，`npm run test:steam` 成功初始化 480，返回 `online: true` 和 4 位好友。`node scripts/steam-smoke.cjs --isolation-only` 验证主进程在 SDK 子进程终止后存活，重建子进程后重新在线。
+- `npm test -w app -- test/steam.test.ts test/steam-bridge.test.ts test/social-client.test.ts`：29 项测试通过；当前版本 `npm run build` 通过。
+- `node scripts/preview-steam.cjs --live` 使用临时存档和本地房间服务；实际界面显示已连接的 SpaceWar 测试账号、4 位好友及在线状态，未开房时邀请按钮禁用。未发送真实邀请，双账号投递仍待验证。
+- 普通 Windows 桌面入口 `scripts/start-desktop.ps1` 不会自动启用 Steam；仅登录 Steam 后点击“重新连接”无法补齐缺失的启动配置。已有应用必须先退出，再使用 `npm run dev:steam`，或在本次启动进程中显式设置 `QBOT_STEAM_APP_ID=480`、`QBOT_STEAM_DEMO=1` 后运行桌面启动脚本。
+
+### 后续事项
 
 1. **双账号/双机邀请**：两端都运行同版本 QBot、登录彼此为好友的 Steam 账号，并配置完全相同且双方可达的 `QBOT_ROOMS_URL`。发送者开房并邀请，接收者确认；验证昵称/成员、聊天和桌宠同步、满房失败、退出和重连。不要用各自独立的 `127.0.0.1` fixture 做双机测试。
 2. **冷启动分发**：当前已实现加入参数处理，但 Steam 的 AppID 480 默认启动的是官方 SpaceWar。不能声称关闭 QBot 后 Steam 会自动启动本地 QBot。正式端到端冷启动需自己的 AppID、安装包和正确的 Steam launch options；当前双机优先让两端 QBot 都已运行。
