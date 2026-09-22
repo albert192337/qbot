@@ -26,6 +26,20 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 beforeEach(async () => { vi.resetModules(); vi.spyOn(Math, 'random').mockReturnValue(.8); mock.dir = await mkdtemp(path.join(os.tmpdir(), 'garden-store-')); mock.points = 500; mock.boxes = 1; mock.receipts.clear(); mock.renameCount = 0; mock.failAt = 0; });
 afterEach(async () => { vi.restoreAllMocks(); await rm(mock.dir, { recursive: true, force: true }); });
 describe('garden transaction journal', () => {
+    it('3D mode accepts strawberries, rejects other new sowing without consuming seeds, and 2D restores it',async()=>{
+        const api=await import('../src/main/garden/service');const start=await api.getGarden();
+        const lotus=start.seeds.find(s=>s.species==='lotus')!,berry=start.seeds.find(s=>s.species==='strawberry')!;
+        await writeFile(path.join(mock.dir,'config.json'),JSON.stringify({gardenRenderMode:'3d'}));
+        const before=await readFile(path.join(mock.dir,'garden-demo.json'),'utf8');
+        expect((await api.gardenAction({type:'plant',plot:0,seed:lotus.id})).ok).toBe(false);
+        expect((await api.gardenAction({type:'plantMany',seed:lotus.id})).ok).toBe(false);
+        expect(await readFile(path.join(mock.dir,'garden-demo.json'),'utf8')).toBe(before);
+        expect((await api.gardenAction({type:'plant',plot:0,seed:berry.id})).ok).toBe(true);
+        await writeFile(path.join(mock.dir,'config.json'),JSON.stringify({gardenRenderMode:'2d'}));
+        expect((await api.gardenAction({type:'plant',plot:1,seed:lotus.id})).ok).toBe(true);
+        const after=await api.getGarden();expect(after.plots[0]?.species).toBe('strawberry');expect(after.plots[1]?.species).toBe('lotus');
+    });
+
     it('records successful ordinary garden activity with a time and actor, excluding failed clicks',async()=>{
         const api=await import('../src/main/garden/service');const s=await api.getGarden();
         expect((await api.gardenAction({type:'plant',plot:0,seed:s.seeds[0].id})).ok).toBe(true);

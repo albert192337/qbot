@@ -29,6 +29,15 @@ export async function mount(host: HTMLElement): Promise<void> {
   host.innerHTML = `
 <div class="studio-body">
   <div class="conn-card">
+    <h3>种植画面</h3>
+    <div class="btn-row" role="group" aria-label="种植画面">
+      <button class="btn" data-garden-render="2d" aria-pressed="false">2D 手绘种植</button>
+      <button class="btn" data-garden-render="3d" aria-pressed="false">3D 草莓种植</button>
+      <button class="btn ghost" id="dev-open-garden">打开土地</button>
+    </div>
+    <p class="studio-hint">随时切换，共用原来的土地和背包。3D 模式先开放草莓播种；已有其他植物保留手绘显示和操作。</p>
+  </div>
+  <div class="conn-card">
     <h3>桌宠模式</h3>
     <div class="btn-row" role="group" aria-label="桌宠模式">
       <button class="btn" data-pet-mode="companion" aria-pressed="false">陪伴模式</button>
@@ -105,6 +114,10 @@ export async function mount(host: HTMLElement): Promise<void> {
   </div>
 </div>`;
   const renderMode = (s: import('../../../shared/ipc-types').Settings) => {
+    host.querySelectorAll<HTMLButtonElement>('[data-garden-render]').forEach(b=>{
+      const active=b.dataset.gardenRender===(s.gardenRenderMode??'2d');
+      b.setAttribute('aria-pressed',String(active));b.classList.toggle('primary',active);b.classList.toggle('ghost',!active);
+    });
     const free = s.behaviorMode === 'free';
     host.querySelectorAll<HTMLButtonElement>('[data-pet-mode]').forEach(b => {
       const active = (b.dataset.petMode === 'free') === free;
@@ -115,6 +128,13 @@ export async function mount(host: HTMLElement): Promise<void> {
       : '保持原有陪伴频率；LLM 脑开启时，台词仍由模型生成。';
   };
   renderMode(await window.qbot.settings.get());
+  host.querySelector('#dev-open-garden')?.addEventListener('click',()=>window.qbot.garden.open('plots'));
+  host.querySelectorAll<HTMLButtonElement>('[data-garden-render]').forEach(b=>b.addEventListener('click',async()=>{
+    const buttons=host.querySelectorAll<HTMLButtonElement>('[data-garden-render]');buttons.forEach(x=>x.disabled=true);
+    try{await window.qbot.settings.set({gardenRenderMode:b.dataset.gardenRender==='3d'?'3d':'2d'});renderMode(await window.qbot.settings.get());}
+    catch{toast(host,'种植画面切换失败，请重试');}
+    finally{buttons.forEach(x=>x.disabled=false);}
+  }));
   const journalHost=document.createElement('div');journalHost.className='conn-card';journalHost.dataset.journalEditor='';
   host.querySelector('.studio-body')!.prepend(journalHost);await mountJournalPrompts(journalHost);
   const memoryHost = document.createElement('div');

@@ -873,3 +873,12 @@ body:not(.strip) .shop-card:has(.select-check) { padding-top:42px; }
 body:not(.strip) .batch-bar { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); width:min(760px,calc(100vw - 40px)); margin:0; z-index:50; }
 .content:has(.batch-bar) { padding-bottom:100px!important; }
 body:not(.strip) .tag,.strip .tag { border-radius:14px 3px 14px 3px; }
+
+/* 3D is an optional appearance layer. The original images remain as WebGL fallback. */
+.art.art-3d{filter:none!important;animation:none!important;background:none!important;overflow:visible}
+.art.art-3d>img,.art.art-3d>.mutation-surface,.art.art-3d>.accessory-layer,.art.art-3d>.mutation-art{visibility:hidden!important}
+.art.art-3d>:not(.strawberry-canvas){visibility:hidden!important}
+.art.art-3d .strawberry-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;filter:none!important}
+.art.art-3d{position:relative}.strip .plot>.art.art-3d{position:absolute;bottom:-8px;pointer-events:auto}
+.strip .plot-3d:has(.art-3d)>.soil{visibility:hidden}.strip .plot>.soil-3d{width:112px;height:135px!important;pointer-events:none!important}
+.strip .plot-3d .empty-plot{z-index:3;bottom:8px}.garden-3d .plant-detail>.art{min-height:240px}

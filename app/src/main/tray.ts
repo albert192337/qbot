@@ -8,6 +8,7 @@ import { toggleClaudeHooks } from './hooks/claude';
 import { getCharacter } from './characters';
 import { notifyRoomCharacterChanged } from './rooms/rooms';
 import { weatherTestMenu, onWeatherTestChanged } from './weather';
+import { openGenePreview, openDesktopGenePreview } from './gene-preview';
 
 onWeatherTestChanged(() => { if (tray) void rebuildTray(); });
 
@@ -114,6 +115,8 @@ export async function connectSection(): Promise<Electron.MenuItemConstructorOpti
 /** 系统：设置 + 退出 */
 export function systemSection(): Electron.MenuItemConstructorOptions[] {
   return [
+    { label: '草莓基因工坊（效果预览）…', click: () => openGenePreview() },
+    { label: '3D 草莓放到桌面（试摆）…', click: () => openDesktopGenePreview() },
     weatherTestMenu(),
     {
       label: '角色管理…',

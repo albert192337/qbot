@@ -105,6 +105,9 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
                 throw Error('无效花园操作');
             const participant = (command.type === 'harvest' || command.type === 'harvestMany') ? (await getSettings()).activeCharacter ?? 'default' : undefined;
             const state = await recover();
+            if((command.type==='plant'||command.type==='plantMany')&&(await getSettings()).gardenRenderMode==='3d'&&state.seeds.find(s=>s.id===command.seed)?.species!=='strawberry')
+                throw Error('3D 模式先支持草莓；其他植物请切回 2D 后播种。');
+
             const result = transition(state, command, Date.now(), rng, { musicPlaying: getMusicStatus().playing });
             const summary=gardenJournalSummary(state,result.state,command,result.reveal);
             if(summary){const at=Date.now(),actor=participant??(await getSettings()).activeCharacter??'default';result.state.journalEvents=[...(result.state.journalEvents??[]).filter(e=>at-e.at<7*86400000),{at,actor,summary:summary.slice(0,500)}].slice(-300);}

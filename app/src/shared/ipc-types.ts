@@ -92,6 +92,8 @@ export interface Settings {
   behaviorMode?: 'companion' | 'free';
   /** 显示控制台中的开发者工具入口（默认 false） */
   developerMode?: boolean;
+  /** Visual renderer only; both modes share the existing garden save. */
+  gardenRenderMode?: '2d' | '3d';
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */

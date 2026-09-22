@@ -7,11 +7,20 @@ import { gardenLane } from '../../shared/garden-layout';
 import { botanicalArt } from './botanical-art';
 import { attachMutationEffects } from './mutation-effects';
 import { supplyArt } from './supply-art';
+import { mountStrawberry3D } from './strawberry-3d.js';
 import { SPECIES, TRAITS, FERTILIZERS, TIER_NAMES, gardenQuest, tier, level, growth, growthLabel, type Species, type Trait, type Plant, type Produce, type GardenState, type GardenCommand, type GardenReveal, type Seed } from '../../shared/garden';
 const sprout = new URL('./assets/sprout.png', import.meta.url).href;
 const api = window.qbot.garden;
 const root = document.querySelector<HTMLElement>('#app')!;
 const strip = new URLSearchParams(location.search).get('view') === 'strip';
+let render3d=false;
+function setRenderMode(settings: {gardenRenderMode?: string}): void {
+    const next=settings.gardenRenderMode==='3d';
+    if(next===render3d)return;
+    render3d=next;document.body.classList.toggle('garden-3d',next);render();
+}
+window.qbot.settings.onChanged(setRenderMode);
+void window.qbot.settings.get().then(setRenderMode).catch(()=>{});
 let page = new URLSearchParams(location.search).get('view') ?? 'bag';
 let state: GardenState | undefined, busy = false, fetching = false, signature = '', parentId: string | null = null;
 let buyMode = false, sellMode = false;
@@ -83,11 +92,16 @@ function art(sp: Species, ts: Trait[] = [], ratio = 1, mode: 'fruit'|'plant'|'se
         box.append(other);
     }
     attachMutationEffects(box, img.src, shown);
+    if(render3d&&sp==='strawberry')mountStrawberry3D(box,{mode,ratio,traits:shown,regrowing});
     return box;
 }
 function go(next: string): void { page = next; parentId = null; buyMode = sellMode = false; buySelection.clear(); sellSelection.clear(); render(); }
 function allParents(): Produce[] { return [...state!.produce, ...state!.plots.filter((p): p is Plant => !!p && p.readyAt <= Date.now())].filter(p => !p.bred); }
 async function act(command: GardenCommand): Promise<void> {
+    if(render3d&&(command.type==='plant'||command.type==='plantMany')&&state?.seeds.find(s=>s.id===command.seed)?.species!=='strawberry'){
+        notice('3D 模式先支持草莓；其他植物可切回 2D 后播种。');return;
+    }
+
     if (busy)
         return;
     busy = true;
@@ -173,8 +187,11 @@ function renderStrip(): void {
             });
             b.append(a);
         }
-        else
+        else {
             b.append(el('span', '+', 'empty-plot'));
+            if(render3d){const soil=el('div',undefined,'art soil-3d');mountStrawberry3D(soil,{mode:'soil'});b.prepend(soil);}
+        }
+        b.classList.toggle('plot-3d',render3d&&(!p||p.species==='strawberry'));
         const mark = el('span', undefined, 'plot-mark');
         mark.innerHTML = gardenIcon('ready'); mark.setAttribute('aria-hidden', 'true');
         b.append(el('span', undefined, 'soil'), mark);
@@ -240,7 +257,7 @@ function renderQuickMenu(): void {
         list.append(button('播种', () => { harvestedParent = null; render(); }, 'primary'));
     } else if (!p) {
         list.append(button('批量播种', () => api.open('sow'), 'primary'));
-        for (const { seed, count } of groupSeeds(state.seeds)) {
+        for (const { seed, count } of groupSeeds(state.seeds.filter(s=>!render3d||s.species==='strawberry'))) {
             const row = button('', () => void act({ type: 'plant', plot: index, seed: seed.id }), 'quick-row');
             row.append(supplyArt('seed', seed.species), el('strong', `${SPECIES[seed.species].name} ×${count}`));
             if (seed.genes.length) row.append(tags(seed.genes));
@@ -304,7 +321,11 @@ function render(): void {
     title.append(el('div', '种一点期待', 'eyebrow'), el('h1', '小小花园'), el('p', '今天也有小小的惊喜。', 'subtitle'));
     const money = el('div', undefined, 'wallet');
     money.append(el('small', '花园币'), el('strong', `◉ ${state.coins.toLocaleString()}`));
-    head.append(title, money);
+    const display=button(render3d?'3D 草莓 · 切回 2D':'2D 手绘 · 试试 3D',()=>{
+        void window.qbot.settings.set({gardenRenderMode:render3d?'2d':'3d'}).catch(()=>notice('画面切换失败，请重试'));
+    },'garden-render-toggle');
+    display.setAttribute('aria-label','切换种植画面');
+    head.append(title,display,money);
     const nav = el('nav', undefined, 'tabs');
     for (const [id, name] of [['plots', '我的土地'], ['bag', '背包'], ['shop', '限时商店'], ['book', '植物图鉴']]) {
         const tab = button('', () => go(id), page === id || (id === 'plots' && page.startsWith('plot:')) ? 'active' : '');
@@ -338,6 +359,7 @@ function seedCard(seed: Seed, plot?: number, count = 1): HTMLElement {
         if (seed.parents)
             card.append(el('small', seed.parents.map(x => SPECIES[x].name).join(' × ')));
     }
+    if(render3d&&seed.species!=='strawberry'){card.append(el('small','切回 2D 后可播种','muted'));return card;}
     if (plot !== undefined)
         card.append(button('种在这里', () => void act({ type: 'plant', plot, seed: seed.id }), 'primary'));
     const countToPlant = Math.min(count, state!.plots.filter(p=>!p).length);
@@ -545,7 +567,7 @@ function tick(allowRender = true): void {
     if (!state)
         return;
     const now = Date.now();
-    const maturity = state.plots.map(p => p ? `${p.id}:${growth(p, now) >= .55}:${growth(p, now) >= .8}:${p.readyAt <= now}` : '-').join('|');
+    const maturity = state.plots.map(p => p ? `${p.id}:${render3d&&growth(p, now)>=.22}:${growth(p, now) >= .55}:${growth(p, now) >= .8}:${p.readyAt <= now}` : '-').join('|');
     if (allowRender && lastMaturity && maturity !== lastMaturity) {
         lastMaturity = maturity;
         render();
@@ -566,6 +588,11 @@ function tick(allowRender = true): void {
             const center = Math.max(width / 2, Math.min(e.offsetLeft + e.clientWidth / 2, side.clientWidth - width / 2));
             a.style.width = `${width}px`;
             a.style.left = `${center - e.offsetLeft}px`;
+            if(render3d&&p.species==='strawberry'){
+                a.style.width=`${p.traits.includes('giant')?150:112}px`;
+                a.style.height=`${p.traits.includes('giant')?172:135}px`;
+                a.style.left='50%';
+            }
         }
     });
     document.querySelectorAll<HTMLElement>('[data-ready]').forEach(e => e.textContent = Number(e.dataset.ready) <= now ? '成熟了！' : `距离成熟 ${time(Number(e.dataset.ready) - now)}`);

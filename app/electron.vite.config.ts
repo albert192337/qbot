@@ -20,6 +20,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          'gene-preview': resolve(__dirname, 'src/renderer/gene-preview/index.html'),
           weather: resolve(__dirname, 'src/renderer/weather/index.html'),
           cozy3d: resolve(__dirname, 'src/renderer/cozy3d/index.html'),
           cozy: resolve(__dirname, 'src/renderer/cozy/index.html'),

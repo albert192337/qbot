@@ -12,6 +12,7 @@ import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
 import { showBubbleWindow, getBubbleWindow, openCozyPreview, displayDesktopSign } from './windows';
+import { openGenePreview, openDesktopGenePreview } from './gene-preview';
 import { getBrainLog, updateBrainCall } from './brain-log';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
@@ -338,6 +339,8 @@ export function registerIpc(): void {
       // ── 去处（角色能去的地方 + 控制台）──────────────────
       { label: '一起玩…', click: () => createLoungeWindow() },
       { label: '角色管理…', click: () => createConsoleWindow() },
+      { label: '草莓基因工坊（效果预览）…', click: () => openGenePreview() },
+      { label: '3D 草莓放到桌面（试摆）…', click: () => openDesktopGenePreview() },
       { label: '工具抽屉（日志）…', click: async () => {
         await setSettings({ developerMode: true });
         createConsoleWindow('devtools');

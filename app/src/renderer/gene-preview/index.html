@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>草莓基因工坊</title></head>
+<body>
+<header><a class="brand" href="#">✳ <span>小小花园 <small>BOTANICAL ATELIER</small></span></a><span class="badge">草莓 · 外观试验</span></header>
+<main>
+  <section class="intro"><div><span class="eyebrow">GENE STUDY / 001</span><h1>让一颗草莓，长出想象。</h1><p>果实 × 果皮 × 挂饰，自由组合你的奇珍异果。</p></div><button id="reset" class="quiet">恢复初始</button></section>
+  <div class="workspace">
+    <section class="viewer" aria-label="草莓效果预览">
+      <div class="stage-top"><span id="specimen">01 / 霜晶蝶梦</span><button id="backdrop" class="glass-button">切换背景</button></div>
+      <div id="stage"><canvas id="scene" aria-label="可拖动旋转的立体草莓" tabindex="0"></canvas><div id="error" hidden>当前设备无法显示立体预览，请使用支持 WebGL 的窗口打开。</div></div>
+      <div class="stage-bottom"><div><span class="eyebrow">YOUR SPECIMEN</span><h2 id="name">霜晶蝶梦</h2><div id="tags"></div></div><div class="viewer-tools"><button id="rotate" aria-pressed="true">旋转中</button><button id="motion" aria-pressed="true">动效开启</button></div></div>
+      <div class="hint">拖动旋转 · 滚轮缩放 · 聚焦画面后方向键旋转</div>
+    </section>
+    <aside><div class="panel-title"><h2>基因搭配</h2><span>3 个独立槽位</span></div><div id="slots"></div><div class="intensity"><label for="strength">动效强度 <output id="strength-value">70%</output></label><input id="strength" type="range" min="0" max="100" value="70"></div><p class="note">外观效果样板，名称仅用于预览。</p></aside>
+  </div>
+  <section class="presets"><div class="section-title"><h2>灵感标本</h2><span>点选一组，或在右侧自由搭配</span></div><div id="presets"></div></section>
+  <footer>三类槽位 · 实时材质与动态挂饰 <span>本次搭配仅作预览</span></footer>
+</main><script type="module" src="./main.js"></script></body></html>
