@@ -33,7 +33,7 @@ app.whenReady().then(async()=>{try{
  const out=path.join(root,'output/garden-growth-v2');fs.mkdirSync(out,{recursive:true});
  const shot=async(w,name)=>{await wait(200);fs.writeFileSync(path.join(out,name+'.png'),(await w.webContents.capturePage()).toPNG());};
  await until(()=>js(panel,'!!document.querySelector(".mystery-fruit")'));
- assert.ok(await js(panel,'!document.querySelector(".plant-detail").textContent.includes("星云")'));
+ assert.ok(await js(panel,'document.querySelector(".plant-detail").textContent.includes("星云")'),'Known traits stay visible so the owner can invite friends');
  assert.ok(await js(panel,'!document.querySelector(".plant-detail").textContent.includes("kg")'));
  await until(()=>js(strip,'!!document.querySelector("[data-plot] .art")'));
  await js(strip,'document.querySelector("[data-plot] .art").click()');await wait(150);
@@ -51,9 +51,9 @@ app.whenReady().then(async()=>{try{
  assert.equal(await js(panel,'[...document.querySelectorAll("button")].filter(b=>b.textContent==="与它繁育").length'),1);
  await click(panel,'与它繁育');assert.equal(state.produce[0].bred,true);assert.equal(state.plots[0].bred,true);
  await click(panel,'植物图鉴');assert.ok(await js(panel,'document.body.textContent.includes("Lv.6")'));
- assert.equal(await js(panel,'document.querySelectorAll(".factor").length'),27);await shot(panel,'growth-book');
+ assert.equal(await js(panel,'document.querySelectorAll(".factor").length'),61);await shot(panel,'growth-book');
  await click(panel,'天气');await until(()=>js(panel,'document.querySelectorAll(".weather-catalog-row").length===6'));
  await shot(panel,'weather-catalog');panel.setSize(420,620);await wait(150);
  assert.ok(await js(panel,'document.documentElement.scrollWidth<=innerWidth'));await shot(panel,'weather-small');
- assert.deepEqual(errors,[]);console.log('PASS: sealed UI, details, pause/resume/reveal, eligible breeding, 26 factors, six weathers and narrow layout. '+out);app.exit(0);
+ assert.deepEqual(errors,[]);console.log('PASS: known traits before reveal, pause/resume/reveal, breeding, 60 factor definitions, six weathers and narrow layout. '+out);app.exit(0);
 }catch(e){console.error(e);app.exit(1);}});

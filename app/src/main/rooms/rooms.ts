@@ -105,6 +105,7 @@ let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let closedByUs = false;
 let socialSupported = false;
 let contactsSupported = false;
+let gardenSupported = false;
 let contactSnapshot: ContactSnapshot = {available:false, reason:'点击刷新连接朋友列表', people:[], invitations:[]};
 let worldCache: RoomChatMsg[] = [];
 let worldSubscribed = false;
@@ -346,6 +347,7 @@ async function hello(generation: number): Promise<void> {
   if (generation !== connectionGeneration) throw new Error('连接已取消');
   socialSupported = ack.social === 1;
   contactsSupported = ack.contacts === 1;
+  gardenSupported = ack.garden === 1;
   RoomPets.setContactRealm(activeUrl!);
   contactSnapshot = {...(readContactCache(activeUrl!).snapshot || {people:[],invitations:[]}),available:false,reason:'正在读取朋友列表'};
   if (contactsSupported && typeof ack.contactToken === 'string') saveContactCache(activeUrl!, {id:String(ack.memberId), token:ack.contactToken});
@@ -404,6 +406,9 @@ function handleMessage(data: unknown): void {
   }
   if (frame.roomId && ['chat','chat:deleted','member:in','member:out','member:pack','presence','wave','kicked'].includes(frame.t) && frame.roomId !== currentRoomId) return;
   switch (frame.t) {
+    case 'garden:interaction': if(frame.roomId===currentRoomId)void import('../garden/network').then(m=>m.playNetworkInteraction(frame)).catch(()=>{});break;
+    case 'garden:result': settle(frame.t,frame);break;
+    case 'garden:changed': push('garden:changed',{});break;
     case 'contacts:ack': settle(frame.t, frame); break;
     case 'contacts:snapshot': {
       contactSnapshot = {available:true, reason:'', people:Array.isArray(frame.people) ? frame.people as ContactSnapshot['people'] : [], invitations:Array.isArray(frame.invitations) ? frame.invitations as ContactSnapshot['invitations'] : []};
@@ -416,7 +421,7 @@ function handleMessage(data: unknown): void {
       push('social:world', worldCache); settle(frame.t, frame); break;
     case 'world:chat': {
       const msg = frame.msg as RoomChatMsg;
-      if (worldSubscribed && msg && !worldCache.some(m => m.id === msg.id)) worldCache = [...worldCache, msg].slice(-50);
+      if (worldSubscribed && msg) worldCache = worldCache.some(m=>m.id===msg.id)?worldCache.map(m=>m.id===msg.id?msg:m):[...worldCache,msg].slice(-50);
       push('social:world', worldCache); break;
     }
     case 'world:deleted':
@@ -970,3 +975,11 @@ export async function rehearseContact(id: string): Promise<void> {
   if (!roomCache) await startTestRoom();
   await inviteTestGuest(guest.id);
 }
+
+export async function gardenRequest(payload:Record<string,unknown>):Promise<Frame>{
+  if(roomCache?.testing)throw Error('请先退出本地试演，再打开联机花园');
+  await prepareSocialConnection();
+  if(!gardenSupported)throw Error('当前房间服务尚未支持联机花园，请更新服务端；本地花园仍可使用');
+  return request({t:'garden:request',...payload},'garden:result');
+}
+export function gardenRealm():string{return `${activeUrl??''}/${memberId??''}`;}

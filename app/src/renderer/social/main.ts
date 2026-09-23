@@ -1,6 +1,7 @@
 import { mountContacts } from './contacts';
 import './style.css';
 import { ChatView } from './chat';
+import {PAIR_INTERACTIONS} from '../../shared/pair-interaction';
 import { mountSteam } from './steam';
 import { DEFAULT_ROOM } from '../room/rooms/default';
 import type { CreateRoomInput, RoomBrief, RoomSnapshot, RoomsStatus } from '../../shared/ipc-types';
@@ -64,6 +65,8 @@ function renderMembers(host:HTMLElement):void {
   const row=document.createElement('div');row.className='member-row';
   row.innerHTML=`<span class="avatar-dot ${m.online?'online':''}">${esc(m.nickname.slice(0,1))}</span><div class="member-name"><strong>${esc(m.nickname)}</strong><small>${m.testing?'测试角色 · 非本人在线':m.memberId===status.memberId?'我':m.online?'在线':'离线'}${m.memberId===room.ownerId?' · 房主':''}</small><span class="title-slot">${esc(m.title||'')}</span></div>`;
   row.title=`玩家 ID：${m.memberId}`;
+  if(!m.testing&&!room.testing){const garden=document.createElement('button');garden.textContent='土地 / 商店';garden.onclick=()=>api.garden.open('visit:'+m.memberId);row.append(garden);}
+  if(!m.testing&&!room.testing&&m.memberId!==status.memberId&&m.online){const select=document.createElement('select');select.setAttribute('aria-label','选择双人互动');select.append(new Option('邀请互动…',''));for(const kind of PAIR_INTERACTIONS)select.append(new Option(kind.label,kind.id));select.onchange=()=>{const kind=select.value as 'heart';if(kind)void run(async()=>{await api.garden.interact(m.memberId,kind);toast('邀请已发出，等待对方回应');select.value='';});};row.append(select);}
   if(m.memberId!==status.memberId&&m.online){
    const wave=document.createElement('button');wave.textContent=m.testing?'模拟招呼':'打招呼';wave.onclick=()=>void run(()=>m.testing?api.social.interactTest(m.memberId,'wave'):api.rooms.wave(m.memberId));row.append(wave);
    if(room.ownerId===status.memberId){const remove=document.createElement('button');remove.textContent=m.testing?'离场':'移出';remove.onclick=()=>void run(async()=>{if(m.testing)await api.social.removeTest(m.memberId);else if(confirm(`将 ${m.nickname} 移出房间？`))await api.rooms.kick(m.memberId);await sync();});row.append(remove);}

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { getGarden, gardenAction } from './service';
 import { getSettings } from '../config';
 import { getCharacter } from '../characters';
+import { choosePairAction } from '../../shared/pair-interaction';
 import { plotPetPosition } from './interaction';
 import { gardenSide } from '../../shared/garden-layout';
 import { moveFixedSize } from '../fixed-window';
@@ -24,12 +25,14 @@ function syncSpeechBounds(): void {
 }
 let home: {x:number;y:number} | null = null;
 let performanceTimer: ReturnType<typeof setTimeout> | undefined;
+let cooperationTimer: ReturnType<typeof setInterval> | undefined;
 let performanceVersion = 0;
 let cultivatingPlot: number | null = null;
 function stopPerformance(restore = true): void {
     performanceVersion++;
     if(cultivatingPlot!==null){const plot=cultivatingPlot;cultivatingPlot=null;void gardenAction({type:'pauseCultivation',plot});}
     clearTimeout(performanceTimer);
+    clearInterval(cooperationTimer);cooperationTimer=undefined;
     const origin = home; home = null;
     if (!origin) return;
     if (pet && !pet.isDestroyed()) {
@@ -38,7 +41,7 @@ function stopPerformance(restore = true): void {
     }
     anchor();
 }
-async function perform(plot: number, kind: 'plant' | 'harvest' | 'cultivate', duration?:number): Promise<boolean> {
+async function perform(plot: number, kind: 'plant' | 'harvest' | 'cultivate', duration?:number, owner?:string): Promise<boolean> {
     stopPerformance();
     if(kind==='cultivate'&&!expanded)toggle();
     const version = performanceVersion;
@@ -55,7 +58,8 @@ async function perform(plot: number, kind: 'plant' | 'harvest' | 'cultivate', du
     pet.setPosition(target.x, target.y);
     if(kind==='cultivate'){
         cultivatingPlot=plot;
-        performanceTimer=setTimeout(()=>{cultivatingPlot=null;void gardenAction({type:'revealPlant',plot}).then(result=>{if(!result.ok)return gardenAction({type:'pauseCultivation',plot});}).finally(()=>stopPerformance());},Math.max(1,duration??30000)+100);
+        if(owner){let pending=false;cooperationTimer=setInterval(()=>{if(pending||version!==performanceVersion)return;pending=true;void import('./network').then(n=>n.cooperateGarden(owner,plot,'join')).then(v=>{if(version!==performanceVersion)return;if(v.tasks?.some(t=>t.plot===plot&&t.done)){cultivatingPlot=null;stopPerformance();for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');}}).catch(()=>{if(version===performanceVersion)stopPerformance();}).finally(()=>{pending=false;});},5000);}
+        else performanceTimer=setTimeout(()=>{cultivatingPlot=null;void gardenAction({type:'revealPlant',plot}).then(result=>{if(!result.ok)return gardenAction({type:'pauseCultivation',plot});}).finally(()=>stopPerformance());},Math.max(1,duration??30000)+100);
     } else performanceTimer = setTimeout(() => stopPerformance(), Math.min(12000, (actions[action].durationSec ?? 5) * 1000 + 600));
     return true;
 }
@@ -125,7 +129,7 @@ function toggle(): void {
 }
 let weatherPanel: BrowserWindow | null=null;
 export function openGardenPanel(page: string): void {
-    const allowed = /^(weather|travel|moments|bag|shop|book|plots|sow|plot:[0-5])$/.test(page) ? page : 'bag';
+    const allowed = /^(weather|travel|moments|bag|shop|book|plots|sow|daily|sprays|feeding|friends|notebook|visit:[0-9A-Z]{12}(?::[0-5]:[a-zA-Z0-9_-]{1,160})?|plot:[0-5])$/.test(page) ? page : 'bag';
     if(allowed==='weather'){
         if(weatherPanel&&!weatherPanel.isDestroyed()){weatherPanel.show();weatherPanel.focus();return;}
         const wa=screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
@@ -164,6 +168,11 @@ export function openGardenPanel(page: string): void {
     }
 }
 export function registerGardenIpc(): void {
+    ipcMain.handle('garden:interact',async(_ev,target,kind)=>(await import('./network')).inviteInteraction(target,kind));
+    ipcMain.handle('garden:answerInteraction',async(_ev,id,accept,response)=>(await import('./network')).answerInteraction(id,accept===true,response));
+    ipcMain.handle('garden:online',async (_ev,enable)=>{await (await import('./network')).setNetworkGarden(enable===true);for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');});
+    ipcMain.handle('garden:visit',async (_ev,owner,preview,task)=> (await import('./network')).visitGarden(owner,preview===true,task));
+    ipcMain.handle('garden:cooperate',async (_ev,owner,plot,action,target,task)=> (await import('./network')).cooperateGarden(owner,plot,action,target,task));
     ipcMain.handle('garden:saveRehearsal', async (_ev,request) => (await import('./rehearsal-store')).saveRehearsal(request));
     ipcMain.handle('garden:journalStatus', async () => (await import('./journal-service')).journalStatus());
     ipcMain.handle('garden:rewriteDiary', async (_ev,request) => (await import('./journal-service')).rewriteDiary(request));
@@ -176,12 +185,21 @@ export function registerGardenIpc(): void {
         const result = await gardenAction(command);
         if(result.ok && command.type==='cultivate'){
             const p=result.state.plots[command.plot]!;
-            let playing=false;try{playing=await perform(command.plot,'cultivate',cultivationRemaining(p,Date.now()));}catch{stopPerformance();}
+            let playing=false;try{playing=await perform(command.plot,'cultivate',cultivationRemaining(p,Date.now()),result.state.online?result.state.life?.owner:undefined);}catch{stopPerformance();}
             if(!playing){await gardenAction({type:'pauseCultivation',plot:command.plot});return {ok:false,error:'请先显示桌宠并选择可播放动作的角色，再继续培育'};}
         }
         if(result.ok && command.type==='pauseCultivation')stopPerformance();
         if (result.ok && (command.type === 'plant' || command.type === 'harvest'))
             void perform(command.plot, command.type).catch(() => stopPerformance());
+        if(result.ok&&command.type==='feed'){
+            const actor=result.state.activeActor;
+            if(actor)void getCharacter(actor).then(character=>{
+                if(!character||!pet||pet.isDestroyed())return;
+                const action=choosePairAction(character.manifest,'happy');
+                if(action)pet.webContents.send('pet:menuCommand',{type:'play',action:action.id});
+                pet.webContents.send('garden:interaction',{kind:'feed',caption:result.reveal?.message??'吃到了，谢谢你！',effect:({strawberry:'🍓',tomato:'🍅',blueberry:'🫐',pineapple:'🍍',apple:'🍎'} as Record<string,string>)[result.state.life?.characters[actor]?.wishes.find(w=>w.id===command.wish)?.species??'']??'🍓'});
+            }).catch(()=>{});
+        }
         return result;
     });
     ipcMain.on('pet:move', () => { if (home) stopPerformance(false); });

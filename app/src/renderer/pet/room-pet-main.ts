@@ -22,7 +22,7 @@ const driver = new NetworkDriver({
 });
 
 /** 临时牌子优先级：离线 > 传输进度 > 聊天气泡（8s）> 同步牌面。 */
-let nickname = '房友';
+let nickname = '房友',gardenOwner:string|undefined;
 let latestState: import('../../shared/ipc-types').LinkPeerState = {mode:'idle'};
 let transferText: string | null = null;
 let chatClearTimer: ReturnType<typeof setTimeout> | null = null;
@@ -39,7 +39,8 @@ function refreshSignboard(): void {
   if(text) { signboard.setText(text); signboard.show(); } else signboard.hide();
 }
 
-window.qbot.roomPet.onHello(({ nickname: n }) => {
+window.qbot.roomPet.onHello(({ nickname: n,memberId }) => {
+  gardenOwner=memberId;
   nickname = n;
   refreshSignboard();
 });
@@ -93,7 +94,7 @@ window.qbot.roomPet.onLeft(() => {
 // 兜底自取：did-finish-load 可能早于上面监听注册（同 1v1 remote-main 的竞态兜底）
 void window.qbot.roomPet.getCache().then((snap) => {
   if (!snap) return;
-  if (snap.hello) nickname = snap.hello.nickname;
+  if (snap.hello) {nickname = snap.hello.nickname;gardenOwner=snap.hello.memberId;}
   if (snap.character) {
     const available = player.load(snap.character.dirId, snap.character.manifest);
     driver.setCharacter(available, snap.character.manifest.agentActions);
@@ -166,7 +167,7 @@ stage.addEventListener('pointerup', (e) => {
     dragStarted = false;
     driver.dragEnd();
     signboard.onDragEnd();
-  }
+  }else if(gardenOwner)window.qbot.garden.open('visit:'+gardenOwner);
 });
 
 // ── 右键菜单：打招呼 / 退出房间 ──────────────────────────────
@@ -189,6 +190,7 @@ stage.addEventListener('contextmenu', (e) => {
   e.preventDefault();
   menu.replaceChildren();
   addMenuItem('打招呼', () => window.qbot.roomPet.wave());
+  if(gardenOwner)addMenuItem('查看花园名片',()=>window.qbot.garden.open('visit:'+gardenOwner));
   addMenuItem('一起玩', () => window.qbot.rooms.open());
   addMenuItem('房间聊天', () => window.qbot.social.openChat());
   addMenuItem('退出房间', () => window.qbot.roomPet.leaveRoom());

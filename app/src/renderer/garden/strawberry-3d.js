@@ -96,15 +96,21 @@ function draw(now){
   const width=Math.max(1,Math.ceil(rect.width*Math.min(devicePixelRatio,1.5))),height=Math.max(1,Math.ceil(rect.height*Math.min(devicePixelRatio,1.5)));
   if(e.canvas.width!==width||e.canvas.height!==height){e.canvas.width=width;e.canvas.height=height;}
   renderer.setSize(width,height,false);e.camera.aspect=width/height;e.camera.position.z=e.camera.aspect<.8?4.8*.8/e.camera.aspect:4.8;e.camera.updateProjectionMatrix();
+  if(e.animate)e.animate(time);
   for(const m of e.moving){if(m.type==='bush')m.node.rotation.z=Math.sin(time*1.3)*.018;else if(m.type==='fruit')m.node.rotation.y=Math.sin(time*.7)*.08;else{const a=time*.4+m.index*1.05;m.node.position.set(Math.cos(a)*.9,.8+Math.sin(time+m.index)*.4,Math.sin(a)*.6);}}
   renderer.render(e.scene,e.camera);e.ctx.clearRect(0,0,width,height);e.ctx.drawImage(renderer.domElement,0,0);e.canvas.dataset.ready='true';e.painted=true;e.w=rect.width;e.h=rect.height;
  }
  if(entries.size)start();
 }
 export function mountStrawberry3D(host,{mode='fruit',ratio=1,traits=[],regrowing=false}={}){
+ const stage=mode==='soil'?'soil':mode==='fruit'?'fruit':ratio<.22&&!regrowing?'sprout':ratio<.55?'flower':ratio<.8?'green':'ripe';
+ return mountGardenModel3D(host,()=>createScene(mode,ratio,traits,regrowing),stage);
+}
+// Imported models use the same renderer, scheduling, fallback and DOM composition.
+export function mountGardenModel3D(host,create,stage){
  if(failed)return false;
  try{gpu();const canvas=document.createElement('canvas');canvas.className='strawberry-canvas';canvas.setAttribute('aria-hidden','true');const ctx=canvas.getContext('2d');if(!ctx)throw Error('Canvas unavailable');
-  const entry={host,canvas,ctx,...createScene(mode,ratio,traits,regrowing),mounted:false,created:performance.now()};host.append(canvas);host.classList.add('art-3d');host.dataset.stage=mode==='soil'?'soil':mode==='fruit'?'fruit':ratio<.22&&!regrowing?'sprout':ratio<.55?'flower':ratio<.8?'green':'ripe';entries.add(entry);start();return true;
+  const entry={host,canvas,ctx,...create(environment.texture),mounted:false,created:performance.now()};host.append(canvas);host.classList.add('art-3d');host.dataset.stage=stage;entries.add(entry);start();return true;
  }catch(error){console.warn('3D 草莓不可用，保留原画',error);fallback();return false;}
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(frame);frame=0;}else start();});

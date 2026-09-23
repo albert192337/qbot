@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "pid": 66808,
+  "errors": [],
+  "checks": [
+    "five pineapple specimens and strawberry comparison",
+    "transparent/cream/dark backgrounds",
+    "crystal detail",
+    "2D/3D without state changes",
+    "harvest/regrowth/basket",
+    "pineapple sowing",
+    "missing GLB image fallback"
+  ],
+  "modelBytes": 2914268
+}

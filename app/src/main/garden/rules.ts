@@ -1,4 +1,7 @@
 import { travelTransition, validateTravel } from '../../shared/travel';
+import { lifeTransition, protectPending, validateLife } from './life-rules';
+import {advanceV3,refreshV3Shop,makeV3Plant,v3HarvestXp,breedV3,protectV3,v3Transition,validateV3} from './v3-rules';
+import {fertilizerV3,v3Value,V3} from '../../shared/garden-v3';
 import { SPECIES, TRAITS, FERTILIZERS, level, HARVEST_XP, CULTIVATION_MS, needsReveal, canBreed, cultivationRemaining, mutationMultiplier, type Species, type Trait, type GardenState, type GardenCommand, type GardenReveal, type Seed, type Produce, type Plant, type Fertilizer } from '../../shared/garden';
 export interface Random {
     random(): number;
@@ -8,6 +11,7 @@ const species = Object.keys(SPECIES) as Species[];
 export const REFRESH_MS = 5 * 60000;
 export const DISCOVERY_POINTS = 20;
 export function refreshShop(s: GardenState, now: number, rng: Random): void {
+    if(refreshV3Shop(s,now))return;
     if (now < s.shop.refreshAt)
         return;
     const appleRequired = (s.journey?.earned ?? 0) >= 240 && !s.journey?.appleBought;
@@ -24,20 +28,27 @@ export function initialGarden(now: number, rng: Random): GardenState {
     return s;
 }
 export function value(p: Pick<Produce, 'species' | 'kg' | 'traits' | 'yieldCount' | 'growthVersion'>): number {
+    if(p.growthVersion===3)return v3Value(p);
     return Math.round(SPECIES[p.species].price * 2 / (p.yieldCount ?? SPECIES[p.species].harvests) * p.kg / SPECIES[p.species].kg * (p.growthVersion === 2 ? mutationMultiplier(p.traits) : p.traits.reduce((m, t) => m * TRAITS[t].multiplier, 1)));
 }
 export function rollTraits(s: GardenState, sp: Species, rng: Random, boost = 1, musicPlaying = false): Trait[] {
     return (Object.keys(TRAITS) as Trait[]).filter(t => TRAITS[t].level <= level(s.xp[sp]) && rng.random() < Math.min(1, TRAITS[t].chance * boost * (musicPlaying && (t === 'punk' || t === 'classical') ? 3 : 1)));
 }
-export function transition(input: GardenState, cmd: GardenCommand, now: number, rng: Random, context: { musicPlaying?: boolean } = {}): {
+export function transition(input: GardenState, cmd: GardenCommand, now: number, rng: Random, context: { musicPlaying?: boolean; actor?:string; shopOwner?:string } = {}): {
     state: GardenState;
     reveal?: GardenReveal;
     points?: number;
     boxes?: number;
 } {
     const s = validateGarden(structuredClone(input));
+    advanceV3(s,now);
     const j = s.journey!;
     refreshShop(s, now, rng);
+    protectPending(s,cmd);
+    protectV3(s,cmd);
+    const modern=v3Transition(s,cmd,now,rng);if(modern.handled)return {state:s,reveal:modern.reveal};
+    const life=lifeTransition(s,cmd,now,rng,context.actor,context.shopOwner);
+    if(life.handled){if(life.changed)life.changed.value=value(life.changed);return {state:s,reveal:life.reveal};}
     let reveal: GardenReveal | undefined, points: number | undefined, boxes: number | undefined;
     const plot = (index: number) => { if (!Number.isInteger(index) || index < 0 || index >= 6)
         throw Error('土地不存在'); return s.plots[index]; };
@@ -76,7 +87,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
         }
         case 'harvestMany': {
             let next = s; const harvests: Produce[] = [];
-            for (let i = 0; i < s.plots.length; i++) if (s.plots[i] && s.plots[i]!.readyAt <= now && !s.plots[i]!.keep && !needsReveal(s.plots[i]!)) {
+            for (let i = 0; i < s.plots.length; i++) if (s.plots[i] && s.plots[i]!.readyAt <= now && !s.plots[i]!.keep && !needsReveal(s.plots[i]!) && !s.plots[i]!.batch?.candidates.length && !Object.entries(s.v3?.appraisals??{}).some(([id,a])=>id===s.plots[i]!.id&&!a.done)) {
                 const result = transition(next, { type: 'harvest', plot: i }, now, rng, context);
                 next = result.state; harvests.push(result.reveal!.produce!);
             }
@@ -97,6 +108,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             if (i < 0)
                 throw Error('种子已用完');
             const seed = s.seeds.splice(i, 1)[0];
+            if(s.v3){s.plots[cmd.plot]=makeV3Plant(s,seed,cmd.plot,now,rng);j.planted++;break;}
             const traits = [...new Set([...seed.genes, ...rollTraits(s, seed.species, rng, 1, context.musicPlaying)])];
             const kg = Math.round(SPECIES[seed.species].kg * (.65 + rng.random() * 1.7) * (traits.includes('giant') ? 4 : 1) * 1000) / 1000;
             const p: Plant = { growthVersion: 2, id: rng.id(), species: seed.species, traits, kg, value: 0, bred: false, plantedAt: now, readyAt: now + SPECIES[seed.species].minutes * 60000 * (1 - .03 * (level(s.xp[seed.species])-1)), fertilizers: [], baseTraits: traits.filter(t => TRAITS[t].category === 'body'), harvestsLeft: SPECIES[seed.species].harvests, harvestIndex: 0 };
@@ -113,7 +125,13 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             if (!Object.hasOwn(FERTILIZERS, cmd.fertilizer) || !(s.fertilizers[cmd.fertilizer] > 0))
                 throw Error('肥料不足');
             if (p.fertilizers.length)
-                throw Error('每株一生只能施肥一次');
+                throw Error(p.growthVersion===3?'每轮生长只能施一种肥料':'每株一生只能施肥一次');
+            if(p.growthVersion===3){
+                if(p.batch!.settled||now>=p.batch!.seedlingEnd)throw Error('已经过了幼苗期，这一轮不用再施肥啦');
+                const f=fertilizerV3(cmd.fertilizer);s.fertilizers[cmd.fertilizer]--;p.fertilizers.push(cmd.fertilizer);p.batch!.fertilizedAt=now;
+                if(f.effect==='speed'){p.readyAt=now+(p.readyAt-now)*(1-f.speed);p.batch!.naturalReadyAt=p.readyAt;p.batch!.seedlingEnd=now+(p.batch!.seedlingEnd-now)*(1-f.speed);}
+                break;
+            }
             s.fertilizers[cmd.fertilizer]--;
             p.fertilizers.push(cmd.fertilizer);
             const fertilizer = FERTILIZERS[cmd.fertilizer];
@@ -134,7 +152,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             const p = plot(cmd.plot);
             if (!p || p.readyAt > now || !needsReveal(p)) throw Error('只有成熟的彩色问号果实需要培育');
             if (s.plots.some(x => x?.cultivation?.startedAt !== undefined)) throw Error('角色正在照料另一株植物');
-            p.cultivation = { remainingMs: p.cultivation?.remainingMs ?? CULTIVATION_MS, startedAt: now };
+            p.cultivation = { remainingMs: p.cultivation?.remainingMs ?? (p.growthVersion===3?V3.cultivationMs:CULTIVATION_MS), startedAt: now };
             break;
         }
         case 'pauseCultivation': {
@@ -154,15 +172,15 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             if (!p || p.readyAt > now)
                 throw Error('还没有成熟');
             if (needsReveal(p)) throw Error('彩色果实需要先培育揭晓');
-            const item: Produce = { growthVersion: p.growthVersion, revealed: p.revealed, id: p.id, species: p.species, traits: p.traits, kg: p.kg, value: p.value, bred: p.bred, yieldCount: p.yieldCount };
+            const item: Produce = { dye:p.dye, growthVersion: p.growthVersion, revealed: p.revealed, id: p.id, species: p.species, traits: p.traits, kg: p.kg, value: p.value, bred: p.bred, yieldCount: p.yieldCount,slots:p.slots,lineage:p.lineage,appraised:p.appraised,locked:p.keep };
             s.produce.push(item);
             if ((p.harvestsLeft ?? 1) > 1) {
-                const next = nextBatch(s, p, now, rng, !!context.musicPlaying);
+                const next = p.growthVersion===3?makeV3Plant(s,{id:p.id,species:p.species,genes:p.baseTraits??[],slots:p.batch!.slots,massGene:p.batch!.massGene,bred:false,lineage:p.lineage},cmd.plot,now,rng,p.harvestsLeft!-1,(p.harvestIndex??0)+1):nextBatch(s, p, now, rng, !!context.musicPlaying);
                 // Every harvest has its own identity; a regrowing plant cannot alias a stored fruit.
                 s.plots[cmd.plot] = next;
             } else s.plots[cmd.plot] = null;
             j.harvested++;
-            s.xp[p.species] += HARVEST_XP;
+            s.xp[p.species] += p.growthVersion===3?v3HarvestXp(s,p,now):HARVEST_XP;
             for (const factor of ['base', ...p.traits]) {
                 const key = `${p.species}:${factor}`;
                 if (!s.discovered.includes(key))
@@ -177,6 +195,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             const a = parent(cmd.first), b = parent(cmd.second);
             if (!a || !b || !canBreed(a) || !canBreed(b)) throw Error('双方需要已揭晓、未繁育过的金色或彩色果实');
             if (!((s.plots.some(p=>p?.id===a.id) && s.produce.some(p=>p.id===b.id)) || (s.plots.some(p=>p?.id===b.id) && s.produce.some(p=>p.id===a.id)))) throw Error('请选择一株地里的植物与一颗背包果实');
+            if(s.v3){const mother=s.plots.some(p=>p?.id===a.id)?a:b,father=mother===a?b:a;const normalized=mother===a?cmd:{...cmd,firstGenes:cmd.secondGenes,secondGenes:cmd.firstGenes};const seed=breedV3(s,mother,father,normalized,now,rng);s.seeds.push(seed);reveal={title:'新生命诞生！',seed};break;}
             const genes = [...new Set([...a.traits, ...b.traits])].filter(t => rng.random() < (a.traits.includes(t) && b.traits.includes(t) ? .8 : .4));
             const seed: Seed = { id: rng.id(), species: rng.random() < .5 ? a.species : b.species, genes, bred: true, parents: [a.species, b.species] };
             a.bred = b.bred = true;
@@ -247,6 +266,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             break;
         }
         case 'mature':
+            if(s.v3){for(const p of s.plots)if(p?.batch&&!p.batch.settled){const duration=p.batch.seedlingEnd-p.plantedAt;p.plantedAt=now-duration;p.batch.seedlingEnd=now;p.batch.naturalReadyAt=now;}advanceV3(s,now);}
             for (const p of s.plots)
                 if (p)
                     p.readyAt = Math.min(p.readyAt, now);
@@ -258,6 +278,8 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
 /** Reject incompatible/corrupt saves and recover a backup instead of silently losing items. */
 export function validateGarden(raw: unknown): GardenState {
     const s = raw as GardenState;
+    if(s)validateLife(s);
+    if(s)validateV3(s);
     if (s && s.version === 1) {
         if (s.xp && typeof s.xp === 'object') for (const sp of species) if (!(sp in s.xp) && !['lotus','strawberry','sunflower'].includes(sp)) s.xp[sp] = 0;
         if (s.fertilizers && typeof s.fertilizers === 'object') for (const f of Object.keys(FERTILIZERS) as Fertilizer[]) if (!(f in s.fertilizers) && FERTILIZERS[f].grade > 1) s.fertilizers[f] = 0;
@@ -273,7 +295,7 @@ export function validateGarden(raw: unknown): GardenState {
     const number = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
     const known = (sp: string) => Object.hasOwn(SPECIES, sp);
     const traits = (ts: Trait[]) => Array.isArray(ts) && ts.every(t => Object.hasOwn(TRAITS, t));
-    const produce = (p: Produce) => p && typeof p.id === 'string' && known(p.species) && traits(p.traits) && number(p.kg) && number(p.value) && typeof p.bred === 'boolean' && (p.growthVersion === undefined || p.growthVersion === 2) && (p.revealed === undefined || typeof p.revealed === 'boolean') && (p.cultivation === undefined || (p.cultivation && number(p.cultivation.remainingMs) && p.cultivation.remainingMs <= CULTIVATION_MS && (p.cultivation.startedAt === undefined || number(p.cultivation.startedAt)))) && (p.locked === undefined || typeof p.locked === 'boolean') && (p.yieldCount === undefined || Number.isInteger(p.yieldCount) && p.yieldCount >= 1 && p.yieldCount <= 3);
+    const produce = (p: Produce) => p && typeof p.id === 'string' && known(p.species) && traits(p.traits) && number(p.kg) && number(p.value) && typeof p.bred === 'boolean' && (p.growthVersion === undefined || p.growthVersion === 2 || p.growthVersion === 3) && (p.revealed === undefined || typeof p.revealed === 'boolean') && (p.cultivation === undefined || (p.cultivation && number(p.cultivation.remainingMs) && p.cultivation.remainingMs <= (s.online || p.growthVersion===3 ? 600000 : CULTIVATION_MS) && (p.cultivation.startedAt === undefined || number(p.cultivation.startedAt)))) && (p.locked === undefined || typeof p.locked === 'boolean') && (p.yieldCount === undefined || Number.isInteger(p.yieldCount) && p.yieldCount >= 1 && p.yieldCount <= 3);
     if (!s || s.version !== 1 || !number(s.boxMisses) || !s.journey || !['bought','planted','harvested','earned','appleBought'].every(k => number(s.journey![k as keyof NonNullable<GardenState['journey']>])) || !number(s.coins) || !Array.isArray(s.plots) || s.plots.length !== 6 ||
         !s.plots.every(p => p === null || (produce(p) && number(p.plantedAt) && number(p.readyAt) && traits(p.baseTraits!) && Number.isSafeInteger(p.harvestsLeft) && p.harvestsLeft! >= 1 && p.harvestsLeft! <= SPECIES[p.species].harvests && Number.isSafeInteger(p.harvestIndex) && p.harvestIndex! >= 0 && (p.keep === undefined || typeof p.keep === 'boolean') && Array.isArray(p.fertilizers) && p.fertilizers.every(f => Object.hasOwn(FERTILIZERS, f)))) ||
         !Array.isArray(s.seeds) || !s.seeds.every(p => p && typeof p.id === 'string' && known(p.species) && traits(p.genes) && typeof p.bred === 'boolean') ||
@@ -295,7 +317,7 @@ function nextBatch(s: GardenState, p: Plant, now: number, rng: Random, music: bo
     let traits = [...new Set([...p.baseTraits!, ...rollTraits(s, p.species, rng, 1, music)])];
     if (fertilizer?.effect === 'mutation') traits = [...new Set([...traits, ...rollTraits(s,p.species,rng,fertilizer.strength,music)])];
     const kg = Math.round(SPECIES[p.species].kg * (.65+rng.random()*1.7) * (traits.includes('giant')?4:1) * (fertilizer?.effect === 'weight' ? fertilizer.strength : 1) * 1000)/1000;
-    const duration = SPECIES[p.species].minutes * 60000 * (p.growthVersion === 2 ? 1-.03*(level(s.xp[p.species])-1) : 1) * (fertilizer?.effect === 'speed' ? 1-fertilizer.strength : 1);
-    const next: Plant = { ...p, revealed: undefined, cultivation: undefined, id: rng.id(), traits, kg, value: 0, plantedAt: now, readyAt: now+duration, harvestsLeft: p.harvestsLeft!-1, harvestIndex: p.harvestIndex!+1 };
+    const duration = SPECIES[p.species].minutes * 60000 * (p.growthVersion === 2 ? 1-.03*((p.legacyLevel??level(s.xp[p.species]))-1) : 1) * (fertilizer?.effect === 'speed' ? 1-fertilizer.strength : 1);
+    const next: Plant = { ...p, dye:undefined, revealed: undefined, cultivation: undefined, id: rng.id(), traits, kg, value: 0, plantedAt: now, readyAt: now+duration, harvestsLeft: p.harvestsLeft!-1, harvestIndex: p.harvestIndex!+1 };
     next.value = value(next); return next;
 }

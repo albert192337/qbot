@@ -23,6 +23,8 @@ import {
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import { Contacts } from './contacts.mjs';
+import { Gardens } from './garden.mjs';
+import gardenCore from './generated/garden-core.cjs';
 
 const PORT = Number(process.env.PORT || 24252);
 /**
@@ -125,7 +127,7 @@ function clampText(v, max) {
 }
 
 function send(ws, obj) {
-  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(['hello:ack','rooms','room','joined','error','social:ack','world:history','reported','contacts:snapshot','contacts:ack'].includes(obj.t) && ws.requestId ? {...obj, requestId:ws.requestId} : obj));
+  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(['hello:ack','rooms','room','joined','error','social:ack','world:history','reported','contacts:snapshot','contacts:ack','garden:result'].includes(obj.t) && ws.requestId ? {...obj, requestId:ws.requestId} : obj));
 }
 
 function fail(ws, code) {
@@ -480,6 +482,9 @@ function noteChatSent(ws, text) {
 // ── 帧处理 ─────────────────────────────────────────────────
 
 const worldPeers = new Set();
+const gardenInvites=new Map();
+const pairInvites=new Map();
+const pairBusy=new Map();
 let worldChat = [];
 const worldReports = [];
 try {
@@ -534,10 +539,38 @@ const handlers = {
     ws.nickname = clampText(f.nickname, NICK_MAX) || '匿名';
     ws.avatarHash = typeof f.avatarHash === 'string' ? f.avatarHash.slice(0, 32) : undefined;
     ws.hello = true;
-    send(ws, {t:'hello:ack', social:1, contacts:1, memberId:ws.memberId, contactToken:identity.token, serverTime:Date.now()});
+    send(ws, {t:'hello:ack', social:1, contacts:1, garden:1, memberId:ws.memberId, contactToken:identity.token, serverTime:Date.now()});
     notifyContacts();
   },
   'contacts:get'(ws, f) { if (typeof f.character === 'string' && contacts.people[ws.memberId].character !== clampText(f.character,32)) { contacts.transaction(()=>{contacts.people[ws.memberId].character=clampText(f.character,32);}); notifyContacts(); } ws.contactsSubscribed = true; send(ws, {t:'contacts:snapshot', ...contactSnapshot(ws)}); },
+  'garden:request'(ws,f){
+    try {
+      if(f.action==='pair:invite'||f.action==='pair:answer'){
+        const result=handleGardenInteraction(ws,f);send(ws,{t:'garden:result',...result});return;
+      }
+      if(f.action==='coop'&&['share','invite'].includes(f.command))requireGardenShare(ws,f);
+      if(f.action==='coop'&&f.command==='invite'){
+        if(!contacts.areFriends(ws.memberId,f.target))throw Error('请选择已确认的游戏好友');
+
+      }
+      const result=gardens.handle(ws.memberId,{...f,realm:ws.roomId??'garden'});
+      if(f.action==='coop'&&f.command==='invite'){
+        const p=result.visit.plots[f.plot];
+        for(const [key,i] of gardenInvites)if(i.expiresAt<Date.now()||i.from===ws.memberId&&i.to===f.target&&i.plant===p.id)gardenInvites.delete(key);
+        gardenInvites.set(randomBytes(16).toString('hex'),{from:ws.memberId,to:f.target,plant:p.id,plot:f.plot,label:`${gardenCore.SPECIES[p.species].name} · ${p.traits.map(t=>gardenCore.TRAITS[t].name+'（'+gardenCore.TIER_NAMES[gardenCore.TRAITS[t].tier]+'）').join(' / ')}`,expiresAt:Date.now()+3600000});
+        noteChatSent(ws,`garden:${f.owner}:${f.plot}`);notifyContacts();
+      }
+      if(f.action==='coop'&&f.command==='share'){
+        const p=result.visit.plots[f.plot],text=`[培育:${ws.memberId}:${f.plot}] ${gardenCore.SPECIES[p.species].name} · ${p.traits.map(t=>gardenCore.TRAITS[t].name+'（'+gardenCore.TIER_NAMES[gardenCore.TRAITS[t].tier]+'）').join(' / ')} · 一起培育，好奖励概率更高`;
+        const existing=worldChat.find(m=>m.garden?.plant===p.id&&m.memberId===ws.memberId);
+        const msg={id:existing?.id??genId(12),memberId:ws.memberId,nickname:ws.nickname,text,at:Date.now(),garden:{owner:ws.memberId,plot:f.plot,plant:p.id}};
+        worldChat=[...worldChat.filter(m=>m.id!==msg.id),msg].slice(-CHAT_KEEP);noteChatSent(ws,text);worldBroadcast({t:'world:chat',msg});
+      }
+      refreshGardenCards();
+      send(ws,{t:'garden:result',...result});
+    }
+    catch(e){send(ws,{t:'garden:result',ok:false,error:e.message});}
+  },
   'contacts:change'(ws, f) {
     if (!contactRate(ws)) return;
     try { contacts.change(ws.memberId, f.id, f.action); }
@@ -557,6 +590,12 @@ const handlers = {
     send(ws, {t:'contacts:ack'}); notifyContacts();
   },
   'contacts:invitation'(ws, f) {
+    const garden= gardenInvites.get(f.id);
+    if(garden){
+      if(garden.to!==ws.memberId||garden.expiresAt<Date.now()||!contacts.areFriends(garden.from,ws.memberId)){fail(ws,'invite_expired');return;}
+      if(f.action==='dismiss')gardenInvites.delete(f.id);
+      send(ws,{t:'contacts:ack',garden:{owner:garden.from,plot:garden.plot}});notifyContacts();return;
+    }
     const invitation = contactInvites.get(f.id);
     if (!invitation || invitation.to !== ws.memberId) { fail(ws, 'invite_expired'); return; }
     if (f.action === 'dismiss') { contactInvites.delete(f.id); send(ws, {t:'contacts:ack'}); notifyContacts(); return; }
@@ -902,6 +941,58 @@ const handlers = {
 // ── WS 服务器 ──────────────────────────────────────────────
 
 const contacts = new Contacts(path.join(DATA_DIR, 'contacts.json'));
+const gardens = new Gardens(path.join(DATA_DIR,'gardens.json'),contacts);
+function refreshGardenCards(){
+  for(const msg of worldChat){if(!msg.garden)continue;const t=gardens.data.tasks[msg.garden.plant];if(!t)continue;
+    const members=Object.entries(t.members).map(([id,m])=>({name:contacts.people[id]?.nickname??'伙伴',qualified:m.seconds>=30&&m.work>=4320}));
+    const qualified=members.filter(m=>m.qualified).length,remaining=Math.ceil(t.remaining/360),active=Object.values(t.members).filter(m=>m.seenAt+15000>Date.now()).length;
+    const fruit=t.fruit??gardens.data.people[t.owner]?.state.plots[t.plot];const state={owner:t.owner,plot:t.plot,plant:t.plant,species:fruit?gardenCore.SPECIES[fruit.species].name:undefined,traits:fruit?.id===t.plant?fruit.traits.map(id=>({name:gardenCore.TRAITS[id].name,quality:gardenCore.TIER_NAMES[gardenCore.TRAITS[id].tier]})):[],done:t.done,remaining,active,members,chance:gardenCore.coopRareChance(qualified),room:t.room,fruit:t.fruit};
+    if(JSON.stringify(msg.garden)===JSON.stringify(state))continue;msg.garden=state;worldBroadcast({t:'world:chat',msg});
+  }
+}
+const gardenShareTimes=new Map();
+function requireGardenShare(ws,f){const key=ws.memberId+':'+f.plot+':'+f.command+':'+(f.target??'');const now=Date.now();if(now-(gardenShareTimes.get(key)??0)<30000)throw Error('这颗果实刚刚邀请过，30秒后可以再次邀请');gardenShareTimes.set(key,now);for(const [k,at] of gardenShareTimes)if(now-at>60000)gardenShareTimes.delete(k);const reason=checkChatLimit(ws,`garden:${f.owner}:${f.plot}`);if(reason)throw Error('分享太快了，请稍后再试');}
+function handleGardenInteraction(ws,f){
+  const now=Date.now();
+  for(const [id,i] of pairInvites)if(i.expiresAt<=now)pairInvites.delete(id);
+  for(const [id,until] of pairBusy)if(until<=now)pairBusy.delete(id);
+  const peerFor=id=>[...wss.clients].find(p=>p.memberId===id&&p.hello&&p.readyState===p.OPEN&&p.roomId===ws.roomId);
+  if(f.action==='pair:invite'){
+    const kind=gardenCore.PAIR_INTERACTIONS.find(k=>k.id===f.kind),peer=peerFor(f.target);
+    if(!kind||!ws.roomId||!peer||peer===ws)throw Error('请邀请同一房间内的在线玩家');
+    if(pairBusy.get(ws.memberId)>now||pairBusy.get(peer.memberId)>now)throw Error('正在互动，请稍后再试');
+    if(checkChatLimit(ws,`pair:${f.target}:${f.kind}`))throw Error('邀请太快了，请稍后再试');
+    if([...pairInvites.values()].filter(i=>i.from===ws.memberId).length>=5)throw Error('请等待之前的邀请回复');
+    const state=gardens.handle(ws.memberId,{action:'get',actor:f.actor}).state;
+    const growth=state.life.characters[state.activeActor];if(!growth)throw Error('请先选择角色');
+    const required=gardenCore.CHARACTER_UNLOCKS.find(k=>k.kind===f.kind)?.level??1;
+    if(gardenCore.characterLevel(growth.xp)<required)throw Error(`角色达到 Lv.${required} 才能发起${kind.label}`);
+    const id=randomBytes(16).toString('hex');pairInvites.set(id,{from:ws.memberId,to:peer.memberId,roomId:ws.roomId,actor:f.actor,kind:f.kind,label:kind.label,expiresAt:now+120000});
+    noteChatSent(ws,`pair:${f.target}:${f.kind}`);notifyContacts();return {ok:true,invitation:id};
+  }
+  const invite=pairInvites.get(f.id);
+  if(!invite||invite.to!==ws.memberId||typeof f.accept!=='boolean')throw Error('邀请已失效');
+  if(!f.accept){pairInvites.delete(f.id);notifyContacts();return {ok:true};}
+  if(invite.kind==='relay'&&!['happy','heart','wave'].includes(f.response))throw Error('请选择一种接力回应');
+  const host=peerFor(invite.from);
+  if(!host||!ws.roomId||ws.roomId!==invite.roomId)throw Error('双方需要在原来的房间内');
+  if(pairBusy.get(ws.memberId)>now||pairBusy.get(host.memberId)>now)throw Error('正在互动，请稍后再试');
+  const state=gardens.handle(ws.memberId,{action:'get',actor:f.actor}).state;
+  if(!state.activeActor)throw Error('请先选择角色');
+  if(gardens.data.people[host.memberId]?.state.activeActor!==invite.actor)throw Error('对方已更换角色，请重新邀请');
+  pairInvites.delete(f.id);notifyContacts();
+  const beats=gardenCore.pairBeats(invite.kind);if(invite.kind==='relay'){const response=['happy','heart','wave'].includes(f.response)?f.response:'happy';beats[1]={...beats[1],guest:response,caption:response==='heart'?'送你一个小心心！':response==='wave'?'嗨，我接住啦！':'开心接住！轮到我啦！'};}
+  for(const [who,other] of [[ws.memberId,host.memberId],[host.memberId,ws.memberId]])gardens.transaction(()=>gardenCore.recordGarden(gardens.data.people[who].state,now,'interaction','一起玩了'+invite.label,other));
+  const until=now+beats.length*4500;
+  pairBusy.set(ws.memberId,until);pairBusy.set(host.memberId,until);
+  const play=(beat,step)=>{
+    if([host,ws].some(p=>p.readyState!==p.OPEN||p.roomId!==invite.roomId))return;
+    for(const [peer,actor,intent] of [[host,invite.actor,beat.host],[ws,f.actor,beat.guest]])
+      peer.send(JSON.stringify({t:'garden:interaction',roomId:invite.roomId,kind:invite.kind,actor,intent,step,partner:peer===host?ws.memberId:host.memberId,caption:beat.caption,effect:beat.effect}));
+  };
+  beats.forEach((beat,i)=>{if(!i)play(beat,i);else setTimeout(()=>play(beat,i),i*4500).unref();});
+  return {ok:true};
+}
 const contactInvites = new Map();
 function contactRate(ws) {
   const now=Date.now(); ws.contactTimes=(ws.contactTimes||[]).filter(t=>now-t<60000);
@@ -911,6 +1002,8 @@ function contactRate(ws) {
 function contactSnapshot(ws) {
   const onlineIds=new Set([...wss.clients].filter(p=>p.hello&&p.readyState===p.OPEN).map(p=>p.memberId));
   const invitations=[...contactInvites].filter(([,v])=>v.to===ws.memberId&&v.expiresAt>Date.now()&&contacts.areFriends(v.from,v.to)).map(([id,v])=>({id, nickname:contacts.people[v.from]?.nickname||'朋友', expiresAt:v.expiresAt}));
+  for(const [id,i] of gardenInvites)if(i.to===ws.memberId&&i.expiresAt>Date.now()&&contacts.areFriends(i.from,i.to))invitations.push({id,nickname:contacts.people[i.from]?.nickname||'朋友',expiresAt:i.expiresAt,garden:{owner:i.from,plot:i.plot,label:i.label,plant:i.plant}});
+  for(const [id,i] of pairInvites)if(i.to===ws.memberId&&i.roomId===ws.roomId&&i.expiresAt>Date.now())invitations.push({id,nickname:contacts.people[i.from]?.nickname||'朋友',expiresAt:i.expiresAt,pair:{kind:i.kind,label:i.label}});
   return {people:contacts.snapshot(ws.memberId,onlineIds), invitations};
 }
 function notifyContacts() {
@@ -952,6 +1045,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    if(ws.memberId)try{gardens.disconnect(ws.memberId);}catch{console.error('[garden] disconnect save failed');}
     ws.contactsSubscribed = false;
     worldPeers.delete(ws);
     leaveRoom(ws);
@@ -992,4 +1086,4 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-console.log(`[rooms] listening on ${HOST}:${PORT}  data=${DATA_FILE}`);
+wss.on('listening',()=>console.log(`[rooms] listening on ${HOST}:${PORT}  data=${DATA_FILE}`));

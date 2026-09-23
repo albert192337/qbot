@@ -1,4 +1,5 @@
 import { scenePool } from '../../shared/action-resources';
+import {CHARACTER_UNLOCKS,currentGrowth,characterLevel} from '../../shared/garden-life';
 import { mountLocalNameplate } from './nameplate';
 /** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 + 串门 + 调试面板 */
 import '../error-handler';
@@ -185,6 +186,8 @@ async function startPair(kind: PairKind, guestId: string): Promise<void> {
   const host = currentCharacter;
   if (!host || !PAIR_INTERACTIONS.some(i => i.id === kind)) return;
   try {
+    const unlock=CHARACTER_UNLOCKS.find(u=>u.kind===kind);
+    if(unlock){const garden=await window.qbot.garden.get();if(characterLevel(currentGrowth(garden)?.xp??0)<unlock.level){hud.toast(`角色 Lv.${unlock.level} 解锁，可以先完成食物心愿`);return;}}
     const characters = await window.qbot.characters.list();
     if (request !== pairRequest || host !== currentCharacter || document.hidden) return;
     const guest = characters.find(c => c.dirId === guestId && c.dirId !== host.dirId && c.manifest);
@@ -296,6 +299,7 @@ function onAgentStatus(activity: AgentActivity): void {
   if (activity !== agentActivity) signDismissed = false;
   // done 一次性庆祝：记忆位立即归 idle，庆祝播完自然回 idle 不再重触发
   agentActivity = activity === 'done' ? 'idle' : activity;
+  document.body.dataset.agentActivity=agentActivity;
   if (available.length === 0) return; // 角色未加载完不驱动
 
   if (activity === 'done') signboardOneShot = '工作完成！';
@@ -698,6 +702,7 @@ stage.addEventListener('contextmenu', (e) => {
 });
 
 window.qbot.pet.onMenuCommand((cmd) => {
+  if(cmd.type==='networkPhoto'){const host=currentCharacter,guest=cmd.guest;if(!host||document.hidden||pointerDown||gardenPerforming||!pairActions(host.manifest).size||!pairActions(guest.manifest).size)return;window.qbot.pet.detachPerch();applyPerch(null);speaker.interrupt();cancelHold();stopDesktopWalk();clearTimer();pairInteraction.start(host,guest,'photo',true);return;}
   if (cmd.type === 'pair') { void startPair(cmd.kind, cmd.guestId); return; }
   if (cmd.type === 'pairEnd') { pairRequest++; pairInteraction.finish(); return; }
   if (cmd.type === 'speak' || cmd.type === 'play') visitOrchestrator.cancelVisit();

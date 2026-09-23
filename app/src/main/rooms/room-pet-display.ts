@@ -39,7 +39,7 @@ function push(memberId: string, channel: string, payload: unknown): void {
 function pushSnapshot(memberId: string): void {
   const state = memberStates.get(memberId);
   if (!state) return;
-  push(memberId, 'roomPet:hello', { nickname: state.nickname });
+  push(memberId, 'roomPet:hello', { nickname: state.nickname,memberId });
   if (state.character) push(memberId, 'roomPet:character', state.character);
   push(memberId, 'roomPet:state', {
     mode: state.mode,

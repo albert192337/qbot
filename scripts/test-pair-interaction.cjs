@@ -22,6 +22,7 @@ app.whenReady().then(async()=>{try{
   return new Response(await fs.readFile(p),{headers:{'Content-Type':p.endsWith('.webm')?'video/webm':'image/png'}});
  });
  const handlers={
+ 'rooms:getStatus':()=>({phase:'offline'}),'garden:weather':()=>({now:Date.now(),current:null,next:null,today:[],forecast:[]}),
  'garden:get':()=>({plots:[]}),'sign:getMessage':()=>null,'pet:getPerch':()=>null,'pet:perch':()=>({}),
  'behavior:getIdlePlan':()=>null,'settings:get':()=>({voiceEnabled:false,talkFrequency:'quiet',freeMode:true}),
  'progress:get':()=>({points:0,boxes:0,inventory:{},idleMs:0}), 'characters:getActive':()=>active,
@@ -43,6 +44,8 @@ app.whenReady().then(async()=>{try{
  const end=async()=>{win.webContents.send('pet:menuCommand',{type:'pairEnd'});await until(()=>evaluate(`!document.querySelector('#pair-interaction')&&!document.body.classList.contains('pair-returning')&&!document.body.classList.contains('pair-arriving')`),'pair did not stop');};
  await win.loadFile(path.join(root,'app/out/renderer/pet/index.html'));
  await until(()=>evaluate(`document.querySelector('#stage video')?.currentTime>0`),'host playback');
+ await fs.mkdir(path.join(root,'output/garden-v3'),{recursive:true});
+ win.webContents.send('pet:menuCommand',{type:'networkPhoto',guest:{...guest,hasUnfinishedJob:false}});await until(()=>evaluate(`document.querySelector('#pair-interaction')?.dataset.kind==='photo'`),'consented photo did not start');await until(()=>evaluate(`Array.from(document.querySelectorAll('#visitor-stage video')).some(v=>v.currentTime>0)`),'photo partner playback');assert.ok(await evaluate(`document.querySelector('.pair-names').title.includes('双方同意')`));assert.ok(await evaluate(`parseFloat(getComputedStyle(document.querySelector('.pair-effects'),'::after').borderTopWidth)>8`),'photo frame visible at Windows scaling');await wait(250);await fs.writeFile(path.join(root,'output/garden-v3/photo-pair.png'),(await win.webContents.capturePage()).toPNG());await end();
  await start('heart');
  assert.equal(await evaluate(`document.querySelectorAll('.pair-heart').length`),3);
  await until(()=>evaluate(`Array.from(document.querySelectorAll('#visitor-stage video')).some(v=>v.style.visibility==='visible'&&v.currentTime>0)`),'guest playback');
@@ -61,7 +64,7 @@ app.whenReady().then(async()=>{try{
  await until(()=>evaluate(`document.querySelector('#pair-interaction')?.dataset.beat==='1'`),'partner heart response');
  assert.equal(await evaluate(`document.querySelector('#pair-interaction').dataset.guestAction`),'st_heart'); await checkCaption('guest');
  await until(()=>evaluate(`!document.querySelector('#pair-interaction')&&!document.body.classList.contains('pair-returning')&&!document.body.classList.contains('pair-arriving')`),'natural completion');
- assert.equal(win.getBounds().width,360); assert.ok(concealedResizes>0,'natural exit waits for hidden resize');
+ assert.ok(Math.abs(win.getBounds().width-360)<=1,'natural exit restores width within Windows DPI rounding'); assert.ok(concealedResizes>0,'natural exit waits for hidden resize');
  await start('tea');
  await until(()=>evaluate(`document.querySelector('#pair-interaction')?.dataset.beat==='1'`),'tea second beat');
  assert.deepEqual(await evaluate(`(()=>{const p=document.querySelector('#pair-interaction');return [p.dataset.hostAction,p.dataset.guestAction,document.body.classList.contains('flip-host'),document.body.classList.contains('flip-visitor')]})()`),['tea','st_tea',true,true]);

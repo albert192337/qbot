@@ -1,0 +1,11 @@
+.life-card { align-items:stretch; text-align:left; gap:10px; padding:20px; }
+.life-card h3 { margin:0; font-size:17px; }
+.life-card p { line-height:1.6; margin:4px 0; }
+.life-card select { width:100%; min-width:0; padding:10px; border:1px solid #d5ccba; border-radius:12px; background:#fffdf6; color:#594235; }
+.life-card button { white-space:normal; }
+.life-card > .art {height:130px;width:100%;}
+.life-card details { font-size:12px; color:#7e705f; }
+.unlock-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px; }
+.art[data-dye] > img,.art[data-dye] > canvas { filter:sepia(.55) saturate(.85) hue-rotate(var(--dye-hue)); }
+.tabs { flex-wrap:wrap; }
+.life-card:has(select:focus-visible) { outline:2px solid #7fa494;outline-offset:3px; }

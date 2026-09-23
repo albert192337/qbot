@@ -1,4 +1,5 @@
 import type { TravelState, TravelCommand } from './travel';
+import {qualityOf} from './garden-v3';
 /** Garden demo contract. No Electron or existing game dependencies. */
 export const SPECIES = {
     lotus: { name: '莲花', minutes: 60, price: 65, kg: .6, harvests: 1, rarity: 'blue', chance: .5 },
@@ -45,6 +46,40 @@ export const TRAITS = {
     prism: { name: '棱光', category: 'body', tier: 'rainbow', level: 6, chance: .001, multiplier: 4.5 },
     nebula: { name: '星云', category: 'body', tier: 'rainbow', level: 7, chance: .0008, multiplier: 5 },
     halo: { name: '天光冠', category: 'accessory', tier: 'rainbow', level: 8, chance: .0006, multiplier: 5 },
+    sugar: {name:'糖心',category:'body',tier:'blue',level:1,chance:0,multiplier:1.4},
+    fragrant: {name:'清香',category:'body',tier:'blue',level:1,chance:0,multiplier:1.4},
+    juicy: {name:'多汁',category:'body',tier:'blue',level:1,chance:0,multiplier:1.4},
+    nectar: {name:'饱蜜',category:'body',tier:'purple',level:2,chance:0,multiplier:1.8},
+    milky: {name:'奶香',category:'body',tier:'purple',level:2,chance:0,multiplier:1.8},
+    softcore: {name:'糯心',category:'body',tier:'purple',level:3,chance:0,multiplier:1.8},
+    delicate: {name:'玲珑',category:'body',tier:'gold',level:4,chance:0,multiplier:2.8},
+    abundant: {name:'丰穗',category:'body',tier:'gold',level:4,chance:0,multiplier:2.8},
+    starcore: {name:'星瓤',category:'body',tier:'gold',level:5,chance:0,multiplier:3},
+    glassheart: {name:'琉璃心',category:'body',tier:'rainbow',level:7,chance:0,multiplier:5},
+    galaxycore: {name:'星河芯',category:'body',tier:'rainbow',level:8,chance:0,multiplier:5},
+    velvet: {name:'绒霜',category:'body',tier:'blue',level:1,chance:0,multiplier:1.4},
+    celadon: {name:'青瓷',category:'body',tier:'purple',level:2,chance:0,multiplier:1.8},
+    wax: {name:'蜜蜡',category:'body',tier:'purple',level:3,chance:0,multiplier:1.8},
+    pearl: {name:'珠光',category:'body',tier:'purple',level:3,chance:0,multiplier:1.8},
+    nightdye: {name:'夜染',category:'body',tier:'purple',level:3,chance:0,multiplier:1.8},
+    redgold: {name:'赤金',category:'body',tier:'gold',level:4,chance:0,multiplier:3},
+    silver: {name:'秘银',category:'body',tier:'gold',level:5,chance:0,multiplier:3},
+    obsidian: {name:'曜石',category:'body',tier:'gold',level:5,chance:0,multiplier:3},
+    iridescent: {name:'幻彩',category:'body',tier:'rainbow',level:7,chance:0,multiplier:5},
+    daylight: {name:'极昼',category:'body',tier:'rainbow',level:8,chance:0,multiplier:5},
+    mist: {name:'晨雾',category:'accessory',tier:'blue',level:1,chance:0,multiplier:1.4},
+    raindrop: {name:'雨珠',category:'accessory',tier:'blue',level:1,chance:0,multiplier:1.4},
+    leafwhistle: {name:'叶哨',category:'accessory',tier:'blue',level:1,chance:0,multiplier:1.4},
+    flowerknot: {name:'花结',category:'accessory',tier:'purple',level:2,chance:0,multiplier:1.8},
+    butterfly: {name:'蝶舞',category:'accessory',tier:'purple',level:3,chance:0,multiplier:1.8},
+    snowbell: {name:'雪铃',category:'accessory',tier:'purple',level:3,chance:0,multiplier:1.8},
+    glowring: {name:'流萤',category:'accessory',tier:'gold',level:5,chance:0,multiplier:3},
+    goldbell: {name:'金铃',category:'accessory',tier:'gold',level:5,chance:0,multiplier:3},
+    meteorRing: {name:'流星环',category:'accessory',tier:'rainbow',level:7,chance:0,multiplier:5},
+    dreambutterfly: {name:'幻蝶',category:'accessory',tier:'rainbow',level:8,chance:0,multiplier:5},
+    mini: {name:'迷你',category:'body',tier:'blue',level:1,chance:0,multiplier:1},
+    plump: {name:'饱满',category:'body',tier:'purple',level:1,chance:0,multiplier:1},
+    large: {name:'大型',category:'body',tier:'gold',level:1,chance:0,multiplier:1},
 } as const;
 export type Trait = keyof typeof TRAITS;
 export type Tier = 'normal' | 'green' | 'blue' | 'purple' | 'gold' | 'rainbow';
@@ -59,9 +94,15 @@ export const FERTILIZERS = {
     speed3: { name: '高级加速', description: '生长时间减少 80%', effect: 'speed', strength: .8, grade: 3, price: 180, chance: .1 },
     mutation3: { name: '高级变异', description: '每批果实获得最高变异机会', effect: 'mutation', strength: 3, grade: 3, price: 240, chance: .08 },
     weight3: { name: '高级增重', description: '每批果实重量增加 120%', effect: 'weight', strength: 2.2, grade: 3, price: 210, chance: .1 },
+    speed4:{name:'特级加速',description:'本轮剩余时间减少 50%',effect:'speed',strength:.5,grade:4,price:45,chance:.05},
+    mutation4:{name:'特级变异',description:'幼苗变异强度 +1.29',effect:'mutation',strength:1.29,grade:4,price:70,chance:.05},
+    weight4:{name:'特级增重',description:'最终重量倍率 +0.8～1.2',effect:'weight',strength:1.2,grade:4,price:55,chance:.05},
 } as const;
 export type Fertilizer = keyof typeof FERTILIZERS;
 export interface Seed {
+    slots?:import('./garden-v3').GeneSlots;
+    massGene?:Trait;
+    lineage?:import('./garden-v3').Lineage;
     id: string;
     species: Species;
     genes: Trait[];
@@ -72,7 +113,12 @@ export interface Seed {
     ];
 }
 export interface Produce {
-    growthVersion?: 2;
+    dye?: import('./garden-life').Dye;
+    growthVersion?: 2|3;
+    slots?:import('./garden-v3').GeneSlots;
+    lineage?:import('./garden-v3').Lineage;
+    appraised?:boolean;
+    publicQuality?:import('./garden-v3').FactorQuality;
     revealed?: boolean;
     cultivation?: { remainingMs: number; startedAt?: number };
     locked?: boolean;
@@ -85,6 +131,8 @@ export interface Produce {
     bred: boolean;
 }
 export interface Plant extends Produce {
+    legacyLevel?:number;
+    batch?:import('./garden-v3').BatchV3;
     baseTraits?: Trait[];
     harvestsLeft?: number;
     harvestIndex?: number;
@@ -101,6 +149,12 @@ export interface Offer {
     stock: number;
 }
 export interface GardenState {
+    cooperationRewardsLeft?:number;
+    v3?:import('./garden-v3').GardenV3;
+    life?: import('./garden-life').GardenLife;
+    activeActor?: string;
+    online?: boolean;
+    cooperations?: import('./garden-life').CoopTask[];
     journalEvents?: {at:number;actor:string;summary:string}[];
     weatherCheckedAt?: number;
     weatherGuarantees?: Record<string,{end:number;winners:string[];evaluated?:string[]}>;
@@ -122,7 +176,7 @@ export interface GardenState {
         offers: Offer[];
     };
 }
-export type GardenCommand = TravelCommand | { type: 'cultivate' | 'pauseCultivation' | 'revealPlant'; plot: number } | {
+export type GardenCommand = import('./garden-v3').V3Command | import('./garden-life').LifeCommand | TravelCommand | { type: 'cultivate' | 'pauseCultivation' | 'revealPlant'; plot: number } | {
     type: 'buyMany'; items: { offer: string; count: number }[];
 } | { type: 'sellMany'; ids: string[];
 } | { type: 'plantMany'; seed: string;
@@ -144,6 +198,9 @@ export type GardenCommand = TravelCommand | { type: 'cultivate' | 'pauseCultivat
     type: 'breed';
     first: string;
     second: string;
+    oil?:'normal'|'rich';
+    firstGenes?:Trait[];
+    secondGenes?:Trait[];
 } | {
     type: 'sell';
     id: string;
@@ -175,6 +232,12 @@ export type GardenResult = {
     error: string;
 };
 export interface GardenApi {
+    interact(target:string,kind:import('./pair-interaction').PairKind):Promise<void>;
+    answerInteraction(id:string,accept:boolean,response?:'happy'|'heart'|'wave'):Promise<void>;
+    onInteraction(cb:(event:{kind:string;caption:string;effect:string})=>void):()=>void;
+    online(enable: boolean): Promise<void>;
+    visit(owner: string,preview?:boolean,task?:string): Promise<import('./garden-life').GardenVisit>;
+    cooperate(owner: string, plot: number, action: 'join'|'leave'|'claim'|'share'|'invite', target?:string, task?:string): Promise<import('./garden-life').GardenVisit>;
     saveRehearsal(request: import('./travel').RehearsalRequest): Promise<import('./travel').JournalResult<import('./travel').TravelRehearsal>>;
     journalStatus(): Promise<import('./travel').JournalStatus>;
     rewriteDiary(request: import('./travel').DiaryRequest): Promise<import('./travel').JournalResult<import('./travel').TravelDiary>>;
@@ -204,18 +267,21 @@ export const LEVEL_XP = [0, 40, 80, 160, 280, 440, 660, 960] as const;
 export const CULTIVATION_MS = 30_000;
 export const HARVEST_XP = 10;
 export function level(xp: number): number { return Math.max(1, LEVEL_XP.filter(n => xp >= n).length); }
-export const SLOT_NAMES = { fruit: '果实', skin: '果皮', accessory: '挂饰' } as const;
+export const SLOT_NAMES = { fruit: '果实', skin: '果皮', accessory: '挂饰', size:'体型' } as const;
 export function traitSlot(t: Trait): keyof typeof SLOT_NAMES {
+    if ((['giant','mini','plump','large'] as Trait[]).includes(t)) return 'size';
     if (TRAITS[t].category === 'accessory') return 'accessory';
-    return (['giant', 'twin', 'honey', 'nebula'] as Trait[]).includes(t) ? 'fruit' : 'skin';
+    return (['twin', 'honey', 'nebula','sugar','fragrant','juicy','nectar','milky','softcore','delicate','abundant','starcore','glassheart','galaxycore'] as Trait[]).includes(t) ? 'fruit' : 'skin';
 }
-export function fruitQuality(ts: Trait[]): 'normal' | 'purple' | 'gold' | 'rainbow' {
+export function fruitQuality(ts: Trait[],p?:Pick<Produce,'growthVersion'|'traits'|'species'|'kg'|'publicQuality'>): 'normal' | 'blue' | 'purple' | 'gold' | 'rainbow' {
+    if(p?.publicQuality)return p.publicQuality;
+    if(p?.growthVersion===3)return qualityOf(p);
     const t = tier(ts); return t === 'blue' || t === 'green' ? 'normal' : t;
 }
-export function needsReveal(p: Produce): boolean { return p.growthVersion === 2 && !p.revealed && fruitQuality(p.traits) === 'rainbow'; }
-export function canBreed(p: Produce): boolean { return !p.bred && !needsReveal(p) && ['gold','rainbow'].includes(fruitQuality(p.traits)); }
+export function needsReveal(p: Produce): boolean { return (p.growthVersion === 2||p.growthVersion===3) && !p.revealed && fruitQuality(p.traits,p) === 'rainbow'; }
+export function canBreed(p: Produce): boolean { return !p.bred && !p.locked && !needsReveal(p) && ['gold','rainbow'].includes(fruitQuality(p.traits,p)); }
 export function cultivationRemaining(p: Produce, now: number): number {
-    const c = p.cultivation; return c ? Math.max(0, c.remainingMs - (c.startedAt === undefined ? 0 : Math.max(0,now-c.startedAt))) : CULTIVATION_MS;
+    const c = p.cultivation; return c ? Math.max(0, c.remainingMs - (c.startedAt === undefined ? 0 : Math.max(0,now-c.startedAt))) : p.growthVersion===3?600000:CULTIVATION_MS;
 }
 export function mutationMultiplier(ts: Trait[]): number {
     return Math.min(15, 1 + [...new Set(ts)].reduce((sum,t)=>sum+TRAITS[t].multiplier-1,0));

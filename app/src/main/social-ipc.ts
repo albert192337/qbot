@@ -117,8 +117,11 @@ export function registerSocialIpc(steamService: () => Pick<ReturnType<typeof get
   ipcMain.handle('social:removeTest', (_e, id) => Rooms.removeTestGuest(id));
   ipcMain.handle('social:replyTest', (_e, id, text) => Rooms.replyTestGuest(id, text));
   ipcMain.handle('social:interactTest', async (_e, id: string, kind: PairKind) => {
-    const intents = {heart:'heart', tea:'tea', chat:'talk', wave:'wave'} as const;
+    const intents = {heart:'heart', tea:'tea', chat:'talk', wave:'wave',flower:'wave',photo:'happy',relay:'talk',celebrate:'happy'} as const;
     if (!Object.hasOwn(intents, kind)) throw new Error('未知互动');
+    const {CHARACTER_UNLOCKS,currentGrowth,characterLevel}=await import('../shared/garden-life');
+    const unlock=CHARACTER_UNLOCKS.find(u=>u.kind===kind);
+    if(unlock&&characterLevel(currentGrowth(await (await import('./garden/service')).getGarden())?.xp??0)<unlock.level)throw Error(`角色 Lv.${unlock.level} 解锁此互动`);
     const guest = Rooms.getTestGuest(id);
     if (!guest) throw new Error('测试访客不存在');
     const action = choosePairAction(guest.character.manifest, intents[kind]);
@@ -130,6 +133,6 @@ export function registerSocialIpc(steamService: () => Pick<ReturnType<typeof get
       if (hostAction) getPetWindow()?.webContents.send('pet:menuCommand', {type:'play', action:hostAction.id});
     }
     if (!Rooms.getTestGuest(id)) return;
-    Rooms.replyTestGuest(id, ({heart:'小心心收到了！',tea:'好呀，一起喝杯茶。',chat:'嗯嗯，我在听。',wave:'嗨！见到你真好。'})[kind]);
+    Rooms.replyTestGuest(id, ({heart:'小心心收到了！',tea:'好呀，一起喝杯茶。',chat:'嗯嗯，我在听。',wave:'嗨！见到你真好。',flower:'喜欢这朵花！',photo:'一起留下纪念！',relay:'轮到我啦！',celebrate:'一起庆祝！'})[kind]);
   });
 }

@@ -1,6 +1,26 @@
 import './mutation-effects.css';
 import type { Trait } from '../../shared/garden';
 
+// Reuse the painted alpha and sparse vector ornaments; no new bitmap per combination.
+const MATERIALS:Partial<Record<Trait,[string,string]>>={
+    dew:['#bdebe5','#fffdf4'],striped:['#af845a','#fce1a5'],jade:['#79b69a','#ecffed'],crystal:['#c4e8f0','#ffffff'],amber:['#d79341','#ffda82'],prism:['#b1bcf5','#bff2d9'],
+    velvet:['#d9e8e3','#f7f5e9'],celadon:['#8fc6b7','#e1f4de'],wax:['#d99e45','#ffe6a7'],pearl:['#e4c2d8','#f9f9e2'],nightdye:['#584d87','#c0bcf5'],redgold:['#c5784e','#ffe2b0'],silver:['#a7bcc9','#f7faff'],obsidian:['#434b63','#abb9d7'],iridescent:['#9ecfd2','#e6bcea'],daylight:['#fff2b1','#fffdf4'],
+    sugar:['#f6b1b5','#fff1c8'],fragrant:['#c5d79e','#f4efbc'],juicy:['#f1ad84','#ffffff'],honey:['#dfaa57','#ffeab6'],nectar:['#df9746','#ffdc86'],milky:['#f3dfc4','#fffbed'],softcore:['#dfd6b7','#fff9e0'],delicate:['#d7c2eb','#fff4c3'],abundant:['#c3bd74','#fff0a4'],starcore:['#d8b768','#fff8bf'],nebula:['#aa9bd4','#e6bcdf'],glassheart:['#bad9e7','#f9e2ee'],galaxycore:['#9898d8','#d6e2fc'],
+};
+function ornament(trait:Trait,copy:number):HTMLElement {
+    const node=layer(`botanical-accessory ornament-${trait}${copy?' twin-copy':''}`);
+    const bell=['breezy','snowbell','goldbell'].includes(trait),butterfly=['butterfly','dreambutterfly'].includes(trait);
+    const color=trait==='goldbell'?'#e7bb57':trait==='snowbell'?'#c7e3e7':trait==='dreambutterfly'?'#b7a2dc':'#dda9bf';
+    const shape=bell?'<path d="M68 30v11m-8 0q8-13 16 0l4 12H56Z"/><circle cx="68" cy="55" r="3"/>'
+      :butterfly?'<path d="M70 40q-23-25-20-4 1 13 20 7-14 18-2 13l3-12q18 15 18 2 0-9-16-6 18-21 3-18Z"/>'
+      :trait==='leafwhistle'?'<path d="M66 55q-26-32 9-33 10 24-9 33Z"/><path d="m64 60 7-31" fill="none"/>'
+      :trait==='moon'?'<path d="M82 22a19 19 0 1 0 0 35 20 20 0 0 1 0-35Z"/>'
+      :trait==='halo'?'<path d="m27 22 7-14 15 13L63 7l9 15Z"/><circle cx="49" cy="17" r="3" fill="#fff7bf"/>'
+      :'<path d="M50 70q-25-23-21-3 2 13 19 7-4 15 2 12 6 3 3-12 20 6 19-8-3-16-21 4Z"/><circle cx="50" cy="72" r="4" fill="#ffecc3"/>';
+    node.innerHTML=`<svg viewBox="0 0 100 100"><g fill="${color}" stroke="#87715d" stroke-width="1.2" stroke-linejoin="round">${shape}</g></svg>`;
+    return node;
+}
+
 const cracks = 'M0 35L22 29 31 43 50 36 65 51 89 39 100 44M22 29L26 9 18 0M31 43L28 67 43 81 39 100M65 51L61 73 76 88 73 100M89 39L78 18 89 0M28 67L0 79M61 73L100 64';
 const crackImage = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="${cracks}" fill="none" stroke="#429ad1" stroke-width="1.8"/><path d="${cracks}" fill="none" stroke="#e7fbff" stroke-width=".65"/></svg>`)}")`;
 function layer(className: string): HTMLDivElement {
@@ -10,6 +30,7 @@ function layer(className: string): HTMLDivElement {
     return node;
 }
 function particles(host: HTMLElement, kind: string, count: number): void {
+    count=Math.min(count,Math.max(0,8-host.querySelectorAll('.mutation-particles i').length));
     const group = layer(`mutation-particles particles-${kind}`);
     for (let i = 0; i < count; i++) {
         const p = document.createElement('i');
@@ -86,8 +107,12 @@ export function attachMutationEffects(box: HTMLElement, src: string, traits: Tra
             if (t === 'rainbow') for (const region of ['a','b','c']) effect.append(layer(`prism-region prism-${region}`));
             surface.append(effect);
         }
+        for(const t of traits){const material=MATERIALS[t];if(!material)continue;
+            const effect=layer(`surface-life surface-life-${t}`);effect.style.setProperty('--material-a',material[0]);effect.style.setProperty('--material-b',material[1]);surface.append(effect);
+        }
         if (surface.childElementCount) box.append(surface);
         for (const t of ['punk', 'classical'] as const) if (traits.includes(t)) box.append(accessory(t, copy));
+        for(const t of ['breezy','snowbell','goldbell','butterfly','dreambutterfly','leafwhistle','moon','halo','flowerknot'] as const)if(traits.includes(t))box.append(ornament(t,copy));
     }
     if (traits.includes('frost')) {
         box.append(layer('frost-mist'));
@@ -109,5 +134,10 @@ export function attachMutationEffects(box: HTMLElement, src: string, traits: Tra
     if (traits.includes('firefly')) particles(box, 'firefly', 5);
     if (traits.includes('petals')) particles(box, 'petal', 7);
     if (traits.includes('classical')) particles(box, 'note', 3);
+    if(traits.includes('mist'))box.append(layer('frost-mist'));
+    if(traits.includes('raindrop'))particles(box,'droplet',3);
+    if(traits.includes('stardust'))particles(box,'star',4);
+    if(traits.includes('glowring')){particles(box,'firefly',5);box.append(layer('life-orbit orbit-glow'));}
+    if(traits.includes('meteorRing')){particles(box,'star',3);box.append(layer('life-orbit orbit-meteor'));}
     watch(box);
 }

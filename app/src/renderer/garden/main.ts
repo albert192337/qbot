@@ -1,4 +1,5 @@
 import { renderWeatherCard, updateWeatherCountdown } from './weather-card';
+import {renderDaily,renderSprays,renderFeeding,renderFriends,renderVisit,applyDye,inviteGardenFriend} from './life';
 import type { GardenWeatherStatus } from '../../shared/garden-weather';
 import { renderTravel, celebrateTravel } from './travel';
 import './style.css';
@@ -10,7 +11,13 @@ import { botanicalArt } from './botanical-art';
 import { attachMutationEffects } from './mutation-effects';
 import { supplyArt } from './supply-art';
 import { mountStrawberry3D } from './strawberry-3d.js';
+import { mountPineapple3D } from './pineapple-3d.js';
+import { supportsGarden3D } from '../../shared/garden-render';
 import { SPECIES, TRAITS, FERTILIZERS, TIER_NAMES, LEVEL_XP, CULTIVATION_MS, fruitQuality, traitSlot, SLOT_NAMES, canBreed, needsReveal, cultivationRemaining, mutationMultiplier, gardenQuest, tier, level, growth, growthLabel, type Species, type Trait, type Plant, type Produce, type GardenState, type GardenCommand, type GardenReveal, type Seed } from '../../shared/garden';
+import { traitSource } from '../../shared/garden-life';
+import {renderFactorChoice,renderAppraisal,renderProvenance,renderV3Breeding,renderNotebook,renderV3Weather} from './v3';
+import {V3_XP,AFFINITIES,speciesLevel,fertilizerDescription,scoreOf} from '../../shared/garden-v3';
+import './v3.css';
 const sprout = new URL('./assets/sprout.png', import.meta.url).href;
 const api = window.qbot.garden;
 const root = document.querySelector<HTMLElement>('#app')!;
@@ -24,12 +31,12 @@ function setRenderMode(settings: {gardenRenderMode?: string}): void {
 window.qbot.settings.onChanged(setRenderMode);
 void window.qbot.settings.get().then(setRenderMode).catch(()=>{});
 let page = new URLSearchParams(location.search).get('view') ?? 'bag';
-let weatherStatus:GardenWeatherStatus|undefined,weatherReceivedAt=0,weatherFetching=false;
+let weatherStatus:GardenWeatherStatus|undefined,weatherReceivedAt=0,weatherFetching=false,v3WeatherHour=-1;
 function showWeather(status:GardenWeatherStatus):void {
  renderWeatherCard(root,status);
  if(new URLSearchParams(location.search).get('view')!=='weather')root.prepend(button('← 返回花园',()=>go('plots'),'weather-back'));
 }
-async function refreshWeather(){if(weatherFetching||page!=='weather')return;weatherFetching=true;try{weatherStatus=await api.weather();weatherReceivedAt=Date.now();if(page==='weather')showWeather(weatherStatus);}catch{if(page==='weather')root.textContent='天气暂时无法读取，稍后自动重试。';}finally{weatherFetching=false;}}
+async function refreshWeather(){if(state?.v3||weatherFetching||page!=='weather')return;weatherFetching=true;try{weatherStatus=await api.weather();weatherReceivedAt=Date.now();if(page==='weather'&&!state?.v3)showWeather(weatherStatus);}catch{if(page==='weather'&&!state?.v3)root.textContent='天气暂时无法读取，稍后自动重试。';}finally{weatherFetching=false;}}
 let state: GardenState | undefined, busy = false, fetching = false, signature = '', parentId: string | null = null;
 let buyMode = false, sellMode = false;
 const buySelection = new Map<string, number>();
@@ -64,7 +71,7 @@ function tags(ts: Trait[]): HTMLElement {
     const row = el('div', undefined, 'tags');
     if (!ts.length)
         row.append(el('span', '原生', 'tag normal'));
-    for (const category of ['fruit', 'skin', 'accessory'] as const) {
+    for (const category of ['fruit', 'skin', 'accessory','size'] as const) {
         const group = ts.filter(t => traitSlot(t) === category);
         if (!group.length) continue;
         const line = el('div', undefined, 'trait-group');
@@ -101,24 +108,30 @@ function art(sp: Species, ts: Trait[] = [], ratio = 1, mode: 'fruit'|'plant'|'se
     }
     attachMutationEffects(box, img.src, shown);
     if(render3d&&sp==='strawberry')mountStrawberry3D(box,{mode,ratio,traits:shown,regrowing});
+    if(render3d&&sp==='pineapple')mountPineapple3D(box,{mode,ratio,traits:shown});
     return box;
 }
 function plantArt(p: Plant): HTMLElement {
     if (needsReveal(p) && p.readyAt <= Date.now()) return el('div', '？', 'art mystery-fruit');
-    return art(p.species, needsReveal(p)?[]:p.traits, growth(p), 'plant', !!p.harvestIndex, needsReveal(p)?[]:p.baseTraits);
+    return applyDye(art(p.species, needsReveal(p)?[]:p.traits, growth(p), 'plant', !!p.harvestIndex, needsReveal(p)?[]:p.baseTraits),p);
 }
-function qualityBadge(p: Produce): HTMLElement { const q=fruitQuality(p.traits);return el('span',TIER_NAMES[q]+'果实','tag '+q); }
+function qualityBadge(p: Produce): HTMLElement { const q=fruitQuality(p.traits,p);return el('span',TIER_NAMES[q]+'果实','tag '+q); }
 function plantActions(host:HTMLElement,p:Plant,index:number):void {
+    if(renderFactorChoice(host,p,act))return;
     host.append(qualityBadge(p));
     if (needsReveal(p)) {
+        host.append(tags(p.traits));
+        if(state?.online)host.append(button('邀请好友培育',()=>{void inviteGardenFriend(state!.life!.owner,index,notice).catch(e=>notice(String(e)));}));
+        if(state?.online){host.append(el('p',`大家一起培育会更快，好奖励的概率也更高。今日还可领取 ${state.cooperationRewardsLeft??5} 次物资${state.cooperationRewardsLeft===0?'；仍可加速和留共同记录':''}。`),button('开始 / 继续单人培育',()=>void act({type:'cultivate',plot:index}),'primary'),button('暂停培育',()=>void act({type:'pauseCultivation',plot:index})),button('查看共同培育',()=>go('visit:'+state!.life!.owner)),button('分享到世界',()=>{void api.cooperate(state!.life!.owner,index,'share').then(()=>notice('已分享到世界频道')).catch(e=>notice(String(e)));}));return;}
         host.append(el('p','彩色惊喜尚未揭晓 · 陪它完成培育','muted'));
-        const progress=el('progress');progress.max=CULTIVATION_MS;progress.value=CULTIVATION_MS-cultivationRemaining(p,Date.now());progress.dataset.cultivation=p.id;host.append(progress);
+        const progress=el('progress');progress.max=p.growthVersion===3?600000:CULTIVATION_MS;progress.value=progress.max-cultivationRemaining(p,Date.now());progress.dataset.cultivation=p.id;host.append(progress);
         const label=el('small',Math.ceil(cultivationRemaining(p,Date.now())/1000)+' 秒');label.dataset.cultivationLabel=p.id;host.append(label);
         const active=p.cultivation?.startedAt!==undefined;
-        host.append(button(active?'暂停培育':p.cultivation?'继续培育':'陪伴培育 · 30 秒',()=>void act({type:active?'pauseCultivation':'cultivate',plot:index}),'primary'));
+        host.append(button(active?'暂停培育':p.cultivation?'继续培育':p.growthVersion===3?'陪伴培育 · 10 分钟':'陪伴培育 · 30 秒',()=>void act({type:active?'pauseCultivation':'cultivate',plot:index}),'primary'));
     } else {
         host.append(tags(p.traits),el('small',p.kg.toFixed(3)+' kg · ◉ '+p.value,'muted'),button('收获 ✦',()=>void act({type:'harvest',plot:index}),'primary'),button(p.bred?'已经繁育过':'与背包果实繁育 ♡',()=>{parentId=p.id;render();},'',!canBreed(p)));
         if (!canBreed(p)&&!p.bred) host.append(el('small','金色及以上品质可以繁育','muted'));
+        renderProvenance(host,p);renderAppraisal(host,p,state!,act);
     }
 }
 function breedingCandidates(): Produce[] {
@@ -126,10 +139,10 @@ function breedingCandidates(): Produce[] {
     return allParents().filter(p=>p.id!==parentId&&(inPlot?state!.produce.some(x=>x.id===p.id):state!.plots.some(x=>x?.id===p.id)));
 }
 function go(next: string): void { document.querySelectorAll('.result-popup').forEach(n=>n.remove()); page = next; parentId = null; buyMode = sellMode = false; buySelection.clear(); sellSelection.clear(); render(); }
-function allParents(): Produce[] { return [...state!.produce, ...state!.plots.filter((p): p is Plant => !!p && p.readyAt <= Date.now())].filter(canBreed); }
+function allParents(): Produce[] { return [...state!.produce, ...state!.plots.filter((p): p is Plant => !!p && p.readyAt <= Date.now())].filter(p=>canBreed(p)&&!('batch'in p&&(p as Plant).batch?.candidates.length)&&(!state!.v3?.appraisals[p.id]||state!.v3.appraisals[p.id].done)); }
 async function act(command: GardenCommand): Promise<void> {
-    if(render3d&&(command.type==='plant'||command.type==='plantMany')&&state?.seeds.find(s=>s.id===command.seed)?.species!=='strawberry'){
-        notice('3D 模式先支持草莓；其他植物可切回 2D 后播种。');return;
+    if(render3d&&(command.type==='plant'||command.type==='plantMany')&&!supportsGarden3D(state?.seeds.find(s=>s.id===command.seed)?.species)){
+        notice('3D 模式支持草莓和菠萝；其他植物可切回 2D 后播种。');return;
     }
     if (busy)
         return;
@@ -221,7 +234,7 @@ function renderStrip(): void {
             b.append(el('span', '+', 'empty-plot'));
             if(render3d){const soil=el('div',undefined,'art soil-3d');mountStrawberry3D(soil,{mode:'soil'});b.prepend(soil);}
         }
-        b.classList.toggle('plot-3d',render3d&&(!p||p.species==='strawberry'));
+        b.classList.toggle('plot-3d',render3d&&(!p||supportsGarden3D(p.species)));
         const mark = el('span', undefined, 'plot-mark');
         mark.innerHTML = gardenIcon('ready'); mark.setAttribute('aria-hidden', 'true');
         b.append(el('span', undefined, 'soil'), mark);
@@ -273,6 +286,7 @@ function renderQuickMenu(): void {
         list.append(button('收好', closeQuick, 'primary'));
     } else if (parentId) {
         const candidates = breedingCandidates();
+        if(state.v3)list.append(button('查看概率、精油与完整配对',()=>api.open('bag')));
         for (const candidate of candidates) {
             const where = state.produce.some(x => x.id === candidate.id) ? '背包' : '土地';
             const row = button('', () => void act({ type: 'breed', first: parentId!, second: candidate.id }), 'quick-row');
@@ -287,7 +301,7 @@ function renderQuickMenu(): void {
         list.append(button('播种', () => { harvestedParent = null; render(); }, 'primary'));
     } else if (!p) {
         list.append(button('批量播种', () => api.open('sow'), 'primary'));
-        for (const { seed, count } of groupSeeds(state.seeds.filter(s=>!render3d||s.species==='strawberry'))) {
+        for (const { seed, count } of groupSeeds(state.seeds.filter(s=>!render3d||supportsGarden3D(s.species)))) {
             const row = button('', () => void act({ type: 'plant', plot: index, seed: seed.id }), 'quick-row');
             row.append(supplyArt('seed', seed.species), el('strong', `${SPECIES[seed.species].name} ×${count}`));
             if (seed.genes.length) row.append(tags(seed.genes));
@@ -299,11 +313,11 @@ function renderQuickMenu(): void {
     } else {
         const status = el('small'); status.dataset.ready = String(p.readyAt); list.append(status);
         for (const f of Object.keys(FERTILIZERS) as (keyof typeof FERTILIZERS)[]) {
-            const used = p.fertilizers.length > 0;
+            const used = p.fertilizers.length > 0 || !!p.batch?.settled;
             if (!state.fertilizers[f]) continue;
             const row = button('', () => void act({ type: 'fertilize', plot: index, fertilizer: f }), 'quick-row', used || !state.fertilizers[f]);
             row.append(supplyArt('fertilizer', f), el('strong', `${FERTILIZERS[f].name.replace('肥料','')} ×${state.fertilizers[f]}`), ...(used ? [el('small','✓')] : []));
-            row.title = FERTILIZERS[f].description;
+            row.title = state.v3?fertilizerDescription(f):FERTILIZERS[f].description;
             list.append(row);
         }
         list.append(button('测试：立即成熟', () => void act({ type: 'mature' }), 'test-button'));
@@ -332,6 +346,7 @@ function positionQuick(): void {
 }
 function render(): void {
     document.body.classList.toggle('weather-mode',page==='weather');
+    if(page==='weather'&&state?.v3){v3WeatherHour=Math.floor(Date.now()/3600000);root.replaceChildren();renderV3Weather(root,state,()=>go('plots'));return;}
     if(page==='weather'){if(weatherStatus)showWeather(weatherStatus);else root.textContent='正在读取天气…';void refreshWeather();return;}
     document.body.classList.toggle('travel-mode', !strip && (page === 'travel' || page === 'moments'));
     if (!state) {
@@ -350,23 +365,32 @@ function render(): void {
     }
     const head = el('header');
     const title = el('div');
-    title.append(el('div', '种一点期待', 'eyebrow'), el('h1', '小小花园'), el('p', '收获 +10 经验 · 每级生长时间缩短 3% · 最高 8 级', 'subtitle'));
+    title.append(el('div', '种一点期待', 'eyebrow'), el('h1', '小小花园'), el('p', state.v3?'种出喜欢的模样 · 植物十级成长 · 成熟后安心等你回来':'植物收获 +10 经验 · 植物最高 8 级 · 角色通过投喂成长', 'subtitle'));
     const money = el('div', undefined, 'wallet');
     money.append(el('small', '花园币'), el('strong', `◉ ${state.coins.toLocaleString()}`));
-    const display=button(render3d?'3D 草莓 · 切回 2D':'2D 手绘 · 试试 3D',()=>{
+    const display=button(render3d?'3D 种植 · 切回 2D':'2D 手绘 · 试试 3D',()=>{
         void window.qbot.settings.set({gardenRenderMode:render3d?'2d':'3d'}).catch(()=>notice('画面切换失败，请重试'));
     },'garden-render-toggle');
     display.setAttribute('aria-label','切换种植画面');
     head.append(title,display,money);
     const nav = el('nav', undefined, 'tabs');
-    for (const [id, name] of [['plots', '我的土地'], ['bag', '背包'], ['shop', '限时商店'], ['book', '植物图鉴']]) {
+    for (const [id, name] of [['plots', '我的土地'], ['bag', '背包'], ['shop', '种植补给'], ['book', '植物图鉴']]) {
         const tab = button('', () => go(id), page === id || (id === 'plots' && page.startsWith('plot:')) ? 'active' : '');
         tab.innerHTML = gardenIcon(id === 'plots' ? 'ready' : id as 'bag'|'shop'|'book');
         tab.append(el('span', name)); nav.append(tab);
     }
     nav.append(button('天气',()=>go('weather')),button('世界旅行',()=>go('travel')),button('朋友圈',()=>go('moments')));
+    nav.append(button('今日小店',()=>go('daily')),button('喷雾',()=>go('sprays')),button('食物心愿',()=>go('feeding')),button('朋友花园',()=>go('friends')));
+    if(state.v3)nav.append(button('花园手册',()=>go('notebook')));
     const content = el('section', undefined, `content page-${page.split(':')[0]}`);
-    if (page === 'shop')
+    const lifeContext={state,act,go,refresh:()=>refresh(true),notice,busy,plantArt};
+    if(page==='notebook'&&state.v3)renderNotebook(content,state,act,go);
+    else if(page==='daily')renderDaily(content,lifeContext);
+    else if(page==='sprays')renderSprays(content,lifeContext);
+    else if(page==='feeding')renderFeeding(content,lifeContext);
+    else if(page==='friends')renderFriends(content,lifeContext);
+    else if(page.startsWith('visit:'))renderVisit(content,lifeContext,page.slice(6));
+    else if (page === 'shop')
         renderShop(content);
     else if (page === 'sow')
         renderSowing(content);
@@ -377,7 +401,8 @@ function render(): void {
     else
         renderBag(content);
     const foot = el('footer');
-    foot.append(el('span', 'DEMO · 离线继续生长 · 成熟不枯萎'), button('测试：立即成熟', () => void act({ type: 'mature' }), 'test-button'));
+    foot.append(el('span', state.online?'联机花园 · 由服务器保存':'本地花园 · 离线继续生长 · 成熟不枯萎'));
+    if(!state.online)foot.append(button('测试：立即成熟', () => void act({ type: 'mature' }), 'test-button'));
     root.replaceChildren(head, questPill(), nav, content, foot);
     if (parentId)
         breeding(content);
@@ -391,7 +416,7 @@ function seedCard(seed: Seed, plot?: number, count = 1): HTMLElement {
         if (seed.parents)
             card.append(el('small', seed.parents.map(x => SPECIES[x].name).join(' × ')));
     }
-    if(render3d&&seed.species!=='strawberry'){card.append(el('small','切回 2D 后可播种','muted'));return card;}
+    if(render3d&&!supportsGarden3D(seed.species)){card.append(el('small','切回 2D 后可播种','muted'));return card;}
     if (plot !== undefined)
         card.append(button('种在这里', () => void act({ type: 'plant', plot, seed: seed.id }), 'primary'));
     const countToPlant = Math.min(count, state!.plots.filter(p=>!p).length);
@@ -418,7 +443,7 @@ function renderPlots(host: HTMLElement): void {
     const index = page.startsWith('plot:') ? Number(page.split(':')[1]) : 0;
     const p = state!.plots[index];
     if (!p) {
-        host.append(el('h2', `给 ${index + 1} 号土地选一粒种子`), el('p', '每株只施肥一次，覆盖全部采摘。', 'muted'));
+        host.append(el('h2', `给 ${index + 1} 号土地选一粒种子`), el('p', state!.v3?'每轮幼苗期可施肥一次，再生后重新选择。':'每株只施肥一次，覆盖全部采摘。', 'muted'));
         const grid = el('div', undefined, 'grid');
         groupSeeds(state!.seeds).forEach(({ seed, count }) => grid.append(seedCard(seed, index, count)));
         host.append(grid);
@@ -442,11 +467,12 @@ function renderPlots(host: HTMLElement): void {
         plantActions(info,p,index);
     }
     else {
+        renderFactorChoice(info,p,act);
         info.append(el('p', '临近成熟时，稀有植株会泛起光芒。', 'muted'));
         for (const f of Object.keys(FERTILIZERS) as (keyof typeof FERTILIZERS)[]) {
-            const used = p.fertilizers.length > 0;
+            const used = p.fertilizers.length > 0 || !!p.batch?.settled;
             if (!state!.fertilizers[f]) continue;
-            info.append(button(`${FERTILIZERS[f].name} · ${used ? '已使用' : `剩 ${state!.fertilizers[f]}`} — ${FERTILIZERS[f].description}`, () => void act({ type: 'fertilize', plot: index, fertilizer: f }), 'fert-button', used || !state!.fertilizers[f]));
+            info.append(button(`${FERTILIZERS[f].name} · ${used ? '本轮不能施肥' : `剩 ${state!.fertilizers[f]}`} — ${state!.v3?fertilizerDescription(f):FERTILIZERS[f].description}`, () => void act({ type: 'fertilize', plot: index, fertilizer: f }), 'fert-button', used || !state!.fertilizers[f]));
         }
     }
     detail.append(img, info);
@@ -461,7 +487,8 @@ function renderBag(host: HTMLElement): void {
     const grid = el('div', undefined, 'grid');
     for (const p of state!.produce) {
         const card = el('article', undefined, `card produce-card border-${tier(p.traits)}${sellSelection.has(p.id)?' selected':''}`);
-        card.append(art(p.species,p.traits),el('h3',SPECIES[p.species].name),qualityBadge(p),tags(p.traits),el('p',`${p.kg.toFixed(3)} kg · ◉ ${p.value}`));
+        card.append(applyDye(art(p.species,p.traits),p),el('h3',SPECIES[p.species].name),qualityBadge(p),tags(p.traits),el('p',`${p.kg.toFixed(3)} kg · ◉ ${p.value}`));
+        renderProvenance(card,p);renderAppraisal(card,p,state!,act);
         card.append(button(p.locked?'★ 已收藏':'☆ 收藏',()=>void act({type:'lock',id:p.id}), 'collection'));
         if (sellMode) card.append(button(sellSelection.has(p.id)?'✓ 已选':'选择',()=>{sellSelection.has(p.id)?sellSelection.delete(p.id):sellSelection.add(p.id);render();},'select-check',!!p.locked));
         else card.append(button('繁育 ♡',()=>{parentId=p.id;render();},'',!canBreed(p)),button(`出售 · ${p.value}`,()=>void act({type:'sell',id:p.id}),'',!!p.locked));
@@ -469,6 +496,7 @@ function renderBag(host: HTMLElement): void {
     }
     if (!state!.produce.length) grid.append(el('p','还没有收获','empty'));
     host.append(grid);
+    host.append(button('用喷雾换个模样',()=>go('sprays')),button('去投喂角色',()=>go('feeding')));
     if (sellMode) {
         const total = state!.produce.filter(p=>sellSelection.has(p.id)).reduce((v,p)=>v+p.value,0);
         const bar = el('div',undefined,'batch-bar');
@@ -481,7 +509,7 @@ function renderBag(host: HTMLElement): void {
     const fertilizers=el('div',undefined,'grid');
     for (const f of Object.keys(FERTILIZERS) as (keyof typeof FERTILIZERS)[]) {
         if (!state!.fertilizers[f]) continue;
-        const c=el('article',undefined,'card');c.append(fertilizerArt(f),el('h3',`${FERTILIZERS[f].name} ×${state!.fertilizers[f]}`),el('small',FERTILIZERS[f].description));fertilizers.append(c);
+        const c=el('article',undefined,'card');c.append(fertilizerArt(f),el('h3',`${FERTILIZERS[f].name} ×${state!.fertilizers[f]}`),el('small',state!.v3?fertilizerDescription(f):FERTILIZERS[f].description));fertilizers.append(c);
     }
     host.append(fertilizers);
 }
@@ -498,7 +526,7 @@ function renderShop(host: HTMLElement): void {
     host.append(banner);
     const grid=el('div',undefined,'grid shop-grid');
     for (const o of state!.shop.offers) {
-        const quality=o.kind==='seed'?SPECIES[o.item as Species].rarity: FERTILIZERS[o.item as keyof typeof FERTILIZERS].grade===3?'gold':FERTILIZERS[o.item as keyof typeof FERTILIZERS].grade===2?'blue':'normal';
+        const quality=o.kind==='seed'?SPECIES[o.item as Species].rarity: FERTILIZERS[o.item as keyof typeof FERTILIZERS].grade===4?'rainbow':FERTILIZERS[o.item as keyof typeof FERTILIZERS].grade===3?'gold':FERTILIZERS[o.item as keyof typeof FERTILIZERS].grade===2?'blue':'normal';
         const card=el('article',undefined,`card shop-card border-${quality}${buySelection.has(o.id)?' selected':''}${!o.stock?' sold-out':''}`);
         const name=o.kind==='seed'?SPECIES[o.item as Species].name:FERTILIZERS[o.item as keyof typeof FERTILIZERS].name;
         card.append(o.kind==='seed'?art(o.item as Species,[],1,'seed'):fertilizerArt(o.item),el('h3',name),el('span',TIER_NAMES[quality],`tag ${quality}`),el('small',o.stock?`剩余 ${o.stock}`:'缺货','stock'));
@@ -512,7 +540,7 @@ function renderShop(host: HTMLElement): void {
             }
             card.append(el('span',`◉ ${o.price}`,'unit-price'));
         } else card.append(button(o.stock?`◉ ${o.price}`:'缺货',()=>void act({type:'buy',offer:o.id}),'buy-price',!o.stock||state!.coins<o.price));
-        if (o.kind==='fertilizer') card.title=FERTILIZERS[o.item as keyof typeof FERTILIZERS].description;
+        if (o.kind==='fertilizer') card.title=state!.v3?fertilizerDescription(o.item as keyof typeof FERTILIZERS):FERTILIZERS[o.item as keyof typeof FERTILIZERS].description;
         grid.append(card);
     }
     host.append(grid);
@@ -527,28 +555,29 @@ function renderBook(host: HTMLElement): void {
     for (const sp of Object.keys(SPECIES) as Species[])
         selector.append(button(SPECIES[sp].name, () => { selectedSpecies = sp; render(); }, selectedSpecies === sp ? 'active' : ''));
     host.append(selector);
-    const sp = selectedSpecies, lv = level(state!.xp[sp]);
+    const sp = selectedSpecies, lv = state!.v3?speciesLevel(state!.xp[sp]):level(state!.xp[sp]), thresholds=state!.v3?V3_XP:LEVEL_XP;
     const heading = el('div', undefined, 'book-heading');
-    heading.append(art(sp), el('h2', `${SPECIES[sp].name} · Lv.${lv}`), el('p', `${state!.xp[sp]} 经验${lv < LEVEL_XP.length ? ` / 下一级 ${LEVEL_XP[lv]}` : ' · 已达最高等级'}`));
-    const xpbar=el('progress');xpbar.max=lv<8?LEVEL_XP[lv]-LEVEL_XP[lv-1]:1;xpbar.value=lv<8?state!.xp[sp]-LEVEL_XP[lv-1]:1;
+    heading.append(art(sp), el('h2', `${SPECIES[sp].name} · Lv.${lv}`), el('p', `${state!.xp[sp]} 经验${lv < thresholds.length ? ` / 下一级 ${thresholds[lv]}` : ' · 已达最高等级'}`));
+    const xpbar=el('progress');xpbar.max=lv<thresholds.length?thresholds[lv]-thresholds[lv-1]:1;xpbar.value=lv<thresholds.length?state!.xp[sp]-thresholds[lv-1]:1;
     heading.append(xpbar);
-    const nextFactors=Object.values(TRAITS).filter(t=>t.level===lv+1).map(t=>t.name);
+    const nextFactors=Object.entries(TRAITS).filter(([id,t])=>t.level===lv+1&&(!state!.v3||AFFINITIES[sp].includes(id as Trait))).map(([,t])=>t.name);
     if(nextFactors.length)heading.append(el('small','下一级解锁：'+nextFactors.join('、'),'muted'));
     host.append(heading);
-    host.append(el('p', '每次收获 +10 经验；首次图鉴奖励另加 20 经验和积分。每级生长时间缩短 3%、天气因子概率提高 6%；升级解锁新因子。', 'muted'));
+    host.append(el('p', state!.v3?'长作物收获经验更多，每物种每日首次 +8，收获经验每天最多60。每级新批次生长缩短1%，亲和因子概率随等级提升；图鉴首次发现另有奖励。':'每次收获 +10 经验；首次图鉴奖励另加 20 经验和积分。每级生长时间缩短 3%、天气因子概率提高 6%；升级解锁新因子。', 'muted'));
     const grid = el('div', undefined, 'factor-grid');
     for (const t of ['base', ...Object.keys(TRAITS)] as ('base' | Trait)[]) {
         const key = `${sp}:${t}`, unlocked = state!.discovered.includes(key), required = t === 'base' ? 1 : TRAITS[t].level;
         const card = el('article', undefined, `factor ${unlocked ? 'unlocked' : ''}`);
         card.append(art(sp, t === 'base' ? [] : [t]), el('strong', t === 'base' ? '原生' : TRAITS[t].name, t === 'base'?'tag normal':`tag ${TRAITS[t].tier}`), el('span', unlocked ? (state!.claimed.includes(key) ? '✓ 已领取' : '+20 待领取') : lv < required ? `Lv.${required} 开放` : '尚未发现'));
         if (t !== 'base')
-            card.append(el('small', `${SLOT_NAMES[traitSlot(t)]} · ${TIER_NAMES[TRAITS[t].tier]}`));
+            card.append(el('small', `${SLOT_NAMES[traitSlot(t)]} · ${TIER_NAMES[TRAITS[t].tier]}`),el('small',traitSource(t),'muted'));
         grid.append(card);
     }
     const count = state!.discovered.filter(k => !state!.claimed.includes(k)).length;
-    host.append(grid, button(`一键领取本次积分 · ${count * 20}`, () => void act({ type: 'claim' }), 'primary claim', count === 0));
+    host.append(grid, button(`一键领取${state!.online?'花园币':'本次积分'} · ${count * 20}`, () => void act({ type: 'claim' }), 'primary claim', count === 0));
 }
 function breeding(host: HTMLElement): void {
+    if(state!.v3){const parent=allParents().find(p=>p.id===parentId);if(parent)renderV3Breeding(host,state!,parent,breedingCandidates(),act,()=>{parentId=null;render();},p=>art(p.species,p.traits));return;}
     const drawer = el('aside', undefined, 'breed-drawer');
     drawer.append(button('× 取消', () => { parentId = null; render(); }, 'close-drawer'), el('h2', '选另一株亲本'), el('p', '可以跨物种。子代随一方，每个词条 50% 概率继承；亲本保留但各消耗一次繁育资格。', 'muted'));
     const candidates = breedingCandidates();
@@ -582,7 +611,7 @@ function resultContents(body: HTMLElement, r: GardenReveal): void {
         body.classList.add('harvest-reveal', `quality-${tier(p.traits)}`);
         body.append(art(p.species, p.traits), el('strong', SPECIES[p.species].name), tags(p.traits), el('div', `${p.kg.toFixed(3)} kg · ◉ ${p.value}`, 'result-stats'));
         body.querySelectorAll<HTMLElement>('.tag').forEach((tag, i) => tag.style.setProperty('--reveal-i', String(i)));
-        if (p.traits.length) body.append(el('div', `${p.traits.length} 重变异 · 词条售价 ×${(p.growthVersion===2?mutationMultiplier(p.traits):p.traits.reduce((m,t)=>m*TRAITS[t].multiplier,1)).toFixed(2)}`, 'harvest-multiplier'));
+        if (p.traits.length) body.append(el('div', p.growthVersion===3?`综合 ${scoreOf(p).toFixed(1)} 分 · ${TIER_NAMES[fruitQuality(p.traits,p)]}品质`:`${p.traits.length} 重变异 · 词条售价 ×${(p.growthVersion===2?mutationMultiplier(p.traits):p.traits.reduce((m,t)=>m*TRAITS[t].multiplier,1)).toFixed(2)}`, 'harvest-multiplier'));
     }
     if (r.seed) {
         body.append(art(r.seed.species, r.seed.genes, 1, 'seed'), el('strong', `${SPECIES[r.seed.species].name} · 繁育种子 ×1`), tags(r.seed.genes), el('small', '重量待成熟后揭晓'));
@@ -621,7 +650,7 @@ function tick(allowRender = true): void {
             const center = Math.max(width / 2, Math.min(e.offsetLeft + e.clientWidth / 2, side.clientWidth - width / 2));
             a.style.width = `${width}px`;
             a.style.left = `${center - e.offsetLeft}px`;
-            if(render3d&&p.species==='strawberry'){
+            if(render3d&&(p.species==='strawberry'||(p.species==='pineapple'&&ratio>=.8))){
                 a.style.width=`${p.traits.includes('giant')?150:112}px`;
                 a.style.height=`${p.traits.includes('giant')?172:135}px`;
                 a.style.left='50%';
@@ -631,7 +660,7 @@ function tick(allowRender = true): void {
     document.querySelectorAll<HTMLElement>('[data-ready]').forEach(e => e.textContent = Number(e.dataset.ready) <= now ? '成熟了！' : `距离成熟 ${time(Number(e.dataset.ready) - now)}`);
     document.querySelectorAll<HTMLProgressElement>('[data-growth]').forEach(e => { const p = state!.plots.find(p => p?.id === e.dataset.growth); if (p)
         e.value = growth(p); });
-    document.querySelectorAll<HTMLProgressElement>('[data-cultivation]').forEach(e=>{const p=state!.plots.find(p=>p?.id===e.dataset.cultivation);if(p)e.value=CULTIVATION_MS-cultivationRemaining(p,now);});
+    document.querySelectorAll<HTMLProgressElement>('[data-cultivation]').forEach(e=>{const p=state!.plots.find(p=>p?.id===e.dataset.cultivation);if(p)e.value=e.max-cultivationRemaining(p,now);});
     document.querySelectorAll<HTMLElement>('[data-cultivation-label]').forEach(e=>{const p=state!.plots.find(p=>p?.id===e.dataset.cultivationLabel);if(p)e.textContent=(p.cultivation?.startedAt!==undefined?'正在培育 · ':'待培育 · ')+Math.ceil(cultivationRemaining(p,now)/1000)+' 秒';});
     const clock = document.querySelector('#refresh-clock');
     if (strip) { positionQuick(); positionQuest(); }
@@ -669,9 +698,10 @@ function syncStripMouse(): void {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(true); else if (strip) closeQuick(); });
 setInterval(() => { if (!document.hidden) {
+    if(page==='weather'&&state?.v3){if(v3WeatherHour!==Math.floor(Date.now()/3600000))void refresh(true);return;}
     if(page==='weather'){if(weatherStatus){updateWeatherCountdown(root,weatherStatus,weatherStatus.now+Date.now()-weatherReceivedAt);}if(Date.now()-weatherReceivedAt>=5000)void refreshWeather();return;}
     tick();
-    if (state && (Date.now() >= state.shop.refreshAt || state.plots.some(p=>p?.cultivation?.startedAt!==undefined)))
+    if (state && !page.startsWith('visit:') && (Date.now() >= state.shop.refreshAt || state.plots.some(p=>p?.batch&&!p.batch.settled&&Date.now()>=p.batch.seedlingEnd) || state.plots.some(p=>p?.cultivation?.startedAt!==undefined) || state.online&&state.plots.some(p=>p?.cultivation)))
         void refresh();
 } }, 1000);
 void refresh(true);

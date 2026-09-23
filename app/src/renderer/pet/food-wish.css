@@ -1,0 +1,18 @@
+#food-wish { position:absolute;z-index:12;top:5%;left:50%;transform:translateX(-50%);display:flex;align-items:flex-start;filter:drop-shadow(0 3px 5px #66523a25); }
+#food-wish[hidden] {display:none;}
+.food-wish-open {display:flex;flex-direction:column;align-items:center;gap:1px;background:#fffaed;border:2px solid #e1ccaa;border-radius:45% 45% 40% 40%;padding:5px 13px;color:#675441;cursor:pointer;}
+.food-wish-open span {font-size:26px;line-height:1.2;}
+.food-wish-open small {font-size:10px;white-space:nowrap;}
+.food-wish-close {border:0;background:#fffaed;border-radius:50%;color:#776955;font-size:12px;cursor:pointer;opacity:0;}
+#food-wish:hover .food-wish-close,#food-wish:focus-within .food-wish-close {opacity:1;}
+body.pair-mode #food-wish,body.garden-performing #food-wish {display:none;}
+#network-interaction {position:absolute;z-index:13;left:50%;top:9%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;background:#fff9ef;border:2px solid #dbc9a6;border-radius:20px;padding:10px;pointer-events:none;max-width:85%;}
+#network-interaction[hidden] {display:none;}
+#network-interaction span {font-size:30px;}
+#network-interaction small {font-size:12px;color:#6b5841;}
+
+#network-interaction[data-kind=feed] span{animation:food-towards-pet 1.4s ease-in both}#network-interaction[data-kind=photo]{border:10px solid #fff9ee;border-bottom-width:30px;outline:1px solid #ba9d76;border-radius:3px;min-width:130px;min-height:100px} @keyframes food-towards-pet{0%{transform:translateY(-20px) scale(1);opacity:1}80%{transform:translateY(70px) scale(.25);opacity:1}100%{transform:translateY(80px) scale(0);opacity:0}}@media(prefers-reduced-motion:reduce){#network-interaction[data-kind=feed] span{animation:none}}
+
+body[data-agent-activity=thinking] #food-wish,body[data-agent-activity=working] #food-wish,body:has(#bubble.show) #food-wish{display:none}
+
+body.pair-mode #network-interaction[data-kind=photo]{display:none}

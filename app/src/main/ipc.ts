@@ -299,7 +299,7 @@ export function registerIpc(): void {
     const win = BrowserWindow.fromWebContents(ev.sender);
     const memberId = win && findRoomPetMemberId(win);
     const snap = memberId ? getMemberSnapshot(memberId) : null;
-    return snap ? {hello:{nickname:snap.nickname}, character:snap.character, state:{mode:snap.mode,action:snap.action,sign:snap.sign}} : null;
+    return snap ? {hello:{nickname:snap.nickname,memberId}, character:snap.character, state:{mode:snap.mode,action:snap.action,sign:snap.sign}} : null;
   });
 
   // 桌宠右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
@@ -311,12 +311,15 @@ export function registerIpc(): void {
     const send = (cmd: PetMenuCommand) => ev.sender.send('pet:menuCommand', cmd);
     const active = (await getSettings()).activeCharacter;
     const guests = (await listCharacters()).filter(c => c.dirId !== active && c.manifest && pairActions(c.manifest).size);
+    const {CHARACTER_UNLOCKS,currentGrowth,characterLevel}=await import('../shared/garden-life');
+    const garden=await (await import('./garden/service')).getGarden().catch(()=>null);
+    const actorLevel=garden?characterLevel(currentGrowth(garden)?.xp??0):1;
     if (win.isDestroyed()) return;
     const menu = Menu.buildFromTemplate([
       // ── 玩宠（最高频，一级直达）─────────────────────────
       { label: '说句话', click: () => send({ type: 'speak' }) },
       { label: '双人互动（本地试演）', submenu: [
-        ...PAIR_INTERACTIONS.map(({ id, label }) => ({ label, submenu: guests.length
+        ...PAIR_INTERACTIONS.map(({ id, label }) => ({ label:label+(CHARACTER_UNLOCKS.some(u=>u.kind===id&&u.level>actorLevel)?` · Lv.${CHARACTER_UNLOCKS.find(u=>u.kind===id)!.level} 解锁`:''),enabled:!CHARACTER_UNLOCKS.some(u=>u.kind===id&&u.level>actorLevel), submenu: guests.length
           ? guests.map(c => ({ label: c.manifest.name, click: () => send({ type: 'pair', kind: id, guestId: c.dirId }) }))
           : [{ label: '请先下载或创建另一个角色', enabled: false }] })),
         { label: '结束互动', click: () => send({ type: 'pairEnd' }) },

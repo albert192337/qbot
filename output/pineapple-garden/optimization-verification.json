@@ -1,0 +1,74 @@
+[
+  {
+    "label": "付费原版 · 197 万面 / 64.1 MB",
+    "info": {
+      "size": [
+        0.692718505859375,
+        0.97943115234375,
+        0.538116455078125
+      ],
+      "meshes": 1,
+      "triangles": 1966370,
+      "textures": [
+        {
+          "map": {
+            "width": 4096,
+            "height": 4096
+          },
+          "normalMap": {
+            "width": 4096,
+            "height": 4096
+          },
+          "roughnessMap": {
+            "width": 4096,
+            "height": 4096
+          }
+        }
+      ],
+      "renderer": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+    }
+  },
+  {
+    "label": "轻量版 · 3.2 万面 / 2.9 MB",
+    "info": {
+      "size": [
+        0.69244384765625,
+        0.97882080078125,
+        0.537872314453125
+      ],
+      "meshes": 2,
+      "triangles": 32000,
+      "textures": [
+        {
+          "map": {
+            "width": 2048,
+            "height": 2048
+          },
+          "normalMap": {
+            "width": 2048,
+            "height": 2048
+          },
+          "roughnessMap": {
+            "width": 2048,
+            "height": 2048
+          }
+        },
+        {
+          "map": {
+            "width": 2048,
+            "height": 2048
+          },
+          "normalMap": {
+            "width": 2048,
+            "height": 2048
+          },
+          "roughnessMap": {
+            "width": 2048,
+            "height": 2048
+          }
+        }
+      ],
+      "renderer": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+    }
+  }
+]

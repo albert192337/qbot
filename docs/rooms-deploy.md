@@ -1,5 +1,33 @@
 # 公共房间服务部署（rooms）
 
+## 2026-09-23：花园 v3 与好友服务已上线
+
+本次更新 `14.103.59.73` 的 `qbot-rooms.service`，生产地址仍为 `wss://albertbeta.cn/rooms`。发布文件为 `server.mjs`、`contacts.mjs`、`garden.mjs`、`generated/garden-core.cjs` 和 `package.json`，复用服务器已有 `ws` 依赖。未更改 nginx、服务权限、客户端默认地址或其他服务。
+
+- 上线前：本地和服务器 Node 24.13.0 隔离环境的三组联机回归全部通过；用现有 `rooms.json` 副本验证新版读取，保留 2 个房间。
+- 切换：先停止旧服务使其落盘，备份完整数据，再切换代码目录并启动。新进程加载 2 个房间、21 份角色包；`NRestarts=0`。现有客户端经历一次短暂断线，可自动重连。
+- 公网验证：TLS WebSocket 握手成功，`social:1`、`contacts:1`、`garden:1` 能力均返回；独立验证账号取得 `state.v3.version=3`、6 地块。未发聊天、邀请、交易或修改玩家资产。该验证账号留作部署记录。
+- 其他服务：`qbot-market`、`qbot-generation` 均保持 active。本次未发布新安装包，需使用已构建的新版客户端体验新增功能。
+
+备份：
+
+- 完整数据：`/root/qbot-rooms-backup-20260923-0103/data.tgz`，100511782 字节，权限 0600，压缩包完整性检查通过。
+- 原服务配置：同备份目录下 `qbot-rooms.service`。
+- 完整旧代码及依赖：`/opt/qbot-rooms-pre-garden-v3-20260923-0103/`。
+- 新代码：`/opt/qbot-rooms/`；原数据仍在 `/var/lib/qbot-rooms/`。
+
+发布校验 SHA256：
+
+```text
+部署包：bcce1a659401cd6b7ff7be1608ccbcebfb7dd5a89d85a09df186ce6533a6f71f
+server.mjs：e5e9839dca41dac448ce4e66e7cc7722fff8e70eb4d80b164b8c82591a637910
+generated/garden-core.cjs：ae3fb0443bd9a088d10d34369722760d19dad2ad0a6e279281029af5e2143faa
+```
+
+回退时先停止 `qbot-rooms`，将当前代码目录另存，再把上述旧代码目录恢复为 `/opt/qbot-rooms` 并启动。保留当前 `/var/lib/qbot-rooms`，不要直接用上线前备份覆盖新增账号或资产；旧服务不支持新增好友/花园接口。只有确认需要恢复数据且已另存当前数据时，才单独进行数据恢复。SSH 密码及玩家凭据不写入仓库。
+
+以下为历史部署记录，其状态仅代表当时，不能代替当前检查。
+
 > 对应 spec：`docs/superpowers/specs/2026-08-21-public-rooms-design.md` §8
 > 目标机：`14.103.59.73`（Ubuntu 22.04，已跑着 `qbot-relay:24250` 和 `qbot-market:24251`）
 

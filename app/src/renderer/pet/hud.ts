@@ -8,6 +8,7 @@ import type { Progress } from '../../shared/ipc-types';
 import { DEFAULT_MAX_BOXES, POINTS_PER_BOX, canAffordBox, shouldShowChest } from '../../shared/furniture';
 import { formatPoints, shouldTweenPoints, spendLabel } from './hud-format';
 import { attachGardenHint } from './garden-hint';
+import { mountFoodWish } from './food-wish';
 
 /** 宝箱内联 SVG —— 梯形箱体 + 弧形盖 + 金色锁扣 */
 const CHEST_SVG = `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -109,6 +110,7 @@ export class ProgressHud {
     this.root.appendChild(this.floatEl);
     this.root.appendChild(this.toastEl);
     document.body.appendChild(this.root);
+    const stopFoodWish=mountFoodWish();window.addEventListener('pagehide',stopFoodWish,{once:true});
   }
 
   /** 幂等更新：走 shouldTween 门控，防回弹 */

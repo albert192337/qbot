@@ -1,3 +1,4 @@
+import { supportsGarden3D } from '../../shared/garden-render';
 import { applyWeatherMutations } from './weather-rules';
 import { prepareTravelMemory, writeTravelDiary } from './travel-memory';
 import { gardenJournalSummary } from './journal-events';
@@ -12,6 +13,8 @@ import { getSettings } from '../config';
 import { emitEvent } from '../perception';
 import { harvestHighlight } from './highlight';
 import { initialGarden, refreshShop, transition, validateGarden } from './rules';
+import { ensureLife } from './life-rules';
+import {enableV3} from './v3-rules';
 interface RecordFile {
     state: GardenState;
     pending?: {
@@ -84,14 +87,18 @@ async function recover(): Promise<GardenState> {
 }
 export function getGarden(): Promise<GardenState> {
     return serial(async () => {
+        const settings=await getSettings();
+        if(settings.gardenOnline)return (await import('./network')).networkGarden();
         const state = structuredClone(await recover());
         const oldPlots=JSON.stringify(state.plots);
         const now=Date.now();
+        const upgraded=enableV3(state,now);
+        const lifeChanged=ensureLife(state,now,rng,settings.activeCharacter??undefined)||upgraded;
         const weatherChanged=applyWeatherMutations(state,now);
         if (state.shop.refreshAt <= now) {
             refreshShop(state, Date.now(), rng);
         }
-        if(weatherChanged || state.shop.refreshAt !== cache!.state.shop.refreshAt) await save({ state });
+        if(lifeChanged || weatherChanged || state.shop.refreshAt !== cache!.state.shop.refreshAt) await save({ state });
         if(oldPlots!==JSON.stringify(state.plots))for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');
         return state;
     });
@@ -108,14 +115,18 @@ export function updateGardenJournal<T>(change:(state:GardenState)=>T|Promise<T>)
 export function gardenAction(command: GardenCommand): Promise<GardenResult> {
     return serial(async () => {
         try {
+            const settings=await getSettings();
+            if(settings.gardenOnline)return (await import('./network')).networkAction(command);
             if (!command || typeof command !== 'object')
                 throw Error('无效花园操作');
             const participant = (command.type === 'harvest' || command.type === 'harvestMany') ? (await getSettings()).activeCharacter ?? 'default' : undefined;
             const state = structuredClone(await recover());
-            if((command.type==='plant'||command.type==='plantMany')&&(await getSettings()).gardenRenderMode==='3d'&&state.seeds.find(s=>s.id===command.seed)?.species!=='strawberry')
-                throw Error('3D 模式先支持草莓；其他植物请切回 2D 后播种。');
+            if((command.type==='plant'||command.type==='plantMany')&&(await getSettings()).gardenRenderMode==='3d'&&!supportsGarden3D(state.seeds.find(s=>s.id===command.seed)?.species))
+                throw Error('3D 模式支持草莓和菠萝；其他植物请切回 2D 后播种。');
             applyWeatherMutations(state,Date.now());
-            const result = transition(state, command, Date.now(), rng, { musicPlaying: getMusicStatus().playing });
+            enableV3(state,Date.now());
+            ensureLife(state,Date.now(),rng,settings.activeCharacter??undefined);
+            const result = transition(state, command, Date.now(), rng, { musicPlaying: getMusicStatus().playing, actor:settings.activeCharacter??undefined });
             const summary=gardenJournalSummary(state,result.state,command,result.reveal);
             if(summary){const at=Date.now(),actor=participant??(await getSettings()).activeCharacter??'default';result.state.journalEvents=[...(result.state.journalEvents??[]).filter(e=>at-e.at<7*86400000),{at,actor,summary:summary.slice(0,500)}].slice(-300);}
             const travelMemory = command.type === 'travelExperience' && result.state.travel ? await prepareTravelMemory(result.state.travel) : undefined;

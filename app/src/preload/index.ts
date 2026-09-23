@@ -10,6 +10,12 @@ const api: QBotApi = {
     edit: (command, character) => ipcRenderer.invoke('memory:edit', command, character),
   },
   garden: {
+    interact:(target,kind)=>ipcRenderer.invoke('garden:interact',target,kind),
+    answerInteraction:(id,accept,response)=>ipcRenderer.invoke('garden:answerInteraction',id,accept,response),
+    onInteraction:cb=>{const fn=(_e:unknown,event:Parameters<typeof cb>[0])=>cb(event);ipcRenderer.on('garden:interaction',fn);return()=>ipcRenderer.removeListener('garden:interaction',fn);},
+    online: enable => ipcRenderer.invoke('garden:online',enable),
+    visit: (owner,preview,task) => ipcRenderer.invoke('garden:visit',owner,preview,task),
+    cooperate: (owner,plot,action,target,task) => ipcRenderer.invoke('garden:cooperate',owner,plot,action,target,task),
     saveRehearsal: request => ipcRenderer.invoke('garden:saveRehearsal',request),
     journalStatus: () => ipcRenderer.invoke('garden:journalStatus'),
     rewriteDiary: request => ipcRenderer.invoke('garden:rewriteDiary',request),

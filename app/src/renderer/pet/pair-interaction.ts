@@ -25,7 +25,7 @@ export class PairInteraction {
   private transitionVersion = 0;
   constructor(private callbacks: PairCallbacks) {}
   isActive(): boolean { return this.root !== null; }
-  start(host: CharacterMeta, guest: CharacterMeta, kind: PairKind): void {
+  start(host: CharacterMeta, guest: CharacterMeta, kind: PairKind, live=false): void {
     this.cancel();
     this.host = host; this.guest = guest; this.swapped = false; this.overrides.clear();
     this.root = document.createElement('div'); this.root.id = 'pair-interaction';
@@ -39,7 +39,7 @@ export class PairInteraction {
     const toolbar = document.createElement('div'); toolbar.className = 'pair-toolbar';
     const names = document.createElement('span'); names.className = 'pair-names';
     names.textContent = `${host.manifest.name} · ${guest.manifest.name}`;
-    names.title = '本地双人试演；缺少朝向信息时可手动转向。回应为试演台词。';
+    names.title = live?'双方同意的合影；缺少朝向信息时可手动转向。':'本地双人试演；缺少朝向信息时可手动转向。回应为试演台词。';
     toolbar.append(names);
     const button = (label: string, click: () => void) => {
       const b = document.createElement('button'); b.textContent = label; b.onclick = click; toolbar.append(b);
@@ -71,6 +71,7 @@ export class PairInteraction {
         captions[who].title = who === 'host' ? host.manifest.name : guest.manifest.name;
       }
       effects.replaceChildren(); effects.dataset.effect = beat.effect;
+      if(['flower','photo','celebrate'].includes(beat.effect)){const prop=document.createElement('span');prop.className='pair-shared-prop';prop.textContent=beat.effect==='flower'?'🌷':beat.effect==='photo'?'📷 ✨':'🎉 ✨ 🎊';effects.append(prop);}
       if (beat.effect === 'heart') {
         for (let i = 0; i < 3; i++) {
           const heart = document.createElement('span'); heart.className = 'pair-heart'; heart.textContent = '♥';

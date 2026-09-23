@@ -29,6 +29,8 @@ export function mountContacts(host: HTMLElement, steam: HTMLElement, api: Social
     host.querySelector('#contact-status')!.textContent = state.reason || (tab === 'recent' ? '真实同房的人会留在这里；近 30 天实际互动过的朋友优先展示。' : '双方确认后成为游戏好友，换角色也不会失联。');
     const invitations=host.querySelector('#contact-invitations')!; invitations.replaceChildren();
     for(const invite of state.invitations.filter(x=>x.expiresAt>Date.now())){
+      if(invite.pair){const row=el('div');row.className='contact-invitation';row.append(el('span',`${invite.nickname} 想和你${invite.pair.label}`),button(invite.pair.kind==='relay'?'开心接力':'一起玩',()=>window.qbot.garden.answerInteraction(invite.id,true,invite.pair?.kind==='relay'?'happy':undefined),state.available),button('暂时不了',()=>window.qbot.garden.answerInteraction(invite.id,false),state.available));if(invite.pair.kind==='relay')row.append(button('用小心心接力',()=>window.qbot.garden.answerInteraction(invite.id,true,'heart'),state.available),button('挥手回应',()=>window.qbot.garden.answerInteraction(invite.id,true,'wave'),state.available));invitations.append(row);continue;}
+      if(invite.garden){const row=el('div');row.className='contact-invitation';row.append(el('span',`${invite.nickname} 邀你培育：${invite.garden.label}`),button('看果实 · 一起培育',async()=>{window.qbot.garden.open('visit:'+invite.garden!.owner+(invite.garden!.plant?':'+invite.garden!.plot+':'+invite.garden!.plant:''));},state.available),button('收起',()=>api.contactInvitation(invite.id,false),state.available));invitations.append(row);continue;}
       const row=el('div');row.className='contact-invitation';row.append(el('span',`${invite.nickname} 邀请你去小屋坐坐`),button('接受邀请',()=>api.contactInvitation(invite.id,true),state.available),button('忽略',()=>api.contactInvitation(invite.id,false),state.available));invitations.append(row);
     }
     list.replaceChildren();
@@ -44,6 +46,7 @@ export function mountContacts(host: HTMLElement, steam: HTMLElement, api: Social
       const title=el('span',p.title);title.className='title-slot';info.append(title);
       if(p.seenAt) info.append(el('small',`最近见于 ${new Date(p.seenAt).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}`));
       const actions=el('div');actions.className='contact-actions';
+      actions.append(button('土地 / 商店',async()=>{window.qbot.garden.open('visit:'+p.id);},state.available));
       if(p.relation==='incoming') { info.append(el('small','想成为你的好友'));actions.append(button('接受',()=>contactAction(p,'accept'),state.available,'已成为游戏好友'),button('拒绝',()=>contactAction(p,'reject'),state.available)); }
       else if(p.relation==='outgoing') { info.append(el('small','等待对方接受'));actions.append(button('取消申请',()=>contactAction(p,'cancel'),state.available)); }
       else if(p.relation==='friend') { actions.append(button('邀请来玩',()=>contactAction(p,'invite'),state.available&&p.online&&canInvite(),'邀请已送达，等待朋友接受'),button('删除好友',async()=>{if(confirm(`不再将 ${p.nickname} 列为游戏好友？`))await contactAction(p,'remove');},state.available)); }

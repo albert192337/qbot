@@ -2,9 +2,11 @@ import {createHash} from 'node:crypto';
 import {TRAITS,level,type GardenState} from '../../shared/garden';
 import {WEATHER_DAY_MS,WEATHER_FACTORS,LEGACY_WEATHER_FACTORS,weatherEvents,gardenWeather,weatherFactorChance} from '../../shared/garden-weather';
 import {value} from './rules';
+import {advanceV3} from './v3-rules';
 export function weatherRoll(key:string):number{return createHash('sha256').update(key).digest().readUInt32BE(0)/4294967296;}
 /** Per-event winners persist even after harvest, so the guarantee cannot refill on new crops. */
 export function applyWeatherMutations(s:GardenState,now:number,roll=weatherRoll):boolean{
+ const v3Changed=advanceV3(s,now);
  const migrated=s.weatherCheckedAt===undefined;
  if(migrated){const current=gardenWeather(now).current;s.weatherCheckedAt=current?current.start-1:now;if(!current)return true;}
  const checkpoint=s.weatherCheckedAt??now;
@@ -22,7 +24,7 @@ export function applyWeatherMutations(s:GardenState,now:number,roll=weatherRoll)
   const record=s.weatherGuarantees[event.id]??={end:event.end,winners:[]};
   if(modern)record.evaluated??=[];
   const candidates=s.plots.filter(p=>{
-   if(!p || (modern && (p.cultivation || p.revealed)))return false;
+   if(!p || p.growthVersion===3 || (modern && (p.cultivation || p.revealed)))return false;
    const eligible=Math.max(modern?p.plantedAt:p.readyAt,event.start);
    return (modern||eligible>=from)&&eligible<=now&&eligible<event.end&&p.plantedAt<=eligible;
   }).filter(p=>p!==null).sort((a,b)=>Math.max(modern?a.plantedAt:a.readyAt,event.start)-Math.max(modern?b.plantedAt:b.readyAt,event.start)||weatherRoll(event.id+a.id)-weatherRoll(event.id+b.id));
@@ -52,6 +54,6 @@ export function applyWeatherMutations(s:GardenState,now:number,roll=weatherRoll)
  }
  const testChanged=!!s.testWeather&&s.testWeather.checkedAt<Math.min(now,s.testWeather.end);
  if(s.testWeather)s.testWeather.checkedAt=Math.max(s.testWeather.checkedAt,Math.min(now,s.testWeather.end));
- if(!migrated&&!checked&&!testChanged&&now-checkpoint<60000)return false;
+ if(!migrated&&!checked&&!testChanged&&!v3Changed&&now-checkpoint<60000)return false;
  s.weatherCheckedAt=Math.max(now,checkpoint);return true;
 }

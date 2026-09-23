@@ -26,6 +26,17 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 beforeEach(async () => { vi.resetModules(); vi.spyOn(Math, 'random').mockReturnValue(.8); mock.dir = await mkdtemp(path.join(os.tmpdir(), 'garden-store-')); mock.points = 500; mock.boxes = 1; mock.receipts.clear(); mock.renameCount = 0; mock.failAt = 0; });
 afterEach(async () => { vi.restoreAllMocks(); await rm(mock.dir, { recursive: true, force: true }); });
 describe('garden transaction journal', () => {
+    it('3D mode permits single and batch pineapple sowing',async()=>{
+        let api=await import('../src/main/garden/service');const state=await api.getGarden();
+        state.seeds.push({id:'pineapple-single',species:'pineapple',genes:[],bred:false},{id:'pineapple-batch',species:'pineapple',genes:[],bred:false});
+        await writeFile(path.join(mock.dir,'garden-demo.json'),JSON.stringify({state}));
+        await writeFile(path.join(mock.dir,'config.json'),JSON.stringify({gardenRenderMode:'3d'}));
+        vi.resetModules();api=await import('../src/main/garden/service');
+        expect((await api.gardenAction({type:'plant',plot:0,seed:'pineapple-single'})).ok).toBe(true);
+        expect((await api.gardenAction({type:'plantMany',seed:'pineapple-batch'})).ok).toBe(true);
+        const after=await api.getGarden();expect(after.plots.filter(p=>p?.species==='pineapple')).toHaveLength(2);
+        expect(after.seeds.some(s=>s.id.startsWith('pineapple-'))).toBe(false);
+    });
     it('3D mode accepts strawberries, rejects other new sowing without consuming seeds, and 2D restores it',async()=>{
         const api=await import('../src/main/garden/service');const start=await api.getGarden();
         const lotus=start.seeds.find(s=>s.species==='lotus')!,berry=start.seeds.find(s=>s.species==='strawberry')!;
@@ -44,7 +55,8 @@ describe('garden transaction journal', () => {
         expect((await api.gardenAction({type:'plant',plot:0,seed:s.seeds[0].id})).ok).toBe(true);
         expect((await api.gardenAction({type:'plant',plot:0,seed:s.seeds[1].id})).ok).toBe(false);
         expect((await api.getGarden()).journalEvents).toHaveLength(1);
-        await api.gardenAction({type:'mature'});expect((await api.gardenAction({type:'harvest',plot:0})).ok).toBe(true);
+        await api.gardenAction({type:'mature'});const mature=(await api.getGarden()).plots[0]!;if(mature.batch?.candidates.length)await api.gardenAction({type:'resolveFactors',target:mature.id,chosen:[]});
+        expect(await api.gardenAction({type:'harvest',plot:0})).toMatchObject({ok:true});
         const harvested=await api.getGarden();expect(harvested.journalEvents?.map(e=>e.summary)).toEqual(['种下了莲花','收获了莲花']);
         expect((await api.gardenAction({type:'sell',id:harvested.produce[0].id})).ok).toBe(true);
         vi.resetModules();const restarted=await import('../src/main/garden/service');const events=(await restarted.getGarden()).journalEvents!;
@@ -62,7 +74,7 @@ describe('garden transaction journal', () => {
     it('recovers an interrupted final save without charging twice', async () => {
         const api = await import('../src/main/garden/service');
         const s = await api.getGarden();
-        mock.failAt = 3; // initial save, pending journal, final state rename
+        mock.failAt = mock.renameCount + 2; // pending journal, then fail the final state rename
         expect((await api.gardenAction({ type: 'box' })).ok).toBe(false);
         expect(mock.points).toBe(0);
         vi.resetModules();
@@ -109,6 +121,7 @@ it('persists real test events and deduplicates repeated activation until restore
 
 it('restart pauses a saved cultivation instead of counting closed-app time',async()=>{
  const api=await import('../src/main/garden/service');const state=await api.getGarden();
+ delete state.v3; // Explicit legacy asset: its original 30-second promise survives the v3 upgrade.
  const {transition}=await import('../src/main/garden/rules');let id=0;const rng={random:()=>.99,id:()=>String(id++)};
  state.seeds[0].genes=['rainbow'];let s=transition(state,{type:'plant',plot:0,seed:state.seeds[0].id},Date.now(),rng).state;
  s.plots[0]!.readyAt=Date.now()-60000;s=transition(s,{type:'cultivate',plot:0},Date.now()-60000,rng).state;

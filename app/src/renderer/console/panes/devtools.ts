@@ -32,10 +32,10 @@ export async function mount(host: HTMLElement): Promise<void> {
     <h3>种植画面</h3>
     <div class="btn-row" role="group" aria-label="种植画面">
       <button class="btn" data-garden-render="2d" aria-pressed="false">2D 手绘种植</button>
-      <button class="btn" data-garden-render="3d" aria-pressed="false">3D 草莓种植</button>
+      <button class="btn" data-garden-render="3d" aria-pressed="false">3D 草莓 / 菠萝</button>
       <button class="btn ghost" id="dev-open-garden">打开土地</button>
     </div>
-    <p class="studio-hint">随时切换，共用原来的土地和背包。3D 模式先开放草莓播种；已有其他植物保留手绘显示和操作。</p>
+    <p class="studio-hint">随时切换，共用原来的土地和背包。3D 模式支持草莓和菠萝，菠萝成熟后使用立体模型；其他植物保留手绘显示和操作。</p>
   </div>
   <div class="conn-card">
     <h3>桌宠模式</h3>

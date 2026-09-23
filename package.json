@@ -14,10 +14,13 @@
     "test": "npm run test -w pipeline",
     "dev": "npm run dev -w app",
     "dev:social": "node scripts/dev-social.cjs",
-    "build": "npm run build -w pipeline && npm run build -w app",
+    "build": "npm run build:garden && npm run build -w pipeline && npm run build -w app",
     "check": "npm run build -w pipeline && npm test -w pipeline && npm test -w app && npm test -w generation && npx tsc --noEmit -p app",
     "dev:steam": "node scripts/dev-steam.cjs",
-    "test:steam": "node scripts/steam-smoke.cjs"
+    "test:steam": "node scripts/steam-smoke.cjs",
+    "build:garden": "node scripts/build-garden-core.cjs",
+    "test:garden-online": "npm run build:garden && node scripts/test-garden-network.cjs && node scripts/test-garden-coop.cjs && node scripts/test-garden-v3-server.cjs",
+    "simulate:garden": "npm run build:garden && node scripts/simulate-garden-v3.cjs"
   },
   "devDependencies": {
     "typescript": "^5.5.0"

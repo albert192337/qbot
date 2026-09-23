@@ -10,6 +10,15 @@
 .art.twin > img,.art.twin .mutation-surface,.art.twin .botanical-accessory { width:calc(var(--fx-width,100%)*.72);height:calc(var(--fx-height,100%)*.72);left:calc(50% - var(--fx-width,100%)*.5);bottom:var(--fx-bottom,0);transform:rotate(-8deg);transform-origin:bottom center; }
 .art.twin > img.twin-copy,.art.twin .mutation-surface.twin-copy,.art.twin .botanical-accessory.twin-copy { left:calc(50% - var(--fx-width,100%)*.22);transform:rotate(9deg) scale(.9); }
 .mutation-surface > div { position:absolute;inset:0; }
+.surface-life {background:linear-gradient(125deg,transparent 22%,var(--material-a) 45%,var(--material-b) 52%,transparent 70%);opacity:.48;mix-blend-mode:soft-light;}
+.surface-life-striped {background:repeating-linear-gradient(35deg,transparent 0 12%,#9f764570 13% 16%);mix-blend-mode:multiply;}
+.surface-life-celadon,.surface-life-nightdye,.surface-life-obsidian,.surface-life-redgold,.surface-life-silver {background:linear-gradient(130deg,var(--material-a) 30%,var(--material-b) 50%,var(--material-a) 75%);mix-blend-mode:color;opacity:.7;}
+.surface-life-prism,.surface-life-iridescent,.surface-life-galaxycore,.surface-life-nebula {background:linear-gradient(130deg,var(--material-a),var(--material-b),#b4e5df);background-size:200% 200%;animation:plant-gold 9s ease-in-out infinite;mix-blend-mode:color;}
+.surface-life-sugar,.surface-life-honey,.surface-life-glassheart {background:radial-gradient(ellipse at 46% 61%,var(--material-a) 0 8%,transparent 9%),radial-gradient(ellipse at 55% 61%,var(--material-a) 0 8%,transparent 9%),radial-gradient(ellipse at 50% 68%,var(--material-b) 0 7%,transparent 8%);mix-blend-mode:screen;opacity:.7;}
+.surface-life-starcore {background:radial-gradient(circle at 47% 60%,#fffbd5 0 2%,transparent 3%),radial-gradient(circle at 55% 70%,#fffbd5 0 2%,transparent 3%);mix-blend-mode:screen;}
+.particles-droplet i {width:5px;height:8px;border-radius:65% 35% 60% 40%;background:#c7ebf5;border:1px solid #a6c8d3;animation:plant-ice 5s ease-in-out infinite;}
+.life-orbit {position:absolute;left:19%;bottom:14%;width:62%;height:35%;border:1px solid #e6d3a2;border-radius:50%;transform:rotate(-22deg);pointer-events:none;box-shadow:0 0 4px #fff5c3;}
+.orbit-meteor {border-color:#bbbbe3;border-top:2px solid #faf2c6;transform:rotate(22deg);}
 .surface-purple,.surface-mint,.surface-coral { background:var(--plant-mask) center bottom/contain no-repeat;mask-image:linear-gradient(transparent calc(var(--body-top) - 8%),#000 var(--body-top),#000 var(--body-bottom),transparent calc(var(--body-bottom) + 8%)); }
 .surface-purple { filter:sepia(.7) saturate(1.8) hue-rotate(225deg); }
 .surface-mint { filter:sepia(.7) saturate(1.2) hue-rotate(95deg); }

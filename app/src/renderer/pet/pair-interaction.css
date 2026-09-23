@@ -24,6 +24,7 @@ body.pair-swapped #pair-interaction { --from:67%; --to:33%; }
 @keyframes pair-send-heart { 0% { opacity:0; transform:translate(-50%,0) scale(.4); } 15% { opacity:1; } 55% { top:23%; } 90% { opacity:1; } 100% { left:var(--to); top:43%; opacity:0; transform:translate(-50%,0) scale(1.15); } }
 .pair-tea { position:absolute; left:50%; top:64%; transform:translateX(-50%); padding:5px 14px; border-radius:50%; background:#e5c5a0; box-shadow:0 5px 0 #a98469; font-size:30px; white-space:nowrap; }
 .pair-talk { position:absolute; left:var(--from); top:22%; transform:translateX(-50%); background:#fff9ef; border:2px solid #cfb19a; border-radius:15px; padding:3px 12px; color:#9c7863; }
+.pair-shared-prop {position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:38px;padding:12px;background:#fff9efde;border:2px solid #dbc9a6;border-radius:25px;white-space:nowrap;}
 .pair-effects[data-effect='guest-talk'] .pair-talk { left:var(--to); }
 @media (prefers-reduced-motion:reduce) { .pair-heart { animation:none; left:50%; opacity:1; } .pair-heart:not(:first-child) { display:none; } }
 
@@ -47,3 +48,5 @@ body.pair-arriving #stage::after { content:''; position:absolute; inset:12%; poi
 @media (prefers-reduced-motion:reduce) {
   body.pair-leaving #pair-interaction::after, body.pair-arriving #stage::after { display:none; }
 }
+
+.pair-effects[data-effect=photo]::after{content:"一起的这一天";position:absolute;inset:10% 5% 12%;border:12px solid #fff8e9;border-bottom-width:38px;border-radius:4px;color:#836649;text-align:center;display:flex;align-items:flex-end;justify-content:center;box-shadow:0 3px 18px #52381720;pointer-events:none}

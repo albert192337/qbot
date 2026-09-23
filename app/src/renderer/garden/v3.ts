@@ -1,0 +1,55 @@
+import {SPECIES,TRAITS,TIER_NAMES,traitSlot,needsReveal,type GardenState,type GardenCommand,type Plant,type Produce,type Trait,type Species} from '../../shared/garden';
+import {V3,V3_XP,V3_WEATHER,AFFINITIES,qualityOf,scoreOf,cappedTraits,geneSlots,speciesLevel,hourlyWeather,weatherWeights,fertilizerDescription} from '../../shared/garden-v3';
+import {traitSource} from '../../shared/garden-life';
+type Act=(c:GardenCommand)=>Promise<void>;
+const el=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',cls='')=>{const e=document.createElement(tag);e.textContent=text;e.className=cls;return e;};
+const button=(text:string,fn:()=>unknown,disabled=false)=>{const b=el('button',text);b.disabled=disabled;b.onclick=()=>{void fn();};return b;};
+const names=(ts:Trait[])=>ts.map(t=>TRAITS[t].name).join('＋')||'原生';
+// Keep an unfinished choice while live cultivation/state updates redraw the panel.
+const factorDrafts=new Map<string,Set<Trait>>();
+const customDraft={species:'lotus' as Species,traits:new Set<Trait>()};
+function selectors(host:HTMLElement,pool:Trait[],selected:Set<Trait>):void{const row=el('div','','factor-options');for(const t of pool){const label=el('label','','tag '+TRAITS[t].tier),input=el('input');input.type='checkbox';input.checked=selected.has(t);input.onchange=()=>{if(input.checked)selected.add(t);else selected.delete(t);};label.append(input,document.createTextNode(TRAITS[t].name));row.append(label);}host.append(row);}
+export function renderFactorChoice(host:HTMLElement,p:Plant,act:Act):boolean {
+ if(!p.batch?.candidates.length)return false;
+ const card=el('article','','card factor-choice');card.append(el('h3','这一轮有新的模样'),el('p','果实1 · 果皮1 · 挂饰2。想留下哪个，由你决定；关闭后结果还在。'));
+ const current=p.traits.filter(t=>traitSlot(t)!=='size'),pool=[...new Set([...current,...p.batch.candidates])];if(!factorDrafts.has(p.id)){factorDrafts.set(p.id,new Set(current));if(factorDrafts.size>20)factorDrafts.delete(factorDrafts.keys().next().value!);}const selected=factorDrafts.get(p.id)!;for(const t of selected)if(!pool.includes(t))selected.delete(t);selectors(card,pool,selected);
+ card.append(button('确定这个模样',()=>act({type:'resolveFactors',target:p.id,chosen:[...selected]})),button('保留原来这些',()=>act({type:'resolveFactors',target:p.id,chosen:current})));host.append(card);return true;
+}
+export function renderAppraisal(host:HTMLElement,p:Produce,s:GardenState,act:Act):void {
+ if(!s.v3||p.growthVersion!==3)return;
+ const a=s.v3.appraisals[p.id];
+ if(a&&!a.done){const card=el('div','','appraisal-card');card.append(el('h3',`重量探险 · 第 ${a.row+1}/${a.maxRows} 行`),el('p',`目前 ×${a.factor.toFixed(2)}。${a.row<3?'三格有两格增重，一格减重':'三格有一格增重，两格减重'}；减重会结束这一轮，果实仍然留下。`));for(let i=0;i<3;i++)card.append(button('？',()=>act({type:'appraisePick',target:p.id,column:i})));card.append(button('现在收手',()=>act({type:'appraiseStop',target:p.id})));host.append(card);return;}
+ if(!p.appraised&&!p.locked&&!needsReveal(p)&&['gold','rainbow'].includes(qualityOf(p)))host.append(button(speciesLevel(s.xp[p.species])>=5?'重量鉴定 · 20币':'物种 Lv.5 开放重量鉴定',()=>act({type:'appraiseStart',target:p.id}),speciesLevel(s.xp[p.species])<5));
+ if(p.appraised&&a?.done)host.append(el('small',`鉴定留念：走到第${a.row}行 · ×${a.factor.toFixed(2)}`));
+}
+export function renderProvenance(host:HTMLElement,p:Produce):void {if(p.growthVersion===3)host.append(el('small',`综合 ${scoreOf(p).toFixed(1)} 分 · ${p.kg/SPECIES[p.species].kg>=1?'重量':'小巧'} ×${(p.kg/SPECIES[p.species].kg).toFixed(2)}`));if(p.lineage){const details=el('details');details.append(el('summary','这颗果实的家谱'));for(const parent of p.lineage.parents)details.append(el('p',`${SPECIES[parent.species].name} · ${names(parent.traits)}`));host.append(details);}}
+export function renderV3Breeding(host:HTMLElement,s:GardenState,parent:Produce,candidates:Produce[],act:Act,close:()=>void,art:(p:Produce)=>HTMLElement):void {
+ const v=s.v3!,drawer=el('aside','','breed-drawer');drawer.append(button('× 取消',close),el('h2','一起留下新种子'),el('p',`本周 ${v.breeds}/90 · 普通继承保底 ${v.geneMisses}/9 · 体型保底 ${v.sizeMisses}/9`));
+ const oil=el('select');oil.append(new Option(`普通精油 ×${v.oils.normal} · 最多3因子`,'normal'),new Option(`浓缩精油 ×${v.oils.rich} · 最多4因子`,'rich'));drawer.append(oil);
+ drawer.append(el('p','双方都有该槽：30%；只有一方有：25%。成功后不同词条各一半，体型另抽20%。父母各用一次资格、各自保留，附加染色不遗传。'));
+ const selected=new Set(cappedTraits(parent.traits.filter(t=>traitSlot(t)!=='size')));if(parent.growthVersion!==3){drawer.append(el('p','为旧版亲本选择本次遗传组合，原收藏不会改变'));selectors(drawer,parent.traits.filter(t=>traitSlot(t)!=='size'),selected);}
+ for(const p of candidates){const card=el('article','','card parent-row');card.append(art(p),el('strong',SPECIES[p.species].name+' · '+names(p.traits)));const chosen=new Set(cappedTraits(p.traits.filter(t=>traitSlot(t)!=='size')));if(p.growthVersion!==3)selectors(card,p.traits.filter(t=>traitSlot(t)!=='size'),chosen);
+  const as=parent.growthVersion===3?parent.slots??geneSlots([...selected]):geneSlots([...selected]),bs=p.growthVersion===3?p.slots??geneSlots([...chosen]):geneSlots([...chosen]);card.append(el('small',as.map((t,i)=>`${['果实','果皮','挂饰一','挂饰二'][i]}：${t&&bs[i]?'30%':t||bs[i]?'25%':'无候选'}`).join(' · ')));
+  card.append(button('留下它们的种子',()=>act({type:'breed',first:parent.id,second:p.id,oil:oil.value as 'normal'|'rich',firstGenes:[...selected],secondGenes:[...chosen]}),v.breeds>=90));drawer.append(card);
+ }
+ if(!candidates.length)drawer.append(el('p','需要一株地里的金色以上亲本，和一颗背包里的金色以上果实。先种着，也不着急。'));host.append(drawer);
+}
+const THEMES:{name:string;species:Species;traits:Trait[]}[]=[{name:'星空巨果 · 长期目标',species:'pineapple',traits:['abundant','redgold','stardust','halo','giant']},{name:'晚风小夜灯',species:'blueberry',traits:['nightdye','firefly','moon']},{name:'奶油草莓派',species:'strawberry',traits:['milky','pearl','flowerknot']},{name:'金色菠萝夏天',species:'pineapple',traits:['honey','redgold','petals']},{name:'星星的池塘',species:'lotus',traits:['celadon','stardust','moon']},{name:'手心里的小苹果',species:'apple',traits:['sugar','mini']}];
+export function renderNotebook(host:HTMLElement,s:GardenState,act:Act,go:(page:string)=>void):void {
+ const v=s.v3;if(!v)return;host.append(el('h2','慢慢收集，长成自己的花园'),el('p','可以选一个目标，也可以随手种。没上线的日子不欠作业，成熟果实不会枯萎。','muted'));
+ const goal=v.goal;
+ if(goal){const fruits=[...s.produce,...s.plots.filter((p):p is Plant=>!!p)],best=fruits.filter(p=>p.species===goal.species).sort((a,b)=>goal.traits.filter(t=>b.traits.includes(t)).length-goal.traits.filter(t=>a.traits.includes(t)).length)[0],have=goal.traits.filter(t=>best?.traits.includes(t)).length;
+  const card=el('article','','card goal-card');card.append(el('h3',`${have===goal.traits.length?'✦ 收集到了！':'✧ 正在期待'} ${SPECIES[goal.species].name} · ${names(goal.traits)}`),el('p',`最接近的一颗：${have}/${goal.traits.length}`));for(const t of goal.traits)card.append(el('small',`${best?.traits.includes(t)?'✓':'○'} ${TRAITS[t].name}：${traitSlot(t)==='size'?'自然重量、增重肥或鉴定':traitSource(t)}`));card.append(button('去花园看看',()=>go('plots')),button('先放下这个目标',()=>act({type:'clearCollectionGoal'})));host.append(card);
+ }
+ const themes=el('div','','grid');for(const theme of THEMES){const card=el('article','','card');card.append(el('h3',theme.name),el('p',SPECIES[theme.species].name+' · '+names(theme.traits)),button('我想收集这个',()=>act({type:'collectionGoal',species:theme.species,traits:theme.traits})));themes.append(card);}host.append(themes);
+ const custom=el('details');custom.append(el('summary','自己挑一个组合'));const species=el('select');for(const sp of Object.keys(SPECIES) as Species[])species.append(new Option(SPECIES[sp].name,sp));species.value=customDraft.species;species.onchange=()=>{customDraft.species=species.value as Species;};custom.append(species);const chosen=customDraft.traits;selectors(custom,Object.keys(TRAITS) as Trait[],chosen);custom.append(button('记在收藏手册',()=>act({type:'collectionGoal',species:species.value as Species,traits:[...chosen]})));host.append(custom);
+ const desk=el('article','','card');desk.append(el('h3','种植小工具'),el('p',`普通精油 ${v.oils.normal} · 浓缩精油 ${v.oils.rich}`),button('普通精油 · 35币',()=>act({type:'buyOil',kind:'normal'})),button('浓缩精油 · 80币',()=>act({type:'buyOil',kind:'rich'})));host.append(desk);
+ const soil=el('details');soil.append(el('summary','慢慢养好六块地'));v.soil.forEach((lv,plot)=>soil.append(button(`${plot+1}号地 Lv.${lv}${lv<3?' · 升级 '+(lv===1?300:700)+'币':' · 已养好'}`,()=>act({type:'upgradeSoil',plot}),lv>=3)));soil.append(el('p','升级对下一轮生长生效：Lv.2 重量倍率 +0.05～0.15，Lv.3 +0.15～0.25。'));host.append(soil);
+ host.append(el('h3','最近的小故事'));for(const r of [...v.records].reverse().slice(0,25)){const row=el('p',`${new Date(r.at).toLocaleDateString('zh-CN')} · ${r.message}`);if(r.peer)row.append(button('回访',()=>go('visit:'+r.peer)));host.append(row);}if(!v.records.length)host.append(el('p','第一粒种子，就是故事的开始。'));
+ const labels:Record<string,string>={question:'发现可培育果实',wishes:'角色每日心愿',welcome:'开始种植',settlement:'生长结算',rainbowPity:'彩色保底',choose:'选择模样',breed:'留下新种子',soil:'养好土地',appraise:'重量探险',shop:'小店采购',friendShop:'朋友家采购',spray:'喷雾惊喜',sprayAccept:'采用新模样',sprayKeep:'保留旧模样',feed:'完成心愿',reroll:'更换心愿',visit:'拜访',visitor:'朋友来访',share:'世界培育邀请',invite:'好友培育邀请',coopJoin:'参加培育',inviteJoin:'回应好友邀请',worldJoin:'参加公开任务',repeatCoop:'再次合作',helper:'朋友帮忙',soloComplete:'独自完成培育',coopComplete:'共同完成培育',coopReward:'助育礼物',sun:'向日葵伙伴',interaction:'一起互动',dailySeed:'基础种子补给'};const stats=el('details');stats.append(el('summary','我的玩法记录（只在自己的存档里）'));for(const [kind,count] of Object.entries(v.counters))stats.append(el('p',`${labels[kind]??'花园活动'} · ${count}`));host.append(stats);
+}
+export function renderV3Weather(host:HTMLElement,s:GardenState,go:(page:string)=>void):void {
+ const hour=Math.floor(Date.now()/3600000),kind=hourlyWeather(hour,s.v3?.realm??'garden'),current=V3_WEATHER[kind];host.append(button('← 回花园',()=>go('plots')),el('h2',`${current.icon} 现在是${current.name}`),el('p',`每小时换天，离线照样记录。幼苗期占一轮的 80%，到时结算一次；成熟后不再追加天气词条。`),el('p',`花园彩因子保底 ${s.v3!.rainbowMisses}/32 · 下一次合格传说天气结算若达到第33次，会留下彩色候选。`));
+ const timeline=el('div','','grid');for(let i=1;i<=3;i++){const w=V3_WEATHER[hourlyWeather(hour+i,s.v3?.realm??'garden')];timeline.append(el('article',`${new Date((hour+i)*3600000).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})} ${w.icon} ${w.name}`,'card'));}host.append(timeline,el('p','普通/稀有天气抽取权重 140:10。连续12个非传说小时后，第13小时进入传说天气；天气日历不会因重启或拜访重抽。','muted'));
+ const grid=el('div','','grid');for(const [id,w] of Object.entries(V3_WEATHER)){const card=el('article','','card');card.append(el('h3',w.icon+' '+w.name+' · '+w.grade),el('p',names([...w.pool] as Trait[])));const weights=weatherWeights(id as keyof typeof V3_WEATHER),total=weights.reduce((a,b)=>a+b,0);card.append(el('small','抽中该天气后，蓝/紫/金/彩占比：'+weights.map(x=>(100*x/total).toFixed(2)+'%').join(' / ')));grid.append(card);}host.append(grid);
+}

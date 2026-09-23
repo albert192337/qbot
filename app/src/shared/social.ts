@@ -61,5 +61,5 @@ export interface ContactSnapshot {
   available: boolean;
   reason: string;
   people: ContactPerson[];
-  invitations: {id: string; nickname: string; expiresAt: number}[];
+  invitations: {id: string; nickname: string; expiresAt: number;garden?:{owner:string;plot:number;label:string;plant?:string};pair?:{kind:string;label:string}}[];
 }

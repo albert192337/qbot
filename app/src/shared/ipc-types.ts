@@ -94,6 +94,7 @@ export interface Settings {
   developerMode?: boolean;
   /** Visual renderer only; both modes share the existing garden save. */
   gardenRenderMode?: '2d' | '3d';
+  gardenOnline?: boolean;
 }
 
 /** 孵化进度事件（pipeline ProgressEvent + 客户端补充） */
@@ -246,6 +247,7 @@ export type PerceptionInteractKind = 'click' | 'drag_start' | 'drag_end' | 'sign
 
 /** 原生右键菜单点选后回渲染端执行的命令 */
 export type PetMenuCommand =
+  | { type:'networkPhoto'; guest:CharacterMeta }
   | { type: 'pair'; kind: import('./pair-interaction').PairKind; guestId: string }
   | { type: 'pairEnd' }
   | { type: 'speak' }
@@ -337,6 +339,7 @@ export interface RoomSnapshot {
 
 /** 一条发言（nickname 是快照：改昵称不追溯改历史） */
 export interface RoomChatMsg {
+  garden?:{owner:string;plot:number;plant:string;species?:string;traits?:{name:string;quality:string}[];done?:boolean;remaining?:number;active?:number;members?:{name:string;qualified:boolean}[];chance?:number;room?:string};
   id: string;
   memberId: string;
   nickname: string;
@@ -523,7 +526,7 @@ export interface QBotApi {
    */
   roomPet: {
     move(x: number, y: number): void;
-    onHello(cb: (info: { nickname: string }) => void): () => void;
+    onHello(cb: (info: { nickname: string;memberId?:string }) => void): () => void;
     onCharacter(cb: (meta: LinkPeerCharacter) => void): () => void;
     onProgress(cb: (p: LinkAssetProgress) => void): () => void;
     onState(cb: (s: { mode?: LinkMode; action?: string; sign?: string }) => void): () => void;
@@ -537,7 +540,7 @@ export interface QBotApi {
     leaveRoom(): void;
     /** 启动自取快照（动态 import 竞态兜底，同 link.getPeerCache） */
     getCache(): Promise<{
-      hello: { nickname: string } | null;
+      hello: { nickname: string;memberId?:string } | null;
       character: LinkPeerCharacter | null;
       state: { mode?: LinkMode; action?: string; sign?: string } | null;
     }>;
