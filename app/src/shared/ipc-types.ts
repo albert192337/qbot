@@ -434,6 +434,10 @@ export type CraftResult =
   | { ok: false; error: string };
 
 export interface QBotApi {
+  overlays: {
+    report(kind:import('./desktop-overlays').HeadOverlay,active:boolean):void;
+    onChanged(cb:(snapshot:import('./desktop-overlays').HeadSnapshot)=>void):()=>void;
+  };
   memory: {
     retry(): Promise<void>;
     get(character?: string, debug?: boolean): Promise<import('./memory').MemorySnapshot>;

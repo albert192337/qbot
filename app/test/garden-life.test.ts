@@ -2,12 +2,22 @@ import {describe,it,expect} from 'vitest';
 import {initialGarden,transition,validateGarden} from '../src/main/garden/rules';
 import {ensureLife} from '../src/main/garden/life-rules';
 import {gardenDay,dailyOffers,sprayPool,characterLevel,wishMatches,coopRareChance} from '../src/shared/garden-life';
-import {TRAITS,traitSlot,type Trait,type Produce} from '../src/shared/garden';
+import {TRAITS,traitSlot,type Trait,type Produce,type Plant} from '../src/shared/garden';
 let seq=0;const rng={random:()=>.1,id:()=>`item-${++seq}`};
 const now=Date.UTC(2026,8,22,8);
 function garden(){const s=initialGarden(now,rng);ensureLife(s,now,rng,'pet-a');s.coins=10000;return s;}
 const fruit=(id='fruit'):Produce=>({id,species:'strawberry',traits:['honey'],kg:.2,value:20,bred:false,growthVersion:2,revealed:true});
+const plant=():Plant=>({...fruit(),plantedAt:now-60000,readyAt:now,fertilizers:[],harvestsLeft:1});
+
 describe('garden daily life',()=>{
+  it('rejects immature field targets but can finish a saved legacy basket result',()=>{
+    const s=garden();s.plots[0]={...plant(),readyAt:now+1000};s.life!.sprays.color=1;
+    expect(()=>transition(s,{type:'spray',kind:'color',target:'fruit'},now,rng)).toThrow('成熟');
+    expect(s.life!.sprays.color).toBe(1);
+    s.plots[0]=null;s.produce=[fruit()];s.life!.pending={id:'old-result',target:'fruit',kind:'color',dye:'pink'};
+    const next=transition(s,{type:'resolveSpray',id:'old-result',accept:true},now,rng).state;
+    expect(next.produce[0].dye).toBe('pink');expect(next.life!.pending).toBeUndefined();
+  });
   it('has 60 unique factors and every spray references real factors',()=>{expect(Object.keys(TRAITS)).toHaveLength(60);for(const k of ['color','fruit','material','charm','moon'] as const)for(const p of sprayPool(k))if(p.trait)expect(TRAITS[p.trait]).toBeDefined();});
   it('makes every non-size factor obtainable and raises rare loot with participation',()=>{
     const obtainable=new Set(['fruit','material','charm','moon'].flatMap(k=>sprayPool(k as 'fruit').map(p=>p.trait)));
@@ -30,21 +40,22 @@ describe('garden daily life',()=>{
     const seed={...cmd,offer:dailyOffers('friend',day)[2].id};s=transition(s,seed,now,rng,{shopOwner:'friend'}).state;expect(s.journey!.bought).toBe(1);
   });
   it('persists one spray result, protects its fruit and consumes even if keeping old appearance',()=>{
-    let s=garden();s.produce=[fruit()];s.life!.sprays.fruit=1;
+    let s=garden();s.plots[0]=plant();s.life!.sprays.fruit=1;
     s=transition(s,{type:'spray',kind:'fruit',target:'fruit'},now,rng).state;
     const pending=s.life!.pending!;expect(pending.trait).toBe('sugar');expect(s.life!.sprays.fruit).toBe(0);
-    expect(()=>transition(s,{type:'sell',id:'fruit'},now,rng)).toThrow('喷雾结果');
+    expect(()=>transition(s,{type:'harvest',plot:0},now,rng)).toThrow('喷雾结果');
     expect(()=>transition(s,{type:'resolveSpray',id:pending.id,accept:true},now,rng)).toThrow('槽位');
     const restored=validateGarden(JSON.parse(JSON.stringify(s)));expect(restored.life!.pending).toEqual(pending);
     s=transition(restored,{type:'resolveSpray',id:pending.id,accept:false},now,rng).state;
-    expect(s.produce[0].traits).toEqual(['honey']);expect(s.life!.pending).toBeUndefined();expect(s.life!.sprays.fruit).toBe(0);
+    expect(s.plots[0]!.traits).toEqual(['honey']);expect(s.life!.pending).toBeUndefined();expect(s.life!.sprays.fruit).toBe(0);
   });
   it('applies same-slot replacement, preserves dye after harvest and does not inherit dye next batch',()=>{
-    let s=garden();s.produce=[fruit()];s.life!.sprays.fruit=1;
+    let s=garden();s.plots[0]=plant();s.life!.sprays.fruit=1;
     s=transition(s,{type:'spray',kind:'fruit',target:'fruit'},now,rng).state;
     s=transition(s,{type:'resolveSpray',id:s.life!.pending!.id,accept:true,replace:'honey'},now,rng).state;
-    expect(s.produce[0].traits).toEqual(['sugar']);
+    expect(s.plots[0]!.traits).toEqual(['sugar']);
     expect(s.discovered).toContain('strawberry:sugar');
+    s.plots[0]=null;
     s=transition(s,{type:'plant',plot:0,seed:s.seeds.find(x=>x.species==='strawberry')!.id},now,rng).state;
     s.plots[0]!.readyAt=now;s.plots[0]!.dye='pink';s.plots[0]!.revealed=true;
     s=transition(s,{type:'harvest',plot:0},now,rng).state;expect(s.produce.at(-1)!.dye).toBe('pink');expect(s.plots[0]!.dye).toBeUndefined();

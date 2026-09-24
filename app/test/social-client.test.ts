@@ -63,11 +63,15 @@ describe('social connection and local rehearsal boundaries',()=>{
   it('isolates local guests/messages and prevents duplicate invitations',async()=>{
     data.guests=[{id:'guest',name:'棉花糖',source:'角色库',character:{dirId:'guest',manifest:{},hasUnfinishedJob:false}}];
     await rooms.startTestRoom();await rooms.inviteTestGuest('guest');await expect(rooms.inviteTestGuest('guest')).rejects.toThrow('已经');
+    const rehearsal=await import('../src/main/garden/local-rehearsal');
+    expect(rehearsal.getRehearsal()!.visit('test:guest').plots).toHaveLength(6);
     rooms.replyTestGuest('test:guest','模拟回应');await rooms.sendSocialChat('我来测试');
     expect(rooms.getRoomsCache().chat).toHaveLength(2);expect(Socket.all).toHaveLength(0);
     await expect(rooms.listRooms()).rejects.toThrow('试演');
     rooms.removeTestGuest('test:guest');expect(rooms.getRoomsCache().room?.members).toHaveLength(1);
+    expect(()=>rehearsal.getRehearsal()!.visit('test:guest')).toThrow('离开');
     rooms.leaveRoom();expect(rooms.getRoomsCache().chat).toEqual([]);expect(rooms.getTestGuest('test:guest')).toBeUndefined();
+    expect(rehearsal.getRehearsal()).toBeUndefined();
   });
   it('does not merge public chat into room history or duplicate public messages',async()=>{
     const push=vi.fn();rooms.setLoungePush(push);await rooms.subscribeWorld(true);

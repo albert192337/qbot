@@ -894,3 +894,6 @@ body:not(.strip) .tag,.strip .tag { border-radius:14px 3px 14px 3px; }
 
 
 .mystery-fruit{padding:0!important;text-align:center;line-height:1;overflow:visible}.strip .plot>.mystery-fruit{font-size:48px!important;min-height:70px}.weather-back{margin:12px}.book-heading progress{width:100%;accent-color:#82ac93}
+
+/* Head-area priority is shared with the independent pet and speech windows. */
+body.strip[data-head-overlay=interaction] .quest-pill,body.strip[data-head-overlay=wish] .quest-pill,body.strip[data-head-overlay=speech] .quest-pill {display:none;pointer-events:none;}

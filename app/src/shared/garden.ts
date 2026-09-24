@@ -1,5 +1,5 @@
 import type { TravelState, TravelCommand } from './travel';
-import {qualityOf} from './garden-v3';
+import {qualityOf,speciesLevel} from './garden-v3';
 /** Garden demo contract. No Electron or existing game dependencies. */
 export const SPECIES = {
     lotus: { name: '莲花', minutes: 60, price: 65, kg: .6, harvests: 1, rarity: 'blue', chance: .5 },
@@ -14,10 +14,12 @@ export const SPECIES = {
 } as const;
 export type Species = keyof typeof SPECIES;
 /** Unfertilized duration of each harvest; shared by shop and seed picker. */
-export function growthLabel(species: Species): string {
-    const { minutes, harvests } = SPECIES[species];
-    const duration = minutes >= 60 ? `${minutes / 60} 小时` : `${minutes} 分钟`;
-    return harvests > 1 ? `${duration} / 轮 · 可采 ${harvests} 次` : `${duration} 成熟`;
+export function sowingMinutes(species:Species,state?:GardenState):number {
+    return SPECIES[species].minutes * (state?.v3 ? 1-.01*(speciesLevel(state.xp[species])-1) : state ? 1-.03*(level(state.xp[species])-1) : 1);
+}
+export function growthLabel(species: Species,state?:GardenState): string {
+    const minutes=Number(sowingMinutes(species,state).toFixed(2)),harvests=SPECIES[species].harvests;
+    return `${minutes} 分钟成熟${harvests>1?` / 轮 · 可采 ${harvests} 次`:''}`;
 }
 export const TRAITS = {
     shiny: { name: '闪亮', category: 'accessory', tier: 'blue', level: 1, chance: .008, multiplier: 1.5 },
@@ -149,6 +151,7 @@ export interface Offer {
     stock: number;
 }
 export interface GardenState {
+    rehearsal?: { members: {id:string;name:string}[] };
     cooperationRewardsLeft?:number;
     v3?:import('./garden-v3').GardenV3;
     life?: import('./garden-life').GardenLife;

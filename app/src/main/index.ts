@@ -2,7 +2,8 @@ import { startSteam, stopSteam, handleSteamArgs } from './steam/runtime';
 import { recoverCloudJobs } from './cloud-generation';
 import { initUserMemory, flushUserMemory } from './user-memory';
 /** 主进程入口：协议注册（必须在 ready 前）→ 预置角色 → 窗口/托盘/IPC */
-import { app, net, protocol, screen } from 'electron';
+import { app, net, protocol, screen, dialog } from 'electron';
+import { applyPendingProgressReset } from './reset-progress-storage';
 import { existsSync } from 'node:fs';
 import { open, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -61,6 +62,11 @@ app.on('second-instance', (_event, argv) => {
 });
 
 app.whenReady().then(async () => {
+  try { await applyPendingProgressReset(app.getPath('userData')); }
+  catch (e) {
+    await dialog.showMessageBox({type:'error',message:'养成重置尚未完成',detail:'原始备份和重置请求已保留。请检查磁盘空间与文件权限后重新启动。\n'+String(e)});
+    app.quit(); return;
+  }
   // 初始化全局错误处理
   initErrorHandler();
   await initUserMemory();

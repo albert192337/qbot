@@ -1,3 +1,4 @@
+import {registerDesktopOverlays} from './desktop-overlays';
 import { saveResourceAnnotation, saveScenePools } from './resource-settings';
 import { registerSocialIpc } from './social-ipc';
 import { moveRoomPetWindow } from './windows';
@@ -69,6 +70,7 @@ import { registerStickerLibraryIpc } from './sticker-library-ipc';
 import { getIdlePlan } from './idle-plan';
 
 export function registerIpc(): void {
+  registerDesktopOverlays((id,kind)=>id===getPetWindow()?.webContents.id||(kind==='speech'&&id===getBubbleWindow()?.webContents.id));
   registerSocialIpc();
   ipcMain.handle('behavior:getIdlePlan',(_ev,id:string)=>getIdlePlan(id));
   ipcMain.handle('memory:retry', async () => {
@@ -344,6 +346,7 @@ export function registerIpc(): void {
       { label: '角色管理…', click: () => createConsoleWindow() },
       { label: '草莓基因工坊（效果预览）…', click: () => openGenePreview() },
       { label: '3D 草莓放到桌面（试摆）…', click: () => openDesktopGenePreview() },
+      { label: '养成从头开始…', click: () => { void import('./reset-progress').then(m => m.confirmProgressReset(win)); } },
       { label: '工具抽屉（日志）…', click: async () => {
         await setSettings({ developerMode: true });
         createConsoleWindow('devtools');

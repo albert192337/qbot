@@ -66,8 +66,8 @@ export function lifeTransition(s:GardenState,cmd:GardenCommand,now:number,rng:Ra
     case 'spray':{
       if(l.pending)throw Error('请先处理上次喷雾结果');
       if(!Object.hasOwn(SPRAYS,cmd.kind)||!(l.sprays[cmd.kind]!>0))throw Error('喷雾不足');
-      const p=s.produce.find(p=>p.id===cmd.target)??s.plots.find(p=>p?.id===cmd.target&&p.readyAt<=now);
-      if(!p||p.locked||needsReveal(p)||('cultivation'in p&&p.cultivation))throw Error('请选择成熟、已揭晓且未收藏锁定的果实');
+      const p=s.plots.find(p=>p?.id===cmd.target&&p.readyAt<=now);
+      if(!p||p.locked||needsReveal(p)||p.cultivation)throw Error('请点击地里成熟、已揭晓且未收藏锁定的作物使用喷雾');
       const pool=sprayPool(cmd.kind);let n=rng.random()*pool.reduce((v,x)=>v+x.weight,0);const out=pool.find(x=>(n-=x.weight)<0)??pool.at(-1)!;
       l.sprays[cmd.kind]!--;l.pending={id:rng.id(),target:p.id,kind:cmd.kind,trait:out.trait,dye:out.dye};
       recordGarden(s,now,'spray',`用了一瓶${SPRAYS[cmd.kind].name}`,undefined,p.id);

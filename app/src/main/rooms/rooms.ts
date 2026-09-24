@@ -1,3 +1,4 @@
+import {setRehearsalMembers,clearRehearsal} from '../garden/local-rehearsal';
 /**
  * 公共房间链路（spec 2026-08-21）：连 rooms 服务、开/加/退房、出在场帧、收广播 → 转 renderer。
  *
@@ -706,6 +707,7 @@ export async function joinRoom(roomId: string): Promise<RoomSnapshot> {
 export function leaveRoom(): void {
   if (!currentRoomId) return;
   const wasTest = roomCache?.testing;
+  if(wasTest){clearRehearsal();push('garden:changed',{});}
   send({ t: 'leave', roomId: currentRoomId });
   testGuests.clear();
   currentRoomId = null;
@@ -887,6 +889,8 @@ export async function moderateSocial(id: string, action: 'delete' | 'report', wo
 
 const testGuests = new Map<string, TestGuest>();
 function publishTest(): void {
+  setRehearsalMembers(roomCache!.members.map(m=>({id:m.memberId,name:m.nickname})));
+  push('garden:changed',{});
   setStatus({phase:'in-room', memberId:memberId!, room:roomCache!});
   push('rooms:history', chatCache);
 }

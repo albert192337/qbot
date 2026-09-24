@@ -94,6 +94,7 @@ __export(server_entry_exports, {
   rollTraits: () => rollTraits,
   scoreOf: () => scoreOf,
   sizeOf: () => sizeOf,
+  sowingMinutes: () => sowingMinutes,
   speciesLevel: () => speciesLevel,
   sprayConflicts: () => sprayConflicts,
   sprayPool: () => sprayPool,
@@ -389,10 +390,12 @@ var SPECIES = {
   apple: { name: "\u82F9\u679C", minutes: 480, price: 240, kg: 0.4, harvests: 3, rarity: "gold", chance: 0.12 },
   tulip: { name: "\u90C1\u91D1\u9999", minutes: 60, price: 55, kg: 0.25, harvests: 1, rarity: "green", chance: 0.7 }
 };
-function growthLabel(species2) {
-  const { minutes, harvests } = SPECIES[species2];
-  const duration = minutes >= 60 ? `${minutes / 60} \u5C0F\u65F6` : `${minutes} \u5206\u949F`;
-  return harvests > 1 ? `${duration} / \u8F6E \xB7 \u53EF\u91C7 ${harvests} \u6B21` : `${duration} \u6210\u719F`;
+function sowingMinutes(species2, state) {
+  return SPECIES[species2].minutes * (state?.v3 ? 1 - 0.01 * (speciesLevel(state.xp[species2]) - 1) : state ? 1 - 0.03 * (level(state.xp[species2]) - 1) : 1);
+}
+function growthLabel(species2, state) {
+  const minutes = Number(sowingMinutes(species2, state).toFixed(2)), harvests = SPECIES[species2].harvests;
+  return `${minutes} \u5206\u949F\u6210\u719F${harvests > 1 ? ` / \u8F6E \xB7 \u53EF\u91C7 ${harvests} \u6B21` : ""}`;
 }
 var TRAITS = {
   shiny: { name: "\u95EA\u4EAE", category: "accessory", tier: "blue", level: 1, chance: 8e-3, multiplier: 1.5 },
@@ -613,8 +616,8 @@ function lifeTransition(s, cmd, now, rng, actor, shopOwner) {
     case "spray": {
       if (l.pending) throw Error("\u8BF7\u5148\u5904\u7406\u4E0A\u6B21\u55B7\u96FE\u7ED3\u679C");
       if (!Object.hasOwn(SPRAYS, cmd.kind) || !(l.sprays[cmd.kind] > 0)) throw Error("\u55B7\u96FE\u4E0D\u8DB3");
-      const p = s.produce.find((p2) => p2.id === cmd.target) ?? s.plots.find((p2) => p2?.id === cmd.target && p2.readyAt <= now);
-      if (!p || p.locked || needsReveal(p) || "cultivation" in p && p.cultivation) throw Error("\u8BF7\u9009\u62E9\u6210\u719F\u3001\u5DF2\u63ED\u6653\u4E14\u672A\u6536\u85CF\u9501\u5B9A\u7684\u679C\u5B9E");
+      const p = s.plots.find((p2) => p2?.id === cmd.target && p2.readyAt <= now);
+      if (!p || p.locked || needsReveal(p) || p.cultivation) throw Error("\u8BF7\u70B9\u51FB\u5730\u91CC\u6210\u719F\u3001\u5DF2\u63ED\u6653\u4E14\u672A\u6536\u85CF\u9501\u5B9A\u7684\u4F5C\u7269\u4F7F\u7528\u55B7\u96FE");
       const pool = sprayPool(cmd.kind);
       let n = rng.random() * pool.reduce((v, x) => v + x.weight, 0);
       const out = pool.find((x) => (n -= x.weight) < 0) ?? pool.at(-1);
@@ -744,7 +747,7 @@ function drawFactor(pool, weights, random) {
   return available.length ? choose(available, random) : void 0;
 }
 function makeV3Plant(s, seed, plot, now, rng, harvests = SPECIES[seed.species].harvests, index = 0) {
-  const duration = SPECIES[seed.species].minutes * 6e4 * (1 - 0.01 * (speciesLevel(s.xp[seed.species]) - 1));
+  const duration = sowingMinutes(seed.species, s) * 6e4;
   const traits = cappedTraits(seed.genes.filter((t) => traitSlot(t) !== "size")), slots = seed.slots ?? geneSlots(traits);
   return {
     id: rng.id(),
@@ -1667,6 +1670,7 @@ function pairFlip(facing, side) {
   rollTraits,
   scoreOf,
   sizeOf,
+  sowingMinutes,
   speciesLevel,
   sprayConflicts,
   sprayPool,

@@ -129,7 +129,7 @@ function toggle(): void {
 }
 let weatherPanel: BrowserWindow | null=null;
 export function openGardenPanel(page: string): void {
-    const allowed = /^(weather|travel|moments|bag|shop|book|plots|sow|daily|sprays|feeding|friends|notebook|visit:[0-9A-Z]{12}(?::[0-5]:[a-zA-Z0-9_-]{1,160})?|plot:[0-5])$/.test(page) ? page : 'bag';
+    const allowed = /^(weather|travel|moments|bag|shop|book|plots|sow|daily|sprays|feeding|friends|notebook|visit:(?:test:[a-zA-Z0-9_.-]{1,160}|[0-9A-Z]{12})(?::[0-5]:[a-zA-Z0-9_-]{1,160})?|plot:[0-5])$/.test(page) ? page : 'bag';
     if(allowed==='weather'){
         if(weatherPanel&&!weatherPanel.isDestroyed()){weatherPanel.show();weatherPanel.focus();return;}
         const wa=screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
@@ -183,7 +183,7 @@ export function registerGardenIpc(): void {
     ipcMain.handle('garden:get', () => getGarden());
     ipcMain.handle('garden:act', async (_ev, command) => {
         const result = await gardenAction(command);
-        if(result.ok && command.type==='cultivate'){
+        if(result.ok && command.type==='cultivate' && !result.state.rehearsal){
             const p=result.state.plots[command.plot]!;
             let playing=false;try{playing=await perform(command.plot,'cultivate',cultivationRemaining(p,Date.now()),result.state.online?result.state.life?.owner:undefined);}catch{stopPerformance();}
             if(!playing){await gardenAction({type:'pauseCultivation',plot:command.plot});return {ok:false,error:'请先显示桌宠并选择可播放动作的角色，再继续培育'};}

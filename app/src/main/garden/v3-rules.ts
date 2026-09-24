@@ -1,4 +1,4 @@
-import {SPECIES,TRAITS,LEVEL_XP,FERTILIZERS,traitSlot,needsReveal,canBreed,type GardenState,type Plant,type Produce,type Seed,type Trait,type Species,type GardenCommand,type GardenReveal} from '../../shared/garden';
+import {sowingMinutes,SPECIES,TRAITS,LEVEL_XP,FERTILIZERS,traitSlot,needsReveal,canBreed,type GardenState,type Plant,type Produce,type Seed,type Trait,type Species,type GardenCommand,type GardenReveal} from '../../shared/garden';
 import {dailyRandom,gardenDay,nextGardenDay} from '../../shared/garden-life';
 import {V3,V3_XP,AFFINITIES,AFFINITY_WEIGHTS,V3_WEATHER,weatherWeights,exposures,fits,cappedTraits,withSize,qualityOf,scoreOf,speciesLevel,fertilizerV3,v3Value,weekKey,geneSlots,stableSlots,recordGarden,type FactorQuality,type Exposure} from '../../shared/garden-v3';
 import type {Random} from './rules';
@@ -21,7 +21,7 @@ export function poisson(mean:number,random:()=>number):number {let p=1,n=0;const
 function weighted<T>(items:T[],weight:(t:T)=>number,random:()=>number):T {let ticket=random()*items.reduce((sum,x)=>sum+weight(x),0);return items.find(x=>(ticket-=weight(x))<0)??items.at(-1)!;}
 function drawFactor(pool:Trait[],weights:number[],random:()=>number):Trait|undefined {const tiers:FactorQuality[]=['blue','purple','gold','rainbow'];const q=weighted(tiers,t=>weights[tiers.indexOf(t)],random),available=pool.filter(t=>TRAITS[t].tier===q);return available.length?choose(available,random):undefined;}
 export function makeV3Plant(s:GardenState,seed:Seed,plot:number,now:number,rng:Random,harvests:number=SPECIES[seed.species].harvests,index=0):Plant {
- const duration=SPECIES[seed.species].minutes*60000*(1-.01*(speciesLevel(s.xp[seed.species])-1));
+ const duration=sowingMinutes(seed.species,s)*60000;
  const traits=cappedTraits(seed.genes.filter(t=>traitSlot(t)!=='size')),slots=seed.slots??geneSlots(traits);
  return {id:rng.id(),species:seed.species,traits,kg:SPECIES[seed.species].kg,value:0,bred:false,growthVersion:3,plantedAt:now,readyAt:now+duration,fertilizers:[],baseTraits:traits,harvestsLeft:harvests,harvestIndex:index,yieldCount:SPECIES[seed.species].harvests,lineage:seed.lineage,slots,
  batch:{seedlingEnd:now+duration*V3.seedling,naturalReadyAt:now+duration,settled:false,seed:Math.floor(rng.random()*4294967296),realm:s.v3!.realm??'garden',exposure:[],candidates:[],slots,massGene:seed.massGene,soil:s.v3!.soil[plot],sunBonus:Math.min(2,s.v3!.sunActive??0)*.03}};

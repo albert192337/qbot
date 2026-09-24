@@ -4,6 +4,17 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
+  overlays: {
+    report:(kind,active)=>ipcRenderer.send('overlays:report',kind,active),
+    onChanged:cb=>{
+      let alive=true,revision=-1;
+      const deliver=(snapshot:import('../shared/desktop-overlays').HeadSnapshot)=>{if(alive&&snapshot.revision>=revision){revision=snapshot.revision;cb(snapshot);}};
+      const listener=(_e:unknown,snapshot:import('../shared/desktop-overlays').HeadSnapshot)=>deliver(snapshot);
+      ipcRenderer.on('overlays:changed',listener);
+      void ipcRenderer.invoke('overlays:get').then(deliver).catch(()=>{});
+      return()=>{alive=false;ipcRenderer.removeListener('overlays:changed',listener);};
+    },
+  },
   memory: {
     retry: () => ipcRenderer.invoke('memory:retry'),
     get: (character, debug) => ipcRenderer.invoke('memory:get', character, debug),

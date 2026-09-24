@@ -1,3 +1,4 @@
+import {headAllows} from '../../shared/desktop-overlays';
 /**
  * 气泡窗渲染层：订阅 agent 消息 → 维护气泡栈 DOM → 到点淡出 → 空栈通知主进程隐藏。
  * 栈的增删逻辑全在 stack.ts（纯函数），这里只管 DOM 与定时器。
@@ -16,6 +17,7 @@ import {
 
 const stackEl = document.getElementById('stack') as HTMLDivElement;
 let thinkingNode: HTMLElement | null = null;
+let speechAllowed=true;
 
 function setThinking(thinking: boolean): void {
   if (thinking === Boolean(thinkingNode)) return;
@@ -41,6 +43,8 @@ function syncHeight(): void {
   const nodes = [...stackEl.children] as HTMLElement[];
   const needed = nodes.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0) + Math.max(0, nodes.length - 1) * 8;
   stackEl.style.height = `${Math.min(500, Math.max(anchorHeight, needed))}px`;
+  window.qbot.overlays.report('speech',!document.hidden&&nodes.some(el=>!el.classList.contains('fade-out')));
+  if(!speechAllowed){window.qbot.bubble.reportBounds(null);return;}
   const visible = nodes.filter(el => !el.classList.contains('fade-out')).map(el => el.getBoundingClientRect());
   window.qbot.bubble.reportBounds(visible.length ? {left:Math.min(...visible.map(r=>r.left)),right:Math.max(...visible.map(r=>r.right)),top:Math.min(...visible.map(r=>r.top)),bottom:Math.max(...visible.map(r=>r.bottom))} : null);
 }
@@ -193,13 +197,19 @@ function clearAll(): void {
   fading.clear();
   thinkingNode = null;
   stackEl.replaceChildren();
+  window.qbot.overlays.report('speech',false);
   // 不发 reportEmpty：主进程正在隐藏本窗，回环没意义
 }
 
+window.qbot.overlays.onChanged(s=>{
+  speechAllowed=headAllows(s.winner,'speech');stackEl.style.visibility=speechAllowed?'':'hidden';stackEl.inert=!speechAllowed;
+  if(!speechAllowed)window.qbot.bubble.ignoreMouse(true);syncHeight();
+});
+document.addEventListener('visibilitychange',syncHeight);
 window.qbot.agent.onMessage(onMessage);
 window.qbot.bubble.onThinking(setThinking);
 document.addEventListener('mousemove', e => {
-  const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest('.reward-close');
+  const hit = speechAllowed&&document.elementFromPoint(e.clientX, e.clientY)?.closest('.reward-close');
   window.qbot.bubble.ignoreMouse(!hit);
 });
 document.addEventListener('mouseleave', () => window.qbot.bubble.ignoreMouse(true));

@@ -1,3 +1,4 @@
+import {getRehearsal} from './local-rehearsal';
 import { supportsGarden3D } from '../../shared/garden-render';
 import { applyWeatherMutations } from './weather-rules';
 import { prepareTravelMemory, writeTravelDiary } from './travel-memory';
@@ -88,6 +89,7 @@ async function recover(): Promise<GardenState> {
 export function getGarden(): Promise<GardenState> {
     return serial(async () => {
         const settings=await getSettings();
+        if(getRehearsal()){const rehearsal=getRehearsal()!;rehearsal.initializeOwn((await load()).state);return rehearsal.get(settings.activeCharacter??undefined);}
         if(settings.gardenOnline)return (await import('./network')).networkGarden();
         const state = structuredClone(await recover());
         const oldPlots=JSON.stringify(state.plots);
@@ -116,6 +118,7 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
     return serial(async () => {
         try {
             const settings=await getSettings();
+            if(getRehearsal()){const rehearsal=getRehearsal()!;rehearsal.initializeOwn((await load()).state);const result=rehearsal.act(command,settings.activeCharacter??undefined);for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');return result;}
             if(settings.gardenOnline)return (await import('./network')).networkAction(command);
             if (!command || typeof command !== 'object')
                 throw Error('无效花园操作');

@@ -13,6 +13,6 @@ body.pair-mode #food-wish,body.garden-performing #food-wish {display:none;}
 
 #network-interaction[data-kind=feed] span{animation:food-towards-pet 1.4s ease-in both}#network-interaction[data-kind=photo]{border:10px solid #fff9ee;border-bottom-width:30px;outline:1px solid #ba9d76;border-radius:3px;min-width:130px;min-height:100px} @keyframes food-towards-pet{0%{transform:translateY(-20px) scale(1);opacity:1}80%{transform:translateY(70px) scale(.25);opacity:1}100%{transform:translateY(80px) scale(0);opacity:0}}@media(prefers-reduced-motion:reduce){#network-interaction[data-kind=feed] span{animation:none}}
 
-body[data-agent-activity=thinking] #food-wish,body[data-agent-activity=working] #food-wish,body:has(#bubble.show) #food-wish{display:none}
+body[data-head-overlay=wish] #bubble,body[data-head-overlay=interaction] #bubble{visibility:hidden;pointer-events:none;}
 
 body.pair-mode #network-interaction[data-kind=photo]{display:none}

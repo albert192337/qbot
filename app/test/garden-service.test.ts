@@ -26,6 +26,22 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 beforeEach(async () => { vi.resetModules(); vi.spyOn(Math, 'random').mockReturnValue(.8); mock.dir = await mkdtemp(path.join(os.tmpdir(), 'garden-store-')); mock.points = 500; mock.boxes = 1; mock.receipts.clear(); mock.renameCount = 0; mock.failAt = 0; });
 afterEach(async () => { vi.restoreAllMocks(); await rm(mock.dir, { recursive: true, force: true }); });
 describe('garden transaction journal', () => {
+    it('routes rehearsal actions away from saved assets even when online garden is enabled',async()=>{
+        const api=await import('../src/main/garden/service');await api.getGarden();
+        const saved=await readFile(path.join(mock.dir,'garden-demo.json'),'utf8');
+        await writeFile(path.join(mock.dir,'config.json'),JSON.stringify({gardenOnline:true}));
+        const rehearsal=await import('../src/main/garden/local-rehearsal');
+        rehearsal.setRehearsalMembers([{id:'test:me',name:'我'}]);
+        try{
+            const state=await api.getGarden();expect(state.rehearsal).toBeDefined();
+            expect(state.coins).toBe(JSON.parse(saved).state.coins);
+            expect((await api.gardenAction({type:'plant',plot:0,seed:state.seeds[0].id})).ok).toBe(true);
+            expect(await readFile(path.join(mock.dir,'garden-demo.json'),'utf8')).toBe(saved);
+            expect(mock.receipts.size).toBe(0);expect(mock.points).toBe(500);
+        }finally{rehearsal.clearRehearsal();}
+        await writeFile(path.join(mock.dir,'config.json'),JSON.stringify({gardenOnline:false}));
+        expect((await api.getGarden()).rehearsal).toBeUndefined();
+    });
     it('3D mode permits single and batch pineapple sowing',async()=>{
         let api=await import('../src/main/garden/service');const state=await api.getGarden();
         state.seeds.push({id:'pineapple-single',species:'pineapple',genes:[],bred:false},{id:'pineapple-batch',species:'pineapple',genes:[],bred:false});

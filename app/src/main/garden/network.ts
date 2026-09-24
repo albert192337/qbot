@@ -1,3 +1,4 @@
+import {getRehearsal} from './local-rehearsal';
 import { app, BrowserWindow } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { readFile,writeFile,rename,mkdir,unlink } from 'node:fs/promises';
@@ -24,7 +25,7 @@ export async function networkGarden():Promise<GardenState>{
   }
   return r.state as GardenState;
 }
-export async function setNetworkGarden(enable:boolean):Promise<void>{if(enable)await networkGarden();await setSettings({gardenOnline:enable});notify();}
+export async function setNetworkGarden(enable:boolean):Promise<void>{if(getRehearsal())return; if(enable)await networkGarden();await setSettings({gardenOnline:enable});notify();}
 /** Persist an uncertain command so retries after restart keep the same transaction identity. */
 export async function networkAction(command:GardenCommand):Promise<GardenResult>{
   const s=await getSettings(),file=pendingFile();
@@ -37,8 +38,9 @@ export async function networkAction(command:GardenCommand):Promise<GardenResult>
   const r=await gardenRequest({action:'act',command:pending.command,actor:pending.actor,operation:pending.id});
   await clearPending();notify();return r as unknown as GardenResult;
 }
-export async function visitGarden(owner:string,preview=false,task?:string):Promise<GardenVisit>{if(!/^[0-9A-Z]{12}$/.test(owner))throw Error('玩家不存在');const r=await gardenRequest({action:preview?'preview':'visit',owner,task});if(!r.ok)throw Error(String(r.error));return r.visit as GardenVisit;}
+export async function visitGarden(owner:string,preview=false,task?:string):Promise<GardenVisit>{if(getRehearsal())return getRehearsal()!.visit(owner);if(!/^[0-9A-Z]{12}$/.test(owner))throw Error('玩家不存在');const r=await gardenRequest({action:preview?'preview':'visit',owner,task});if(!r.ok)throw Error(String(r.error));return r.visit as GardenVisit;}
 export async function cooperateGarden(owner:string,plot:number,action:'join'|'leave'|'claim'|'share'|'invite',target?:string,task?:string):Promise<GardenVisit>{
+  if(getRehearsal()){const v=getRehearsal()!.cooperate(owner,plot,action,target,task);if(action!=='join')notify();return v;}
   if(!/^[0-9A-Z]{12}$/.test(owner)||!Number.isInteger(plot)||plot<0||plot>5||!['join','leave','claim','share','invite'].includes(action))throw Error('无效培育请求');
   if(action==='invite'&&(!target||!/^[0-9A-Z]{12}$/.test(target)))throw Error('请选择好友');
   const r=await gardenRequest({action:'coop',owner,plot,command:action,target,task});if(!r.ok)throw Error(String(r.error));if(action!=='join')notify();return r.visit as GardenVisit;

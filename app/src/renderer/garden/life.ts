@@ -1,4 +1,4 @@
-import {SPECIES,TRAITS,TIER_NAMES,traitSlot,needsReveal,canBreed,type GardenState,type GardenCommand,type Produce,type Trait,type Plant} from '../../shared/garden';
+import {SPECIES,growthLabel,TRAITS,TIER_NAMES,traitSlot,needsReveal,canBreed,type GardenState,type GardenCommand,type Produce,type Trait,type Plant} from '../../shared/garden';
 import {SPRAYS,DYE_COLORS,FOOD_ICONS,CHARACTER_XP,CHARACTER_UNLOCKS,characterLevel,currentGrowth,dailyOffers,nextGardenDay,sprayPool,wishMatches,wishLabel,coopRareChance,type SprayKind,type GardenVisit} from '../../shared/garden-life';
 import './life.css';
 type Context={state:GardenState;act:(c:GardenCommand)=>Promise<void>;go:(p:string)=>void;refresh:()=>Promise<void>;notice:(s:string)=>void;busy:boolean;plantArt:(p:Plant)=>HTMLElement};
@@ -17,17 +17,17 @@ export function renderDaily(host:HTMLElement,c:Context,owner=c.state.life?.owner
   for(const o of visit?.offers??dailyOffers(owner,day)){
     const used=l.purchases[`${owner}/${o.id}`]??0,remaining=Math.max(0,o.limit-used),spray=o.kind==='spray'?SPRAYS[o.item as SprayKind]:undefined;
     const item=card(spray?'🧴 '+spray.name:FOOD_ICONS[o.item as keyof typeof SPECIES]+' '+SPECIES[o.item as keyof typeof SPECIES].name+'种子',spray?.description??'带回自己的花园种下');
-    if(spray)item.append(poolDetails(o.item as SprayKind));
+    if(spray)item.append(poolDetails(o.item as SprayKind));else item.append(el('small',growthLabel(o.item as keyof typeof SPECIES,c.state)));
     item.append(el('small',`你还可买 ${remaining} 份`),btn(`◉ ${o.price} · 带回家`,()=>c.act({type:'buyDaily',owner,offer:o.id}),c.busy||!remaining||c.state.coins<o.price||!!spray&&l.rareBought>=3));grid.append(item);
   }
   host.append(grid);
-  if(!visit)host.append(btn('去朋友的小店看看',()=>c.go('friends')),btn('普通种子与肥料',()=>c.go('shop')));
+  if(!visit)host.append(btn('去朋友的小店看看',()=>c.go('friends')));
 }
-export function renderSprays(host:HTMLElement,c:Context):void{
+export function renderSprays(host:HTMLElement,c:Context,target?:string):void{
   const l=c.state.life;if(!l)return;
-  host.append(el('h2','给果实一点新模样'),el('p','使用后随机揭晓；可保留原样，但喷雾仍会消耗。纯染色不增加词条或售价。','muted'));
+  host.append(el('h2','给地里的作物换个模样'),el('p','使用后随机揭晓；可保留原样，但喷雾仍会消耗。纯染色不增加词条或售价。','muted'));
   const pending=l.pending;
-  if(pending){
+  if(pending&&(!target||pending.target===target)){
     const p=c.state.produce.find(p=>p.id===pending.target)??c.state.plots.find(p=>p?.id===pending.target);
     const result=card('✨ '+(pending.trait?TRAITS[pending.trait].name:DYE_COLORS[pending.dye!].name),'结果已保存。选择使用，或保留原来的模样。');
     if(p){result.append(el('p',badge(p)));const same=pending.trait?p.traits.filter(t=>traitSlot(t)===traitSlot(pending.trait!)):[];
@@ -36,12 +36,13 @@ export function renderSprays(host:HTMLElement,c:Context):void{
     }
     result.append(btn('保留原样（喷雾已消耗）',()=>c.act({type:'resolveSpray',id:pending.id,accept:false}),c.busy));host.append(result);return;
   }
-  const targets=[...c.state.produce,...c.state.plots.filter((p):p is NonNullable<typeof p>=>!!p&&p.readyAt<=Date.now())].filter(p=>!p.locked&&!needsReveal(p));
+  const plant=c.state.plots.find(p=>p?.id===target);
+  if(!plant){host.append(el('p','点击地里成熟的作物，在详情中选择「使用喷雾」。收获篮中的果实不能喷雾。'),btn('去我的土地',()=>c.go('plots')));return;}
+  if(pending){host.append(el('p','请先处理另一株作物的喷雾结果'),btn('查看待选结果',()=>c.go('sprays')));return;}
   const grid=el('div','','grid');
   for(const kind of Object.keys(SPRAYS) as SprayKind[]){const n=l.sprays[kind]??0;if(!n)continue;const spray=SPRAYS[kind],item=card(`🧴 ${spray.name} ×${n}`,spray.description);
     item.append(poolDetails(kind));
-    const select=el('select');select.setAttribute('aria-label',spray.name+'使用目标');select.append(new Option('选择一颗果实',''));for(const p of targets)select.append(new Option(badge(p),p.id));
-    const use=btn('使用并揭晓',()=>{if(select.value)void c.act({type:'spray',kind,target:select.value});},true);select.onchange=()=>{use.disabled=c.busy||!select.value;};item.append(select,use);grid.append(item);
+    item.append(btn('使用'+spray.name,()=>c.act({type:'spray',kind,target:plant.id}),c.busy||plant.readyAt>Date.now()||!!plant.locked||needsReveal(plant)||!!plant.cultivation));grid.append(item);
   }
   if(!grid.children.length)grid.append(el('p','还没有喷雾。去每日商店看看，或参加朋友的培育。','empty'));host.append(grid,btn('逛今日商店',()=>c.go('daily')));
 }
@@ -67,25 +68,27 @@ export function renderFeeding(host:HTMLElement,c:Context):void{
 export function renderFriends(host:HTMLElement,c:Context):void{
   host.append(el('h2','朋友的花园与小店'));
   for(const t of c.state.cooperations??[])if(t.done){const reward=card('共同培育完成了','即使主人已经收获，你的助育奖励仍可领取。');reward.append(btn('领取助育奖励',async()=>{await window.qbot.garden.cooperate(t.owner,t.plot,'claim',undefined,t.id);await c.refresh();},c.busy));host.append(reward);}
+  if(c.state.rehearsal){host.append(el('p','本地试演：自己的土地使用本地收藏副本，其他角色使用虚拟花园；操作不会写回正式存档。'),btn('我的模拟土地',()=>c.go('plots')));for(const m of c.state.rehearsal.members.filter(m=>m.id!==c.state.life?.owner)){const row=card(m.name,'测试角色 · 虚拟花园与商店');row.append(btn('看土地 / 逛商店',()=>c.go('visit:'+m.id)));host.append(row);}return;}
   if(!c.state.online){host.append(el('p','联机花园由服务器保存，每个人都有自己的每日货架。现有本地收藏会完整保留，开通后从新的联机花园开始。'),btn('开通 / 进入联机花园',async()=>{await window.qbot.garden.online(true);await c.refresh();},c.busy));return;}
   for(const scope of ['land','shop'] as const){const privacy=el('select');for(const [v,n] of [['private','仅自己'],['friends','仅好友'],['public','所有人']])privacy.append(new Option(n,v));privacy.value=(scope==='shop'?c.state.life?.shopVisibility:undefined)??c.state.life?.visibility??'friends';privacy.onchange=()=>void c.act({type:'gardenVisibility',scope,visibility:privacy.value as 'friends'});host.append(el('label',scope==='land'?'土地查看范围':'商店购物范围'),privacy);}host.append(btn('返回本地收藏花园',async()=>{await window.qbot.garden.online(false);await c.refresh();}));
   if(c.state.v3){host.append(el('h3',`向日葵伙伴 ${c.state.v3.sunPartners.length}/2`),el('p','双方接受后，朋友地里有向日葵时，为你下一轮果实增加 0.03 重量倍率，最多 +0.06。可以随时解除。'));for(const id of c.state.v3.sunPartners)host.append(btn('回访伙伴',()=>c.go('visit:'+id)),btn('解除绑定',()=>c.act({type:'sunRemove',target:id})));for(const id of c.state.v3.sunRequests??[])host.append(btn('看看邀请者',()=>c.go('visit:'+id)),btn('接受向日葵邀请',()=>c.act({type:'sunAnswer',target:id,accept:true})),btn('婉拒',()=>c.act({type:'sunAnswer',target:id,accept:false})));}
   const list=el('div','','grid');host.append(list);void window.qbot.social.contacts(true).then(s=>{if(!host.isConnected)return;for(const p of s.people.filter(p=>p.relation==='friend')){const row=card(p.nickname,p.online?'在线 · 去看看今日有什么':'离线 · 开放的商店仍可访问');row.append(btn('看土地 / 逛商店',()=>c.go('visit:'+p.id)));list.append(row);void window.qbot.garden.visit(p.id,true).then(v=>{if(!row.isConnected)return;row.append(el('small',`${v.actorName??p.character} · Lv.${v.actorLevel}`),el('p',v.shopOpen===false?'商店暂未开放':v.offers.filter(o=>o.kind==='spray').map(o=>{const left=o.limit-(c.state.life?.purchases[p.id+'/'+o.id]??0);return '🧴 '+SPRAYS[o.item as SprayKind].name+(left>0?' · 可购买':' · 已买过');}).join(' / ')));}).catch(()=>{if(row.isConnected)row.append(el('small','花园暂未开放'));});}if(!list.children.length)list.append(el('p','还没有游戏好友。在“一起玩”的朋友页认识伙伴吧。'));}).catch(e=>c.notice(String(e)));
 }
 export async function inviteGardenFriend(owner:string,plot:number,notice:(s:string)=>void):Promise<void>{
-  const snapshot=await window.qbot.social.contacts(true),friends=snapshot.people.filter(p=>p.relation==='friend');
+  const state=await window.qbot.garden.get();
+  const friends=state.rehearsal?state.rehearsal.members.filter(m=>m.id!==state.life?.owner).map(m=>({id:m.id,nickname:m.name,online:true})):(await window.qbot.social.contacts(true)).people.filter(p=>p.relation==='friend');
   const dialog=el('dialog','','garden-invite-dialog');dialog.append(el('h2','邀请朋友一起培育'),el('p','消息会展示这颗果实的已有词条。','muted'));
   if(!friends.length)dialog.append(el('p','还没有游戏好友，去“一起玩”认识伙伴吧。'));
-  for(const p of friends)dialog.append(btn(p.nickname+(p.online?' · 在线':' · 离线'),async()=>{try{await window.qbot.garden.cooperate(owner,plot,'invite',p.id);notice('邀请已送达');dialog.close();dialog.remove();}catch(e){notice(String(e));}}));
+  for(const p of friends)dialog.append(btn(p.nickname+(p.online?' · 在线':' · 离线'),async()=>{try{await window.qbot.garden.cooperate(owner,plot,'invite',p.id);notice(state.rehearsal?'测试伙伴已加入待培育名单':'邀请已送达');dialog.close();dialog.remove();}catch(e){notice(String(e));}}));
   dialog.append(btn('关闭',()=>{dialog.close();dialog.remove();}));dialog.oncancel=()=>dialog.remove();document.body.append(dialog);dialog.showModal();
 }
 export function renderVisit(host:HTMLElement,c:Context,address:string):void{
-  const [owner,,targetTask]=address.split(':');
+  const [owner,,targetTask]=address.startsWith('test:')?[address]:address.split(':');
   host.append(el('h2','朋友的花园'),btn('← 返回朋友',()=>c.go('friends')));
   const body=el('div');host.append(body);let fetching=false,joined:number|undefined;
   const draw=(v:GardenVisit)=>{
     if(!host.isConnected)return;body.replaceChildren(el('h2',v.name+'的花园名片'),el('p',`${v.actorName??'当前角色'} · Lv.${v.actorLevel} · 土地${v.landOpen===false?'未开放':'可查看'} · 商店${v.shopOpen===false?'未开放':'可购物'}`,'muted'));
-    if(c.state.online&&owner!==c.state.life?.owner)body.append(btn('邀请成为向日葵伙伴',()=>c.act({type:'sunRequest',target:owner})));
+    if(c.state.online&&!c.state.rehearsal&&owner!==c.state.life?.owner)body.append(btn('邀请成为向日葵伙伴',()=>c.act({type:'sunRequest',target:owner})));
     body.append(el('p',`今日还可领取 ${v.rewardsLeft??5} 次培育物资${v.rewardsLeft===0?'；仍可帮忙加速并留下共同记录':''}`));
     if(!c.state.online)body.append(el('p','你正在本地花园。进入联机花园后可购物和共同培育，本地收藏会保留。'),btn('进入联机花园',async()=>{await window.qbot.garden.online(true);await c.refresh();}));
     if(targetTask){const task=v.tasks?.find(t=>t.id===targetTask);if(task?.done){const done=card('这次共同培育已完成',task.fruit?badge(task.fruit):'果实已由主人收好');if(task.fruit)done.prepend(c.plantArt(task.fruit));done.append(el('p',`${Object.keys(task.members).length} 位伙伴留下了这段经历`),btn('领取我的助育奖励',async()=>{await window.qbot.garden.cooperate(owner,task.plot,'claim',undefined,task.id);await c.refresh();}));body.append(done);}else if(!v.plots.some(p=>p?.id===targetTask))body.append(el('p','这颗果实已不在地里，可以去朋友的花园看看近况。'));}

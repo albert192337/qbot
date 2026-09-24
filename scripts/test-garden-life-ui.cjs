@@ -7,6 +7,7 @@ app.whenReady().then(async()=>{try{
  session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_,cb)=>cb({cancel:true}));
  let id=0,now=Date.now();const rng={random:()=>.1,id:()=>`fixture-${++id}`};let state=core.initialGarden(now,rng);core.ensureLife(state,now,rng,'pet-a');state.coins=3000;state.life.sprays.fruit=2;
  state.produce=[{id:'snack',species:'strawberry',traits:['honey'],kg:.2,value:50,bred:false,growthVersion:2,revealed:true}];
+ state.plots[0]={...state.produce[0],id:'crop',plantedAt:now-60000,readyAt:now-1,fertilizers:[],harvestsLeft:1};
  state.life.characters['pet-a'].wishes[0]={id:'today-food',species:'strawberry',traits:['honey'],xp:10,done:false};
  let panel;ipcMain.handle('characters:getActive',()=>null);ipcMain.handle('settings:get',()=>({}));ipcMain.handle('garden:get',()=>state);
  ipcMain.handle('garden:act',(_,cmd)=>{try{const r=core.transition(state,cmd,now,rng,{actor:'pet-a',shopOwner:'ABCDEFGHIJKL'});state=r.state;return {ok:true,...r};}catch(e){return {ok:false,error:e.message};}});
@@ -20,9 +21,9 @@ app.whenReady().then(async()=>{try{
  const out=path.join(root,'output/garden-life');fs.mkdirSync(out,{recursive:true});const shot=async name=>{await wait(200);fs.writeFileSync(path.join(out,name+'.png'),(await panel.webContents.capturePage()).toPNG());};
  await panel.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'daily'}});await until(()=>js('document.querySelectorAll(".life-card").length===5'));await shot('daily-shop');
  const wallet=state.coins;await js('document.querySelector(".life-card button").click()');await wait(200);assert.ok(state.coins<wallet);await js('document.querySelectorAll(".result-popup button").forEach(b=>b.click())');
- await click('喷雾');await until(()=>js('!!document.querySelector(".life-card select")'));await js('(()=>{const s=document.querySelector(".life-card select");s.value="snack";s.dispatchEvent(new Event("change"));})()');await click('使用并揭晓');assert.ok(state.life.pending);await shot('spray-choice');
+ await click('种植补给');assert.ok(await js('!!document.querySelector(".shop-tabs")'));await click('今日小店');await click('我的土地');await until(()=>js('!!document.querySelector(".plot-sprays")'));await js('document.querySelector(".plot-sprays").open=true');await click('使用果实喷雾');assert.ok(state.life.pending);await shot('spray-choice');
  await click('保留原样（喷雾已消耗）');await js('document.querySelectorAll(".result-popup button").forEach(b=>b.click())');assert.equal(state.life.pending,undefined);
- await click('食物心愿');await until(()=>js('document.body.textContent.includes("今天想吃点什么")'));await shot('food-wishes');
+ await click('批量播种');assert.ok(await js('[...document.querySelectorAll(".seed-card")].every(c=>c.textContent.includes("分钟成熟"))'));await click('食物心愿');await until(()=>js('document.body.textContent.includes("今天想吃点什么")'));await shot('food-wishes');
  await js('window.confirm=()=>true;(()=>{const s=document.querySelector(".life-card select");s.value="snack";s.dispatchEvent(new Event("change"));})()');await click('投喂这颗果实');assert.equal(state.produce.length,0);assert.equal(state.life.characters['pet-a'].xp,10);await js('document.querySelectorAll(".result-popup button").forEach(b=>b.click())');await shot('fed');
  panel.setSize(560,680);await wait(200);assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'));await shot('food-small');
  state.online=true;panel.webContents.send('garden:page','visit:ABCDEFGHIJKL');await until(()=>js('document.body.textContent.includes("小夏的今日商店")'));await shot('friend-garden');
