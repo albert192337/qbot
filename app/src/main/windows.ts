@@ -1,6 +1,6 @@
 /** 窗口管理：桌宠透明置顶窗 + 孵化常规窗 + 小房间窗 + dock 显隐协调 */
 import { BrowserWindow, app, screen, shell } from 'electron';
-import { trackDesktopWindow, allowDesktopWindow, desktopQuiet, desktopHidden, onDesktopVisibilityChanged, windowPeeking } from './desktop-visibility';
+import { trackDesktopWindow, allowDesktopWindow, desktopQuiet, desktopHidden, onDesktopVisibilityChanged, windowPeeking, setPairedMember } from './desktop-visibility';
 import path from 'node:path';
 import type { CharacterMeta, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
 import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset, resolveRoomSceneSize } from './rooms/rooms-rules';
@@ -261,10 +261,13 @@ export function createPetWindow(): BrowserWindow {
   desktopSign = createDesktopSign(win, desktopWindowGroup, path.join(__dirname, '../preload/index.js'), sign => load(sign, 'sign'),
     () => win.webContents.send('pet:menuCommand', { type: 'signDismiss' }));
   win.webContents.on('did-start-loading', () => setPetVisitMode(false));
+  win.webContents.on('render-process-gone', () => setPetVisitMode(false));
+  win.on('hide', () => setPetVisitMode(false));
   attachGarden(win);
   attachPetWindowRecovery(win, () => !isRoomOpen());
   win.once('ready-to-show', () => { if (!isRoomOpen()) win.showInactive(); });
   petWindow.on('closed', () => {
+    setPairedMember();petVisitMode=false;
     desktopSign = null;
     chatWindow?.close();
     petWindow = null;
@@ -498,7 +501,8 @@ export function movePetWindow(x: number, y: number): void {
 }
 
 /** 进入串门模式：窗口拓宽为双人宽；离开时恢复单人尺寸 */
-export function setPetVisitMode(enter: boolean): void {
+export function setPetVisitMode(enter: boolean, partner?: string): void {
+  setPairedMember(enter ? partner : undefined);
   if (petVisitMode === enter) return;
   petVisitMode = enter;
   if (!petWindow || petWindow.isDestroyed()) return;

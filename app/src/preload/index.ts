@@ -25,7 +25,7 @@ const api: QBotApi = {
     hint:value=>ipcRenderer.send('hint:set',value),
     onHint:cb=>{const fn=(_e:unknown,value:import('../shared/pet-hint').PetHint)=>cb(value);ipcRenderer.on('hint:changed',fn);return()=>ipcRenderer.removeListener('hint:changed',fn);},
     hintAction:action=>ipcRenderer.send('hint:action',action),
-    onHintAction:cb=>{const fn=(_e:unknown,action:'open'|'dismiss')=>cb(action);ipcRenderer.on('hint:action',fn);return()=>ipcRenderer.removeListener('hint:action',fn);},
+    onHintAction:cb=>{const fn=(_e:unknown,action:import('../shared/pet-hint').PetHintAction)=>cb(action);ipcRenderer.on('hint:action',fn);return()=>ipcRenderer.removeListener('hint:action',fn);},
     hintHover:hit=>ipcRenderer.send('hint:hover',hit),
     report:(kind,active)=>ipcRenderer.send('overlays:report',kind,active),
     onChanged:cb=>{
@@ -110,7 +110,7 @@ const api: QBotApi = {
     onPerch: cb => { const fn=(_ev:unknown,state:Parameters<typeof cb>[0])=>cb(state); ipcRenderer.on('pet:perch',fn); return ()=>ipcRenderer.removeListener('pet:perch',fn); },
     // 高频拖拽走 send（不等待回包）
     move: (x, y) => ipcRenderer.send('pet:move', x, y),
-    setVisitMode: (enter) => ipcRenderer.invoke('pet:setVisitMode', enter),
+    setVisitMode: (enter,partner) => ipcRenderer.invoke('pet:setVisitMode', enter,partner),
     popupMenu: (actions) => ipcRenderer.send('pet:popupMenu', actions),
     previewAction: (action) => ipcRenderer.send('pet:previewAction', action),
     onMenuCommand: (cb) => {

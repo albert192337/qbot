@@ -158,12 +158,16 @@ function endVisit(): Promise<void> {
 }
 
 // ── 串门编排器 ──────────────────────────────────────────
+let networkPartner:string|undefined;
+let pairMediaVersion=0;
 const pairInteraction = new PairInteraction({
-  start(visitor: CharacterMeta) {
+  async start(visitor: CharacterMeta,partner?:string) {
+    const version=++pairMediaVersion;
+    await window.qbot.pet.setVisitMode(true,partner);
+    if(version!==pairMediaVersion)return;
     visitorCharacter = visitor;
     visitorPlayer.load(visitor.dirId, visitor.manifest);
     document.body.classList.add('visit-mode');
-    void window.qbot.pet.setVisitMode(true).catch(() => { visitOrchestrator.cancelVisit(); hud.toast('双人窗口打开失败'); });
   },
   play(action, guestAction) {
     visitorPlayer.playOnce(guestAction);
@@ -178,11 +182,15 @@ const pairInteraction = new PairInteraction({
     (who === 'host' ? player : visitorPlayer).playLooping(action);
   },
   end() {
+    pairMediaVersion++;
+    networkPartner=undefined;
     const resized = endVisit();
     dispatch({ type: 'VISIT_END' });
     return resized;
   },
 });
+window.qbot.rooms.onStatus(s=>{if(networkPartner&&s.phase!=='in-room')pairInteraction.cancel();});
+window.qbot.rooms.onMemberOut(id=>{if(networkPartner===id)pairInteraction.cancel();});
 let pairRequest = 0;
 // All previous visit cancellation sites share this adapter, including drag and character replacement.
 const visitOrchestrator = { cancelVisit() { pairRequest++; pairInteraction.cancel(); } };
@@ -721,7 +729,7 @@ stage.addEventListener('contextmenu', (e) => {
 });
 
 window.qbot.pet.onMenuCommand((cmd) => {
-  if(cmd.type==='networkPhoto'){const host=currentCharacter,guest=cmd.guest;if(!host||document.hidden||pointerDown||gardenPerforming||!pairActions(host.manifest).size||!pairActions(guest.manifest).size)return;window.qbot.pet.detachPerch();applyPerch(null);speaker.interrupt();cancelHold();stopDesktopWalk();clearTimer();pairInteraction.start(host,guest,'photo',true);return;}
+  if(cmd.type==='networkPhoto'||cmd.type==='networkPair'){const host=currentCharacter,guest=cmd.guest;if(!host||document.hidden||isDesktopQuiet()||pointerDown||gardenPerforming||!pairActions(host.manifest).size||!pairActions(guest.manifest).size)return;window.qbot.pet.detachPerch();applyPerch(null);speaker.interrupt();cancelHold();stopDesktopWalk();clearTimer();pairInteraction.start(host,guest,cmd.type==='networkPair'?cmd.kind:'photo',true,cmd.type==='networkPair'&&cmd.recipient,cmd.type==='networkPair'?cmd.partner:undefined);networkPartner=cmd.type==='networkPair'?cmd.partner:undefined;return;}
   if (cmd.type === 'pair') { void startPair(cmd.kind, cmd.guestId); return; }
   if (cmd.type === 'pairEnd') { pairRequest++; pairInteraction.finish(); return; }
   if (cmd.type === 'speak' || cmd.type === 'play') visitOrchestrator.cancelVisit();

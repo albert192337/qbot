@@ -34,10 +34,18 @@ export function registerPetHints():void {
       if(process.env.ELECTRON_RENDERER_URL)void win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/pet-hint/index.html`);
       else void win.loadFile(path.join(__dirname,'../renderer/pet-hint/index.html'));
     }
-    state.value=value?{kind:value.kind,text:value.text.slice(0,200),icon:typeof value.icon==='string'?value.icon.slice(0,20):'',title:typeof value.title==='string'?value.title.slice(0,200):''}:null;
+    const invitation=value?.kind==='interaction'&&typeof value.invitation?.id==='string'&&Number.isFinite(value.invitation.expiresAt)&&value.invitation.expiresAt>Date.now()?{id:value.invitation.id.slice(0,200),expiresAt:value.invitation.expiresAt}:undefined;
+    state.value=value?{kind:value.kind,text:value.text.slice(0,200),icon:typeof value.icon==='string'?value.icon.slice(0,20):'',title:typeof value.title==='string'?value.title.slice(0,200):'',invitation}:null;
     sync(owner);
   });
-  ipcMain.on('hint:action',(event,action)=>{if(!['open','dismiss'].includes(action))return;for(const [owner,s] of hints)if(s.win.webContents===event.sender&&s.win.isVisible()&&s.value?.kind==='wish'&&desktopActorVisible(owner))owner.webContents.send('hint:action',action);});
+  ipcMain.on('hint:action',(event,action)=>{
+    for(const [owner,s] of hints){
+      if(s.win.webContents!==event.sender||!s.win.isVisible()||!desktopActorVisible(owner))continue;
+      const invitation=s.value?.invitation;
+      if(invitation&&action&&typeof action==='object'&&action.invitationId===invitation.id&&typeof action.accept==='boolean'&&invitation.expiresAt>Date.now())owner.webContents.send('hint:action',{invitationId:invitation.id,accept:action.accept});
+      else if(s.value?.kind==='wish'&&['open','dismiss'].includes(action))owner.webContents.send('hint:action',action);
+    }
+  });
   ipcMain.on('hint:hover',(event,hit)=>{for(const s of hints.values())if(s.win.webContents===event.sender)s.win.setIgnoreMouseEvents(!hit,{forward:true});});
   onDesktopVisibilityChanged(()=>{for(const [owner,s] of hints){if(!desktopActorVisible(owner))s.value=null;sync(owner);}});
 }

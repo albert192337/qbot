@@ -174,8 +174,9 @@ export function registerIpc(): void {
   ipcMain.handle('pet:getPerch', ev => ev.sender === getPetWindow()?.webContents ? getPerchState() : null);
   ipcMain.on('pet:detachPerch', ev => { if(ev.sender === getPetWindow()?.webContents)detachPerch(); });
   ipcMain.on('pet:move', (_ev, x: number, y: number) => movePetWindow(x, y));
-  ipcMain.handle('pet:setVisitMode', (ev, enter: boolean) => {
-    if (ev.sender === getPetWindow()?.webContents && typeof enter === 'boolean') setPetVisitMode(enter);
+  ipcMain.handle('pet:setVisitMode', (ev, enter: boolean, partner?:string) => {
+    if(partner!==undefined&&(typeof partner!=='string'||!/^[A-Z0-9]{12}$/.test(partner)))throw Error('无效的互动房友');
+    if (ev.sender === getPetWindow()?.webContents && typeof enter === 'boolean') setPetVisitMode(enter,partner);
   });
 
   // ── 手动举牌（纯本地记账）────────────────────────────────

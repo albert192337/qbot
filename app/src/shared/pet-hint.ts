@@ -1,4 +1,5 @@
-export type PetHint = { kind: 'wish' | 'interaction' | 'speech'; icon?: string; text: string; title?: string };
+export type PetHint = { kind: 'wish' | 'interaction' | 'speech'; icon?: string; text: string; title?: string; invitation?:{id:string;expiresAt:number} };
+export type PetHintAction = 'open'|'dismiss'|{invitationId:string;accept:boolean};
 type Rect = { x: number; y: number; width: number; height: number };
 export const HINT_SIZE = {width: 240, height: 112};
 /** Never clamp an exterior hint back across the actor. If no exterior slot fits, suppress it. */

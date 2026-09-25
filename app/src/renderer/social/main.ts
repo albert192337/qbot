@@ -45,20 +45,6 @@ async function run(fn:()=>unknown):Promise<void>{try{await fn();}catch(e){toast(
 async function mutate(fn:()=>Promise<unknown>):Promise<void>{if(busy)return;busy=true;root.classList.add('busy');try{await fn();await sync();}finally{busy=false;root.classList.remove('busy');}}
 const roomChat=compact?new ChatView($('compact-chat'),false,()=>status.memberId,toast):null;
 const worldChat=!compact?new ChatView($('world-chat'),true,()=>status.memberId,toast):null;
-const pairNotice=document.createElement('aside');pairNotice.id='pair-notice';pairNotice.hidden=true;pairNotice.setAttribute('aria-live','polite');$('room-strip').after(pairNotice);
-let pairNoticeKey='',pairAnswering=false;
-function renderPairNotice():void {
- const invitation=contacts.invitations.find(i=>i.pair&&i.expiresAt>Date.now());
- pairNotice.hidden=!room||!invitation;if(pairNotice.hidden){pairNoticeKey='';pairNotice.replaceChildren();return;}
- if(pairNoticeKey===invitation!.id)return;pairNoticeKey=invitation!.id;pairNotice.replaceChildren();
- const following=[...document.querySelectorAll<HTMLElement>('.messages')].filter(e=>e.scrollHeight-e.scrollTop-e.clientHeight<80);
- const invitationText:Record<string,string>={heart:'想送你一颗小心心',tea:'想请你喝杯茶',wave:'想和你打个招呼',chat:'想和你聊聊天',flower:'想送你一朵花',photo:'想和你拍张合影',relay:'想和你玩表情接力',celebrate:'想和你一起庆祝'};
- const text=document.createElement('span');text.textContent=`${invitation!.nickname} ${invitationText[invitation!.pair!.kind]??'想和你一起玩'}`;pairNotice.append(text);
- for(const [label,accept] of [['一起玩',true],['暂时不了',false]] as const){const button=document.createElement('button');button.textContent=label;button.disabled=pairAnswering;button.onclick=()=>void run(async()=>{if(pairAnswering)return;pairAnswering=true;pairNotice.querySelectorAll('button').forEach(b=>b.disabled=true);try{await api.garden.answerInteraction(invitation!.id,accept,invitation!.pair!.kind==='relay'?'happy':undefined);contacts=await api.social.contacts(true);pairNoticeKey='';renderPairNotice();toast(accept?'好呀，一起玩一会儿。':'好，先不打扰你。');}finally{pairAnswering=false;pairNotice.querySelectorAll('button').forEach(b=>b.disabled=false);}});pairNotice.append(button);}
- requestAnimationFrame(()=>following.forEach(e=>e.scrollTop=e.scrollHeight));
-}
-setInterval(renderPairNotice,1000);
-
 async function sync():Promise<void>{
  const version=++refreshVersion;
  const cache=await api.rooms.getCache();if(version!==refreshVersion)return;
@@ -67,7 +53,6 @@ async function sync():Promise<void>{
  if(compact)renderMembers($('compact-members'));else {renderRoom();renderTestMembers();}
 }
 function renderStatus():void {
- renderPairNotice();
  $('room-summary').textContent=room?`${room.testing?'本地试演 · ':''}${room.name} · ${room.members.filter(m=>m.online).length}/${room.capacity} 人`:'一个人也很自在，有朋友更热闹。';
  $('copy-code').hidden=!room||!!room.testing;$('leave').hidden=!room;
  if($('connection'))$('connection').textContent=room?.testing?'本地试演':status.phase==='connecting'?'正在连接…':status.phase==='off'?'尚未连接':'房间服务已连接';

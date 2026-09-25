@@ -7,7 +7,7 @@ import { getSettings,setSettings } from '../config';
 import { gardenRequest,gardenRealm } from '../rooms/rooms';
 import type { GardenCommand,GardenResult,GardenState } from '../../shared/garden';
 import type { GardenVisit } from '../../shared/garden-life';
-import {PAIR_INTERACTIONS,choosePairAction,type PairKind,type PairIntent} from '../../shared/pair-interaction';
+import {PAIR_INTERACTIONS,choosePairAction,pairBeats,type PairKind,type PairIntent} from '../../shared/pair-interaction';
 const notify=()=>{for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');};
 type Pending={id:string;command:GardenCommand;actor?:string;realm:string};
 const pendingFile=()=>path.join(app.getPath('userData'),'garden-network-pending.json');
@@ -57,7 +57,19 @@ export async function playNetworkInteraction(frame:Record<string,unknown>):Promi
   const character=await getCharacter(s.activeCharacter);if(!character)return;
   const intent=frame.intent;if(!['heart','happy','tea','talk','listen','wave'].includes(String(intent)))return;
   const action=choosePairAction(character.manifest,intent as PairIntent);
-  let paired=false;if(frame.kind==='photo'&&typeof frame.partner==='string'){const {getMemberSnapshot}=await import('../rooms/room-pets');const guest=getMemberSnapshot(frame.partner)?.character;if(guest){paired=true;if(frame.step===0)getPetWindow()?.webContents.send('pet:menuCommand',{type:'networkPhoto',guest:{...guest,hasUnfinishedJob:false}});}}
+  if(!PAIR_INTERACTIONS.some(k=>k.id===frame.kind))return;
+  const kind=frame.kind as PairKind;
+  let paired=false;
+  if(typeof frame.partner==='string'){
+    const {getMemberSnapshot}=await import('../rooms/room-pets');
+    const guest=getMemberSnapshot(frame.partner)?.character;
+    if(guest){
+      paired=true;
+      // All first beats have distinct intents, so existing servers also identify the
+      // recipient without a protocol upgrade. Later network beats must not restart media.
+      if(frame.step===0)getPetWindow()?.webContents.send('pet:menuCommand',{type:'networkPair',partner:frame.partner,kind,recipient:intent===pairBeats(kind)[0].guest,guest:{...guest,hasUnfinishedJob:false}});
+    }
+  }
   if(!paired&&action)getPetWindow()?.webContents.send('pet:menuCommand',{type:'play',action:action.id});
   for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:interaction',{kind:frame.kind,caption:frame.caption,effect:frame.effect});
 }

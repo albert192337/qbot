@@ -248,6 +248,7 @@ export type PerceptionInteractKind = 'click' | 'drag_start' | 'drag_end' | 'sign
 /** 原生右键菜单点选后回渲染端执行的命令 */
 export type PetMenuCommand =
   | { type:'networkPhoto'; guest:CharacterMeta }
+  | { type:'networkPair'; partner?:string; kind:import('./pair-interaction').PairKind; recipient:boolean; guest:CharacterMeta }
   | { type: 'pair'; kind: import('./pair-interaction').PairKind; guestId: string }
   | { type: 'pairEnd' }
   | { type: 'speak' }
@@ -452,8 +453,8 @@ export interface QBotApi {
   overlays: {
     hint(value:import('./pet-hint').PetHint|null):void;
     onHint(cb:(value:import('./pet-hint').PetHint)=>void):()=>void;
-    hintAction(action:'open'|'dismiss'):void;
-    onHintAction(cb:(action:'open'|'dismiss')=>void):()=>void;
+    hintAction(action:import('./pet-hint').PetHintAction):void;
+    onHintAction(cb:(action:import('./pet-hint').PetHintAction)=>void):()=>void;
     hintHover(hit:boolean):void;
     report(kind:import('./desktop-overlays').HeadOverlay,active:boolean):void;
     onChanged(cb:(snapshot:import('./desktop-overlays').HeadSnapshot)=>void):()=>void;
@@ -510,7 +511,7 @@ export interface QBotApi {
     /** 高频拖拽移动（send，不走 invoke） */
     move(screenX: number, screenY: number): void;
     /** 串门模式：拓宽/恢复窗口 */
-    setVisitMode(enter: boolean): Promise<void>;
+    setVisitMode(enter: boolean, partner?:string): Promise<void>;
     /**
      * 右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
      * 动作列表由渲染端传入，说话/播动作的执行经 onMenuCommand 回渲染端。

@@ -9,6 +9,17 @@ type Surface = { kind: 'aux' | 'host' | 'peer' | 'decoration'; member?: string; 
 const surfaces = new Map<BrowserWindow, Surface>();
 let hidden = false, revision = 0, initialized = false;
 let hiddenMembers = new Set<string>();
+let pairedMember: string | undefined;
+/** Transient ownership transfer to the host's pair stage, never a saved preference. */
+export function setPairedMember(id?: string): void {
+  if(pairedMember===id)return;
+  const previous=pairedMember;pairedMember=id;
+  for(const [win,s] of surfaces)if(s.kind==='peer'&&!win.isDestroyed()){
+    if(s.member===id)win.hide();
+    else if(s.member===previous)win.showInactive();
+  }
+  publish();
+}
 const listeners = new Set<() => void>();
 export function onDesktopVisibilityChanged(fn: () => void): () => void { listeners.add(fn); return () => listeners.delete(fn); }
 export function desktopHidden(): boolean { return hidden; }
@@ -16,14 +27,14 @@ export function desktopQuiet(): boolean { return hidden || [...surfaces.values()
 export function memberHidden(id: string): boolean { return hiddenMembers.has(id); }
 export function desktopActorVisible(win: BrowserWindow, requireVisible = true): boolean {
   const s=surfaces.get(win);
-  return !win.isDestroyed()&&(!requireVisible||win.isVisible())&&!hidden&&!!s&&['host','peer'].includes(s.kind)&&!s.peek&&!(s.member&&memberHidden(s.member));
+  return !win.isDestroyed()&&(!requireVisible||win.isVisible())&&!hidden&&!!s&&['host','peer'].includes(s.kind)&&!s.peek&&!(s.member&&(memberHidden(s.member)||s.member===pairedMember));
 }
 export function desktopSnapshot(win?: BrowserWindow | null): DesktopVisibility {
   return { revision, hidden, hiddenMembers: [...hiddenMembers], peek: win ? surfaces.get(win)?.peek ?? null : null };
 }
 function allowed(s: Surface): boolean {
   if (s.kind === 'host') return true; // its renderer retains only the toolbar
-  if (s.kind === 'peer') return !hidden; // individually hidden actors retain their recovery toolbar
+  if (s.kind === 'peer') return !hidden&&s.member!==pairedMember; // paired actors move into the shared stage
   if (s.kind === 'decoration' && desktopQuiet() && !s.permitted) return false;
   if(s.kind==='aux'&&s.suppressed&&!s.permitted)return false;
   return !hidden || s.permitted;
@@ -31,7 +42,7 @@ function allowed(s: Surface): boolean {
 function publish(): void {
   revision++;
   for (const [win,s] of surfaces) if (!win.isDestroyed()) {
-    win.webContents.setAudioMuted(hidden || !!s.peek || (s.kind === 'peer' && memberHidden(s.member!)));
+    win.webContents.setAudioMuted(hidden || !!s.peek || (s.kind === 'peer' && (memberHidden(s.member!)||s.member===pairedMember)));
     win.webContents.send('desktop:changed', desktopSnapshot(win));
   }
   for (const fn of listeners) fn();
@@ -39,14 +50,14 @@ function publish(): void {
 /** Guard the actual display calls, including late ready-to-show callbacks. All callers keep their normal API. */
 export function trackDesktopWindow(win: BrowserWindow, kind: Surface['kind'] = 'aux', member?: string): void {
   const existing = surfaces.get(win);
-  if (existing) { existing.kind = kind; existing.member = member; return; }
+  if (existing) { existing.kind = kind; existing.member = member;if(!allowed(existing))win.hide();win.webContents.setAudioMuted(hidden||(kind==='peer'&&(memberHidden(member!)||member===pairedMember)));return; }
   const state: Surface = {kind, member, permitted:false, suppressed:hidden, restore:false, hostWasVisible:true, pendingHostShow:false, hits:[], peek:null};
   surfaces.set(win, state);
   for (const method of ['show','showInactive','restore'] as const) {
     const original = win[method].bind(win);
     win[method] = () => { if (!win.isDestroyed() && allowed(state)) original(); };
   }
-  win.webContents.setAudioMuted(hidden);
+  win.webContents.setAudioMuted(hidden||(kind==='peer'&&(memberHidden(member!)||member===pairedMember)));
   win.webContents.on('did-finish-load', () => win.webContents.send('desktop:changed', desktopSnapshot(win)));
   win.once('closed', () => surfaces.delete(win));
 }
