@@ -105,6 +105,8 @@ let lastPresence: string | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let closedByUs = false;
 let socialSupported = false;
+let pettingSupported = false;
+let pettingContinuous = false;
 let contactsSupported = false;
 let gardenSupported = false;
 let contactSnapshot: ContactSnapshot = {available:false, reason:'点击刷新连接朋友列表', people:[], invitations:[]};
@@ -347,6 +349,8 @@ async function hello(generation: number): Promise<void> {
   );
   if (generation !== connectionGeneration) throw new Error('连接已取消');
   socialSupported = ack.social === 1;
+  pettingSupported = Number(ack.petting) >= 1;
+  pettingContinuous = Number(ack.petting) >= 2;
   contactsSupported = ack.contacts === 1;
   gardenSupported = ack.garden === 1;
   RoomPets.setContactRealm(activeUrl!);
@@ -526,11 +530,15 @@ function handleMessage(data: unknown): void {
       break;
     }
 
+    case 'petting': {
+      if(frame.roomId===currentRoomId && typeof frame.target==='string')void showPetting(frame.target,frame.phase==='end'?'end':frame.phase==='keep'?'keep':'start');
+      break;
+    }
     case 'chat': {
       const msg = frame.msg as RoomChatMsg | undefined;
       if (!msg) break;
       chatCache = [...chatCache, msg].slice(-50);
-      RoomPets.onChat(msg.memberId, msg.nickname, msg.text);
+      if(!msg.interaction)RoomPets.onChat(msg.memberId, msg.nickname, msg.text);
       push('rooms:chat', msg);
       break;
     }
@@ -861,6 +869,28 @@ export async function subscribeWorld(subscribe: boolean): Promise<RoomChatMsg[]>
   const frame = await request({t:'world:subscribe', subscribe}, 'world:history');
   return frame.messages as RoomChatMsg[];
 }
+async function showPetting(target?: string, phase: 'start'|'keep'|'end' = 'start'): Promise<void> {
+  const scope=currentRoomId;
+  const windows=await import('../windows');
+  if(scope!==currentRoomId)return;
+  const win=!target || target===memberId ? windows.getPetWindow() : windows.getRoomPetWindow(target);
+  if(win&&!win.isDestroyed())win.webContents.send('social:pet',phase);
+}
+export async function petMember(target?: string, phase: 'start'|'keep'|'end' = 'start'): Promise<void> {
+  if(!roomCache){if(target)throw Error('房友已离开');await showPetting(undefined,phase);return;}
+  const recipient=target??memberId;
+  const peer=roomCache.members.find(m=>m.memberId===recipient&&m.online);
+  if(!peer)throw Error('房友已离开');
+  if(roomCache.chatEnabled===false)throw Error('房主关闭了聊天');
+  if(roomCache.testing){
+    const actor=roomCache.members.find(m=>m.memberId===memberId)!;
+    if(phase==='start')appendTestChat(memberId!,recipient===memberId?actor.nickname+'摸了摸自己的桌宠。':actor.nickname+'轻轻摸了摸'+peer.nickname+'，'+peer.nickname+'开心地蹭了蹭小手。','petting');
+    await showPetting(recipient!,phase);return;
+  }
+  if(!pettingSupported)throw Error('房间服务需更新后才能摸摸');
+  if(phase!=='start'&&!pettingContinuous){await showPetting(recipient!,phase);return;}
+  await request({t:'petting',roomId:currentRoomId,target:recipient,phase},'social:ack');
+}
 export async function sendSocialChat(text: string, world = false): Promise<void> {
   const clean = clampText(text, 200);
   if (!clean) throw new Error('请输入消息');
@@ -926,12 +956,12 @@ export function removeTestGuest(id: string): void {
   testGuests.delete(id.slice(5)); roomCache.members = roomCache.members.filter(m => m.memberId !== id);
   RoomPets.onMemberOut(id); publishTest();
 }
-function appendTestChat(id: string, text: string): void {
+function appendTestChat(id: string, text: string, interaction?: 'petting'): void {
   const member = roomCache?.members.find(m => m.memberId === id);
   if (!roomCache?.testing || !member) throw new Error('测试成员不存在');
-  const msg = {id:`local-${++requestSequence}`, memberId:id, nickname:member.nickname + (member.testing ? ' · 模拟' : ''), text:clampText(text,200), at:Date.now()};
+  const msg = {interaction,id:`local-${++requestSequence}`, memberId:id, nickname:member.nickname + (member.testing ? ' · 模拟' : ''), text:clampText(text,200), at:Date.now()};
   chatCache = [...chatCache, msg].slice(-50);
-  RoomPets.onChat(id, msg.nickname, msg.text); push('rooms:chat', msg);
+  if(!interaction)RoomPets.onChat(id, msg.nickname, msg.text); push('rooms:chat', msg);
 }
 export function replyTestGuest(id: string, text: string): void {
   if (!getTestGuest(id)) throw new Error('测试访客不存在');

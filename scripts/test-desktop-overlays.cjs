@@ -13,6 +13,7 @@ app.whenReady().then(async()=>{try{
   const core=require('../rooms/generated/garden-core.cjs');let seq=0;
   const state=core.initialGarden(Date.now(),{random:()=>.5,id:()=>String(++seq)});core.ensureLife(state,Date.now(),{random:()=>.5,id:()=>String(++seq)},'pet');
   ipcMain.handle('garden:get',()=>state);ipcMain.handle('settings:get',()=>({}));ipcMain.handle('bubble:idleSeconds',()=>0);
+  let exteriorHint;ipcMain.on('hint:set',(_,value)=>exteriorHint=value);
   let bounds;ipcMain.on('bubble:bounds',(_,b)=>bounds=b);ipcMain.on('bubble:empty',()=>{});
   const make=(width,height)=>new BrowserWindow({width,height,show:false,webPreferences:{preload:path.join(root,'app/out/preload/index.js'),offscreen:true,backgroundThrottling:false}});
   const pet=make(360,420),speech=make(540,540);
@@ -24,6 +25,12 @@ app.whenReady().then(async()=>{try{
   await visible(pet);await pet.webContents.insertCSS(fs.readFileSync(path.join(root,'app/src/renderer/pet/food-wish.css'),'utf8'));
   await js(pet,food+';window.disposeWish=FoodWish.mountFoodWish();void 0');
   await until(()=>js(pet,'document.body.dataset.headOverlay==="wish"'));
+  const names=buildSync({entryPoints:[path.join(root,'app/src/renderer/pet/nameplate.ts')],bundle:true,write:false,format:'iife',globalName:'Names',loader:{'.css':'empty'}}).outputFiles[0].text;
+  await pet.webContents.insertCSS(fs.readFileSync(path.join(root,'app/src/renderer/pet/nameplate.css'),'utf8'));
+  await js(pet,names+';window.setName=Names.createNameplate(document.body);setName("小岛来客", "花园新朋友");void 0');
+  assert.equal(await js(pet,'document.querySelector("#food-wish").getBoundingClientRect().right < 0'),true);
+  await js(pet,'setName("");void 0');
+
   await speech.loadFile(path.join(root,'app/out/renderer/bubble/index.html'));await visible(speech);
   speech.webContents.send('behavior:say',{text:'草里躺着，暖乎乎的～',durationMs:20000});
   await until(()=>js(speech,'document.querySelectorAll("#stack .bubble").length>0'));
@@ -39,17 +46,17 @@ app.whenReady().then(async()=>{try{
   speech.webContents.send('bubble:clear');await js(pet,'document.querySelector("#bubble").classList.remove("show")');
   await until(()=>js(garden,'getComputedStyle(document.querySelector(".quest-pill")).display!=="none"'));
   state.life.characters.pet.wishes[0].done=true;pet.webContents.send('garden:changed');
-  await until(()=>js(pet,'!document.querySelector("#food-wish").hidden'));
+  await wait(150);assert.equal(await js(pet,'document.querySelector("#food-wish").hidden'),true);assert.equal(exteriorHint,null);
   pet.webContents.send('garden:interaction',{kind:'feed',effect:'🍓',caption:'吃到了，谢谢你！'});await wait(150);
   pet.webContents.send('garden:changed');await wait(150);
   assert.equal(await js(pet,'document.querySelector("#food-wish").hidden'),true);
   assert.equal(await js(garden,'document.body.dataset.headOverlay'),'interaction');
   await until(()=>js(pet,'document.querySelector("#network-interaction").hidden'));
-  await until(()=>js(garden,'document.body.dataset.headOverlay==="wish"'));
+  await until(()=>js(garden,'getComputedStyle(document.querySelector(".quest-pill")).display!=="none"'));
   await js(pet,'document.body.classList.add("pair-mode")');
   await until(()=>js(garden,'getComputedStyle(document.querySelector(".quest-pill")).display!=="none"'));
   await js(pet,'document.body.classList.remove("pair-mode")');
-  await until(()=>js(garden,'document.body.dataset.headOverlay==="wish"'));
+  assert.equal(await js(pet,'document.querySelector("#food-wish").hidden'),true);
   // A crashed/closed pet must not leave the quest permanently suppressed.
   pet.destroy();await until(()=>js(garden,'getComputedStyle(document.querySelector(".quest-pill")).display!=="none"'));
   console.log('PASS: real cross-window wish/speech/quest exclusion, late window, recovery, null hit bounds, interaction refresh and owner destruction. '+out);app.exit(0);

@@ -1,4 +1,5 @@
 import { app, nativeImage, utilityProcess } from 'electron';
+import { desktopHidden } from '../desktop-visibility';
 import path from 'node:path';
 import { ROOMS } from '../../shared/config';
 import * as Rooms from '../rooms/rooms';
@@ -31,7 +32,7 @@ export function getSteam(): SteamBridge {
       return cache.room ? { roomId: cache.room.roomId, testing: cache.room.testing, online: cache.status.phase === 'in-room' } : null;
     },
     changed: state => pushToLounge('steam:changed', state),
-    incoming: () => { if (app.isReady()) createLoungeWindow(); },
+    incoming: () => { if (app.isReady()&&!desktopHidden()) createLoungeWindow(); },
   });
 }
 export function startSteam(): void {

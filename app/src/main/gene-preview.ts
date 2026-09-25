@@ -3,6 +3,29 @@ import path from 'node:path';
 
 let window: BrowserWindow | null = null;
 let desktopWindow: BrowserWindow | null = null;
+let pineappleWindow: BrowserWindow | null = null;
+
+/** Independent trait study with no preload or access to garden saves. */
+export function openPineapplePreview(): BrowserWindow {
+  if (pineappleWindow && !pineappleWindow.isDestroyed()) {
+    if (pineappleWindow.isMinimized()) pineappleWindow.restore();
+    pineappleWindow.show(); pineappleWindow.focus(); return pineappleWindow;
+  }
+  const area = screen.getPrimaryDisplay().workArea;
+  const win = new BrowserWindow({
+    width: Math.min(1380, area.width), height: Math.min(980, area.height),
+    minWidth: Math.min(620, area.width), minHeight: Math.min(600, area.height),
+    title: 'QBot · 菠萝词条工坊', backgroundColor: '#f5f3ec', autoHideMenuBar: true,
+    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+  });
+  pineappleWindow = win;
+  win.on('closed', () => { pineappleWindow = null; });
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', event => event.preventDefault());
+  if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/pineapple-preview/index.html`);
+  else void win.loadFile(path.join(__dirname, '../renderer/pineapple-preview/index.html'));
+  return win;
+}
 
 /** Isolated desktop specimen; does not change garden data. */
 export function openDesktopGenePreview(rendererFile = path.join(__dirname, '../renderer/gene-preview/index.html')): BrowserWindow {

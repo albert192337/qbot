@@ -1,0 +1,26 @@
+/* The host window remains alive solely to retain its toolbar. Hidden surfaces never hit-test. */
+body.desktop-hidden > :not(#pet-hud) { display:none!important; pointer-events:none!important; }
+body.desktop-hidden #pet-hud { visibility:visible!important; opacity:1!important; transition:none!important; }
+body.desktop-hidden #pet-hud .hud-float,body.desktop-hidden #pet-hud .hud-toast { display:none!important; }
+body.desktop-hidden #pet-hud * { animation:none!important; }
+body.desktop-hidden .hud-garden::after { display:none!important; }
+.hud-hide[aria-pressed="true"] .eye-slash { display:none; }
+body.member-hidden > :not(.peer-controls) { display:none!important;pointer-events:none!important; }
+body.member-hidden .peer-controls { display:block!important;visibility:visible!important; }
+.peer-hide[aria-pressed="true"] .eye-slash { display:none; }
+body[data-peek="left"] #stage,body[data-peek="right"] #stage { transform:none!important; }
+body[data-peek="left"] #stage { clip-path:inset(0); }
+body[data-peek="right"] #stage { clip-path:inset(0); }
+body[data-peek="left"] #stage video,body[data-peek="left"] #stage > img { transform:translateX(-40%) rotate(55deg)!important; transform-origin:50% 32%; }
+body[data-peek="right"] #stage video,body[data-peek="right"] #stage > img { transform:translateX(40%) rotate(-55deg)!important; transform-origin:50% 32%; }
+body[data-peek="left"] > :not(#stage):not(#pet-hud),body[data-peek="right"] > :not(#stage):not(#pet-hud),
+body[data-peek="left"] #stage > :not(video):not(img),body[data-peek="right"] #stage > :not(video):not(img) { display:none!important; pointer-events:none!important; }
+body[data-peek="left"] #pet-hud,body[data-peek="right"] #pet-hud { visibility:hidden; }
+body.peek-controls #pet-hud { visibility:visible!important; opacity:1!important; }
+body.desktop-hidden #pet-hud { right:0!important; }
+body.desktop-hidden #pet-hud svg,body.desktop-hidden #pet-hud span { visibility:visible; }
+#pet-hud .hud-chat { min-width:0;flex-shrink:1; }
+#pet-hud .hud-pill { padding-left:clamp(3px,2vw,8px);padding-right:clamp(3px,2vw,10px); }
+@media(prefers-reduced-motion:reduce) { .peer-controls * { transition:none!important; } }
+
+body[data-peek="left"] #pet-hud,body[data-peek="right"] #pet-hud { top:58%;bottom:auto; }

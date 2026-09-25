@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "checks": [
+    "60 traits rendered and changed model view",
+    "leaf single selection",
+    "two ornament maximum",
+    "five mixed presets",
+    "narrow layout"
+  ],
+  "errors": []
+}

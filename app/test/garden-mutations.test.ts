@@ -59,8 +59,8 @@ describe('stacked elemental garden mutations', () => {
         const plant = structuredClone(state.plots[0]!);
         state = validateGarden(JSON.parse(JSON.stringify(state)));
         state = transition(state,{type:'cultivate',plot:0},plant.readyAt,rng).state;
-        state = transition(state,{type:'revealPlant',plot:0},plant.readyAt+30000,rng).state;
-        const result = transition(state, { type: 'harvest', plot: 0 }, plant.readyAt+30000, rng);
+        state = transition(state,{type:'revealPlant',plot:0},plant.readyAt+180000,rng).state;
+        const result = transition(state, { type: 'harvest', plot: 0 }, plant.readyAt+180000, rng);
         const item = result.reveal!.produce!;
         expect(item.traits).toEqual(plant.traits);
         expect(item.value).toBe(plant.value);

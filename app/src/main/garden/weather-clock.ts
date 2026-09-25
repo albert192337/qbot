@@ -1,8 +1,8 @@
 import {app} from 'electron';
-import {gardenWeather} from '../../shared/garden-weather';
+import {gardenWeatherStatus} from '../../shared/garden-weather-status';
 import {showScheduledWeather,clearScheduledWeather} from '../weather';
 import {getGarden} from './service';
-import {hourlyWeather} from '../../shared/garden-v3';
+import {desktopQuiet,onDesktopVisibilityChanged} from '../desktop-visibility';
 import type {GardenState} from '../../shared/garden';
 let started=false;
 /** Calendar owns mutations; visual preview never affects the calendar or rolls. */
@@ -12,19 +12,21 @@ export function startGardenWeatherClock():void{
  const tick=async()=>{
   if(busy)return;busy=true;
   try{
-   const now=Date.now(),status=gardenWeather(now);
+   const now=Date.now();
    if(now-lastSettlement>=60000){state=await getGarden();lastSettlement=now;}
-   const hour=Math.floor(now/3600000),kind=state?.v3?hourlyWeather(hour,state.v3.realm??'garden'):status.current?.kind;
-   const id=state?.v3?`v3:${state.v3.realm??'garden'}:${hour}`:status.current?.id??'clear';
+   const status=gardenWeatherStatus(state??{},now),event=status.hourly?.current??status.current;
+   const kind=event?.kind,id=event?.id??'clear';
+   if(desktopQuiet())return;
    if(id!==seen){
-    seen=id;
     if(process.platform==='win32'){
-     if(kind==='meteor'||kind==='aurora')await showScheduledWeather(kind,state?.v3?(hour+1)*3600000:status.current!.end);
+     if(kind==='meteor'||kind==='aurora')await showScheduledWeather(kind,event!.end);
      else await clearScheduledWeather();
     }
+    seen=id;
    }
   }catch(error){console.warn('[garden-weather]',error);}finally{busy=false;}
  };
  const timer=setInterval(()=>void tick(),15000);timer.unref();
- app.once('before-quit',()=>clearInterval(timer));void tick();
+ const unsubscribe=onDesktopVisibilityChanged(()=>{if(!desktopQuiet()){seen=undefined;void tick();}});
+ app.once('before-quit',()=>{clearInterval(timer);unsubscribe();});void tick();
 }

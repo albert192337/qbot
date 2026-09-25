@@ -1,4 +1,7 @@
+import { registerRoomPetMenu } from './rooms/room-pet-menu';
+import { registerDesktopVisibility, desktopQuiet } from './desktop-visibility';
 import {registerDesktopOverlays} from './desktop-overlays';
+import {registerPetHints} from './pet-hint';
 import { saveResourceAnnotation, saveScenePools } from './resource-settings';
 import { registerSocialIpc } from './social-ipc';
 import { moveRoomPetWindow } from './windows';
@@ -13,7 +16,7 @@ import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
 import { showBubbleWindow, getBubbleWindow, openCozyPreview, displayDesktopSign } from './windows';
-import { openGenePreview, openDesktopGenePreview } from './gene-preview';
+import { openGenePreview, openDesktopGenePreview, openPineapplePreview } from './gene-preview';
 import { getBrainLog, updateBrainCall } from './brain-log';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
@@ -70,6 +73,8 @@ import { registerStickerLibraryIpc } from './sticker-library-ipc';
 import { getIdlePlan } from './idle-plan';
 
 export function registerIpc(): void {
+  registerDesktopVisibility();
+  registerPetHints();
   registerDesktopOverlays((id,kind)=>id===getPetWindow()?.webContents.id||(kind==='speech'&&id===getBubbleWindow()?.webContents.id));
   registerSocialIpc();
   ipcMain.handle('behavior:getIdlePlan',(_ev,id:string)=>getIdlePlan(id));
@@ -164,7 +169,7 @@ export function registerIpc(): void {
   });
 
   // ── pet ────────────────────────────────────────────────
-  ipcMain.handle('pet:perch', ev => ev.sender === getPetWindow()?.webContents ? tryPerch() : {ok:false});
+  ipcMain.handle('pet:perch', ev => !desktopQuiet() && ev.sender === getPetWindow()?.webContents ? tryPerch() : {ok:false});
   app.once('before-quit',detachPerch);
   ipcMain.handle('pet:getPerch', ev => ev.sender === getPetWindow()?.webContents ? getPerchState() : null);
   ipcMain.on('pet:detachPerch', ev => { if(ev.sender === getPetWindow()?.webContents)detachPerch(); });
@@ -293,6 +298,7 @@ export function registerIpc(): void {
     if (memberId) waveAt(memberId);
   });
   ipcMain.on('roomPet:leaveRoom', () => leaveRoom());
+  registerRoomPetMenu();
   ipcMain.on('roomPet:move', (event, x: number, y: number) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) moveRoomPetWindow(win, x, y);
@@ -345,6 +351,7 @@ export function registerIpc(): void {
       { label: '一起玩…', click: () => createLoungeWindow() },
       { label: '角色管理…', click: () => createConsoleWindow() },
       { label: '草莓基因工坊（效果预览）…', click: () => openGenePreview() },
+      { label: '菠萝词条工坊（效果预览）…', click: () => openPineapplePreview() },
       { label: '3D 草莓放到桌面（试摆）…', click: () => openDesktopGenePreview() },
       { label: '养成从头开始…', click: () => { void import('./reset-progress').then(m => m.confirmProgressReset(win)); } },
       { label: '工具抽屉（日志）…', click: async () => {
@@ -472,13 +479,13 @@ export function registerIpc(): void {
       win.setIgnoreMouseEvents(ignore, { forward: true });
   });
   ipcMain.on('bubble:say', (ev, payload: { text?: unknown; durationMs?: unknown }) => {
-    if (ev.sender !== getPetWindow()?.webContents || typeof payload?.text !== 'string') return;
+    if (desktopQuiet() || ev.sender !== getPetWindow()?.webContents || typeof payload?.text !== 'string') return;
     const text = payload.text.trim().slice(0, 500);
     if (!text) return;
     const win = showBubbleWindow();
     const msg = { text, durationMs: 20_000 };
     if (win.webContents.isLoading()) win.webContents.once('did-finish-load', () => {
-      if (!win.isDestroyed()) win.webContents.send('behavior:say', msg);
+      if (!desktopQuiet() && !win.isDestroyed() && win.isVisible()) win.webContents.send('behavior:say', msg);
     });
     else win.webContents.send('behavior:say', msg);
   });

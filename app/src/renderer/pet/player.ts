@@ -9,6 +9,18 @@ import type { Manifest, ManifestAction, PlayableId } from '@qbot/pipeline';
 const LOOPING: ReadonlySet<string> = new Set(['idle', 'drag', 'perch_sit', 'perch_lie']);
 
 export class Player {
+  private suspended = false;
+  /** Keep assets, but cancel decoder retries and one-shot completions while concealed. */
+  setSuspended(value: boolean): void {
+    this.suspended=value;
+    if(!value)return;
+    this.generation++;
+    this.cancelAttempt?.();this.cancelAttempt=null;
+    this.clearSafetyTimer();
+    if(this.recoveryTimer)clearTimeout(this.recoveryTimer);
+    this.recoveryTimer=null;
+    for(const video of this.videos.values())video.pause();
+  }
   private manifest: Manifest | null = null;
   private requested: string | null = null;
   private selected: string | null = null;
@@ -21,6 +33,8 @@ export class Player {
   private cancelAttempt: (() => void) | null = null;
   private failed = new Set<string>();
   private fallback: HTMLImageElement | null = null;
+  private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+  private recoveryAttempts = 0;
 
   /** Stop detached visitors / release decoders before replacing a character. */
   dispose(): void {
@@ -28,6 +42,9 @@ export class Player {
     this.cancelAttempt?.();
     this.cancelAttempt = null;
     this.clearSafetyTimer();
+    if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
+    this.recoveryTimer = null;
+    this.recoveryAttempts = 0;
     for (const video of this.videos.values()) {
       video.pause();
       video.removeAttribute('src');
@@ -125,6 +142,9 @@ export class Player {
   }
 
   private playImpl(action: PlayableId, forceLoop: boolean, forceOnce = false, usePool = true): void {
+    if(this.suspended)return;
+    if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
+    this.recoveryTimer = null;
     const generation = ++this.generation;
     this.cancelAttempt?.();
     this.cancelAttempt = null;
@@ -136,7 +156,20 @@ export class Player {
     }
     const id = [this.selected, action, 'idle', ...this.videos.keys()]
       .find((candidate) => this.videos.has(candidate) && !this.failed.has(candidate));
-    if (!id) return; // Leave the last good frame / source image in place.
+    if (!id) {
+      // A temporary decoder/load failure must not strand a looping visitor on its source photo.
+      // Bounded backoff avoids continuously retrying genuinely broken packs or stale one-shot actions.
+      if (this.videos.size && !forceOnce && (forceLoop || LOOPING.has(action)) && this.recoveryAttempts < 3) {
+        this.recoveryTimer = setTimeout(() => {
+          this.recoveryTimer = null;
+          if (generation !== this.generation || !this.container.isConnected) return;
+          this.failed.clear();
+          for (const video of this.videos.values()) video.load();
+          this.playImpl(action, forceLoop, forceOnce, usePool);
+        }, 15000 * 2 ** this.recoveryAttempts++);
+      }
+      return;
+    }
     const next = this.videos.get(id)!;
     const active = () => generation === this.generation;
     let retries = 0;
@@ -173,6 +206,7 @@ export class Player {
     };
     const reveal = () => {
       if (!active()) return;
+      this.recoveryAttempts = 0;
       if (this.current && this.current !== id) this.triggerPoof();
       for (const video of this.videos.values()) {
         video.style.visibility = video === next ? 'visible' : 'hidden';

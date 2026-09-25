@@ -4,7 +4,29 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
+  desktop: {
+    get: () => ipcRenderer.invoke('desktop:get'),
+    toggle: () => ipcRenderer.invoke('desktop:toggle'),
+    setMemberHidden: (id, hidden) => ipcRenderer.invoke('desktop:member', id, hidden),
+    drop: () => ipcRenderer.invoke('desktop:drop'),
+    unpeek: () => ipcRenderer.send('desktop:unpeek'),
+    reportHits: hits => ipcRenderer.send('desktop:hits', hits),
+    openPeerControls: () => ipcRenderer.send('desktop:peerControls'),
+    onPeerControlsClose: cb => { const fn = () => cb(); ipcRenderer.on('desktop:peerControlsClose',fn); return () => ipcRenderer.removeListener('desktop:peerControlsClose',fn); },
+    onChanged: cb => {
+      let alive=true, revision=-1;
+      const deliver=(s:import('../shared/desktop-visibility').DesktopVisibility)=>{if(alive&&s.revision>=revision){revision=s.revision;cb(s);}};
+      const fn=(_e:unknown,s:import('../shared/desktop-visibility').DesktopVisibility)=>deliver(s);
+      ipcRenderer.on('desktop:changed',fn); void ipcRenderer.invoke('desktop:get').then(deliver).catch(()=>{});
+      return()=>{alive=false;ipcRenderer.removeListener('desktop:changed',fn);};
+    },
+  },
   overlays: {
+    hint:value=>ipcRenderer.send('hint:set',value),
+    onHint:cb=>{const fn=(_e:unknown,value:import('../shared/pet-hint').PetHint)=>cb(value);ipcRenderer.on('hint:changed',fn);return()=>ipcRenderer.removeListener('hint:changed',fn);},
+    hintAction:action=>ipcRenderer.send('hint:action',action),
+    onHintAction:cb=>{const fn=(_e:unknown,action:'open'|'dismiss')=>cb(action);ipcRenderer.on('hint:action',fn);return()=>ipcRenderer.removeListener('hint:action',fn);},
+    hintHover:hit=>ipcRenderer.send('hint:hover',hit),
     report:(kind,active)=>ipcRenderer.send('overlays:report',kind,active),
     onChanged:cb=>{
       let alive=true,revision=-1;
@@ -158,6 +180,8 @@ const api: QBotApi = {
     remove: (hash) => ipcRenderer.invoke('market:remove', hash),
   },
   social: {
+    pet: phase => ipcRenderer.invoke("social:pet", phase),
+    onPet: cb => { const fn=(_e:unknown,phase?: 'start'|'keep'|'end')=>cb(phase); ipcRenderer.on("social:pet",fn); return ()=>ipcRenderer.removeListener("social:pet",fn); },
     rehearseContact: id => ipcRenderer.invoke('social:rehearseContact', id),
     contacts: refresh => ipcRenderer.invoke('social:contacts', refresh),
     contactAction: (id, action) => ipcRenderer.invoke('social:contactAction', id, action),
@@ -384,6 +408,9 @@ const api: QBotApi = {
     },
   },
   roomPet: {
+    interactions: () => ipcRenderer.invoke('roomPet:interactions'),
+    interact: kind => ipcRenderer.invoke('roomPet:interact', kind),
+    popupMenu: () => ipcRenderer.send('roomPet:popupMenu'),
     move: (x, y) => ipcRenderer.send('roomPet:move', x, y),
     onHello: (cb) => {
       const listener = (_ev: unknown, info: { nickname: string }) => cb(info);

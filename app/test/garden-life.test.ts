@@ -39,20 +39,23 @@ describe('garden daily life',()=>{
     s.life!.rareBought=3;const next={...cmd,offer:dailyOffers('friend',day)[1].id};expect(()=>transition(s,next,now,rng,{shopOwner:'friend'})).toThrow('3 瓶');
     const seed={...cmd,offer:dailyOffers('friend',day)[2].id};s=transition(s,seed,now,rng,{shopOwner:'friend'}).state;expect(s.journey!.bought).toBe(1);
   });
-  it('persists one spray result, protects its fruit and consumes even if keeping old appearance',()=>{
+  it('applies one random result immediately and allows harvesting without confirmation',()=>{
     let s=garden();s.plots[0]=plant();s.life!.sprays.fruit=1;
     s=transition(s,{type:'spray',kind:'fruit',target:'fruit'},now,rng).state;
-    const pending=s.life!.pending!;expect(pending.trait).toBe('sugar');expect(s.life!.sprays.fruit).toBe(0);
-    expect(()=>transition(s,{type:'harvest',plot:0},now,rng)).toThrow('喷雾结果');
-    expect(()=>transition(s,{type:'resolveSpray',id:pending.id,accept:true},now,rng)).toThrow('槽位');
-    const restored=validateGarden(JSON.parse(JSON.stringify(s)));expect(restored.life!.pending).toEqual(pending);
-    s=transition(restored,{type:'resolveSpray',id:pending.id,accept:false},now,rng).state;
-    expect(s.plots[0]!.traits).toEqual(['honey']);expect(s.life!.pending).toBeUndefined();expect(s.life!.sprays.fruit).toBe(0);
+    expect(s.plots[0]!.traits).toEqual(['sugar']);expect(s.life!.pending).toBeUndefined();expect(s.life!.sprays.fruit).toBe(0);
+    expect(()=>transition(s,{type:'spray',kind:'fruit',target:'fruit'},now,rng)).toThrow('喷雾不足');
+    const restored=validateGarden(JSON.parse(JSON.stringify(s)));
+    expect(transition(restored,{type:'harvest',plot:0},now,rng).state.produce.at(-1)!.traits).toEqual(['sugar']);
   });
-  it('applies same-slot replacement, preserves dye after harvest and does not inherit dye next batch',()=>{
+  it('applies saved legacy results once without rerolling or spending another spray',()=>{
+    const s=garden();s.plots[0]=plant();s.life!.sprays.fruit=2;
+    s.life!.pending={id:'saved',target:'fruit',kind:'fruit',trait:'milky'};
+    ensureLife(s,now,rng);expect(s.plots[0]!.traits).toEqual(['milky']);expect(s.life!.pending).toBeUndefined();
+    const snapshot=JSON.stringify(s);ensureLife(s,now,rng);expect(JSON.stringify(s)).toBe(snapshot);expect(s.life!.sprays.fruit).toBe(2);
+  });  it('applies same-slot replacement, preserves dye after harvest and does not inherit dye next batch',()=>{
     let s=garden();s.plots[0]=plant();s.life!.sprays.fruit=1;
     s=transition(s,{type:'spray',kind:'fruit',target:'fruit'},now,rng).state;
-    s=transition(s,{type:'resolveSpray',id:s.life!.pending!.id,accept:true,replace:'honey'},now,rng).state;
+
     expect(s.plots[0]!.traits).toEqual(['sugar']);
     expect(s.discovered).toContain('strawberry:sugar');
     s.plots[0]=null;

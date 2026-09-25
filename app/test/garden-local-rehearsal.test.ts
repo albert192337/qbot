@@ -29,9 +29,9 @@ describe('local garden rehearsal',()=>{
   expect(r.act({type:'spray',target:s.produce[0].id,kind:'color'}).ok).toBe(false);
   expect(r.get().life!.sprays.color).toBe(5);
   expect(r.act({type:'spray',target:s.plots[0]!.id,kind:'color'}).ok).toBe(true);
-  expect(r.act({type:'harvest',plot:0}).ok).toBe(false);
-  const pending=r.get().life!.pending!;expect(r.act({type:'resolveSpray',id:pending.id,accept:true}).ok).toBe(true);
-  expect(r.act({type:'harvest',plot:0}).ok).toBe(true);expect(r.get().produce.at(-1)?.dye).toBe(pending.dye);
+
+  const dye=r.get().plots[0]!.dye;expect(dye).toBeDefined();expect(r.get().life!.pending).toBeUndefined();
+  expect(r.act({type:'harvest',plot:0}).ok).toBe(true);expect(r.get().produce.at(-1)?.dye).toBe(dye);
  });
  it('completes a friend cultivation with heartbeat leases and grants a reward once',()=>{
   let clock=now;const r=new LocalGardenRehearsal(members,()=>clock);
@@ -42,7 +42,7 @@ describe('local garden rehearsal',()=>{
  });
  it('does not cultivate offline; rejects removed guests and resets the session',()=>{
   let clock=now;const r=new LocalGardenRehearsal(members,()=>clock);r.cooperate('test:guest',2,'join');clock+=600000;
-  expect(r.visit('test:guest').tasks![0].remaining).toBe(216000-15*360);
+  expect(r.visit('test:guest').tasks![0].remaining).toBe(64800-15*360);
   r.members=[members[0]];expect(()=>r.visit('test:guest')).toThrow('离开');
   setRehearsalMembers(members);expect(getRehearsal()).toBeDefined();clearRehearsal();expect(getRehearsal()).toBeUndefined();
  });

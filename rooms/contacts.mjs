@@ -76,7 +76,7 @@ export class Contacts {
     const outgoing = Object.keys(this.people).filter(x => this.people[x].incoming.includes(id));
     const ids = new Set([...p.friends, ...p.incoming, ...outgoing, ...Object.keys(p.seen)]);
     return [...ids].filter(x => this.people[x]).map(x => ({
-      id: x, nickname: this.people[x].nickname, character: this.people[x].character, title: '',
+      id: x, nickname: this.people[x].nickname, character: this.people[x].character, title: this.people[x].companion ? '陪伴角色' : '',
       online: onlineIds.has(x), ...p.seen[x],
       relation: p.friends.includes(x) ? 'friend' : p.incoming.includes(x) ? 'incoming' : outgoing.includes(x) ? 'outgoing' : 'none',
     }));

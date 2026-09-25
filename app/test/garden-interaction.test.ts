@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { plotPetPosition } from '../src/main/garden/interaction';
-const mocks = vi.hoisted(() => ({handlers: new Map<string,Function>(), events:new Map<string,Function>(), windows:[] as any[], ok:true,state:null as any}));
+const mocks = vi.hoisted(() => ({handlers: new Map<string,Function>(), events:new Map<string,Function>(), windows:[] as any[], ok:true,state:null as any,visit:null as any,coop:[] as any[]}));
 vi.mock('electron', () => ({
   powerMonitor:{on:vi.fn()},app:{on:vi.fn()}, ipcMain:{handle:(k:string,v:Function)=>mocks.handlers.set(k,v),on:(k:string,v:Function)=>mocks.events.set(k,v)},
   screen:{getDisplayMatching:()=>({workArea:{x:0,y:0,width:1600,height:1000}})},
@@ -16,10 +16,11 @@ vi.mock('electron', () => ({
   }
 }));
 vi.mock('../src/main/garden/weather-clock',()=>({startGardenWeatherClock:vi.fn()}));
-vi.mock('../src/main/garden/service',()=>({getGarden:vi.fn(),gardenAction:async(cmd:any)=>{if(!mocks.state)return {ok:mocks.ok};try{const {transition}=await import('../src/main/garden/rules');const result=transition(mocks.state,cmd,Date.now(),{random:()=>.99,id:()=>String(Math.random())});mocks.state=result.state;return {ok:true,...result};}catch(e){return {ok:false,error:String(e)};}}}));
+vi.mock('../src/main/garden/service',()=>({getGarden:async()=>mocks.state,gardenAction:async(cmd:any)=>{if(!mocks.state)return {ok:mocks.ok};try{const {transition}=await import('../src/main/garden/rules');const result=transition(mocks.state,cmd,Date.now(),{random:()=>.99,id:()=>String(Math.random())});mocks.state=result.state;return {ok:true,...result};}catch(e){return {ok:false,error:String(e)};}}}));
+vi.mock('../src/main/garden/network',()=>({cooperateGarden:async(owner:string,plot:number,action:string)=>{mocks.coop.push({owner,plot,action});return mocks.visit;}}));
 vi.mock('../src/main/config',()=>({getSettings:async()=>({activeCharacter:'frog'})}));
-vi.mock('../src/main/characters',()=>({getCharacter:async()=>({manifest:{actions:{idle:{status:'done'}},customActions:{garden_sow:{status:'done',durationSec:5},garden_harvest:{status:'done',durationSec:5}}}})}));
-afterEach(()=>{vi.useRealTimers();vi.resetModules();mocks.windows=[];mocks.handlers.clear();mocks.events.clear();mocks.ok=true;mocks.state=null});
+vi.mock('../src/main/characters',()=>({getCharacter:async()=>({manifest:{actions:{idle:{status:'done'}},customActions:{writing:{status:'done',durationSec:5},garden_sow:{status:'done',durationSec:5},garden_harvest:{status:'done',durationSec:5}}}})}));
+afterEach(()=>{vi.useRealTimers();vi.resetModules();mocks.windows=[];mocks.handlers.clear();mocks.events.clear();mocks.ok=true;mocks.state=null;mocks.visit=null;mocks.coop=[]});
 describe('garden pet interaction',()=>{
  it('positions all six plots on the available side and clamps negative-origin monitors',()=>{
   const pet={x:600,y:500,width:360,height:360}, strip={x:230,y:280,width:1100}, area={x:0,y:0,width:1600,height:1000};
@@ -49,7 +50,7 @@ describe('garden pet interaction',()=>{
  });
 });
 
-it('cultivation keeps the pet at the crop for 30 seconds and drag pauses the remaining time',async()=>{
+it('cultivation keeps the pet at the crop for three minutes and drag pauses the remaining time',async()=>{
  vi.useFakeTimers();vi.setSystemTime(100000);
  const {initialGarden,transition}=await import('../src/main/garden/rules');let id=0;const rng={random:()=>.99,id:()=>String(id++)};
  const state=initialGarden(Date.now(),rng);state.seeds[0].genes=['rainbow'];
@@ -58,11 +59,36 @@ it('cultivation keeps the pet at the crop for 30 seconds and drag pauses the rem
  const pet:any=new BrowserWindow({x:600,y:500,width:360,height:360});pet.visible=true;attachGarden(pet);registerGardenIpc();mocks.events.get('garden:toggle')!();mocks.windows[1].visible=true;
  const act=mocks.handlers.get('garden:act')!;
  expect((await act({},{type:'cultivate',plot:0})).ok).toBe(true);
+ expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance','writing');
  await vi.advanceTimersByTimeAsync(10000);expect(mocks.state.plots[0].revealed).not.toBe(true);expect(pet.getBounds().x).not.toBe(600);
- mocks.events.get('pet:move')!();await vi.advanceTimersByTimeAsync(0);expect(mocks.state.plots[0].cultivation).toEqual({remainingMs:20000});
+ mocks.events.get('pet:move')!();await vi.advanceTimersByTimeAsync(0);expect(mocks.state.plots[0].cultivation).toEqual({remainingMs:170000});
  await vi.advanceTimersByTimeAsync(60000);expect(mocks.state.plots[0].revealed).not.toBe(true);
  expect((await act({},{type:'cultivate',plot:0})).ok).toBe(true);
- await vi.advanceTimersByTimeAsync(19999);expect(mocks.state.plots[0].revealed).not.toBe(true);
+ await vi.advanceTimersByTimeAsync(169999);expect(mocks.state.plots[0].revealed).not.toBe(true);
  await vi.advanceTimersByTimeAsync(200);expect(mocks.state.plots[0].revealed).toBe(true);expect(mocks.state.produce).toHaveLength(0);
- expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance',null);
+expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance',null);
+});
+
+it('brings the pet and a read-only friend crop to the desktop, heartbeats once, and leaves on drag',async()=>{
+ vi.useFakeTimers();vi.setSystemTime(100000);
+ const {initialGarden}=await import('../src/main/garden/rules');
+ mocks.state=initialGarden(Date.now(),{random:()=>.5,id:()=> 'own'});
+ const p={id:'friend-secret',species:'strawberry',traits:[],publicQuality:'rainbow',kg:0,value:0,bred:false,growthVersion:3,plantedAt:0,readyAt:0,fertilizers:[]};
+ mocks.visit={owner:'friend',plots:[null,null,p,null,null,null],tasks:[{plant:'old-friend',plot:2,done:true},{plant:'friend-secret',plot:2,done:false}]};
+ const {BrowserWindow}=await import('electron');const {attachGarden,registerGardenIpc}=await import('../src/main/garden/windows');
+ const pet:any=new BrowserWindow({x:600,y:500,width:360,height:360});pet.visible=true;attachGarden(pet);registerGardenIpc();
+ mocks.events.get('garden:toggle')!();mocks.windows[1].visible=true;
+ const join=mocks.handlers.get('garden:cooperate')!;
+ await join({},'friend',2,'join');
+ const strip=mocks.windows[1];
+ expect(pet.getBounds().x).not.toBe(600);expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance','writing');
+ const view=await mocks.handlers.get('garden:get')!({sender:strip.webContents});
+ expect(view.cultivationVisit).toEqual({owner:'friend',plot:2});expect(view.plots[2].id).toBe('friend-secret');
+ expect((await mocks.handlers.get('garden:act')!({sender:strip.webContents},{type:'harvest',plot:2})).ok).toBe(false);
+ await join({},'friend',2,'join');expect(mocks.coop.some(c=>c.action==='leave')).toBe(false);
+ await vi.advanceTimersByTimeAsync(5000);expect(mocks.coop.filter(c=>c.action==='join')).toHaveLength(3);
+ mocks.events.get('pet:move')!();await vi.advanceTimersByTimeAsync(0);
+ expect(mocks.coop.at(-1)).toEqual({owner:'friend',plot:2,action:'leave'});
+ const count=mocks.coop.length;await vi.advanceTimersByTimeAsync(20000);expect(mocks.coop).toHaveLength(count);
+ expect((await mocks.handlers.get('garden:get')!({sender:strip.webContents})).cultivationVisit).toBeUndefined();
 });

@@ -2,6 +2,7 @@
  * 全局错误处理模块：统一捕获主进程的未捕获异常、未处理Promise拒绝等
  */
 import { app, dialog } from 'electron';
+import {desktopHidden} from './desktop-visibility';
 import { getAgentStatus } from './agent-server';
 
 /**
@@ -19,7 +20,7 @@ function handleUncaughtException(error: Error, origin: string): void {
   });
 
   // 显示错误提示框（开发环境或关键错误）
-  if (process.env.NODE_ENV !== 'production' || error.message.includes('fatal')) {
+  if (!desktopHidden() && (process.env.NODE_ENV !== 'production' || error.message.includes('fatal'))) {
     dialog.showErrorBox('QBot 发生错误', `${error.message}\n\n起源: ${origin}`);
   }
 }

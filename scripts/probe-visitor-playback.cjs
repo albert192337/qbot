@@ -1,0 +1,22 @@
+const {app,BrowserWindow,protocol,net}=require('electron');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+const {pathToFileURL}=require('node:url');
+const root=path.resolve(__dirname,'..');
+app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'qbot-visitor-probe-')));
+protocol.registerSchemesAsPrivileged([{scheme:'qbot-asset',privileges:{stream:true,supportFetchAPI:true,bypassCSP:true}}]);
+app.whenReady().then(async()=>{try{
+ const dir=process.env.QBOT_QA_ASSET_DIR;
+ protocol.handle('qbot-asset',req=>net.fetch(pathToFileURL(path.join(dir,new URL(req.url).pathname)).href));
+ const w=new BrowserWindow({width:300,height:300,show:false,webPreferences:{offscreen:true,backgroundThrottling:false}});
+ w.webContents.on('console-message',(_e,_level,message)=>console.log(message));
+ const esbuild=require('node:module').createRequire(require.resolve('../app/node_modules/vite'))('esbuild');
+ const code=esbuild.buildSync({entryPoints:[path.join(root,'app/src/renderer/pet/player.ts')],bundle:true,write:false,format:'iife',globalName:'Pet'}).outputFiles[0].text;
+ await w.loadURL('data:text/html,<style>body{margin:0;overflow:hidden}video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}</style><body><div id="stage" style="width:300px;height:300px;position:relative"></div></body>');
+ const m=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json'),'utf8'));
+ await w.webContents.executeJavaScript(code+`;window.p=new Pet.Player(document.getElementById('stage'),()=>{});p.load('guest',${JSON.stringify(m)});p.playLooping('idle');void 0`);
+ await new Promise(r=>setTimeout(r,5000));
+ const states=await w.webContents.executeJavaScript(`Array.from(document.querySelectorAll('video')).map(v=>({src:v.src,time:v.currentTime,visible:v.style.visibility,error:v.error?.message,paused:v.paused}))`);
+ require('node:assert/strict').ok(states.some(v=>v.visible==='visible'&&!v.paused&&v.time>0),'Actual character video must play');console.log(JSON.stringify(states));
+ fs.mkdirSync(path.join(root,'output/visitor-fix'),{recursive:true});fs.writeFileSync(path.join(root,'output/visitor-fix/playback.png'),(await w.webContents.capturePage()).toPNG());
+ app.exit(0);
+}catch(e){console.error(e);app.exit(1);}});

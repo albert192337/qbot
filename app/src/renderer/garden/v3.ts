@@ -5,16 +5,8 @@ type Act=(c:GardenCommand)=>Promise<void>;
 const el=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',cls='')=>{const e=document.createElement(tag);e.textContent=text;e.className=cls;return e;};
 const button=(text:string,fn:()=>unknown,disabled=false)=>{const b=el('button',text);b.disabled=disabled;b.onclick=()=>{void fn();};return b;};
 const names=(ts:Trait[])=>ts.map(t=>TRAITS[t].name).join('＋')||'原生';
-// Keep an unfinished choice while live cultivation/state updates redraw the panel.
-const factorDrafts=new Map<string,Set<Trait>>();
 const customDraft={species:'lotus' as Species,traits:new Set<Trait>()};
 function selectors(host:HTMLElement,pool:Trait[],selected:Set<Trait>):void{const row=el('div','','factor-options');for(const t of pool){const label=el('label','','tag '+TRAITS[t].tier),input=el('input');input.type='checkbox';input.checked=selected.has(t);input.onchange=()=>{if(input.checked)selected.add(t);else selected.delete(t);};label.append(input,document.createTextNode(TRAITS[t].name));row.append(label);}host.append(row);}
-export function renderFactorChoice(host:HTMLElement,p:Plant,act:Act):boolean {
- if(!p.batch?.candidates.length)return false;
- const card=el('article','','card factor-choice');card.append(el('h3','这一轮有新的模样'),el('p','果实1 · 果皮1 · 挂饰2。想留下哪个，由你决定；关闭后结果还在。'));
- const current=p.traits.filter(t=>traitSlot(t)!=='size'),pool=[...new Set([...current,...p.batch.candidates])];if(!factorDrafts.has(p.id)){factorDrafts.set(p.id,new Set(current));if(factorDrafts.size>20)factorDrafts.delete(factorDrafts.keys().next().value!);}const selected=factorDrafts.get(p.id)!;for(const t of selected)if(!pool.includes(t))selected.delete(t);selectors(card,pool,selected);
- card.append(button('确定这个模样',()=>act({type:'resolveFactors',target:p.id,chosen:[...selected]})),button('保留原来这些',()=>act({type:'resolveFactors',target:p.id,chosen:current})));host.append(card);return true;
-}
 export function renderAppraisal(host:HTMLElement,p:Produce,s:GardenState,act:Act):void {
  if(!s.v3||p.growthVersion!==3)return;
  const a=s.v3.appraisals[p.id];
@@ -49,7 +41,7 @@ export function renderNotebook(host:HTMLElement,s:GardenState,act:Act,go:(page:s
  const labels:Record<string,string>={question:'发现可培育果实',wishes:'角色每日心愿',welcome:'开始种植',settlement:'生长结算',rainbowPity:'彩色保底',choose:'选择模样',breed:'留下新种子',soil:'养好土地',appraise:'重量探险',shop:'小店采购',friendShop:'朋友家采购',spray:'喷雾惊喜',sprayAccept:'采用新模样',sprayKeep:'保留旧模样',feed:'完成心愿',reroll:'更换心愿',visit:'拜访',visitor:'朋友来访',share:'世界培育邀请',invite:'好友培育邀请',coopJoin:'参加培育',inviteJoin:'回应好友邀请',worldJoin:'参加公开任务',repeatCoop:'再次合作',helper:'朋友帮忙',soloComplete:'独自完成培育',coopComplete:'共同完成培育',coopReward:'助育礼物',sun:'向日葵伙伴',interaction:'一起互动',dailySeed:'基础种子补给'};const stats=el('details');stats.append(el('summary','我的玩法记录（只在自己的存档里）'));for(const [kind,count] of Object.entries(v.counters))stats.append(el('p',`${labels[kind]??'花园活动'} · ${count}`));host.append(stats);
 }
 export function renderV3Weather(host:HTMLElement,s:GardenState,go:(page:string)=>void):void {
- const hour=Math.floor(Date.now()/3600000),kind=hourlyWeather(hour,s.v3?.realm??'garden'),current=V3_WEATHER[kind];host.append(button('← 回花园',()=>go('plots')),el('h2',`${current.icon} 现在是${current.name}`),el('p',`每小时换天，离线照样记录。幼苗期占一轮的 80%，到时结算一次；成熟后不再追加天气词条。`),el('p',`花园彩因子保底 ${s.v3!.rainbowMisses}/32 · 下一次合格传说天气结算若达到第33次，会留下彩色候选。`));
+ const hour=Math.floor(Date.now()/3600000),kind=hourlyWeather(hour,s.v3?.realm??'garden'),current=V3_WEATHER[kind];host.append(button('← 回花园',()=>go('plots')),el('h2',`${current.icon} 现在是${current.name}`),el('p',`每小时换天，离线照样记录。幼苗期占一轮的 80%，到时结算一次；成熟后不再追加天气词条。`),el('p',`花园彩因子保底 ${s.v3!.rainbowMisses}/32 · 下一次合格传说天气结算若达到第33次，会获得彩色因子。`));
  const timeline=el('div','','grid');for(let i=1;i<=3;i++){const w=V3_WEATHER[hourlyWeather(hour+i,s.v3?.realm??'garden')];timeline.append(el('article',`${new Date((hour+i)*3600000).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})} ${w.icon} ${w.name}`,'card'));}host.append(timeline,el('p','普通/稀有天气抽取权重 140:10。连续12个非传说小时后，第13小时进入传说天气；天气日历不会因重启或拜访重抽。','muted'));
  const grid=el('div','','grid');for(const [id,w] of Object.entries(V3_WEATHER)){const card=el('article','','card');card.append(el('h3',w.icon+' '+w.name+' · '+w.grade),el('p',names([...w.pool] as Trait[])));const weights=weatherWeights(id as keyof typeof V3_WEATHER),total=weights.reduce((a,b)=>a+b,0);card.append(el('small','抽中该天气后，蓝/紫/金/彩占比：'+weights.map(x=>(100*x/total).toFixed(2)+'%').join(' / ')));grid.append(card);}host.append(grid);
 }

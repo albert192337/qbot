@@ -41,8 +41,8 @@ function setThinking(thinking: boolean): void {
 let anchorHeight = 500;
 function syncHeight(): void {
   const nodes = [...stackEl.children] as HTMLElement[];
-  const needed = nodes.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0) + Math.max(0, nodes.length - 1) * 8;
-  stackEl.style.height = `${Math.min(500, Math.max(anchorHeight, needed))}px`;
+  stackEl.style.overflow = 'hidden';
+  stackEl.style.height = `${Math.max(0, anchorHeight)}px`;
   window.qbot.overlays.report('speech',!document.hidden&&nodes.some(el=>!el.classList.contains('fade-out')));
   if(!speechAllowed){window.qbot.bubble.reportBounds(null);return;}
   const visible = nodes.filter(el => !el.classList.contains('fade-out')).map(el => el.getBoundingClientRect());
@@ -216,7 +216,7 @@ document.addEventListener('mouseleave', () => window.qbot.bubble.ignoreMouse(tru
 window.qbot.bubble.onReward(rewards => onMessage({ sessionKey: 'chat:reward', source:'桌宠', sessionShort:'', kind:'done', text:'开箱啦！', at:Date.now(), durationMs:20000, rewards }));
 window.qbot.bubble.onClear(clearAll);
 window.qbot.bubble.onAnchor((_side, contentHeight = 500) => {
-  document.body.classList.remove('below');
+  document.body.classList.toggle('below',_side==='below');
   anchorHeight = contentHeight;
   syncHeight();
 });

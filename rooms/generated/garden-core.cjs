@@ -86,6 +86,8 @@ __export(server_entry_exports, {
   poisson: () => poisson,
   protectPending: () => protectPending,
   protectV3: () => protectV3,
+  publicGardenPlant: () => publicGardenPlant,
+  publicGardenState: () => publicGardenState,
   qualityOf: () => qualityOf,
   recordGarden: () => recordGarden,
   refreshShop: () => refreshShop,
@@ -93,6 +95,8 @@ __export(server_entry_exports, {
   refreshV3Shop: () => refreshV3Shop,
   rollTraits: () => rollTraits,
   scoreOf: () => scoreOf,
+  settleFactors: () => settleFactors,
+  settlePendingSpray: () => settlePendingSpray,
   sizeOf: () => sizeOf,
   sowingMinutes: () => sowingMinutes,
   speciesLevel: () => speciesLevel,
@@ -214,7 +218,7 @@ function travelTransition(s, cmd, now) {
 
 // app/src/shared/garden-life.ts
 var DAY_MS = 864e5;
-var COOP_RULES = { work: 216e3, speed: 360, maxPlayers: 8, leaseMs: 15e3, minSeconds: 30, minContribution: 0.02, dailyRewards: 5 };
+var COOP_RULES = { work: 64800, speed: 360, maxPlayers: 8, leaseMs: 15e3, minSeconds: 20, minContribution: 0.02, dailyRewards: 5 };
 var coopRareChance = (participants) => 0.18 + 0.09 * (Math.max(1, Math.min(8, participants)) - 1) / 7;
 var gardenDay = (now) => Math.floor((now + 4 * 36e5) / DAY_MS);
 var nextGardenDay = (day) => (day + 1) * DAY_MS - 4 * 36e5;
@@ -271,7 +275,7 @@ function currentGrowth(s) {
 }
 
 // app/src/shared/garden-v3.ts
-var V3 = { version: 3, seedling: 0.8, lambda: 1.1, affinity: 0.25, affinityMax: 4, weatherPity: 12, rainbowPity: 32, cultivationMs: 6e5, weeklyBreeds: 90, breedPity: 9, hourIncome: 24, dayXp: 60 };
+var V3 = { version: 3, seedling: 0.8, lambda: 1.1, affinity: 0.25, affinityMax: 4, weatherPity: 12, rainbowPity: 32, cultivationMs: 18e4, weeklyBreeds: 90, breedPity: 9, hourIncome: 24, dayXp: 60 };
 var V3_XP = [0, 20, 50, 100, 170, 260, 380, 540, 740, 1e3];
 function factorDefinition(id) {
   const slot = traitSlot(id);
@@ -475,7 +479,7 @@ var FERTILIZERS = {
   weight4: { name: "\u7279\u7EA7\u589E\u91CD", description: "\u6700\u7EC8\u91CD\u91CF\u500D\u7387 +0.8\uFF5E1.2", effect: "weight", strength: 1.2, grade: 4, price: 55, chance: 0.05 }
 };
 var LEVEL_XP = [0, 40, 80, 160, 280, 440, 660, 960];
-var CULTIVATION_MS = 3e4;
+var CULTIVATION_MS = 18e4;
 var HARVEST_XP = 10;
 function level(xp) {
   return Math.max(1, LEVEL_XP.filter((n) => xp >= n).length);
@@ -500,7 +504,7 @@ function canBreed(p) {
 }
 function cultivationRemaining(p, now) {
   const c = p.cultivation;
-  return c ? Math.max(0, c.remainingMs - (c.startedAt === void 0 ? 0 : Math.max(0, now - c.startedAt))) : p.growthVersion === 3 ? 6e5 : CULTIVATION_MS;
+  return c ? Math.max(0, c.remainingMs - (c.startedAt === void 0 ? 0 : Math.max(0, now - c.startedAt))) : p.growthVersion === 3 ? 18e4 : CULTIVATION_MS;
 }
 function mutationMultiplier(ts) {
   return Math.min(15, 1 + [...new Set(ts)].reduce((sum, t) => sum + TRAITS[t].multiplier - 1, 0));
@@ -525,9 +529,10 @@ function gardenQuest(s) {
 
 // app/src/main/garden/life-rules.ts
 var safeKey = (s) => typeof s === "string" && s.length > 0 && s.length <= 160 && !["__proto__", "constructor", "prototype"].includes(s);
-function ensureLife(s, now, rng, actor) {
+function ensureLife(s, now, rng, actor, migrate = true) {
   const before = JSON.stringify(s.life);
   s.life ??= { owner: rng.id(), day: gardenDay(now), sprays: {}, purchases: {}, rareBought: 0, characters: {}, visibility: "friends" };
+  if (migrate) settlePendingSpray(s, now);
   const l = s.life, day = Math.max(l.day, gardenDay(now));
   if (day !== l.day) {
     l.day = day;
@@ -579,6 +584,36 @@ function validateLife(s) {
   if (l.pending && (!safeKey(l.pending.id) || typeof l.pending.target !== "string" || !Object.hasOwn(SPRAYS, l.pending.kind) || !(l.pending.trait ? Object.hasOwn(TRAITS, l.pending.trait) : l.pending.dye && Object.hasOwn(DYE_COLORS, l.pending.dye)))) throw Error("\u55B7\u96FE\u7ED3\u679C\u635F\u574F");
 }
 var sprayConflicts = (a, b) => [["firefly", "glowring"], ["breezy", "snowbell", "goldbell"]].some((g) => g.includes(a) && g.includes(b));
+function settlePendingSpray(s, now) {
+  const candidate = s.life?.pending;
+  if (!candidate) return;
+  const p = s.produce.find((p2) => p2.id === candidate.target) ?? s.plots.find((p2) => p2?.id === candidate.target);
+  if (!p) {
+    delete s.life.pending;
+    return;
+  }
+  if (candidate.dye) p.dye = candidate.dye;
+  if (candidate.trait) {
+    const t = candidate.trait, slot = traitSlot(t), capacity = slot === "accessory" ? 2 : 1;
+    let traits = p.traits.filter((x) => !sprayConflicts(x, t) || x === t);
+    if (!traits.includes(t)) {
+      while (traits.filter((x) => traitSlot(x) === slot).length >= capacity) {
+        const old = traits.find((x) => traitSlot(x) === slot);
+        traits = traits.filter((x) => x !== old);
+      }
+      traits.push(t);
+    }
+    p.traits = traits;
+    p.revealed = true;
+    if (p.growthVersion === 3) p.slots = stableSlots(p.traits, p.slots);
+    const key = `${p.species}:${t}`;
+    if (!s.discovered.includes(key)) s.discovered.push(key);
+  }
+  p.value = value(p);
+  recordGarden(s, now, "sprayAccept", "\u55B7\u96FE\u7684\u65B0\u7ED3\u679C\u5DF2\u76F4\u63A5\u751F\u6548", void 0, p.id);
+  delete s.life.pending;
+  return p;
+}
 function protectPending(s, c) {
   const id = s.life?.pending?.target;
   if (!id || c.type === "resolveSpray") return;
@@ -586,7 +621,7 @@ function protectPending(s, c) {
 }
 function lifeTransition(s, cmd, now, rng, actor, shopOwner) {
   if (!["buyDaily", "spray", "resolveSpray", "feed", "rerollWish", "gardenVisibility"].includes(cmd.type)) return { handled: false };
-  ensureLife(s, now, rng, actor);
+  ensureLife(s, now, rng, actor, cmd.type !== "resolveSpray");
   const l = s.life;
   switch (cmd.type) {
     case "buyDaily": {
@@ -624,36 +659,14 @@ function lifeTransition(s, cmd, now, rng, actor, shopOwner) {
       l.sprays[cmd.kind]--;
       l.pending = { id: rng.id(), target: p.id, kind: cmd.kind, trait: out.trait, dye: out.dye };
       recordGarden(s, now, "spray", `\u7528\u4E86\u4E00\u74F6${SPRAYS[cmd.kind].name}`, void 0, p.id);
-      return { handled: true };
+      const changed = settlePendingSpray(s, now);
+      return { handled: true, changed, reveal: { title: "\u55B7\u96FE\u751F\u6548\uFF01", message: out.trait ? TRAITS[out.trait].name : DYE_COLORS[out.dye].name } };
     }
     case "resolveSpray": {
       const candidate = l.pending;
       if (!candidate || candidate.id !== cmd.id || typeof cmd.accept !== "boolean") throw Error("\u55B7\u96FE\u7ED3\u679C\u5DF2\u5904\u7406");
-      const p = s.produce.find((p2) => p2.id === candidate.target) ?? s.plots.find((p2) => p2?.id === candidate.target);
-      if (!p) throw Error("\u76EE\u6807\u679C\u5B9E\u4E0D\u5B58\u5728");
-      if (cmd.accept) {
-        if (candidate.dye) p.dye = candidate.dye;
-        if (candidate.trait) {
-          const t = candidate.trait, slot = traitSlot(t);
-          let traits = [...p.traits];
-          if (cmd.replace) {
-            if (!traits.includes(cmd.replace) || traitSlot(cmd.replace) !== slot) throw Error("\u8BF7\u9009\u62E9\u540C\u69FD\u4F4D\u7684\u65E7\u8BCD\u6761");
-            traits = traits.filter((x) => x !== cmd.replace);
-          }
-          if (!traits.includes(t)) {
-            if (traits.filter((x) => traitSlot(x) === slot).length >= (slot === "accessory" ? 2 : 1) || traits.some((x) => sprayConflicts(x, t))) throw Error("\u69FD\u4F4D\u5DF2\u6EE1\u6216\u8BCD\u6761\u51B2\u7A81\uFF0C\u8BF7\u9009\u62E9\u66FF\u6362\u9879");
-            traits.push(t);
-          }
-          p.traits = traits;
-          p.revealed = true;
-          if (p.growthVersion === 3) p.slots = stableSlots(p.traits, p.slots);
-          const key = `${p.species}:${t}`;
-          if (!s.discovered.includes(key)) s.discovered.push(key);
-        }
-      }
-      recordGarden(s, now, cmd.accept ? "sprayAccept" : "sprayKeep", cmd.accept ? "\u9009\u7528\u4E86\u55B7\u96FE\u7684\u65B0\u6A21\u6837" : "\u4FDD\u7559\u4E86\u539F\u6765\u7684\u6A21\u6837", void 0, p.id);
-      delete l.pending;
-      return { handled: true, changed: p, reveal: { title: cmd.accept ? "\u65B0\u6A21\u6837\uFF01" : "\u4FDD\u7559\u4E86\u539F\u6765\u7684\u6A21\u6837", message: "\u55B7\u96FE\u5DF2\u4F7F\u7528\uFF0C\u679C\u5B9E\u7559\u5728\u539F\u5904\u3002" } };
+      const changed = settlePendingSpray(s, now);
+      return { handled: true, changed, reveal: { title: "\u55B7\u96FE\u751F\u6548\uFF01", message: candidate.trait ? TRAITS[candidate.trait].name : DYE_COLORS[candidate.dye].name } };
     }
     case "feed": {
       const c = actor && l.characters[actor];
@@ -770,13 +783,29 @@ function makeV3Plant(s, seed, plot, now, rng, harvests = SPECIES[seed.species].h
   };
 }
 var massRange = (t) => t === "giant" ? [5, 5.6] : t === "large" ? [3, 4.2] : t === "plump" ? [1.5, 2.4] : [0.45, 0.58];
+function settleFactors(traits) {
+  return cappedTraits([...new Set(traits)].filter((t) => traitSlot(t) !== "size").sort((a, b) => FACTOR_SCORE[TRAITS[b].tier] - FACTOR_SCORE[TRAITS[a].tier]));
+}
 function advanceV3(s, now) {
   if (!s.v3) return false;
   refreshV3Day(s, now);
   let changed = false;
   for (const [plot, p] of s.plots.entries()) {
     const b = p?.batch;
-    if (!p || p.growthVersion !== 3 || !b || b.settled || now < b.seedlingEnd) continue;
+    if (!p || p.growthVersion !== 3 || !b) continue;
+    if (b.settled && b.candidates.length) {
+      p.traits = withSize(settleFactors([...p.traits, ...b.candidates]), p.kg / SPECIES[p.species].kg);
+      p.slots = stableSlots(p.traits, p.slots);
+      b.candidates = [];
+      p.value = v3Value(p);
+      if (!p.revealed && qualityOf(p) === "rainbow") p.readyAt = Math.min(p.readyAt, now);
+      changed = true;
+    }
+    if (p.cultivation && p.cultivation.remainingMs > V3.cultivationMs) {
+      p.cultivation.remainingMs = V3.cultivationMs;
+      changed = true;
+    }
+    if (b.settled || now < b.seedlingEnd) continue;
     b.exposure = exposures(p.plantedAt, b.seedlingEnd, b.realm);
     b.settled = true;
     changed = true;
@@ -805,7 +834,7 @@ function advanceV3(s, now) {
         if (p.traits.includes(candidate)) candidates.push(candidate);
         else propose(candidate);
         s.v3.rainbowMisses = 0;
-        recordGarden(s, now, "rainbowPity", "\u7B2C 33 \u6B21\u4F20\u8BF4\u5929\u6C14\u7ED3\u7B97\uFF1A\u4E3A\u4F60\u7559\u4E0B\u4E00\u679A\u5F69\u8272\u5019\u9009\u3002", void 0, p.id);
+        recordGarden(s, now, "rainbowPity", "\u7B2C 33 \u6B21\u4F20\u8BF4\u5929\u6C14\u7ED3\u7B97\uFF1A\u51FA\u73B0\u4E86\u5F69\u8272\u56E0\u5B50\u3002", void 0, p.id);
       } else s.v3.rainbowMisses++;
     }
     const lv = speciesLevel(s.xp[p.species]);
@@ -827,15 +856,15 @@ function advanceV3(s, now) {
     mass += b.sunBonus;
     mass = Math.min(8, mass);
     p.kg = Math.round(SPECIES[p.species].kg * mass * 1e3) / 1e3;
-    p.traits = withSize(p.traits, p.kg / SPECIES[p.species].kg);
+    p.traits = withSize(settleFactors([...p.traits, ...candidates]), p.kg / SPECIES[p.species].kg);
     p.slots = stableSlots(p.traits, p.slots);
-    b.candidates = candidates;
+    b.candidates = [];
     p.value = v3Value(p);
     if (qualityOf(p) === "rainbow") {
       p.readyAt = Math.min(p.readyAt, b.seedlingEnd);
       if (!b.candidates.length) recordGarden(s, now, "question", "\u53D1\u73B0\u4E00\u9897\u53EF\u4EE5\u5171\u540C\u57F9\u80B2\u7684\u679C\u5B9E", void 0, p.id);
     }
-    recordGarden(s, now, "settlement", `${SPECIES[p.species].name}\u7ED3\u7B97\uFF1A${p.traits.filter((t) => !old.includes(t)).map((t) => TRAITS[t].name).join("\u3001") || "\u539F\u751F\u5C0F\u60CA\u559C"}${candidates.length ? "\uFF0C\u6709\u65B0\u5019\u9009\u53EF\u4EE5\u9009\u62E9" : ""}`, void 0, p.id);
+    recordGarden(s, now, "settlement", `${SPECIES[p.species].name}\u7ED3\u7B97\uFF1A${p.traits.filter((t) => !old.includes(t)).map((t) => TRAITS[t].name).join("\u3001") || "\u539F\u751F\u5C0F\u60CA\u559C"}`, void 0, p.id);
   }
   return changed;
 }
@@ -847,7 +876,7 @@ function v3HarvestXp(s, p, now) {
 }
 function protectV3(s, c) {
   if (!s.v3) return;
-  const targets = s.plots.filter((p) => !!p && !!p.batch?.candidates.length).map((p) => p.id);
+  const targets = [];
   for (const [id, a] of Object.entries(s.v3.appraisals)) if (!a.done) targets.push(id);
   if (["resolveFactors", "appraisePick", "appraiseStop"].includes(c.type)) return;
   const touches = (id) => "id" in c && c.id === id || "target" in c && c.target === id || "produce" in c && c.produce === id || "first" in c && (c.first === id || c.second === id) || "ids" in c && c.ids.includes(id) || "plot" in c && s.plots[c.plot]?.id === id;
@@ -909,24 +938,8 @@ function v3Transition(s, c, now, rng) {
   refreshV3Day(s, now);
   const find = (id) => s.produce.find((p) => p.id === id) ?? s.plots.find((p) => p?.id === id);
   switch (c.type) {
-    case "resolveFactors": {
-      const p = s.plots.find((p2) => p2?.id === c.target), b = p?.batch;
-      if (!p || !b?.candidates.length) throw Error("\u6CA1\u6709\u5F85\u9009\u8BCD\u6761");
-      const pool = [...p.traits, ...b.candidates];
-      if (!Array.isArray(c.chosen) || c.chosen.some((t) => !pool.includes(t) || traitSlot(t) === "size") || cappedTraits(c.chosen).length !== c.chosen.length) throw Error("\u8BF7\u9009\u62E9\u7B26\u5408\u69FD\u4F4D\u548C\u4E92\u65A5\u89C4\u5219\u7684\u8BCD\u6761");
-      p.traits = withSize(c.chosen, p.kg / SPECIES[p.species].kg);
-      p.slots = stableSlots(p.traits, p.slots);
-      b.candidates = [];
-      p.value = v3Value(p);
-      p.readyAt = b.naturalReadyAt ?? p.readyAt;
-      if (qualityOf(p) === "rainbow") {
-        p.readyAt = Math.min(p.readyAt, now);
-        p.revealed = false;
-        recordGarden(s, now, "question", "\u9009\u51FA\u4E86\u53EF\u4EE5\u5171\u540C\u57F9\u80B2\u7684\u679C\u5B9E", void 0, p.id);
-      }
-      recordGarden(s, now, "choose", "\u9009\u597D\u4E86\u8FD9\u6279\u679C\u5B9E\u7684\u6A21\u6837", void 0, p.id);
-      return { handled: true };
-    }
+    case "resolveFactors":
+      throw Error("\u679C\u5B9E\u73B0\u5728\u81EA\u52A8\u7ED3\u7B97\uFF0C\u65E0\u9700\u9009\u62E9\u8BCD\u6761");
     case "collectionGoal":
       if (!Object.hasOwn(SPECIES, c.species) || !Array.isArray(c.traits) || !c.traits.length || c.traits.some((t) => !Object.hasOwn(TRAITS, t)) || cappedTraits(c.traits).length !== c.traits.length) throw Error("\u8BF7\u9009\u62E9\u517C\u5BB9\u7684\u6536\u85CF\u76EE\u6807");
       v.goal = { species: c.species, traits: [...c.traits] };
@@ -1055,6 +1068,7 @@ function transition(input, cmd, now, rng, context = {}) {
   advanceV3(s, now);
   const j = s.journey;
   refreshShop(s, now, rng);
+  if (cmd.type !== "resolveSpray") settlePendingSpray(s, now);
   protectPending(s, cmd);
   protectV3(s, cmd);
   const modern = v3Transition(s, cmd, now, rng);
@@ -1595,6 +1609,37 @@ function pairBeats(kind) {
 function pairFlip(facing, side) {
   return facing !== void 0 && facing !== (side === "left" ? "right" : "left");
 }
+
+// app/src/shared/garden-public.ts
+function publicGardenPlant(plant) {
+  const p = structuredClone(plant);
+  if (p.batch) p.batch.seed = 0;
+  if (plant.growthVersion === 3) p.publicQuality = fruitQuality(plant.traits, plant);
+  if (!needsReveal(plant)) return p;
+  p.publicQuality = fruitQuality(plant.traits, plant);
+  p.traits = [];
+  p.kg = 0;
+  p.value = 0;
+  delete p.slots;
+  delete p.baseTraits;
+  delete p.lineage;
+  delete p.dye;
+  if (p.batch) {
+    p.batch.candidates = [];
+    p.batch.slots = [null, null, null, null];
+    delete p.batch.massGene;
+  }
+  return p;
+}
+function publicGardenState(state) {
+  const s = structuredClone(state), hidden = new Set(state.plots.filter((p) => p && needsReveal(p)).map((p) => p.id));
+  s.plots = s.plots.map((p) => p ? publicGardenPlant(p) : null);
+  if (s.v3) {
+    for (const a of Object.values(s.v3.appraisals)) a.board = [];
+    for (const r of s.v3.records) if (r.plant && hidden.has(r.plant) && ["settlement", "choose", "rainbowPity"].includes(r.kind)) r.message = "\u53D1\u73B0\u795E\u79D8\u679C\u5B9E \xB7 \uFF1F \uFF1F \uFF1F \xB7 \u57F9\u80B2\u540E\u63ED\u6653";
+  }
+  return s;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   AFFINITIES,
@@ -1662,6 +1707,8 @@ function pairFlip(facing, side) {
   poisson,
   protectPending,
   protectV3,
+  publicGardenPlant,
+  publicGardenState,
   qualityOf,
   recordGarden,
   refreshShop,
@@ -1669,6 +1716,8 @@ function pairFlip(facing, side) {
   refreshV3Shop,
   rollTraits,
   scoreOf,
+  settleFactors,
+  settlePendingSpray,
   sizeOf,
   sowingMinutes,
   speciesLevel,

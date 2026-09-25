@@ -3,7 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { getSettings, setSettings } from './config';
 import { getCharacter } from './characters';
-import { createRoomChatWindow, getPetWindow } from './windows';
+import { createRoomChatWindow, getPetWindow, findRoomPetMemberId } from './windows';
 import * as Rooms from './rooms/rooms';
 import * as RoomPets from './rooms/room-pets';
 import { listTestGuests } from './rooms/test-guests';
@@ -23,6 +23,20 @@ export function registerSocialIpc(steamService: () => Pick<ReturnType<typeof get
     if(result.response!==0)return false;
     await setSettings({roomsChatConsent:true});return true;
   };
+  const petCooldown = new Map<number, number>();
+  ipcMain.handle('social:pet', async (event, phase: 'start'|'keep'|'end' = 'start') => {
+    if(!['start','keep','end'].includes(phase))throw Error('无效摸摸状态');
+    const win=BrowserWindow.fromWebContents(event.sender);
+    if(!win || event.senderFrame!==event.sender.mainFrame)throw Error('无效的桌宠窗口');
+    const target=win===getPetWindow()?undefined:findRoomPetMemberId(win);
+    if(target===null)throw Error('无效的桌宠窗口');
+    const now=Date.now(), last=petCooldown.get(event.sender.id);
+    if(phase==='start' && last!==undefined && now-last<8000)throw Error('让桌宠歇一小会儿');
+    if(last===undefined)event.sender.once('destroyed',()=>petCooldown.delete(event.sender.id));
+    if(phase==='start')petCooldown.set(event.sender.id,now);
+    else if(last===undefined)return;
+    await Rooms.petMember(target,phase);
+  });
   ipcMain.handle('social:prepareJoin', prepareJoin);
   ipcMain.handle('social:rehearseContact', async (_event, id) => { await Rooms.rehearseContact(id); createRoomChatWindow(); });
   ipcMain.handle('social:contacts', (_event, refresh) => Rooms.getContacts(refresh === true));
@@ -116,7 +130,10 @@ export function registerSocialIpc(steamService: () => Pick<ReturnType<typeof get
   ipcMain.handle('social:inviteTest', (_e, id) => Rooms.inviteTestGuest(id));
   ipcMain.handle('social:removeTest', (_e, id) => Rooms.removeTestGuest(id));
   ipcMain.handle('social:replyTest', (_e, id, text) => Rooms.replyTestGuest(id, text));
-  ipcMain.handle('social:interactTest', async (_e, id: string, kind: PairKind) => {
+  ipcMain.handle('social:interactTest', (_e, id: string, kind: PairKind) => interactTestGuest(id, kind));
+}
+
+export async function interactTestGuest(id: string, kind: PairKind): Promise<void> {
     const intents = {heart:'heart', tea:'tea', chat:'talk', wave:'wave',flower:'wave',photo:'happy',relay:'talk',celebrate:'happy'} as const;
     if (!Object.hasOwn(intents, kind)) throw new Error('未知互动');
     const {CHARACTER_UNLOCKS,currentGrowth,characterLevel}=await import('../shared/garden-life');
@@ -134,5 +151,4 @@ export function registerSocialIpc(steamService: () => Pick<ReturnType<typeof get
     }
     if (!Rooms.getTestGuest(id)) return;
     Rooms.replyTestGuest(id, ({heart:'小心心收到了！',tea:'好呀，一起喝杯茶。',chat:'嗯嗯，我在听。',wave:'嗨！见到你真好。',flower:'喜欢这朵花！',photo:'一起留下纪念！',relay:'轮到我啦！',celebrate:'一起庆祝！'})[kind]);
-  });
 }

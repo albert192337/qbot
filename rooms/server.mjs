@@ -24,6 +24,7 @@ import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import { Contacts } from './contacts.mjs';
 import { Gardens } from './garden.mjs';
+import { Companions } from './companions.mjs';
 import gardenCore from './generated/garden-core.cjs';
 
 const PORT = Number(process.env.PORT || 24252);
@@ -197,6 +198,7 @@ function sanitizeRoom(r) {
       memberId: c.memberId,
       nickname: clampText(c.nickname, NICK_MAX) || '匿名',
       text: c.text.slice(0, CHAT_MAX),
+      ...(c.interaction==='petting'?{interaction:'petting'}:{}),
       at: num(c.at, now),
     });
   }
@@ -225,7 +227,7 @@ function flush() {
   dirty = false;
   try {
     const tmp = `${DATA_FILE}.tmp`;
-    writeFileSync(tmp, JSON.stringify({ rooms: [...rooms.values()] }));
+    writeFileSync(tmp, JSON.stringify({ rooms: [...rooms.values()].filter(r=>!r.companion) }));
     renameSync(tmp, DATA_FILE); // 原子替换：崩在写一半也不会留下坏档
   } catch (err) {
     console.error('[rooms] flush failed:', err.message);
@@ -371,6 +373,7 @@ function streamPack(ws, hash) {
 /** 列表条目：不含聊天/token/成员详情（列表页不需要，也少一份泄漏面） */
 function roomBrief(room) {
   return {
+    companion: room.companion === true,
     ...roomMeta(room),
     roomId: room.roomId,
     name: room.name,
@@ -408,6 +411,7 @@ function roomSnapshot(room) {
     ownerId: room.ownerId,
     members: room.members.map((m) => ({
       memberId: m.memberId,
+      companion: m.companion === true,
       nickname: m.nickname,
       avatarHash: m.avatarHash,
       joinedAt: m.joinedAt,
@@ -438,6 +442,7 @@ function upsertMember(room, ws) {
 
 /** 离房：清在线表 + 广播；不动 members（常驻） */
 function leaveRoom(ws, notify = true) {
+  companions?.left(ws);
   const roomId = ws.roomId;
   if (!roomId) return;
   ws.roomId = null;
@@ -539,7 +544,7 @@ const handlers = {
     ws.nickname = clampText(f.nickname, NICK_MAX) || '匿名';
     ws.avatarHash = typeof f.avatarHash === 'string' ? f.avatarHash.slice(0, 32) : undefined;
     ws.hello = true;
-    send(ws, {t:'hello:ack', social:1, contacts:1, garden:1, memberId:ws.memberId, contactToken:identity.token, serverTime:Date.now()});
+    send(ws, {t:'hello:ack', social:1, contacts:1, garden:1, petting:2, memberId:ws.memberId, contactToken:identity.token, serverTime:Date.now()});
     notifyContacts();
   },
   'contacts:get'(ws, f) { if (typeof f.character === 'string' && contacts.people[ws.memberId].character !== clampText(f.character,32)) { contacts.transaction(()=>{contacts.people[ws.memberId].character=clampText(f.character,32);}); notifyContacts(); } ws.contactsSubscribed = true; send(ws, {t:'contacts:snapshot', ...contactSnapshot(ws)}); },
@@ -557,11 +562,11 @@ const handlers = {
       if(f.action==='coop'&&f.command==='invite'){
         const p=result.visit.plots[f.plot];
         for(const [key,i] of gardenInvites)if(i.expiresAt<Date.now()||i.from===ws.memberId&&i.to===f.target&&i.plant===p.id)gardenInvites.delete(key);
-        gardenInvites.set(randomBytes(16).toString('hex'),{from:ws.memberId,to:f.target,plant:p.id,plot:f.plot,label:`${gardenCore.SPECIES[p.species].name} · ${p.traits.map(t=>gardenCore.TRAITS[t].name+'（'+gardenCore.TIER_NAMES[gardenCore.TRAITS[t].tier]+'）').join(' / ')}`,expiresAt:Date.now()+3600000});
+        gardenInvites.set(randomBytes(16).toString('hex'),{from:ws.memberId,to:f.target,plant:p.id,plot:f.plot,label:`${gardenCore.SPECIES[p.species].name} · ${gardenCore.needsReveal(p)?'？ ？ ？':p.traits.map(t=>gardenCore.TRAITS[t].name+'（'+gardenCore.TIER_NAMES[gardenCore.TRAITS[t].tier]+'）').join(' / ')}`,expiresAt:Date.now()+3600000});
         noteChatSent(ws,`garden:${f.owner}:${f.plot}`);notifyContacts();
       }
       if(f.action==='coop'&&f.command==='share'){
-        const p=result.visit.plots[f.plot],text=`[培育:${ws.memberId}:${f.plot}] ${gardenCore.SPECIES[p.species].name} · ${p.traits.map(t=>gardenCore.TRAITS[t].name+'（'+gardenCore.TIER_NAMES[gardenCore.TRAITS[t].tier]+'）').join(' / ')} · 一起培育，好奖励概率更高`;
+        const p=result.visit.plots[f.plot],text=`[培育:${ws.memberId}:${f.plot}] ${gardenCore.SPECIES[p.species].name} · ${gardenCore.needsReveal(p)?'？ ？ ？':p.traits.map(t=>gardenCore.TRAITS[t].name+'（'+gardenCore.TIER_NAMES[gardenCore.TRAITS[t].tier]+'）').join(' / ')} · 一起培育，好奖励概率更高`;
         const existing=worldChat.find(m=>m.garden?.plant===p.id&&m.memberId===ws.memberId);
         const msg={id:existing?.id??genId(12),memberId:ws.memberId,nickname:ws.nickname,text,at:Date.now(),garden:{owner:ws.memberId,plot:f.plot,plant:p.id}};
         worldChat=[...worldChat.filter(m=>m.id!==msg.id),msg].slice(-CHAT_KEEP);noteChatSent(ws,text);worldBroadcast({t:'world:chat',msg});
@@ -688,6 +693,7 @@ const handlers = {
         packHash: ws.packHash,
       },
     }, ws);
+    companions?.joined(ws);
   },
 
   leave(ws) {
@@ -809,6 +815,35 @@ const handlers = {
     streamPack(ws, hash);
   },
 
+  petting(ws, f) {
+    const room=rooms.get(ws.roomId);
+    if(!room || f.roomId!==ws.roomId){fail(ws,'not_in_room');return;}
+    if(room.chatEnabled===false){fail(ws,'chat_disabled');return;}
+    const target=[...(online.get(ws.roomId)||[])].find(p=>p.memberId===f.target);
+    if(!target){fail(ws,'not_in_room');return;}
+    const now=Date.now();
+    const phase=f.phase??'start';
+    if(!['start','keep','end'].includes(phase)){fail(ws,'invalid_request');return;}
+    if(phase!=='start'){
+      const active=ws.petSession;
+      if(!active||active.room!==ws.roomId||active.target!==f.target||now-active.at>2000){fail(ws,'not_in_room');return;}
+      if(phase==='keep'&&now-active.at<350){send(ws,{t:'social:ack'});return;}
+      if(phase==='end')ws.petSession=null;else active.at=now;
+      send(ws,{t:'social:ack'});
+      broadcast(ws.roomId,{t:'petting',roomId:ws.roomId,target:target.memberId,phase});return;
+    }
+    room.petTimes ??= {};
+    for(const [id,at] of Object.entries(room.petTimes))if(now-at>=8000)delete room.petTimes[id];
+    if(now-(room.petTimes[ws.memberId]??0)<8000){fail(ws,'rate_limited');return;}
+    room.petTimes[ws.memberId]=now;
+    ws.petSession={room:ws.roomId,target:target.memberId,at:now};
+    const text=target.memberId===ws.memberId?ws.nickname+'摸了摸自己的桌宠。':ws.nickname+'轻轻摸了摸'+target.nickname+'，'+target.nickname+'开心地蹭了蹭小手。';
+    const msg={id:genId(12),memberId:ws.memberId,nickname:ws.nickname,text,at:now,interaction:'petting'};
+    room.chat=[...room.chat,msg].slice(-CHAT_KEEP);room.lastActiveAt=now;dirty=true;
+    send(ws,{t:'social:ack'});
+    broadcast(ws.roomId,{t:'chat',roomId:ws.roomId,msg});
+    broadcast(ws.roomId,{t:'petting',roomId:ws.roomId,target:target.memberId});
+  },
   chat(ws, f) {
     if (!ws.roomId) { fail(ws, 'not_in_room'); return; }
     const room = rooms.get(ws.roomId);
@@ -836,6 +871,7 @@ const handlers = {
     dirty = true;
     send(ws, { t: 'social:ack' });
     broadcast(ws.roomId, { t: 'chat', roomId: ws.roomId, msg }); // 含发送者：以服务端 id/时间为准
+    companions?.heard(ws,text);
   },
 
   'chat:delete'(ws, f) {
@@ -944,9 +980,9 @@ const contacts = new Contacts(path.join(DATA_DIR, 'contacts.json'));
 const gardens = new Gardens(path.join(DATA_DIR,'gardens.json'),contacts);
 function refreshGardenCards(){
   for(const msg of worldChat){if(!msg.garden)continue;const t=gardens.data.tasks[msg.garden.plant];if(!t)continue;
-    const members=Object.entries(t.members).map(([id,m])=>({name:contacts.people[id]?.nickname??'伙伴',qualified:m.seconds>=30&&m.work>=4320}));
+    const members=Object.entries(t.members).map(([id,m])=>({name:contacts.people[id]?.nickname??'伙伴',qualified:m.seconds>=gardenCore.COOP_RULES.minSeconds&&m.work>=gardenCore.COOP_RULES.work*gardenCore.COOP_RULES.minContribution}));
     const qualified=members.filter(m=>m.qualified).length,remaining=Math.ceil(t.remaining/360),active=Object.values(t.members).filter(m=>m.seenAt+15000>Date.now()).length;
-    const fruit=t.fruit??gardens.data.people[t.owner]?.state.plots[t.plot];const state={owner:t.owner,plot:t.plot,plant:t.plant,species:fruit?gardenCore.SPECIES[fruit.species].name:undefined,traits:fruit?.id===t.plant?fruit.traits.map(id=>({name:gardenCore.TRAITS[id].name,quality:gardenCore.TIER_NAMES[gardenCore.TRAITS[id].tier]})):[],done:t.done,remaining,active,members,chance:gardenCore.coopRareChance(qualified),room:t.room,fruit:t.fruit};
+    const fruit=t.fruit??gardens.data.people[t.owner]?.state.plots[t.plot];const state={owner:t.owner,plot:t.plot,plant:t.plant,species:fruit?gardenCore.SPECIES[fruit.species].name:undefined,traits:t.done&&fruit?.id===t.plant?fruit.traits.map(id=>({name:gardenCore.TRAITS[id].name,quality:gardenCore.TIER_NAMES[gardenCore.TRAITS[id].tier]})):[],done:t.done,remaining,active,members,chance:gardenCore.coopRareChance(qualified),room:t.room,fruit:t.fruit};
     if(JSON.stringify(msg.garden)===JSON.stringify(state))continue;msg.garden=state;worldBroadcast({t:'world:chat',msg});
   }
 }
@@ -956,7 +992,7 @@ function handleGardenInteraction(ws,f){
   const now=Date.now();
   for(const [id,i] of pairInvites)if(i.expiresAt<=now)pairInvites.delete(id);
   for(const [id,until] of pairBusy)if(until<=now)pairBusy.delete(id);
-  const peerFor=id=>[...wss.clients].find(p=>p.memberId===id&&p.hello&&p.readyState===p.OPEN&&p.roomId===ws.roomId);
+  const peerFor=id=>[...wss.clients,...(companions?.peers??[])].find(p=>p.memberId===id&&p.hello&&p.readyState===p.OPEN&&p.roomId===ws.roomId);
   if(f.action==='pair:invite'){
     const kind=gardenCore.PAIR_INTERACTIONS.find(k=>k.id===f.kind),peer=peerFor(f.target);
     if(!kind||!ws.roomId||!peer||peer===ws)throw Error('请邀请同一房间内的在线玩家');
@@ -1000,7 +1036,7 @@ function contactRate(ws) {
   ws.contactTimes.push(now);return true;
 }
 function contactSnapshot(ws) {
-  const onlineIds=new Set([...wss.clients].filter(p=>p.hello&&p.readyState===p.OPEN).map(p=>p.memberId));
+  const onlineIds=new Set([...wss.clients,...(companions?.peers??[])].filter(p=>p.hello&&p.readyState===p.OPEN).map(p=>p.memberId));
   const invitations=[...contactInvites].filter(([,v])=>v.to===ws.memberId&&v.expiresAt>Date.now()&&contacts.areFriends(v.from,v.to)).map(([id,v])=>({id, nickname:contacts.people[v.from]?.nickname||'朋友', expiresAt:v.expiresAt}));
   for(const [id,i] of gardenInvites)if(i.to===ws.memberId&&i.expiresAt>Date.now()&&contacts.areFriends(i.from,i.to))invitations.push({id,nickname:contacts.people[i.from]?.nickname||'朋友',expiresAt:i.expiresAt,garden:{owner:i.from,plot:i.plot,label:i.label,plant:i.plant}});
   for(const [id,i] of pairInvites)if(i.to===ws.memberId&&i.roomId===ws.roomId&&i.expiresAt>Date.now())invitations.push({id,nickname:contacts.people[i.from]?.nickname||'朋友',expiresAt:i.expiresAt,pair:{kind:i.kind,label:i.label}});
@@ -1016,6 +1052,33 @@ load();
 loadPacks();
 
 const wss = new WebSocketServer({ host: HOST, port: PORT, maxPayload: MAX_PAYLOAD });
+let companions;
+let companionTimer;
+if(process.env.QBOT_COMPANIONS==='1'){
+  try{
+    companions=new Companions({file:path.join(DATA_DIR,'companions.json'),marketDir:process.env.QBOT_COMPANION_MARKET_DIR||path.resolve('market/data'),contacts,gardens,
+      installPack(hash,buffer){writeFileSync(packPath(hash),buffer);packs.set(hash,{size:buffer.length,at:Date.now()});}});
+    companions.start();
+    for(const room of companions.rooms){if(rooms.has(room.roomId))throw Error('companion room collision');rooms.set(room.roomId,room);online.set(room.roomId,new Set(companions.peers.filter(p=>p.roomId===room.roomId)));}
+    companions.hasHumans=id=>[...(online.get(id)??[])].some(p=>!p.companion);
+    companions.animate=(peer,frame)=>{
+      const patterns={wave:/wave|挥手/,heart:/heart|love|比心/,tea:/tea|drink|喝茶/,talk:/talk|chat|聊天/,listen:/idle|listen/,happy:/happy|wave/};
+      const action=peer.actions.find(a=>patterns[frame.intent]?.test(a.label))?.id??peer.action;
+      broadcast(peer.roomId,{t:'presence',roomId:peer.roomId,memberId:peer.memberId,mode:'idle',action});
+    };
+    const say=(peer,text,world=false)=>{
+      const room=rooms.get(peer.roomId);if(!room||!world&&room.chatEnabled===false)return;
+      const msg={id:genId(12),memberId:peer.memberId,nickname:peer.nickname,companion:true,text,at:Date.now()};
+      if(world){worldChat=[...worldChat,msg].slice(-CHAT_KEEP);worldBroadcast({t:'world:chat',msg});}
+      else{room.chat=[...room.chat,msg].slice(-CHAT_KEEP);room.lastActiveAt=msg.at;broadcast(room.roomId,{t:'chat',roomId:room.roomId,msg});}
+    };
+    companions.say=say;
+    companionTimer=setInterval(()=>{try{companions.tick({humans:[...wss.clients].filter(p=>p.hello),worldActive:worldPeers.size>0,say,pending:pairInvites,
+      invite:(peer,user,kind)=>handleGardenInteraction(peer,{action:'pair:invite',target:user.memberId,actor:peer.actor,kind}),
+      answer:(peer,id)=>handleGardenInteraction(peer,{action:'pair:answer',id,accept:true,actor:peer.actor,response:'happy'})});}catch{console.error('[companions] tick failed');}},1000);
+    companionTimer.unref();console.log(`[companions] residents=${companions.peers.length} rooms=${companions.rooms.length}`);
+  }catch(error){for(const room of companions?.rooms??[])if(rooms.get(room.roomId)?.companion){rooms.delete(room.roomId);online.delete(room.roomId);}companions=undefined;console.error('[companions] unavailable:',error.message);}
+}
 
 wss.on('connection', (ws) => {
   ws.isAlive = true;
@@ -1077,6 +1140,7 @@ const logger = setInterval(() => {
 logger.unref();
 
 function shutdown() {
+  clearInterval(companionTimer);
   clearInterval(pinger);
   clearInterval(flusher);
   flush(); // 退出前落盘，别丢最后 30s 的聊天

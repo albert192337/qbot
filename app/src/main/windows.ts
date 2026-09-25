@@ -1,5 +1,6 @@
 /** 窗口管理：桌宠透明置顶窗 + 孵化常规窗 + 小房间窗 + dock 显隐协调 */
 import { BrowserWindow, app, screen, shell } from 'electron';
+import { trackDesktopWindow, allowDesktopWindow, desktopQuiet, desktopHidden, onDesktopVisibilityChanged, windowPeeking } from './desktop-visibility';
 import path from 'node:path';
 import type { CharacterMeta, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
 import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset, resolveRoomSceneSize } from './rooms/rooms-rules';
@@ -28,8 +29,8 @@ const ROOM_ART_SIZE = 1024;
 /** 气泡窗：固定尺寸，创建后只 setPosition 永不改大小（绕开透明窗 resize 渲染 bug） */
 const BUBBLE_W = 340;
 const BUBBLE_H = 500;
-/** 利用角色素材顶部留白，使台词更贴近头顶；花园卡按气泡实测边界避让。 */
-const BUBBLE_OVERLAP = 42;
+/** 气泡不得借用角色素材留白；花园卡按气泡实测边界避让。 */
+const BUBBLE_OVERLAP = 0;
 
 let petWindow: BrowserWindow | null = null;
 /** 公共房间宠上屏：键控多窗（memberId -> 窗），全员在线上限即窗口数上限 */
@@ -43,7 +44,8 @@ let loungeWindow: BrowserWindow | null = null;
 let roomChatWindow: BrowserWindow | null = null;
 let bubbleWindow: BrowserWindow | null = null;
 let desktopSign: ReturnType<typeof createDesktopSign> | null = null;
-export function displayDesktopSign(text: string | null): void { desktopSign?.setText(text); }
+onDesktopVisibilityChanged(() => { if (desktopQuiet()) { hideBubbleWindow(); desktopSign?.setText(null); } });
+export function displayDesktopSign(text: string | null): void { desktopSign?.setText(desktopQuiet() ? null : text); }
 let bubbleSide: 'above' | 'below' = 'above';
 let petScale = 1;
 /** 桌宠是否处于串门（双人宽）模式——权威尺寸的一部分，移动时要重申 */
@@ -89,6 +91,7 @@ type RendererPage = 'social' | 'pet' | 'room' | 'cozy' | 'bubble' | 'console' | 
 
 /** A local, framed preview: never changes room membership or the active desktop pet. */
 export function openCozyPreview(): BrowserWindow {
+  allowDesktopWindow(cozyPreviewWindow);
   if (cozyPreviewWindow && !cozyPreviewWindow.isDestroyed()) {
     cozyPreviewWindow.show(); cozyPreviewWindow.focus(); return cozyPreviewWindow;
   }
@@ -96,10 +99,11 @@ export function openCozyPreview(): BrowserWindow {
   const win = new BrowserWindow({
     width: Math.min(1160, area.width), height: Math.min(850, area.height),
     minWidth: Math.min(720, area.width), minHeight: Math.min(580, area.height),
-    title: 'QBot · 奶油小屋试住', backgroundColor: '#f6f1e8', autoHideMenuBar: true,
+    title: 'QBot · 奶油小屋试住', backgroundColor: '#f6f1e8', autoHideMenuBar: true, show:false,
     webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false },
   });
   cozyPreviewWindow = win;
+  allowDesktopWindow(win); win.once('ready-to-show',()=>win.show());
   win.on('closed', () => { cozyPreviewWindow = null; });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   load(win, 'cozy');
@@ -118,6 +122,7 @@ function syncChatBounds(): void {
 }
 export function closePetChat(): void { chatWindow?.hide(); }
 export function openPetChat(): void {
+  allowDesktopWindow(chatWindow);
   if (chatWindow?.isVisible()) { closePetChat(); return; }
   if (petWindow) {
     const pet = petWindow.getBounds();
@@ -131,6 +136,7 @@ export function openPetChat(): void {
       resizable: false, hasShadow: false, skipTaskbar: true, show: false,
       webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
     chatWindow.setAlwaysOnTop(true, 'floating');
+    allowDesktopWindow(chatWindow);
     attachPetWindowLayer(chatWindow, desktopWindowGroup, petWindow);
     chatWindow.on('closed', () => { chatWindow = null; });
     chatWindow.once('ready-to-show', () => { syncChatBounds(); chatWindow?.show(); });
@@ -245,6 +251,7 @@ export function createPetWindow(): BrowserWindow {
     },
   });
   petWindow.setAlwaysOnTop(true, 'floating'); // 盖普通窗，不盖 Mission Control
+  trackDesktopWindow(petWindow,'host');
   attachPetWindowLayer(petWindow, desktopWindowGroup);
   petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   // 气泡窗跟随：move 覆盖拖拽与 OS 侧移动，resize 覆盖缩放
@@ -298,6 +305,7 @@ export function ensureRoomPetWindow(memberId: string): BrowserWindow {
     },
   });
   win.setAlwaysOnTop(true, 'floating');
+  trackDesktopWindow(win,'peer',memberId);
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   win.once('ready-to-show', () => win.show());
   win.on('closed', () => {
@@ -352,6 +360,7 @@ export function layoutRoomPetWindows(orderedMemberIds: readonly string[]): void 
   for (const slot of slots) {
     const win = roomPetWindows.get(slot.memberId);
     if (!win || win.isDestroyed()) continue;
+    if(windowPeeking(win))continue;
     roomPetSizes.set(win, ROOM_PET_SIZE);
     moveFixedSize(
       win,
@@ -446,6 +455,8 @@ function createBubbleWindow(): BrowserWindow {
 /** 显示气泡窗（先摆位再 show，避免在旧坐标闪一帧） */
 export function showBubbleWindow(): BrowserWindow {
   const win = createBubbleWindow();
+  if (desktopQuiet()) return win;
+  allowDesktopWindow(win);
   if (!win.isVisible()) {
     if (petWindow && !petWindow.isDestroyed()) {
       const { x, y, side, contentHeight } = bubbleAnchor(petWindow.getBounds());
@@ -563,13 +574,14 @@ export function openRoomWindow(title: string): BrowserWindow {
     roomWindow.focus();
     return roomWindow;
   }
-  petWindow?.hide();
+  if (!desktopHidden()) petWindow?.hide();
   hideBubbleWindow(); // 角色进小房间：气泡跟着走
   if (process.platform === 'darwin') void app.dock?.show();
   const display = screen.getPrimaryDisplay();
   const size = roomSize(display);
   const { workArea } = display;
   roomWindow = new BrowserWindow({
+    show:false,
     width: size,
     height: size,
     // 原来完全没定位，Electron 默认摆放常常偏上角；房间是主要观赏面，居中
@@ -589,6 +601,8 @@ export function openRoomWindow(title: string): BrowserWindow {
       sandbox: false,
     },
   });
+  trackDesktopWindow(roomWindow,'decoration');
+  roomWindow.once('ready-to-show',()=>roomWindow?.show());
   roomWindow.on('closed', () => {
     roomWindow = null;
     petWindow?.show(); // 角色回桌面
@@ -647,6 +661,7 @@ export function sendToWindows(channel: string, payload: unknown): void {
  * dock 协调：mac 上 dock 隐藏时常规窗聚焦行为异常，所以开窗前 show、关窗后按需 hide。
  */
 export function createConsoleWindow(pane?: ConsolePane): BrowserWindow {
+  allowDesktopWindow(consoleWindow);
   if (consoleWindow && !consoleWindow.isDestroyed()) {
     const win = consoleWindow;
     if (win.isMinimized()) win.restore();
@@ -661,6 +676,7 @@ export function createConsoleWindow(pane?: ConsolePane): BrowserWindow {
     minWidth: Math.min(760,workArea.width), minHeight: Math.min(560,workArea.height), title: 'QBot', backgroundColor: '#f7f7f8', show: false,
     webPreferences: { preload: path.join(__dirname,'../preload/index.js'), contextIsolation:true, sandbox:false } });
   consoleWindow = win; win.setMenuBarVisibility(false);
+  allowDesktopWindow(win);
   win.webContents.setWindowOpenHandler(({url}) => { if(/^https?:/.test(url)) void shell.openExternal(url); return {action:'deny'}; });
   win.once('ready-to-show', () => win.show());
   win.on('closed', () => { consoleWindow = null; });
@@ -673,12 +689,14 @@ export function createConsoleWindow(pane?: ConsolePane): BrowserWindow {
  * 要输入文字、要滚动、要长时间停留，透明窗那套约束（血泪坑 5/18）全是负担。
  */
 export function createLoungeWindow(): BrowserWindow {
+  allowDesktopWindow(loungeWindow);
   if (loungeWindow && !loungeWindow.isDestroyed()) { loungeWindow.restore(); loungeWindow.show(); loungeWindow.focus(); return loungeWindow; }
   loungeWindow = createSocialWindow(false);
   loungeWindow.on('closed', () => { loungeWindow = null; });
   return loungeWindow;
 }
 export function createRoomChatWindow(): BrowserWindow {
+  allowDesktopWindow(roomChatWindow);
   if (roomChatWindow && !roomChatWindow.isDestroyed()) { roomChatWindow.restore(); roomChatWindow.show(); roomChatWindow.focus(); return roomChatWindow; }
   roomChatWindow = createSocialWindow(true);
   roomChatWindow.on('closed', () => { roomChatWindow = null; });
@@ -686,9 +704,10 @@ export function createRoomChatWindow(): BrowserWindow {
 }
 function createSocialWindow(compact: boolean): BrowserWindow {
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  const win = new BrowserWindow({title:compact ? '房间聊天' : '一起玩', width:Math.min(compact ? 370 : 960, area.width), height:Math.min(compact ? 490 : 740, area.height),
+  const win = new BrowserWindow({show:false,title:compact ? '房间聊天' : '一起玩', width:Math.min(compact ? 370 : 960, area.width), height:Math.min(compact ? 490 : 740, area.height),
     minWidth:Math.min(compact ? 300 : 640,area.width), minHeight:Math.min(compact ? 340 : 500, area.height), backgroundColor:'#f5f1e5', autoHideMenuBar:true,
     webPreferences:{preload:path.join(__dirname,'../preload/index.js'), contextIsolation:true, sandbox:false}});
+  allowDesktopWindow(win); win.once('ready-to-show',()=>win.show());
   load(win, 'social', compact ? {compact:'1'} : undefined);
   return win;
 }

@@ -35,8 +35,8 @@ export class Gardens {
   }
   allow(viewer,owner,scope='land'){requireThat(this.permitted(viewer,owner,scope),'主人尚未向你开放'+(scope==='shop'?'商店':'土地'));}
   taskAllowed(viewer,t){return !!t&&(viewer===t.owner||t.shared||t.invited?.includes(viewer)||t.members[viewer]);}
-  publicState(state){const s=structuredClone(state);s.cooperationRewardsLeft=Math.max(0,5-(this.data.rewards[`${s.life.owner}:${core.gardenDay(this.now())}`]??0));for(const p of s.plots)if(p?.batch)p.batch.seed=0;for(const a of Object.values(s.v3?.appraisals??{}))a.board=[];return s;}
-  publicPlant(p){return p?{id:p.id,species:p.species,traits:p.traits,kg:core.needsReveal(p)?0:p.kg,value:core.needsReveal(p)?0:p.value,publicQuality:core.fruitQuality(p.traits,p),bred:p.bred,plantedAt:p.plantedAt,readyAt:p.readyAt,harvestsLeft:p.harvestsLeft,growthVersion:p.growthVersion,revealed:p.revealed,dye:p.dye,fertilizers:[]}:null;}
+  publicState(state){const s=core.publicGardenState(state);s.cooperationRewardsLeft=Math.max(0,5-(this.data.rewards[`${s.life.owner}:${core.gardenDay(this.now())}`]??0));for(const p of s.plots)if(p?.batch)p.batch.seed=0;for(const a of Object.values(s.v3?.appraisals??{}))a.board=[];return s;}
+  publicPlant(p){return p?core.publicGardenPlant(p):null;}
   view(viewer,owner,task){
     requireThat(this.data.people[owner],'这位朋友还没有开通联机花园');const s=this.ensure(owner).state,landOpen=this.permitted(viewer,owner),shopOpen=this.permitted(viewer,owner,'shop');
     const tasks=Object.values(this.data.tasks).filter(t=>t.owner===owner&&(!task||t.id===task)&&(landOpen||this.taskAllowed(viewer,t))).slice(-20);
@@ -53,11 +53,13 @@ export class Gardens {
     return {state:a};
   }
   advance(t){
-    const now=this.now();if(t.done){t.updatedAt=now;return;}
+    const now=this.now();
+    if(!t.workBudget){if(!t.done){const scale=TOTAL_WORK/216000;t.remaining*=scale;for(const m of Object.values(t.members))m.work*=scale;}t.workBudget=TOTAL_WORK;}
+    if(t.done){t.updatedAt=now;return;}
     let from=t.updatedAt;
     const boundaries=[...new Set([...Object.values(t.members).map(m=>m.seenAt+15000).filter(at=>at>from&&at<now),now])].sort((a,b)=>a-b);
     for(const end of boundaries){const active=Object.values(t.members).filter(m=>m.seenAt+15000>from);if(active.length){const seconds=Math.min((end-from)/1000,t.remaining/(360*active.length));for(const m of active){m.work+=360*seconds;m.seconds+=seconds;}t.remaining=Math.max(0,t.remaining-seconds*360*active.length);}from=end;if(!t.remaining)break;}
-    t.updatedAt=now;
+    t.updatedAt=now;const growing=this.data.people[t.owner]?.state.plots[t.plot];if(growing?.id===t.plant&&!t.done)growing.cultivation={remainingMs:t.remaining/360*1000};
     if(t.remaining<=0){t.done=true;const p=this.data.people[t.owner]?.state.plots[t.plot];if(p?.id===t.plant){p.revealed=true;delete p.cultivation;t.fruit=this.publicPlant(p);}for(const who of Object.keys(t.members)){const state=this.data.people[who]?.state;if(state)core.recordGarden(state,now,Object.keys(t.members).length===1?'soloComplete':'coopComplete','一起培育的果实揭晓了',who===t.owner?undefined:t.owner,t.plant);}}
   }
   coop(id,owner,plot,command,task){
@@ -66,19 +68,19 @@ export class Gardens {
     if(saved)requireThat(saved.owner===owner&&saved.plot===plot&&saved.members[id],'培育记录不属于你');else if(!this.taskAllowed(id,this.data.tasks[this.data.people[owner]?.state.plots[plot]?.id]))this.allow(id,owner);
     const s=this.ensure(owner).state,p=s.plots[plot];if(!saved)requireThat(p&&p.readyAt<=this.now(),'果实尚未成熟');
     let t=saved??this.data.tasks[p.id];
-    if(!t){requireThat(!p.batch?.candidates.length,'请先选择这一轮的词条');requireThat(core.needsReveal(p),'这株果实不需要培育');t=this.data.tasks[p.id]={id:p.id,plant:p.id,owner,plot,remaining:TOTAL_WORK,updatedAt:this.now(),members:{},done:false,claimed:[],room:s.v3.realm};}
+    if(!t){requireThat(core.needsReveal(p),'这株果实不需要培育');t=this.data.tasks[p.id]={id:p.id,plant:p.id,owner,plot,remaining:TOTAL_WORK,workBudget:TOTAL_WORK,updatedAt:this.now(),members:{},done:false,claimed:[],room:s.v3.realm};}
     this.advance(t);
     if(command==='join'){
       if(t.done)return this.view(id,owner);
       const active=Object.entries(t.members).filter(([,m])=>m.seenAt+15000>this.now());requireThat(active.length<8||active.some(([who])=>who===id),'已经有 8 位伙伴在培育');
       requireThat(!Object.values(this.data.tasks).some(other=>other.id!==t.id&&!other.done&&(other.members[id]?.seenAt??0)+15000>this.now()),'正在培育另一株果实');
-      if(!t.members[id]){const helper=this.ensure(id).state;if(helper.v3.records.some(r=>r.kind==='coopJoin'&&r.peer===owner))core.recordGarden(helper,this.now(),'repeatCoop','再次和这位伙伴一起培育',owner,t.plant);if(t.invited?.includes(id))core.recordGarden(helper,this.now(),'inviteJoin','接受了朋友的培育邀请',owner,t.plant);else if(t.shared&&id!==owner)core.recordGarden(helper,this.now(),'worldJoin','从公开任务来一起培育',owner,t.plant);core.recordGarden(helper,this.now(),'coopJoin','参加了一次共同培育',owner,t.plant);if(id!==owner)core.recordGarden(s,this.now(),'helper','朋友来帮忙培育了',id,t.plant);}t.members[id]??={work:0,seconds:0,seenAt:0};t.members[id].seenAt=this.now();p.cultivation={remainingMs:t.remaining/360};
+      if(!t.members[id]){const helper=this.ensure(id).state;if(helper.v3.records.some(r=>r.kind==='coopJoin'&&r.peer===owner))core.recordGarden(helper,this.now(),'repeatCoop','再次和这位伙伴一起培育',owner,t.plant);if(t.invited?.includes(id))core.recordGarden(helper,this.now(),'inviteJoin','接受了朋友的培育邀请',owner,t.plant);else if(t.shared&&id!==owner)core.recordGarden(helper,this.now(),'worldJoin','从公开任务来一起培育',owner,t.plant);core.recordGarden(helper,this.now(),'coopJoin','参加了一次共同培育',owner,t.plant);if(id!==owner)core.recordGarden(s,this.now(),'helper','朋友来帮忙培育了',id,t.plant);}t.members[id]??={work:0,seconds:0,seenAt:0};t.members[id].seenAt=this.now();p.cultivation={remainingMs:t.remaining/360*1000};
     }else if(command==='leave'){if(t.members[id])t.members[id].seenAt=0;}
     else if(command==='claim'){
-      const m=t.members[id];requireThat(t.done&&m?.seconds>=30&&m.work>=TOTAL_WORK*.02,'需要培育完成，且参与至少30秒并贡献2%工作量');
+      const m=t.members[id];requireThat(t.done&&m?.seconds>=core.COOP_RULES.minSeconds&&m.work>=TOTAL_WORK*.02,'需要培育完成，且参与至少20秒并贡献2%工作量');
       if(!t.claimed.includes(id)){
         const row=this.ensure(id),day=core.gardenDay(this.now()),key=`${id}:${day}`;requireThat((this.data.rewards[key]??0)<5,'今日 5 次物资奖励已领满');
-        const n=Math.min(8,Object.values(t.members).filter(m=>m.seconds>=30&&m.work>=TOTAL_WORK*.02).length),q=core.coopRareChance(n),roll=Math.random();
+        const n=Math.min(8,Object.values(t.members).filter(m=>m.seconds>=core.COOP_RULES.minSeconds&&m.work>=TOTAL_WORK*.02).length),q=core.coopRareChance(n),roll=Math.random();
         if(roll<q*8/18){const types=Object.keys(core.SPRAYS),kind=types[Math.floor(Math.random()*types.length)];row.state.life.sprays[kind]=(row.state.life.sprays[kind]??0)+1;}
         else {const pool=roll<q?['pineapple','apple']:['strawberry','tomato','blueberry'];row.state.seeds.push({id:randomUUID(),species:pool[Math.floor(Math.random()*pool.length)],genes:[],bred:false});}
         this.data.rewards[key]=(this.data.rewards[key]??0)+1;t.claimed.push(id);core.recordGarden(row.state,this.now(),'coopReward','领到了共同培育礼物',owner,t.plant);

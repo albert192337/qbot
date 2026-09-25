@@ -48,6 +48,16 @@ beforeEach(() => {
 afterEach(() => { player.dispose(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('Player visibility and recovery', () => {
+  it('suspends playback and watchdogs without discarding assets, then explicitly resumes', async () => {
+    player.play('tea');await flush();
+    const clip=video('tea'),source=clip.src;
+    player.setSuspended(true);player.play('idle');
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(clip.paused).toBe(true);expect(clip.src).toBe(source);
+    expect(ended).not.toHaveBeenCalled();expect(video('idle').play).not.toHaveBeenCalled();
+    player.setSuspended(false);player.play('idle');await flush();
+    expect(video('idle').paused).toBe(false);
+  });
   it('keeps the previous video visible until the next playback starts', async () => {
     player.play('idle'); await flush();
     let resolve!: () => void;
@@ -106,7 +116,23 @@ describe('Player visibility and recovery', () => {
     player.play('idle'); for (let i = 0; i < 8; i++) await flush();
     expect(visible()).toEqual([]);
     expect(stage.children.find((el) => el.tag === 'img')?.style.visibility).not.toBe('hidden');
+    expect(vi.getTimerCount()).toBe(1);
+  });
+  it('retries a temporarily unavailable visitor without leaving the source photo forever', async () => {
+    for (const el of stage.children.filter(el => el.tag === 'video')) el.play.mockRejectedValue(new Error('decoder unavailable'));
+    player.playLooping('idle'); for (let i = 0; i < 8; i++) await flush();
+    video('idle').play.mockImplementation(async () => { video('idle').paused = false; });
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(visible()).toEqual([video('idle')]);
+    expect(stage.children.find(el => el.tag === 'img')?.style.visibility).toBe('hidden');
+  });
+  it('bounds recovery for broken packs and cancels it when disposed', async () => {
+    for (const el of stage.children.filter(el => el.tag === 'video')) el.play.mockRejectedValue(new Error('broken'));
+    player.playLooping('idle'); for (let i = 0; i < 8; i++) await flush();
+    await vi.advanceTimersByTimeAsync(105000);
     expect(vi.getTimerCount()).toBe(0);
+    player.load('other', manifest()); player.playLooping('idle'); await flush();
+    player.dispose(); expect(vi.getTimerCount()).toBe(0);
   });
   it('releases old media and ignores pending callbacks after character reload', async () => {
     const old = video('tea'); let resolve!: () => void;

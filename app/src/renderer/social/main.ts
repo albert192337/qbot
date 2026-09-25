@@ -26,6 +26,8 @@ let refreshVersion=0;
 let worldVersion=0;
 let pin=false;
 let busy=false;
+let hiddenMembers:string[]=[];
+api.desktop.onChanged(s=>{hiddenMembers=s.hiddenMembers;if(compact)renderMembers($('compact-members'));else if(room)renderRoom();});
 
 root.innerHTML=`<header><div><span class="eyebrow">QBOT · LITTLE COMPANY</span><h1>${compact?'房间聊天':'一起玩'} <span class="leaf">❧</span></h1></div><div class="header-actions">${compact?'<button id="pin" title="保持在其他窗口上方">置顶</button><button id="open-main">一起玩</button>':'<span id="connection" class="badge">尚未连接</span>'}<button id="close" aria-label="关闭窗口">×</button></div></header>
 <div id="room-strip"><span id="room-summary">一个人也很自在，有朋友更热闹。</span><div><button id="copy-code" hidden>复制房间码</button>${!compact?'<button id="open-chat">聊天小窗 ↗</button>':''}<button id="leave" hidden>退出房间</button></div></div>
@@ -43,6 +45,19 @@ async function run(fn:()=>unknown):Promise<void>{try{await fn();}catch(e){toast(
 async function mutate(fn:()=>Promise<unknown>):Promise<void>{if(busy)return;busy=true;root.classList.add('busy');try{await fn();await sync();}finally{busy=false;root.classList.remove('busy');}}
 const roomChat=compact?new ChatView($('compact-chat'),false,()=>status.memberId,toast):null;
 const worldChat=!compact?new ChatView($('world-chat'),true,()=>status.memberId,toast):null;
+const pairNotice=document.createElement('aside');pairNotice.id='pair-notice';pairNotice.hidden=true;pairNotice.setAttribute('aria-live','polite');$('room-strip').after(pairNotice);
+let pairNoticeKey='',pairAnswering=false;
+function renderPairNotice():void {
+ const invitation=contacts.invitations.find(i=>i.pair&&i.expiresAt>Date.now());
+ pairNotice.hidden=!room||!invitation;if(pairNotice.hidden){pairNoticeKey='';pairNotice.replaceChildren();return;}
+ if(pairNoticeKey===invitation!.id)return;pairNoticeKey=invitation!.id;pairNotice.replaceChildren();
+ const following=[...document.querySelectorAll<HTMLElement>('.messages')].filter(e=>e.scrollHeight-e.scrollTop-e.clientHeight<80);
+ const invitationText:Record<string,string>={heart:'想送你一颗小心心',tea:'想请你喝杯茶',wave:'想和你打个招呼',chat:'想和你聊聊天',flower:'想送你一朵花',photo:'想和你拍张合影',relay:'想和你玩表情接力',celebrate:'想和你一起庆祝'};
+ const text=document.createElement('span');text.textContent=`${invitation!.nickname} ${invitationText[invitation!.pair!.kind]??'想和你一起玩'}`;pairNotice.append(text);
+ for(const [label,accept] of [['一起玩',true],['暂时不了',false]] as const){const button=document.createElement('button');button.textContent=label;button.disabled=pairAnswering;button.onclick=()=>void run(async()=>{if(pairAnswering)return;pairAnswering=true;pairNotice.querySelectorAll('button').forEach(b=>b.disabled=true);try{await api.garden.answerInteraction(invitation!.id,accept,invitation!.pair!.kind==='relay'?'happy':undefined);contacts=await api.social.contacts(true);pairNoticeKey='';renderPairNotice();toast(accept?'好呀，一起玩一会儿。':'好，先不打扰你。');}finally{pairAnswering=false;pairNotice.querySelectorAll('button').forEach(b=>b.disabled=false);}});pairNotice.append(button);}
+ requestAnimationFrame(()=>following.forEach(e=>e.scrollTop=e.scrollHeight));
+}
+setInterval(renderPairNotice,1000);
 
 async function sync():Promise<void>{
  const version=++refreshVersion;
@@ -52,6 +67,7 @@ async function sync():Promise<void>{
  if(compact)renderMembers($('compact-members'));else {renderRoom();renderTestMembers();}
 }
 function renderStatus():void {
+ renderPairNotice();
  $('room-summary').textContent=room?`${room.testing?'本地试演 · ':''}${room.name} · ${room.members.filter(m=>m.online).length}/${room.capacity} 人`:'一个人也很自在，有朋友更热闹。';
  $('copy-code').hidden=!room||!!room.testing;$('leave').hidden=!room;
  if($('connection'))$('connection').textContent=room?.testing?'本地试演':status.phase==='connecting'?'正在连接…':status.phase==='off'?'尚未连接':'房间服务已连接';
@@ -63,8 +79,9 @@ function renderMembers(host:HTMLElement):void {
  host.replaceChildren();if(!room){host.innerHTML='<p class="empty">还没有加入房间。</p>';return;}
  for(const m of room.members){
   const row=document.createElement('div');row.className='member-row';
-  row.innerHTML=`<span class="avatar-dot ${m.online?'online':''}">${esc(m.nickname.slice(0,1))}</span><div class="member-name"><strong>${esc(m.nickname)}</strong><small>${m.testing?'测试角色 · 非本人在线':m.memberId===status.memberId?'我':m.online?'在线':'离线'}${m.memberId===room.ownerId?' · 房主':''}</small><span class="title-slot">${esc(m.title||'')}</span></div>`;
+  row.innerHTML=`<span class="avatar-dot ${m.online?'online':''}">${esc(m.nickname.slice(0,1))}</span><div class="member-name"><strong>${esc(m.nickname)}</strong><small>${m.companion?'陪伴角色':m.testing?'测试角色 · 非本人在线':m.memberId===status.memberId?'我':m.online?'在线':'离线'}${m.memberId===room.ownerId?' · 房主':''}</small><span class="title-slot">${esc(m.title||'')}</span></div>`;
   row.title=`玩家 ID：${m.memberId}`;
+  if(m.memberId!==status.memberId){const visibility=document.createElement('button');const hidden=hiddenMembers.includes(m.memberId);visibility.textContent=hidden?'显示在桌面':'隐藏';visibility.title=hidden?'已在本机隐藏 · 点击恢复':'只在我的桌面隐藏';visibility.onclick=()=>void run(()=>api.desktop.setMemberHidden(m.memberId,!hidden));row.append(visibility);}
   {const garden=document.createElement('button');garden.textContent='土地 / 商店';garden.onclick=()=>api.garden.open(m.memberId===status.memberId&&room?.testing?'plots':'visit:'+m.memberId);row.append(garden);}
   if(!m.testing&&!room.testing&&m.memberId!==status.memberId&&m.online){const select=document.createElement('select');select.setAttribute('aria-label','选择双人互动');select.append(new Option('邀请互动…',''));for(const kind of PAIR_INTERACTIONS)select.append(new Option(kind.label,kind.id));select.onchange=()=>{const kind=select.value as 'heart';if(kind)void run(async()=>{await api.garden.interact(m.memberId,kind);toast('邀请已发出，等待对方回应');select.value='';});};row.append(select);}
   if(m.memberId!==status.memberId&&m.online){
@@ -127,7 +144,7 @@ if (!compact) {
   const details=document.createElement('details'); details.className='filter-panel';
   const summary=document.createElement('summary');summary.textContent='筛选小屋';details.append(summary);
   filters.replaceWith(details);details.append(filters);
-  const fit=()=>{details.open=window.innerHeight>=640;};fit();window.addEventListener('resize',fit);
+  details.open=false;
 }
 const form=$<HTMLFormElement>('room-form');
 function fillForm(value:Partial<CreateRoomInput>):void{for(const [key,v] of Object.entries(value)){const el=form.elements.namedItem(key) as HTMLInputElement|null;if(el&&v!==undefined)el.value=String(v);}}

@@ -4,12 +4,13 @@
  * 要清气泡就成环——所以 bubble:clear 由 windows.ts 的 hideBubbleWindow 自己发）。
  */
 import type { AgentMessage } from '../shared/ipc-types';
+import { desktopQuiet } from './desktop-visibility';
 import { getPetWindow, isRoomOpen, showBubbleWindow } from './windows';
 
 /** 请求拥有自己的清理函数，隐藏或尚未加载就结束时不补发过期状态。 */
 export function beginChatThinking(): () => void {
   const pet = getPetWindow();
-  if (isRoomOpen() || !pet || pet.isDestroyed() || !pet.isVisible()) return () => {};
+  if (desktopQuiet() || isRoomOpen() || !pet || pet.isDestroyed() || !pet.isVisible()) return () => {};
   const win = showBubbleWindow();
   let active = true;
   const show = () => {
@@ -39,6 +40,7 @@ const PENDING_MAX = 5;
 const pending: AgentMessage[] = [];
 
 export function pushAgentMessage(msg: AgentMessage): void {
+  if (desktopQuiet()) return;
   if (isRoomOpen()) return; // 角色在小房间里，不弹气泡
   const win = showBubbleWindow();
   if (win.webContents.isLoading()) {
@@ -46,7 +48,7 @@ export function pushAgentMessage(msg: AgentMessage): void {
     if (pending.length >= PENDING_MAX) pending.shift();
     pending.push(msg);
     win.webContents.once('did-finish-load', () => {
-      for (const m of pending.splice(0)) win.webContents.send('agent:message', m);
+      for (const m of pending.splice(0)) if (!desktopQuiet() && win.isVisible()) win.webContents.send('agent:message', m);
     });
     return;
   }

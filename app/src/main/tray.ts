@@ -1,5 +1,6 @@
 /** 托盘：创建角色 / 切换角色 / Claude 联动 / 联机空间 / 设置 / 退出 */
 import { Menu, Tray, app, nativeImage } from 'electron';
+import { desktopHidden, setDesktopHidden, onDesktopVisibilityChanged } from './desktop-visibility';
 import path from 'node:path';
 import { listCharacters } from './characters';
 import { getSettings, setSettings } from './config';
@@ -8,11 +9,12 @@ import { toggleClaudeHooks } from './hooks/claude';
 import { getCharacter } from './characters';
 import { notifyRoomCharacterChanged } from './rooms/rooms';
 import { weatherTestMenu, onWeatherTestChanged } from './weather';
-import { openGenePreview, openDesktopGenePreview } from './gene-preview';
+import { openGenePreview, openDesktopGenePreview, openPineapplePreview } from './gene-preview';
 
 onWeatherTestChanged(() => { if (tray) void rebuildTray(); });
 
 let tray: Tray | null = null;
+onDesktopVisibilityChanged(() => { if (tray) void rebuildTray(); });
 
 /** mac：16x16 模板图（占位）——深色圆点，setTemplateImage 适配深浅色菜单栏 */
 function macTrayIcon(): Electron.NativeImage {
@@ -115,7 +117,9 @@ export async function connectSection(): Promise<Electron.MenuItemConstructorOpti
 /** 系统：设置 + 退出 */
 export function systemSection(): Electron.MenuItemConstructorOptions[] {
   return [
+    { label: desktopHidden() ? '显示角色' : '隐藏全部角色', click: () => setDesktopHidden(!desktopHidden()) },
     { label: '草莓基因工坊（效果预览）…', click: () => openGenePreview() },
+    { label: '菠萝词条工坊（效果预览）…', click: () => openPineapplePreview() },
     { label: '3D 草莓放到桌面（试摆）…', click: () => openDesktopGenePreview() },
     weatherTestMenu(),
     {

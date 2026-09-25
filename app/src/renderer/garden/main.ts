@@ -8,6 +8,7 @@ import { gardenIcon } from './icons';
 import { quickLayout } from './quick-layout';
 import { gardenLane } from '../../shared/garden-layout';
 import { botanicalArt } from './botanical-art';
+import { juvenileArt } from './juvenile-art';
 import { secretGrowth } from './secret-growth';
 import { attachMutationEffects } from './mutation-effects';
 import { supplyArt } from './supply-art';
@@ -15,8 +16,9 @@ import { mountStrawberry3D } from './strawberry-3d.js';
 import { mountPineapple3D } from './pineapple-3d.js';
 import { supportsGarden3D } from '../../shared/garden-render';
 import { SPECIES, TRAITS, FERTILIZERS, TIER_NAMES, LEVEL_XP, CULTIVATION_MS, fruitQuality, traitSlot, SLOT_NAMES, canBreed, needsReveal, cultivationRemaining, mutationMultiplier, gardenQuest, tier, level, growth, growthLabel, type Species, type Trait, type Plant, type Produce, type GardenState, type GardenCommand, type GardenReveal, type Seed } from '../../shared/garden';
-import { traitSource } from '../../shared/garden-life';
-import {renderFactorChoice,renderAppraisal,renderProvenance,renderV3Breeding,renderNotebook,renderV3Weather} from './v3';
+import { traitSource, wishMatches, wishLabel } from '../../shared/garden-life';
+import {cultivationFraction,cultivationHintPosition} from '../../shared/cultivation-hint';
+import {renderAppraisal,renderProvenance,renderV3Breeding,renderNotebook,renderV3Weather} from './v3';
 import {V3_XP,AFFINITIES,speciesLevel,fertilizerDescription,scoreOf} from '../../shared/garden-v3';
 import './v3.css';
 const sprout = new URL('./assets/sprout.png', import.meta.url).href;
@@ -46,6 +48,7 @@ const sellSelection = new Set<string>();
 let selectedSpecies: Species = 'lotus';
 let quickPlot: number | null = null;
 let petBounds = { left: 370, right: 730, top: 180, bottom: 540 };
+let performerBounds:typeof petBounds|undefined;
 let gardenDirection: 'left' | 'right' = 'left';
 let speechBounds: {left:number;right:number;top:number;bottom:number} | null = null;
 api.onSpeechBounds(bounds => { speechBounds = bounds; positionQuick(); positionQuest(); });
@@ -83,17 +86,16 @@ function tags(ts: Trait[]): HTMLElement {
     }
     return row;
 }
-function art(sp: Species, ts: Trait[] = [], ratio = 1, mode: 'fruit'|'plant'|'seed' = 'fruit', regrowing = false, baseTraits: Trait[] = []): HTMLElement {
-    if (mode === 'plant' && ratio < 1 && (ratio >= .55 || regrowing)) {
-        const secret = secretGrowth(fruitQuality(ts));
-        secret.dataset.species = sp;
-        secret.dataset.artMode = mode;
-        return secret;
-    }
-    const shown = regrowing && ratio < .8 ? baseTraits : ratio < .55 ? [] : ts;
+function art(sp: Species, ts: Trait[] = [], ratio = 1, mode: 'fruit'|'plant'|'seed' = 'fruit', regrowing = false): HTMLElement {
+    // Growing plants may show their species, but no trait appearance until maturity.
+    const shown = mode === 'plant' && ratio < 1 ? [] : ts;
     const box = el('div', undefined, `art ${shown.join(' ')} quality-${ratio >= .8 ? tier(shown) : 'normal'}`);
     box.dataset.species = sp;
     box.dataset.artMode = mode;
+    if (mode === 'plant' && ratio < 1 && (ratio >= .22 || regrowing)) {
+        box.append(juvenileArt(sp));
+        return box;
+    }
     if (mode === 'seed') {
         // The paper packet stays neutral; its emblem carries the actual inherited appearance.
         box.className = 'art seed-art';
@@ -105,7 +107,7 @@ function art(sp: Species, ts: Trait[] = [], ratio = 1, mode: 'fruit'|'plant'|'se
         return box;
     }
     const img = el('img');
-    img.src = mode === 'plant' && ratio < .55 && !regrowing ? sprout : botanicalArt(sp, mode, ratio >= .8);
+    img.src = mode === 'plant' && ratio < .55 && !regrowing ? sprout : botanicalArt(sp, mode);
     img.alt = SPECIES[sp].name;
     img.draggable = false;
     box.append(img);
@@ -119,24 +121,32 @@ function art(sp: Species, ts: Trait[] = [], ratio = 1, mode: 'fruit'|'plant'|'se
     if(render3d&&sp==='pineapple'&&(mode!=='plant'||ratio>=1))mountPineapple3D(box,{mode,ratio,traits:shown});
     return box;
 }
+function cultivationActive(p:Plant):boolean {return p.cultivation?.startedAt!==undefined||!!state?.cooperations?.some(t=>t.plant===p.id&&!t.done&&Object.values(t.members).some(m=>m.seenAt+15000>Date.now()));}
 function plantArt(p: Plant): HTMLElement {
-    if (needsReveal(p) && (p.readyAt <= Date.now() || growth(p) >= .55)) return secretGrowth(fruitQuality(p.traits,p), true, p.cultivation?.startedAt !== undefined);
-    if (p.readyAt > Date.now() && (growth(p) >= .55 || p.harvestIndex)) return secretGrowth(fruitQuality(p.traits,p));
-    return applyDye(art(p.species, needsReveal(p)?[]:p.traits, growth(p), 'plant', !!p.harvestIndex, needsReveal(p)?[]:p.baseTraits),p);
+    if (needsReveal(p) && (p.readyAt <= Date.now() || growth(p) >= .55)) return secretGrowth(fruitQuality(p.traits,p), true, cultivationActive(p));
+    const result = art(p.species, needsReveal(p)?[]:p.traits, growth(p), 'plant', !!p.harvestIndex);
+    if (p.readyAt > Date.now()) {
+        const quality = fruitQuality(p.traits,p);
+        result.classList.remove('quality-normal');
+        result.classList.add('growing-quality', `quality-${quality}`);
+        result.dataset.growingQuality = quality;
+        result.setAttribute('aria-label', `${SPECIES[p.species].name}，${TIER_NAMES[quality]}品质，生长中`);
+    }
+    return p.readyAt > Date.now() || needsReveal(p) ? result : applyDye(result,p);
 }
 function qualityBadge(p: Produce): HTMLElement { const q=fruitQuality(p.traits,p);return el('span',TIER_NAMES[q]+'果实','tag '+q); }
 function plantActions(host:HTMLElement,p:Plant,index:number):void {
-    if(renderFactorChoice(host,p,act))return;
+
     host.append(qualityBadge(p));
     if (needsReveal(p)) {
-        host.append(tags(p.traits));
-        if(state?.online)host.append(button('邀请好友培育',()=>{void inviteGardenFriend(state!.life!.owner,index,notice).catch(e=>notice(String(e)));}));
-        if(state?.online){host.append(el('p',`大家一起培育会更快，好奖励的概率也更高。今日还可领取 ${state.cooperationRewardsLeft??5} 次物资${state.cooperationRewardsLeft===0?'；仍可加速和留共同记录':''}。`),button('开始 / 继续单人培育',()=>void act({type:'cultivate',plot:index}),'primary'),button('暂停培育',()=>void act({type:'pauseCultivation',plot:index})),button('查看共同培育',()=>go('visit:'+state!.life!.owner)),button(state!.rehearsal?'邀请所有测试伙伴':'分享到世界',()=>{void api.cooperate(state!.life!.owner,index,'share').then(()=>notice(state!.rehearsal?'测试伙伴已加入待培育名单':'已分享到世界频道')).catch(e=>notice(String(e)));}));return;}
-        host.append(el('p','彩色惊喜尚未揭晓 · 陪它完成培育','muted'));
-        const progress=el('progress');progress.max=p.growthVersion===3?600000:CULTIVATION_MS;progress.value=progress.max-cultivationRemaining(p,Date.now());progress.dataset.cultivation=p.id;host.append(progress);
+        host.append(el('p','？ ？ ？ · 培育完成后揭晓','muted'));
+        const progress=el('progress');progress.max=p.growthVersion===3?180000:CULTIVATION_MS;progress.value=progress.max-cultivationRemaining(p,Date.now());progress.dataset.cultivation=p.id;host.append(progress);
         const label=el('small',Math.ceil(cultivationRemaining(p,Date.now())/1000)+' 秒');label.dataset.cultivationLabel=p.id;host.append(label);
+        if(state?.online)host.append(button('邀请好友培育',()=>{void inviteGardenFriend(state!.life!.owner,index,notice).catch(e=>notice(String(e)));}));
+        if(state?.online){host.append(el('p',`大家一起培育会更快，好奖励的概率也更高。今日还可领取 ${state.cooperationRewardsLeft??5} 次物资${state.cooperationRewardsLeft===0?'；仍可加速和留共同记录':''}。`),button('培育 · 单人约 3 分钟',()=>void act({type:'cultivate',plot:index}),'primary'),button('暂停培育',()=>void act({type:'pauseCultivation',plot:index})),button('查看共同培育',()=>go('visit:'+state!.life!.owner)),button(state!.rehearsal?'邀请所有测试伙伴':'分享到世界',()=>{void api.cooperate(state!.life!.owner,index,'share').then(()=>notice(state!.rehearsal?'测试伙伴已加入待培育名单':'已分享到世界频道')).catch(e=>notice(String(e)));}));return;}
+        host.append(el('p','彩色惊喜尚未揭晓 · 陪它完成培育','muted'));
         const active=p.cultivation?.startedAt!==undefined;
-        host.append(button(active?'暂停培育':p.cultivation?'继续培育':p.growthVersion===3?'陪伴培育 · 10 分钟':'陪伴培育 · 30 秒',()=>void act({type:active?'pauseCultivation':'cultivate',plot:index}),'primary'));
+        host.append(button(active?'暂停培育':p.cultivation?'继续培育':p.growthVersion===3?'培育 · 约 3 分钟':'培育 · 约 3 分钟',()=>void act({type:active?'pauseCultivation':'cultivate',plot:index}),'primary'));
     } else {
         host.append(tags(p.traits),el('small',p.kg.toFixed(3)+' kg · ◉ '+p.value,'muted'),button('收获 ✦',()=>void act({type:'harvest',plot:index}),'primary'),button(p.bred?'已经繁育过':'与背包果实繁育 ♡',()=>{parentId=p.id;render();},'',!canBreed(p)));
         if (!canBreed(p)&&!p.bred) host.append(el('small','金色及以上品质可以繁育','muted'));
@@ -151,7 +161,7 @@ function breedingCandidates(): Produce[] {
 }
 function go(next: string): void { if(strip){api.open(next);return;} document.querySelectorAll('.result-popup').forEach(n=>n.remove()); page = next; parentId = null; buyMode = sellMode = false; buySelection.clear(); sellSelection.clear(); render(); }
 function allParents(): Produce[] { return [...state!.produce, ...state!.plots.filter((p): p is Plant => !!p && p.readyAt <= Date.now())].filter(p=>canBreed(p)&&!('batch'in p&&(p as Plant).batch?.candidates.length)&&(!state!.v3?.appraisals[p.id]||state!.v3.appraisals[p.id].done)); }
-async function act(command: GardenCommand): Promise<void> {
+async function act(command: GardenCommand, onSuccess?:()=>void): Promise<void> {
     if(render3d&&(command.type==='plant'||command.type==='plantMany')&&!supportsGarden3D(state?.seeds.find(s=>s.id===command.seed)?.species)){
         notice('3D 模式支持草莓和菠萝；其他植物可切回 2D 后播种。');return;
     }
@@ -167,6 +177,7 @@ async function act(command: GardenCommand): Promise<void> {
             return;
         }
         state = r.state;
+        onSuccess?.();
         if (command.type === 'travelExperience') celebrateTravel(command.city,command.project,command.step);
         signature = JSON.stringify(state);
         if (command.type === 'buyMany') { buySelection.clear(); buyMode = false; }
@@ -228,6 +239,7 @@ function renderStrip(): void {
             quickPlot = i; parentId = null; quickResult = null; harvestedParent = harvestedByPlot.get(i) ?? null;
             render();
         }, 'plot');
+        b.disabled=!!state!.cultivationVisit;
         b.setAttribute('aria-label', `${i + 1}号土地${p ? ` ${SPECIES[p.species].name}` : ' 种植'}`);
         b.dataset.plot = String(i);
         if (p) {
@@ -235,11 +247,12 @@ function renderStrip(): void {
             a.dataset.plant = p.id;
             a.addEventListener('click', event => {
                 event.stopPropagation();
-                if (busy) return;
+                if (busy||state!.cultivationVisit) return;
                 quickPlot = i; parentId = null; quickResult = null; harvestedParent = null;
                 render();
             });
             b.append(a);
+            if(needsReveal(p)&&cultivationActive(p))b.append(el('span','🔎','research-mark'));
         }
         else {
             b.append(el('span', '+', 'empty-plot'));
@@ -251,6 +264,16 @@ function renderStrip(): void {
         b.append(el('span', undefined, 'soil'), mark);
         sides[0].append(b);
     });
+    const activePlot=state!.plots.findIndex(p=>p&&needsReveal(p)&&p.cultivation?.startedAt!==undefined);
+    if(state!.cultivationVisit||activePlot>=0){
+        const visit=state!.cultivationVisit,controls=el('div',undefined,'garden-controls cultivation-hint');
+        const progress=el('progress');progress.max=1;progress.className='cultivation-hint-progress';progress.setAttribute('aria-label','培育进度');
+        controls.dataset.cultivationPlot=String(visit?.plot??activePlot);
+        const pause=button('暂停',()=>{if(visit)void api.cooperate(visit.owner,visit.plot,'leave').then(()=>refresh(true)).catch(e=>notice(String(e)));else void act({type:'pauseCultivation',plot:activePlot});},'cultivation-pause');
+        pause.setAttribute('aria-label','暂停培育');
+        controls.append(el('span','正在培育神秘果实','cultivation-hint-title'),pause,progress);
+        root.replaceChildren(...sides,controls);tick(false);requestAnimationFrame(syncStripMouse);return;
+    }
     const tools = el('nav', undefined, 'garden-tools');
     for (const [name, label] of [['bag', '背包'], ['shop', '商店'], ['book', '图鉴']] as const) {
         const control = button('', () => api.open(name), 'garden-icon');
@@ -294,7 +317,6 @@ function renderQuickMenu(): void {
     const list = el('div', undefined, 'quick-list');
     if (quickResult) {
         resultContents(list, quickResult);
-        list.append(button('收好', closeQuick, 'primary'));
     } else if (parentId) {
         const candidates = breedingCandidates();
         if(state.v3)list.append(button('查看概率、精油与完整配对',()=>api.open('bag')));
@@ -334,7 +356,9 @@ function renderQuickMenu(): void {
         list.append(button('测试：立即成熟', () => void act({ type: 'mature' }), 'test-button'));
     }
     if (p && !quickResult && !parentId) list.append(button(p.keep ? '✓ 留养中' : '留养', () => void act({type:'keep',plot:index}), 'keep-button'));
-    menu.append(list); root.append(menu); positionQuick();
+    menu.append(list);
+    if (quickResult) resultActions(menu, quickResult, closeQuick);
+    root.append(menu); positionQuick();
     requestAnimationFrame(syncStripMouse);
 }
 function positionQuick(): void {
@@ -386,9 +410,9 @@ function render(): void {
     display.setAttribute('aria-label','切换种植画面');
     head.append(title,display,money);
     const nav = el('nav', undefined, 'tabs');
-    for (const [id, name] of [['plots', '我的土地'], ['bag', '背包'], ['shop', '商店'], ['book', '植物图鉴']]) {
-        const tab = button('', () => go(id), page === id || (id === 'shop' && page==='daily') || (id === 'plots' && page.startsWith('plot:')) ? 'active' : '');
-        tab.innerHTML = gardenIcon(id === 'plots' ? 'ready' : id as 'bag'|'shop'|'book');
+    for (const [id, name] of [['bag', '背包'], ['shop', '商店'], ['book', '植物图鉴']]) {
+        const tab = button('', () => go(id), page === id || (id === 'shop' && page==='daily') ? 'active' : '');
+        tab.innerHTML = gardenIcon(id as 'bag'|'shop'|'book');
         tab.append(el('span', name)); nav.append(tab);
     }
     nav.append(button('天气',()=>go('weather')),button('世界旅行',()=>go('travel')),button('朋友圈',()=>go('moments')));
@@ -482,7 +506,7 @@ function renderPlots(host: HTMLElement): void {
         plantActions(info,p,index);
     }
     else {
-        renderFactorChoice(info,p,act);
+
         info.append(el('p', '临近成熟时，稀有植株会泛起光芒。', 'muted'));
         for (const f of Object.keys(FERTILIZERS) as (keyof typeof FERTILIZERS)[]) {
             const used = p.fertilizers.length > 0 || !!p.batch?.settled;
@@ -616,9 +640,36 @@ function reveal(r: GardenReveal): void {
     dismiss.setAttribute('aria-label', '关闭');
     heading.append(el('strong', r.title), dismiss);
     card.append(heading);
-    resultContents(card, r);
-    const done = button('收好', close, 'primary'); done.disabled = false; card.append(done);
+    const contents = el('div', undefined, 'quick-list result-body');
+    resultContents(contents, r);
+    card.append(contents);
+    resultActions(card, r, close);
     document.body.append(card);
+}
+function resultActions(body:HTMLElement,r:GardenReveal,close:()=>void):void {
+    const p=state?.produce.find(p=>p.id===r.produce?.id);
+    // A cultivation reveal is still in the soil; a batch summary is not a single-fruit action.
+    if(!p||(r.harvests?.length??0)>1){const area=el('div',undefined,'result-action-area'),done=button('收好',close,'primary');done.disabled=false;area.append(done);body.append(area);return;}
+    const area=el('div',undefined,'result-action-area'),row=el('div',undefined,'result-actions');
+    const pending=state!.life?.pending?.target===p.id||!!state!.v3?.appraisals[p.id]&&!state!.v3!.appraisals[p.id].done;
+    const unavailable=!!p.locked||pending;
+    const actor=state!.activeActor,growth=actor?state!.life?.characters[actor]:undefined;
+    const wish=growth?.wishes.filter(w=>wishMatches(w,p)).sort((a,b)=>b.xp-a.xp)[0];
+    const run=async(command:GardenCommand)=>{
+        if(busy)return;
+        row.querySelectorAll('button').forEach(b=>b.disabled=true);
+        await act(command,close);
+        // Keep a rejected result reviewable and refresh its eligibility for retry.
+        if(area.isConnected){area.remove();resultActions(body,r,close);}
+    };
+    const sell=button('出售',()=>void run({type:'sell',id:p.id}));
+    sell.disabled=unavailable||(strip&&busy);sell.title='出售这颗果实，获得 '+p.value+' 花园币';
+    const feed=button('投喂',()=>{if(wish)void run({type:'feed',wish:wish.id,produce:p.id});},'primary');
+    feed.disabled=unavailable||!wish||(strip&&busy);feed.title=wish?wishLabel(wish)+' · +'+wish.xp+' 角色经验':'不符合当前角色的食物心愿';
+    row.append(sell,feed);area.append(row);
+    if(unavailable)area.append(el('small',p.locked?'已收藏，取消收藏后可出售或投喂':'请先完成这颗果实的待处理操作','muted'));
+    else if(!wish)area.append(el('small',!actor?'选择角色后可投喂':'不符合当前角色的食物心愿','muted'));
+    body.append(area);
 }
 function resultContents(body: HTMLElement, r: GardenReveal): void {
     if (r.produce) {
@@ -644,7 +695,7 @@ function tick(allowRender = true): void {
     if (!state)
         return;
     const now = Date.now();
-    const maturity = state.plots.map(p => p ? `${p.id}:${render3d&&growth(p, now)>=.22}:${growth(p, now) >= .55}:${growth(p, now) >= .8}:${p.readyAt <= now}` : '-').join('|');
+    const maturity = state.plots.map(p => p ? `${p.id}:${growth(p, now)>=.22}:${growth(p, now) >= .55}:${growth(p, now) >= .8}:${p.readyAt <= now}` : '-').join('|');
     if (allowRender && lastMaturity && maturity !== lastMaturity) {
         lastMaturity = maturity;
         render();
@@ -657,17 +708,18 @@ function tick(allowRender = true): void {
         mark.hidden = !p || p.readyAt > now;
         if (p) {
             const ratio = growth(p, now);
+            const giant = ratio >= 1 && !needsReveal(p) && p.traits.includes('giant');
             const visualRatio = p.harvestIndex ? .8+ratio*.2 : ratio;
             const a = e.querySelector<HTMLElement>('.art')!;
-            a.style.height = `${visualRatio < .55 ? 35 + visualRatio * 60 : (90 + visualRatio * 55) * ((!needsReveal(p) && p.traits.includes('giant')) ? 1.8 : 1)}px`;
+            a.style.height = `${visualRatio < .55 ? 35 + visualRatio * 60 : (90 + visualRatio * 55) * (giant ? 1.8 : 1)}px`;
             const side = e.parentElement!;
-            const width = (!needsReveal(p) && p.traits.includes('giant')) && ratio >= .55 ? 200 : 70;
+            const width = giant ? 200 : 70;
             const center = Math.max(width / 2, Math.min(e.offsetLeft + e.clientWidth / 2, side.clientWidth - width / 2));
             a.style.width = `${width}px`;
             a.style.left = `${center - e.offsetLeft}px`;
-            if(render3d&&(p.species==='strawberry'||(p.species==='pineapple'&&ratio>=.8))){
-                a.style.width=`${p.traits.includes('giant')?150:112}px`;
-                a.style.height=`${p.traits.includes('giant')?172:135}px`;
+            if(a.classList.contains('art-3d')){
+                a.style.width=`${giant?150:112}px`;
+                a.style.height=`${giant?172:135}px`;
                 a.style.left='50%';
             }
         }
@@ -676,13 +728,20 @@ function tick(allowRender = true): void {
     document.querySelectorAll<HTMLProgressElement>('[data-growth]').forEach(e => { const p = state!.plots.find(p => p?.id === e.dataset.growth); if (p)
         e.value = growth(p); });
     document.querySelectorAll<HTMLProgressElement>('[data-cultivation]').forEach(e=>{const p=state!.plots.find(p=>p?.id===e.dataset.cultivation);if(p)e.value=e.max-cultivationRemaining(p,now);});
-    document.querySelectorAll<HTMLElement>('[data-cultivation-label]').forEach(e=>{const p=state!.plots.find(p=>p?.id===e.dataset.cultivationLabel);if(p)e.textContent=(p.cultivation?.startedAt!==undefined?'正在培育 · ':'待培育 · ')+Math.ceil(cultivationRemaining(p,now)/1000)+' 秒';});
+    document.querySelectorAll<HTMLElement>('[data-cultivation-label]').forEach(e=>{const p=state!.plots.find(p=>p?.id===e.dataset.cultivationLabel);if(p)e.textContent=(cultivationActive(p)?'正在培育 · ':'待培育 · ')+Math.ceil(cultivationRemaining(p,now)/1000)+' 秒';});
+    const cultivation=root.querySelector<HTMLElement>('.cultivation-hint');
+    if(cultivation){const p=state.plots[Number(cultivation.dataset.cultivationPlot)],bar=cultivation.querySelector('progress')!;
+        const task=state.cooperations?.find(t=>t.plant===p?.id);
+        bar.value=task?cultivationFraction(task,now):p?Math.max(0,Math.min(1,1-cultivationRemaining(p,now)/CULTIVATION_MS)):0;
+        bar.setAttribute('aria-valuetext',`${Math.round(bar.value*100)}%`);
+    }
     const clock = document.querySelector('#refresh-clock');
     if (strip) { positionQuick(); positionQuest(); }
     if (clock)
         clock.textContent = `下一批 ${time(state.shop.refreshAt - now)}`;
 }
-api.onAnchor(({ left, right, bottom, top, side }) => {
+api.onAnchor(({ left, right, bottom, top, side, performer }) => {
+    performerBounds=performer;
     gardenDirection = side ?? (left >= innerWidth - right ? 'left' : 'right');
     petBounds = { left, right, top: top ?? bottom + 25 - (right - left), bottom: bottom + 25 };
     document.documentElement.style.setProperty('--pet-left', `${left}px`);
@@ -723,6 +782,10 @@ void refresh(true);
 
 function positionQuest(): void {
     const quest=root.querySelector<HTMLElement>('.quest-pill'), controls=root.querySelector<HTMLElement>('.garden-controls');
+    if(controls?.classList.contains('cultivation-hint')){
+        const p=cultivationHintPosition(performerBounds??petBounds,controls.offsetWidth,controls.offsetHeight,innerWidth,innerHeight);
+        controls.style.visibility=p?'visible':'hidden';if(p){controls.style.left=`${p.x}px`;controls.style.top=`${p.y}px`;}return;
+    }
     if (!quest || !controls) return;
     const left=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--garden-left'))||12;
     const center=(petBounds.left+petBounds.right)/2;

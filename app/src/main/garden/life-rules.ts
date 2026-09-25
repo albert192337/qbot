@@ -1,12 +1,13 @@
 import { SPECIES, TRAITS, needsReveal, traitSlot, level, type GardenState, type GardenCommand, type Trait, type Produce, type GardenReveal, type Species } from '../../shared/garden';
 import { FRUITS, SPRAYS, DYE_COLORS, dailyOffers, dailyRandom, gardenDay, sprayPool, wishMatches, characterLevel, CHARACTER_UNLOCKS, type GardenLife, type CharacterGrowth, type FoodWish, type SprayKind } from '../../shared/garden-life';
-import type { Random } from './rules';
+import { value, type Random } from './rules';
 import {stableSlots,speciesLevel,recordGarden,fits} from '../../shared/garden-v3';
 
 const safeKey=(s:string)=>typeof s==='string'&&s.length>0&&s.length<=160&&!['__proto__','constructor','prototype'].includes(s);
-export function ensureLife(s:GardenState,now:number,rng:Random,actor?:string):boolean {
+export function ensureLife(s:GardenState,now:number,rng:Random,actor?:string,migrate=true):boolean {
   const before=JSON.stringify(s.life);
   s.life??={owner:rng.id(),day:gardenDay(now),sprays:{},purchases:{},rareBought:0,characters:{},visibility:'friends'};
+  if(migrate)settlePendingSpray(s,now);
   const l=s.life,day=Math.max(l.day,gardenDay(now));
   if(day!==l.day){l.day=day;l.purchases={};l.rareBought=0;}
   if(s.v3&&l.supplyDay!==day){s.seeds.push({id:rng.id(),species:'strawberry',genes:[],bred:false});l.supplyDay=day;recordGarden(s,now,'dailySeed','小店留了一包草莓种子，想种的时候再种。');}
@@ -41,6 +42,29 @@ export function validateLife(s:GardenState):void {
   if(l.pending&&(!safeKey(l.pending.id)||typeof l.pending.target!=='string'||!Object.hasOwn(SPRAYS,l.pending.kind)||!(l.pending.trait?Object.hasOwn(TRAITS,l.pending.trait):l.pending.dye&&Object.hasOwn(DYE_COLORS,l.pending.dye))))throw Error('喷雾结果损坏');
 }
 export const sprayConflicts=(a:Trait,b:Trait)=>[['firefly','glowring'],['breezy','snowbell','goldbell']].some(g=>g.includes(a)&&g.includes(b));
+/** Apply the saved roll once; replace conflicts first, then the oldest full-slot entry. */
+export function settlePendingSpray(s:GardenState,now:number):Produce|undefined {
+  const candidate=s.life?.pending;if(!candidate)return;
+  const p=s.produce.find(p=>p.id===candidate.target)??s.plots.find(p=>p?.id===candidate.target);
+  if(!p){delete s.life!.pending;return;}
+  if(candidate.dye)p.dye=candidate.dye;
+  if(candidate.trait){
+    const t=candidate.trait,slot=traitSlot(t),capacity=slot==='accessory'?2:1;
+    let traits=p.traits.filter(x=>!sprayConflicts(x,t)||x===t);
+    if(!traits.includes(t)){
+      while(traits.filter(x=>traitSlot(x)===slot).length>=capacity){
+        const old=traits.find(x=>traitSlot(x)===slot)!;traits=traits.filter(x=>x!==old);
+      }
+      traits.push(t);
+    }
+    p.traits=traits;p.revealed=true;
+    if(p.growthVersion===3)p.slots=stableSlots(p.traits,p.slots);
+    const key=`${p.species}:${t}`;if(!s.discovered.includes(key))s.discovered.push(key);
+  }
+  p.value=value(p);
+  recordGarden(s,now,'sprayAccept','喷雾的新结果已直接生效',undefined,p.id);
+  delete s.life!.pending;return p;
+}
 export function protectPending(s:GardenState,c:GardenCommand):void {
   const id=s.life?.pending?.target;if(!id||c.type==='resolveSpray')return;
   if(('id'in c&&c.id===id)||('ids'in c&&c.ids.includes(id))||('produce'in c&&c.produce===id)||('target'in c&&c.target===id)||('first'in c&&(c.first===id||c.second===id))||('plot'in c&&s.plots[c.plot]?.id===id)||c.type==='harvestMany'||c.type==='sellMany')throw Error('请先处理已经揭晓的喷雾结果');
@@ -48,7 +72,7 @@ export function protectPending(s:GardenState,c:GardenCommand):void {
 /** Pure mutation inside the caller's cloned, atomic transaction. */
 export function lifeTransition(s:GardenState,cmd:GardenCommand,now:number,rng:Random,actor?:string,shopOwner?:string):{handled:boolean;reveal?:GardenReveal;changed?:Produce} {
   if(!['buyDaily','spray','resolveSpray','feed','rerollWish','gardenVisibility'].includes(cmd.type))return {handled:false};
-  ensureLife(s,now,rng,actor);const l=s.life!;
+  ensureLife(s,now,rng,actor,cmd.type!=='resolveSpray');const l=s.life!;
   switch(cmd.type){
     case 'buyDaily':{
       if(cmd.owner!==l.owner&&cmd.owner!==shopOwner)throw Error('请从好友商店购买');
@@ -71,26 +95,13 @@ export function lifeTransition(s:GardenState,cmd:GardenCommand,now:number,rng:Ra
       const pool=sprayPool(cmd.kind);let n=rng.random()*pool.reduce((v,x)=>v+x.weight,0);const out=pool.find(x=>(n-=x.weight)<0)??pool.at(-1)!;
       l.sprays[cmd.kind]!--;l.pending={id:rng.id(),target:p.id,kind:cmd.kind,trait:out.trait,dye:out.dye};
       recordGarden(s,now,'spray',`用了一瓶${SPRAYS[cmd.kind].name}`,undefined,p.id);
-      return {handled:true};
+      const changed=settlePendingSpray(s,now)!;
+      return {handled:true,changed,reveal:{title:'喷雾生效！',message:out.trait?TRAITS[out.trait].name:DYE_COLORS[out.dye!].name}};
     }
     case 'resolveSpray':{
       const candidate=l.pending;if(!candidate||candidate.id!==cmd.id||typeof cmd.accept!=='boolean')throw Error('喷雾结果已处理');
-      const p=s.produce.find(p=>p.id===candidate.target)??s.plots.find(p=>p?.id===candidate.target);if(!p)throw Error('目标果实不存在');
-      if(cmd.accept){
-        if(candidate.dye)p.dye=candidate.dye;
-        if(candidate.trait){
-          const t=candidate.trait,slot=traitSlot(t);let traits=[...p.traits];
-          if(cmd.replace){if(!traits.includes(cmd.replace)||traitSlot(cmd.replace)!==slot)throw Error('请选择同槽位的旧词条');traits=traits.filter(x=>x!==cmd.replace);}
-          if(!traits.includes(t)){
-            if(traits.filter(x=>traitSlot(x)===slot).length>=(slot==='accessory'?2:1)||traits.some(x=>sprayConflicts(x,t)))throw Error('槽位已满或词条冲突，请选择替换项');
-            traits.push(t);
-          }
-          p.traits=traits;p.revealed=true;
-          if(p.growthVersion===3)p.slots=stableSlots(p.traits,p.slots);
-          const key=`${p.species}:${t}`;if(!s.discovered.includes(key))s.discovered.push(key);
-        }
-      }
-      recordGarden(s,now,cmd.accept?'sprayAccept':'sprayKeep',cmd.accept?'选用了喷雾的新模样':'保留了原来的模样',undefined,p.id);delete l.pending;return {handled:true,changed:p,reveal:{title:cmd.accept?'新模样！':'保留了原来的模样',message:'喷雾已使用，果实留在原处。'}};
+      const changed=settlePendingSpray(s,now)!;
+      return {handled:true,changed,reveal:{title:'喷雾生效！',message:candidate.trait?TRAITS[candidate.trait].name:DYE_COLORS[candidate.dye!].name}};
     }
     case 'feed':{
       const c=actor&&l.characters[actor];if(!c)throw Error('请先选择自己的角色');

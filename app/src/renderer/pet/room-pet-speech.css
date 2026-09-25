@@ -1,0 +1,46 @@
+/* Same cream paper, brown outline and typography as the local speech window. */
+.room-pet-speech {
+  position: absolute;
+  top: max(8px, var(--nameplate-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
+  padding: 7px 11px;
+  background: #fff9ef;
+  border: 2px solid #594235;
+  border-radius: 16px 13px 15px 12px;
+  box-shadow: 0 2px 0 #3f2a1e33;
+  color: #4b352b;
+  font: 650 15px/1.55 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  text-align: center;
+  pointer-events: none;
+  z-index: 5;
+}
+.room-pet-speech[hidden] { display: none; }
+.room-pet-speech::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: calc(50% - 5px);
+  width: 8px;
+  height: 8px;
+  background: #fff9ef;
+  border-right: 2px solid #594235;
+  border-bottom: 2px solid #594235;
+  transform: rotate(45deg);
+}
+.room-pet-speech-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+body.room-pet .signboard { top: max(8px, var(--nameplate-bottom, 0px)); }
+body.room-pet.peer-speaking .signboard { visibility: hidden; }
+
+/* Speech is rendered outside the actor by the native hint surface. */
+.room-pet-speech {display:none!important;}

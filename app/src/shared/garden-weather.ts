@@ -20,7 +20,8 @@ export const WEATHER_FACTORS:Record<GardenWeatherKind,{trait:Trait;chance:number
 };
 export const LEGACY_WEATHER_FACTORS:Record<WeatherKind,{trait:Trait;chance:number}[]>={meteor:[{trait:'shiny',chance:.06},{trait:'firefly',chance:.03}],aurora:[{trait:'frost',chance:.04},{trait:'rainbow',chance:.005}]};
 export interface WeatherEvent {id:string;kind:GardenWeatherKind;start:number;end:number}
-export interface GardenWeatherStatus {now:number;current:WeatherEvent|null;next:WeatherEvent;preview?:WeatherKind|null;test?:WeatherEvent|null}
+export interface GardenWeatherStatus {now:number;current:WeatherEvent|null;next:WeatherEvent;preview?:WeatherKind|null;test?:WeatherEvent|null;hourly?:{current:HourlyWeatherEvent;next:HourlyWeatherEvent}}
+export interface HourlyWeatherEvent {id:string;kind:import('./garden-v3').V3Weather;start:number;end:number}
 /** Fixed UTC+8 calendar: timezone changes cannot create a second event. */
 export function weatherEvents(from:number,to:number):WeatherEvent[]{
  const offset=8*3600000,result:WeatherEvent[]=[];

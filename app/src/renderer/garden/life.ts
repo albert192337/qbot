@@ -1,5 +1,5 @@
 import {SPECIES,growthLabel,TRAITS,TIER_NAMES,traitSlot,needsReveal,canBreed,type GardenState,type GardenCommand,type Produce,type Trait,type Plant} from '../../shared/garden';
-import {SPRAYS,DYE_COLORS,FOOD_ICONS,CHARACTER_XP,CHARACTER_UNLOCKS,characterLevel,currentGrowth,dailyOffers,nextGardenDay,sprayPool,wishMatches,wishLabel,coopRareChance,type SprayKind,type GardenVisit} from '../../shared/garden-life';
+import {COOP_RULES,SPRAYS,DYE_COLORS,FOOD_ICONS,CHARACTER_XP,CHARACTER_UNLOCKS,characterLevel,currentGrowth,dailyOffers,nextGardenDay,sprayPool,wishMatches,wishLabel,coopRareChance,type SprayKind,type GardenVisit} from '../../shared/garden-life';
 import './life.css';
 type Context={state:GardenState;act:(c:GardenCommand)=>Promise<void>;go:(p:string)=>void;refresh:()=>Promise<void>;notice:(s:string)=>void;busy:boolean;plantArt:(p:Plant)=>HTMLElement};
 const el=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',cls='')=>{const e=document.createElement(tag);e.textContent=text;e.className=cls;return e;};
@@ -23,22 +23,23 @@ export function renderDaily(host:HTMLElement,c:Context,owner=c.state.life?.owner
   host.append(grid);
   if(!visit)host.append(btn('去朋友的小店看看',()=>c.go('friends')));
 }
+const settlingSprays=new Set<string>();
 export function renderSprays(host:HTMLElement,c:Context,target?:string):void{
   const l=c.state.life;if(!l)return;
-  host.append(el('h2','给地里的作物换个模样'),el('p','使用后随机揭晓；可保留原样，但喷雾仍会消耗。纯染色不增加词条或售价。','muted'));
+  host.append(el('h2','给地里的作物换个模样'),el('p','使用后随机结果立即生效，同槽位满时自动替换最早的词条。纯染色不增加词条或售价。','muted'));
   const pending=l.pending;
-  if(pending&&(!target||pending.target===target)){
-    const p=c.state.produce.find(p=>p.id===pending.target)??c.state.plots.find(p=>p?.id===pending.target);
-    const result=card('✨ '+(pending.trait?TRAITS[pending.trait].name:DYE_COLORS[pending.dye!].name),'结果已保存。选择使用，或保留原来的模样。');
-    if(p){result.append(el('p',badge(p)));const same=pending.trait?p.traits.filter(t=>traitSlot(t)===traitSlot(pending.trait!)):[];
-      if(!pending.trait||p.traits.includes(pending.trait)||same.length<(traitSlot(pending.trait)==='accessory'?2:1))result.append(btn('使用这个结果',()=>c.act({type:'resolveSpray',id:pending.id,accept:true}),c.busy));
-      for(const old of same)result.append(btn('替换 '+TRAITS[old].name,()=>c.act({type:'resolveSpray',id:pending.id,accept:true,replace:old}),c.busy));
+  if(pending){
+    host.append(el('p','正在应用已保存的喷雾结果…'));
+    if(!settlingSprays.has(pending.id)){
+      settlingSprays.add(pending.id);
+      const p=c.state.produce.find(p=>p.id===pending.target)??c.state.plots.find(p=>p?.id===pending.target);
+      const replace=pending.trait?p?.traits.find(t=>traitSlot(t)===traitSlot(pending.trait!)):undefined;
+      queueMicrotask(()=>void c.act({type:'resolveSpray',id:pending.id,accept:true,replace}).finally(()=>settlingSprays.delete(pending.id)));
     }
-    result.append(btn('保留原样（喷雾已消耗）',()=>c.act({type:'resolveSpray',id:pending.id,accept:false}),c.busy));host.append(result);return;
-  }
-  const plant=c.state.plots.find(p=>p?.id===target);
+    return;
+  }  const plant=c.state.plots.find(p=>p?.id===target);
   if(!plant){host.append(el('p','点击地里成熟的作物，在详情中选择「使用喷雾」。收获篮中的果实不能喷雾。'),btn('去我的土地',()=>c.go('plots')));return;}
-  if(pending){host.append(el('p','请先处理另一株作物的喷雾结果'),btn('查看待选结果',()=>c.go('sprays')));return;}
+
   const grid=el('div','','grid');
   for(const kind of Object.keys(SPRAYS) as SprayKind[]){const n=l.sprays[kind]??0;if(!n)continue;const spray=SPRAYS[kind],item=card(`🧴 ${spray.name} ×${n}`,spray.description);
     item.append(poolDetails(kind));
@@ -77,7 +78,7 @@ export function renderFriends(host:HTMLElement,c:Context):void{
 export async function inviteGardenFriend(owner:string,plot:number,notice:(s:string)=>void):Promise<void>{
   const state=await window.qbot.garden.get();
   const friends=state.rehearsal?state.rehearsal.members.filter(m=>m.id!==state.life?.owner).map(m=>({id:m.id,nickname:m.name,online:true})):(await window.qbot.social.contacts(true)).people.filter(p=>p.relation==='friend');
-  const dialog=el('dialog','','garden-invite-dialog');dialog.append(el('h2','邀请朋友一起培育'),el('p','消息会展示这颗果实的已有词条。','muted'));
+  const dialog=el('dialog','','garden-invite-dialog');dialog.append(el('h2','邀请朋友一起培育'),el('p','消息只展示神秘果实，特性在培育完成后揭晓。','muted'));
   if(!friends.length)dialog.append(el('p','还没有游戏好友，去“一起玩”认识伙伴吧。'));
   for(const p of friends)dialog.append(btn(p.nickname+(p.online?' · 在线':' · 离线'),async()=>{try{await window.qbot.garden.cooperate(owner,plot,'invite',p.id);notice(state.rehearsal?'测试伙伴已加入待培育名单':'邀请已送达');dialog.close();dialog.remove();}catch(e){notice(String(e));}}));
   dialog.append(btn('关闭',()=>{dialog.close();dialog.remove();}));dialog.oncancel=()=>dialog.remove();document.body.append(dialog);dialog.showModal();
@@ -87,18 +88,18 @@ export function renderVisit(host:HTMLElement,c:Context,address:string):void{
   host.append(el('h2','朋友的花园'),btn('← 返回朋友',()=>c.go('friends')));
   const body=el('div');host.append(body);let fetching=false,joined:number|undefined;
   const draw=(v:GardenVisit)=>{
-    if(!host.isConnected)return;body.replaceChildren(el('h2',v.name+'的花园名片'),el('p',`${v.actorName??'当前角色'} · Lv.${v.actorLevel} · 土地${v.landOpen===false?'未开放':'可查看'} · 商店${v.shopOpen===false?'未开放':'可购物'}`,'muted'));
+    if(!host.isConnected)return;joined=v.tasks?.find(t=>!t.done&&(t.members[c.state.life?.owner??'']?.seenAt??0)+15000>Date.now())?.plot;body.replaceChildren(el('h2',v.name+'的花园名片'),el('p',`${v.actorName??'当前角色'} · Lv.${v.actorLevel} · 土地${v.landOpen===false?'未开放':'可查看'} · 商店${v.shopOpen===false?'未开放':'可购物'}`,'muted'));
     if(c.state.online&&!c.state.rehearsal&&owner!==c.state.life?.owner)body.append(btn('邀请成为向日葵伙伴',()=>c.act({type:'sunRequest',target:owner})));
     body.append(el('p',`今日还可领取 ${v.rewardsLeft??5} 次培育物资${v.rewardsLeft===0?'；仍可帮忙加速并留下共同记录':''}`));
     if(!c.state.online)body.append(el('p','你正在本地花园。进入联机花园后可购物和共同培育，本地收藏会保留。'),btn('进入联机花园',async()=>{await window.qbot.garden.online(true);await c.refresh();}));
     if(targetTask){const task=v.tasks?.find(t=>t.id===targetTask);if(task?.done){const done=card('这次共同培育已完成',task.fruit?badge(task.fruit):'果实已由主人收好');if(task.fruit)done.prepend(c.plantArt(task.fruit));done.append(el('p',`${Object.keys(task.members).length} 位伙伴留下了这段经历`),btn('领取我的助育奖励',async()=>{await window.qbot.garden.cooperate(owner,task.plot,'claim',undefined,task.id);await c.refresh();}));body.append(done);}else if(!v.plots.some(p=>p?.id===targetTask))body.append(el('p','这颗果实已不在地里，可以去朋友的花园看看近况。'));}
-    const grid=el('div','','grid');v.plots.forEach((p,i)=>{if(targetTask&&p?.id!==targetTask)return;const item=card(`${i+1}号地 · ${p?FOOD_ICONS[p.species]+' '+SPECIES[p.species].name:'空土地'}`,p?p.traits.map(t=>TRAITS[t].name+'（'+TIER_NAMES[TRAITS[t].tier]+'）').join(' / ')||'原生':'还没有种下植物');if(p){item.prepend(c.plantArt(p));const t=v.tasks?.find(t=>t.plant===p.id);if(needsReveal(p)||t){const active=Object.values(t?.members??{}).filter(m=>m.seenAt+15000>Date.now()).length;item.append(el('p',t?.done?'已经揭晓':`？ 可一起培育 · ${active} 人正在参与 · ${Math.ceil((t?.remaining??216000)/(360*Math.max(1,active)))} 秒${active?'':'（单人）'}`));
-        const qualified=Object.values(t?.members??{}).filter(m=>m.seconds>=30&&m.work>=4320).length;item.append(el('small',`${qualified} 位已达标 · 好奖励 ${(100*coopRareChance(qualified)).toFixed(1)}%（最终以达标人数计算）`));
-        const me=t?.members[c.state.life?.owner??''],needSeconds=Math.max(0,30-(me?.seconds??0),(4320-(me?.work??0))/360),remainingSeconds=(t?.remaining??216000)/(360*Math.max(1,active+(joined===i?0:1)));
-        if(!t?.done)item.append(el('small',remainingSeconds<needSeconds?'剩余工作可能不足奖励资格，仍欢迎来陪伴':`再参与约 ${Math.ceil(needSeconds)} 秒可达个人奖励资格`),btn(joined===i?'暂停参与':'一起培育',async()=>{const action=joined===i?'leave':'join';const next=await window.qbot.garden.cooperate(owner,i,action);joined=action==='join'?i:undefined;draw(next);},!c.state.online));
-        else {const claimed=t.claimed.includes(c.state.life?.owner??''),eligible=!!me&&me.seconds>=30&&me.work>=4320;item.append(btn(claimed?'已领取':eligible?'领取我的助育奖励':'本次贡献未达到领取资格',async()=>{draw(await window.qbot.garden.cooperate(owner,i,'claim'));c.notice('奖励已经放入联机背包');},!c.state.online||claimed||!eligible||v.rewardsLeft===0));}
+    const grid=el('div','','grid');v.plots.forEach((p,i)=>{if(targetTask&&p?.id!==targetTask)return;const item=card(`${i+1}号地 · ${p?FOOD_ICONS[p.species]+' '+SPECIES[p.species].name:'空土地'}`,p?needsReveal(p)?'？ ？ ？ · 培育后揭晓':p.traits.map(t=>TRAITS[t].name+'（'+TIER_NAMES[TRAITS[t].tier]+'）').join(' / ')||'原生':'还没有种下植物');if(p){item.prepend(c.plantArt(p));const t=v.tasks?.find(t=>t.plant===p.id);if(needsReveal(p)||t){const active=Object.values(t?.members??{}).filter(m=>m.seenAt+15000>Date.now()).length;item.append(el('p',t?.done?'已经揭晓':`？ 可一起培育 · ${active} 人正在参与 · ${Math.ceil((t?.remaining??COOP_RULES.work)/(360*Math.max(1,active)))} 秒${active?'':'（单人）'}`));
+        const qualified=Object.values(t?.members??{}).filter(m=>m.seconds>=COOP_RULES.minSeconds&&m.work>=COOP_RULES.work*COOP_RULES.minContribution).length;item.append(el('small',`${qualified} 位已达标 · 好奖励 ${(100*coopRareChance(qualified)).toFixed(1)}%（最终以达标人数计算）`));
+        const me=t?.members[c.state.life?.owner??''],needSeconds=Math.max(0,COOP_RULES.minSeconds-(me?.seconds??0),(COOP_RULES.work*COOP_RULES.minContribution-(me?.work??0))/360),remainingSeconds=(t?.remaining??COOP_RULES.work)/(360*Math.max(1,active+(joined===i?0:1)));
+        if(!t?.done)item.append(el('small',remainingSeconds<needSeconds?'剩余工作可能不足奖励资格，仍欢迎来陪伴':`再参与约 ${Math.ceil(needSeconds)} 秒可达个人奖励资格`),btn(joined===i?'暂停参与':'培育',async()=>{const action=joined===i?'leave':'join';const next=await window.qbot.garden.cooperate(owner,i,action);joined=action==='join'?i:undefined;draw(next);},!c.state.online));
+        else {const claimed=t.claimed.includes(c.state.life?.owner??''),eligible=!!me&&me.seconds>=COOP_RULES.minSeconds&&me.work>=COOP_RULES.work*COOP_RULES.minContribution;item.append(btn(claimed?'已领取':eligible?'领取我的助育奖励':'本次贡献未达到领取资格',async()=>{draw(await window.qbot.garden.cooperate(owner,i,'claim'));c.notice('奖励已经放入联机背包');},!c.state.online||claimed||!eligible||v.rewardsLeft===0));}
       }else item.append(el('p',p.readyAt<=Date.now()?'已经成熟':'正在生长'));}grid.append(item);});body.append(grid);if(c.state.online&&v.shopOpen!==false)renderDaily(body,c,owner,v);
   };
-  const poll=async()=>{if(fetching||document.hidden)return;fetching=true;try{draw(joined!==undefined?await window.qbot.garden.cooperate(owner,joined,'join'):await window.qbot.garden.visit(owner,false,targetTask));}catch(e){body.replaceChildren(el('p',String(e)),btn('重试',()=>poll()));joined=undefined;}finally{fetching=false;}};
+  const poll=async()=>{if(fetching||document.hidden)return;fetching=true;try{draw(await window.qbot.garden.visit(owner,false,targetTask));}catch(e){body.replaceChildren(el('p',String(e)),btn('重试',()=>poll()));joined=undefined;}finally{fetching=false;}};
   void poll();const timer=setInterval(()=>{if(!host.isConnected){clearInterval(timer);if(joined!==undefined)void window.qbot.garden.cooperate(owner,joined,'leave').catch(()=>{});return;}void poll();},5000);
 }

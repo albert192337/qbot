@@ -18,8 +18,8 @@ describe('resolveRoomPetSign', () => {
     expect(resolveRoomPetSign({ ...base, presenceSign: '正在开会' })).toBe('正在开会');
   });
 
-  it('聊天临时覆盖同步牌面', () => {
-    expect(resolveRoomPetSign({ ...base, presenceSign: '工作中…', chatText: '大家好' })).toBe('大家好');
+  it('聊天使用独立气泡，暂时收起同步牌面', () => {
+    expect(resolveRoomPetSign({ ...base, presenceSign: '工作中…', chatText: '大家好' })).toBe('');
   });
 
   it('传输和离线提示保持最高优先级', () => {

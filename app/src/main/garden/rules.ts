@@ -1,5 +1,5 @@
 import { travelTransition, validateTravel } from '../../shared/travel';
-import { lifeTransition, protectPending, validateLife } from './life-rules';
+import { lifeTransition, protectPending, validateLife, settlePendingSpray } from './life-rules';
 import {advanceV3,refreshV3Shop,makeV3Plant,v3HarvestXp,breedV3,protectV3,v3Transition,validateV3} from './v3-rules';
 import {fertilizerV3,v3Value,V3} from '../../shared/garden-v3';
 import { SPECIES, TRAITS, FERTILIZERS, level, HARVEST_XP, CULTIVATION_MS, needsReveal, canBreed, cultivationRemaining, mutationMultiplier, type Species, type Trait, type GardenState, type GardenCommand, type GardenReveal, type Seed, type Produce, type Plant, type Fertilizer } from '../../shared/garden';
@@ -44,6 +44,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
     advanceV3(s,now);
     const j = s.journey!;
     refreshShop(s, now, rng);
+    if(cmd.type!=='resolveSpray')settlePendingSpray(s,now);
     protectPending(s,cmd);
     protectV3(s,cmd);
     const modern=v3Transition(s,cmd,now,rng);if(modern.handled)return {state:s,reveal:modern.reveal};

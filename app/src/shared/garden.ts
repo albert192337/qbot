@@ -151,6 +151,7 @@ export interface Offer {
     stock: number;
 }
 export interface GardenState {
+    cultivationVisit?: {owner:string;plot:number};
     rehearsal?: { members: {id:string;name:string}[] };
     cooperationRewardsLeft?:number;
     v3?:import('./garden-v3').GardenV3;
@@ -256,6 +257,7 @@ export interface GardenApi {
     open(page: string): void;
     ignoreMouse(ignore: boolean): void;
     onAnchor(cb: (anchor: {
+        performer?: {left:number;right:number;top:number;bottom:number};
         top?: number;
         side?: 'left' | 'right';
         left: number;
@@ -267,7 +269,7 @@ export interface GardenApi {
 }
 /** QBot project design, not original-game values. */
 export const LEVEL_XP = [0, 40, 80, 160, 280, 440, 660, 960] as const;
-export const CULTIVATION_MS = 30_000;
+export const CULTIVATION_MS = 180_000;
 export const HARVEST_XP = 10;
 export function level(xp: number): number { return Math.max(1, LEVEL_XP.filter(n => xp >= n).length); }
 export const SLOT_NAMES = { fruit: '果实', skin: '果皮', accessory: '挂饰', size:'体型' } as const;
@@ -284,7 +286,7 @@ export function fruitQuality(ts: Trait[],p?:Pick<Produce,'growthVersion'|'traits
 export function needsReveal(p: Produce): boolean { return (p.growthVersion === 2||p.growthVersion===3) && !p.revealed && fruitQuality(p.traits,p) === 'rainbow'; }
 export function canBreed(p: Produce): boolean { return !p.bred && !p.locked && !needsReveal(p) && ['gold','rainbow'].includes(fruitQuality(p.traits,p)); }
 export function cultivationRemaining(p: Produce, now: number): number {
-    const c = p.cultivation; return c ? Math.max(0, c.remainingMs - (c.startedAt === undefined ? 0 : Math.max(0,now-c.startedAt))) : p.growthVersion===3?600000:CULTIVATION_MS;
+    const c = p.cultivation; return c ? Math.max(0, c.remainingMs - (c.startedAt === undefined ? 0 : Math.max(0,now-c.startedAt))) : p.growthVersion===3?180000:CULTIVATION_MS;
 }
 export function mutationMultiplier(ts: Trait[]): number {
     return Math.min(15, 1 + [...new Set(ts)].reduce((sum,t)=>sum+TRAITS[t].multiplier-1,0));

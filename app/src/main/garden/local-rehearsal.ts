@@ -1,3 +1,4 @@
+import {publicGardenState,publicGardenPlant} from '../../shared/garden-public';
 import {randomUUID} from 'node:crypto';
 import {SPECIES,needsReveal,type GardenState,type GardenCommand,type GardenResult,type Species,type Trait} from '../../shared/garden';
 import {SPRAYS,COOP_RULES,dailyOffers,type GardenVisit,type CoopTask,type SprayKind} from '../../shared/garden-life';
@@ -49,8 +50,9 @@ export class LocalGardenRehearsal {
     const now=this.now();
     for(const t of this.tasks.values()){
       if(t.done)continue;
-      const active=Object.values(t.members).filter(m=>m.seenAt+COOP_RULES.leaseMs>t.updatedAt);
-      for(const m of active){const seconds=Math.max(0,(Math.min(now,m.seenAt+COOP_RULES.leaseMs)-t.updatedAt)/1000);const work=Math.min(t.remaining,seconds*COOP_RULES.speed);m.seconds+=work/COOP_RULES.speed;m.work+=work;t.remaining-=work;}
+      let from=t.updatedAt;
+      const boundaries=[...new Set([...Object.values(t.members).map(m=>m.seenAt+COOP_RULES.leaseMs).filter(at=>at>from&&at<now),now])].sort((a,b)=>a-b);
+      for(const end of boundaries){const active=Object.values(t.members).filter(m=>m.seenAt+COOP_RULES.leaseMs>from);if(active.length){const seconds=Math.min((end-from)/1000,t.remaining/(COOP_RULES.speed*active.length));for(const m of active){m.work+=COOP_RULES.speed*seconds;m.seconds+=seconds;}t.remaining=Math.max(0,t.remaining-seconds*COOP_RULES.speed*active.length);}from=end;if(!t.remaining)break;}
       t.updatedAt=now;
       const p=this.gardens.get(t.owner)?.plots[t.plot];
       if(p?.id===t.plant){p.cultivation={remainingMs:t.remaining/COOP_RULES.speed*1000};if(!t.remaining){p.revealed=true;delete p.cultivation;t.done=true;t.fruit=structuredClone(p);}}
@@ -59,7 +61,7 @@ export class LocalGardenRehearsal {
   get(actor?:string):GardenState {
     this.advance();const s=this.ensure('test:me');ensureLife(s,this.now(),this.rng,actor);
     for(const t of this.tasks.values())if(t.owner==='test:me'&&!t.done&&t.members['test:me']?.seenAt+COOP_RULES.leaseMs>this.now()){for(const m of Object.values(t.members))if(m.seenAt+COOP_RULES.leaseMs>this.now())m.seenAt=this.now();}
-    return structuredClone({...s,rehearsal:{members:this.members},cooperations:[...this.tasks.values()].filter(t=>!!t.members['test:me'])});
+    return publicGardenState({...s,rehearsal:{members:this.members},cooperations:[...this.tasks.values()].filter(t=>!!t.members['test:me'])});
   }
   act(command:GardenCommand,actor?:string):GardenResult {
     try{
@@ -77,7 +79,7 @@ export class LocalGardenRehearsal {
   }
   visit(owner:string):GardenVisit {
     this.advance();const s=this.ensure(owner);ensureLife(s,this.now(),this.rng);
-    return structuredClone({owner,name:this.members.find(m=>m.id===owner)!.name+' · 模拟',plots:s.plots,offers:dailyOffers(owner,s.life!.day),day:s.life!.day,visibility:'public',actorLevel:1,landOpen:true,shopOpen:true,rewardsLeft:Math.max(0,5-(this.rewards.get(String(s.life!.day))??0)),tasks:[...this.tasks.values()].filter(t=>t.owner===owner)});
+    return structuredClone({owner,name:this.members.find(m=>m.id===owner)!.name+' · 模拟',plots:s.plots.map(p=>p?publicGardenPlant(p):null),offers:dailyOffers(owner,s.life!.day),day:s.life!.day,visibility:'public',actorLevel:1,landOpen:true,shopOpen:true,rewardsLeft:Math.max(0,5-(this.rewards.get(String(s.life!.day))??0)),tasks:[...this.tasks.values()].filter(t=>t.owner===owner)});
   }
   cooperate(owner:string,plot:number,action:'join'|'leave'|'claim'|'share'|'invite',target?:string,task?:string):GardenVisit {
     this.advance();const s=this.ensure(owner),p=s.plots[plot];
@@ -94,7 +96,7 @@ export class LocalGardenRehearsal {
       if(p)p.cultivation={remainingMs:t.remaining/COOP_RULES.speed*1000};
     }else if(action==='leave'){for(const m of Object.values(t.members))m.seenAt=0;}
     else if(action==='claim'){
-      const me=t.members['test:me'];if(!t.done||!me||me.seconds<COOP_RULES.minSeconds||me.work<COOP_RULES.work*COOP_RULES.minContribution)throw Error('培育完成并参与至少30秒、贡献2%后可领取');
+      const me=t.members['test:me'];if(!t.done||!me||me.seconds<COOP_RULES.minSeconds||me.work<COOP_RULES.work*COOP_RULES.minContribution)throw Error('培育完成并参与至少20秒、贡献2%后可领取');
       if(!t.claimed.includes('test:me')){const mine=this.ensure('test:me'),key=String(mine.life!.day),count=this.rewards.get(key)??0;if(count>=5)throw Error('今日助育奖励已领满');mine.seeds.push({id:randomUUID(),species:'strawberry',genes:[],bred:false});t.claimed.push('test:me');this.rewards.set(key,count+1);}
     }else {
       if(owner!=='test:me'||t.done)throw Error('只能邀请培育自己尚未完成的作物');

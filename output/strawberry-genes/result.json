@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "checks": [
+    "WebGL",
+    "12 slot choices",
+    "4 presets",
+    "animated frames",
+    "pause controls",
+    "640px layout",
+    "reset",
+    "reduced motion"
+  ],
+  "time": "2026-09-21T15:53:42.746Z"
+}

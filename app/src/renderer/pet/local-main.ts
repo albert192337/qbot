@@ -1,4 +1,8 @@
+import { mountPetting } from './petting';
+import { choosePairAction } from '../../shared/pair-interaction';
 import { scenePool } from '../../shared/action-resources';
+import { resolvePetDrop } from './drop-target';
+import { mountDesktopVisibility, isDesktopQuiet } from './desktop-visibility';
 import {CHARACTER_UNLOCKS,currentGrowth,characterLevel} from '../../shared/garden-life';
 import { mountLocalNameplate } from './nameplate';
 /** pet 渲染进程入口：角色加载 + 状态机驱动 + 拖拽 + 自言自语 + 串门 + 调试面板 */
@@ -25,6 +29,7 @@ const visitorStage = document.getElementById('visitor-stage')!;
 const rng = { random: () => Math.random() };
 
 let state: PetState = { kind: 'idle' };
+let pettingAction=false;
 let available: PlayableId[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
 let currentCharacter: CharacterMeta | null = null;
@@ -74,7 +79,7 @@ const speaker = new Speaker({
   },
   bubble: document.getElementById('bubble')!,
   showBubble: (text, durationMs) => window.qbot.bubble.say(text, durationMs),
-  canSpeak: () => state.kind === 'idle',
+  canSpeak: () => !isDesktopQuiet() && state.kind === 'idle',
   playAction: (action) => dispatch({ type: 'PLAY_ACTION', action }),
   hasAction: (action) => available.includes(action),
 });
@@ -264,6 +269,7 @@ function hideAndSyncSign(): void {
 }
 
 function refreshSignboard(): void {
+  if (isDesktopQuiet()) { hostSignboard.hide(); return; }
   if (signDismissed) { hideAndSyncSign(); return; }
   if (userSign) {
     showAndSyncSign(userSign);
@@ -344,6 +350,7 @@ function behaviorCanPlay(): boolean {
 }
 let behaviorReplayTimers: ReturnType<typeof setTimeout>[] = [];
 window.qbot.behaviorAction.onPlay(({ action, loops, preview, traceId }) => {
+  if(isDesktopQuiet())return;
   if(perched)return;
   const trace = (stage: string) => { if (traceId) window.qbot.behavior.reportTrace(traceId, stage); };
   behaviorReplayTimers.forEach(clearTimeout);
@@ -429,6 +436,7 @@ function startDesktopWalk(): void {
 
 function scheduleTimer(): void {
   clearTimer();
+  if(isDesktopQuiet())return;
   if(perched)return;
   timer = setTimeout(() => dispatch({ type: 'TIMER_FIRE' }), randomDelay(rng));
 }
@@ -454,6 +462,11 @@ window.qbot.garden.onPerformance(action => {
   else dispatch({ type: 'PLAY_ACTION', action: 'idle' });
 });
 function dispatch(event: Parameters<typeof step>[1]): void {
+  if(pettingAction){
+    if(event.type==='VIDEO_ENDED'||event.type==='TIMER_FIRE')return;
+    petting.stop();
+  }
+  if(isDesktopQuiet())return;
   if(gardenPerforming&&gardenActionPlaying&&event.type==='VIDEO_ENDED'){player.play(gardenActionPlaying as PlayableId);return;}
   if(perched){
     if(event.type==='POINTER_DOWN'){window.qbot.pet.detachPerch();applyPerch(null);}
@@ -577,6 +590,7 @@ const DRAG_THRESHOLD = 4;
 const DBLCLICK_MS = 250;
 
 let pointerDown = false;
+let dropRevision = 0;
 let dragStarted = false;
 let downScreenX = 0;
 let downScreenY = 0;
@@ -589,7 +603,9 @@ let lastScreenY = 0;
 let clickTimer: ReturnType<typeof setTimeout> | null = null;
 
 stage.addEventListener('pointerdown', (e) => {
+  if(document.body.classList.contains('desktop-hidden'))return;
   if (e.button !== 0 || !e.isPrimary || pointerDown) return;
+  dropRevision++;
   if (gardenPerforming) window.qbot.garden.cancelPerformance(false);
   activePointer = e.pointerId;
   pointerDown = true;
@@ -608,6 +624,7 @@ stage.addEventListener('pointermove', (e) => {
     const dy = e.screenY - downScreenY;
     if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD) return;
     dragStarted = true;
+    window.qbot.desktop.unpeek();document.body.dataset.peek='';
     window.qbot.pet.detachPerch();
     applyPerch(null);
     if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
@@ -646,9 +663,11 @@ stage.addEventListener('pointerup', (e) => {
     hostSignboard.onDragEnd();
     hud.onDragEnd();
     window.qbot.perception.report('drag_end');
-    void window.qbot.pet.perch().then(result=>{if(result.reason)hud.toast(result.reason);});
+    const revision = dropRevision;
+    void resolvePetDrop({perch:()=>window.qbot.pet.perch(),peek:()=>window.qbot.desktop.drop(),toast:message=>hud.toast(message)},()=>revision===dropRevision&&!isDesktopQuiet());
     return;
   }
+  if(document.body.dataset.peek){window.qbot.desktop.unpeek();return;}
   // 双击 = 立即说一句；单击不做任何事（房间入口在右键菜单）
   if (clickTimer) {
     clearTimeout(clickTimer);
@@ -775,3 +794,29 @@ function showSignPrompt(): void {
   signEntry.style.display = 'block';
   signEntry.focus();
 }
+
+// Subscribe after initialization: a snapshot can arrive immediately from preload.
+mountDesktopVisibility(s => {
+  player.setSuspended(s.hidden);visitorPlayer.setSuspended(s.hidden);
+  speaker.interrupt(); cancelHold(); stopDesktopWalk(); clearTimer();
+  behaviorReplayTimers.forEach(clearTimeout); behaviorReplayTimers=[];
+  visitOrchestrator.cancelVisit(); endVisit(); hideSignPrompt();
+  if(s.hidden || s.peek) {
+    dropRevision++;
+    window.qbot.pet.detachPerch(); applyPerch(null);
+    hostSignboard.hide(); visitorSignboard.hide();
+    hud.root.classList.remove('lifted'); hud.root.style.visibility='';
+    state={kind:'idle'};
+    if(s.peek && !s.hidden)player.playLooping('idle');
+    else document.querySelectorAll('video').forEach(v=>v.pause());
+  } else if(available.length) {
+    state={kind:'idle'}; playIdle(); scheduleTimer();
+  }
+});
+
+const petting=mountPetting(stage,()=>!!currentCharacter&&available.length>0&&state.kind==='idle'&&!pointerDown&&!gardenPerforming&&!perched&&!actionHold.action&&!pairInteraction.isActive(),()=>{
+  const action=currentCharacter&&choosePairAction(currentCharacter.manifest,'happy');
+  pettingAction=true;clearTimer();stopDesktopWalk();
+  if(action)player.playLooping(action.id);
+  return ()=>{pettingAction=false;if(!isDesktopQuiet()&&!document.hidden&&state.kind==='idle'&&!gardenPerforming&&!perched&&!pairInteraction.isActive()){playIdle();scheduleTimer();}};
+});

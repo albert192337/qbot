@@ -21,6 +21,8 @@ export interface TestGuest {
   character: CharacterMeta;
 }
 export interface SocialApi {
+  pet(phase?: 'start'|'keep'|'end'): Promise<void>;
+  onPet(cb: (phase?: 'start'|'keep'|'end') => void): () => void;
   rehearseContact(id: string): Promise<void>;
   contacts(refresh?: boolean): Promise<ContactSnapshot>;
   contactAction(id: string, action: ContactAction): Promise<void>;

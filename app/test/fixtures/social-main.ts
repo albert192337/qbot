@@ -1,3 +1,5 @@
+import { registerRoomPetMenu } from '../../src/main/rooms/room-pet-menu';
+import { registerDesktopVisibility } from '../../src/main/desktop-visibility';
 import { SteamService } from '../../src/main/steam/service';
 import { roomRealm } from '../../src/main/steam/rules';
 import { getSteam, startSteam, stopSteam } from '../../src/main/steam/runtime';
@@ -15,6 +17,7 @@ const root=process.env.QBOT_QA_ROOT!;
 app.setPath('userData',process.env.QBOT_QA_DATA!);
 protocol.registerSchemesAsPrivileged([{scheme:'qbot-asset',privileges:{stream:true,supportFetchAPI:true,bypassCSP:true}}]);
 app.whenReady().then(async()=>{
+  registerDesktopVisibility();
   const chars=path.join(app.getPath('userData'),'characters');await mkdir(chars,{recursive:true});
   for(const [id,name] of [['host','小芽'],['guest','棉花糖'],['.peer-0123456789abcdef','老朋友']]){
     const target=path.join(chars,id);await cp(path.join(root,'app/resources/presets/mascot'),target,{recursive:true});
@@ -47,6 +50,11 @@ app.whenReady().then(async()=>{
     fakeSteam.start();
     app.on('before-quit',()=>fakeSteam!.stop());
   } else if (process.env.QBOT_QA_STEAM === 'live') { startSteam(); app.on('before-quit',stopSteam); }
+  registerRoomPetMenu();
+  if(process.env.QBOT_QA_COMPANIONS==='1'){
+    (await import('../../src/main/garden/windows')).registerGardenIpc();
+    await (await import('../../src/main/config')).setSettings({gardenOnline:true});
+  }
   registerSocialIpc(fakeSteam ? () => fakeSteam! : getSteam);
   const handlers:Record<string,(...args:any[])=>unknown>={
     'rooms:getCache':()=>Rooms.getRoomsCache(),'rooms:getStatus':()=>Rooms.getRoomsStatus(),

@@ -451,9 +451,9 @@ export function startLocalTest(self: string): void {
   onLeftRoom(); myMemberId = self; emit({kind:'roomJoined'});
 }
 export function addLocalTestGuest(member: RoomMember, character: LinkPeerCharacter): void {
-  memberStates.set(member.memberId, {nickname:member.nickname + ' · 测试', character, mode:'idle'});
+  memberStates.set(member.memberId, {nickname:member.nickname, character, mode:'idle'});
   emit({kind:'memberIn', member});
-  emit({kind:'character', memberId:member.memberId, nickname:member.nickname + ' · 测试', character});
+  emit({kind:'character', memberId:member.memberId, nickname:member.nickname, character});
 }
 
 /**

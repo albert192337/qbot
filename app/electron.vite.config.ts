@@ -20,7 +20,9 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          'pet-hint': resolve(__dirname, 'src/renderer/pet-hint/index.html'),
           'gene-preview': resolve(__dirname, 'src/renderer/gene-preview/index.html'),
+          'pineapple-preview': resolve(__dirname, 'src/renderer/pineapple-preview/index.html'),
           weather: resolve(__dirname, 'src/renderer/weather/index.html'),
           cozy3d: resolve(__dirname, 'src/renderer/cozy3d/index.html'),
           cozy: resolve(__dirname, 'src/renderer/cozy/index.html'),

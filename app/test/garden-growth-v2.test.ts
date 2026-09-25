@@ -23,16 +23,16 @@ it('rainbow remains sealed across saves, refuses harvesting and cannot skip its 
  expect(()=>transition(s,{type:'revealPlant',plot:0},now+60000,rng)).toThrow();
  s=transition(s,{type:'cultivate',plot:0},now,rng).state;
  expect(()=>transition(s,{type:'cultivate',plot:0},now+1,rng)).toThrow();
- expect(()=>transition(s,{type:'revealPlant',plot:0},now+29999,rng)).toThrow();
+ expect(()=>transition(s,{type:'revealPlant',plot:0},now+179999,rng)).toThrow();
  s=transition(s,{type:'pauseCultivation',plot:0},now+12000,rng).state;
- expect(s.plots[0]!.cultivation).toEqual({remainingMs:18000});
+ expect(s.plots[0]!.cultivation).toEqual({remainingMs:168000});
  s=validateGarden(JSON.parse(JSON.stringify(s)));
  expect(()=>transition(s,{type:'revealPlant',plot:0},now+100000,rng)).toThrow();
  s=transition(s,{type:'cultivate',plot:0},now+100000,rng).state;
- const result=transition(s,{type:'revealPlant',plot:0},now+118000,rng);s=result.state;
+ const result=transition(s,{type:'revealPlant',plot:0},now+268000,rng);s=result.state;
  expect(needsReveal(s.plots[0]!)).toBe(false);expect(result.reveal?.title).toBe('惊喜揭晓！');
  expect(s.produce).toHaveLength(0);expect(canBreed(s.plots[0]!)).toBe(true);
- expect(transition(s,{type:'harvest',plot:0},now+118001,rng).state.produce).toHaveLength(1);
+ expect(transition(s,{type:'harvest',plot:0},now+268001,rng).state.produce).toHaveLength(1);
 });
 it('requires a mature field parent and a gold or better bag parent; consumes each opportunity once',()=>{
  const s=plant(['golden']);s.plots[0]!.readyAt=now;

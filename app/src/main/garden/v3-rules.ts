@@ -1,6 +1,6 @@
 import {sowingMinutes,SPECIES,TRAITS,LEVEL_XP,FERTILIZERS,traitSlot,needsReveal,canBreed,type GardenState,type Plant,type Produce,type Seed,type Trait,type Species,type GardenCommand,type GardenReveal} from '../../shared/garden';
 import {dailyRandom,gardenDay,nextGardenDay} from '../../shared/garden-life';
-import {V3,V3_XP,AFFINITIES,AFFINITY_WEIGHTS,V3_WEATHER,weatherWeights,exposures,fits,cappedTraits,withSize,qualityOf,scoreOf,speciesLevel,fertilizerV3,v3Value,weekKey,geneSlots,stableSlots,recordGarden,type FactorQuality,type Exposure} from '../../shared/garden-v3';
+import {FACTOR_SCORE,V3,V3_XP,AFFINITIES,AFFINITY_WEIGHTS,V3_WEATHER,weatherWeights,exposures,fits,cappedTraits,withSize,qualityOf,scoreOf,speciesLevel,fertilizerV3,v3Value,weekKey,geneSlots,stableSlots,recordGarden,type FactorQuality,type Exposure} from '../../shared/garden-v3';
 import type {Random} from './rules';
 
 export function enableV3(s:GardenState,now:number):boolean {
@@ -27,10 +27,16 @@ export function makeV3Plant(s:GardenState,seed:Seed,plot:number,now:number,rng:R
  batch:{seedlingEnd:now+duration*V3.seedling,naturalReadyAt:now+duration,settled:false,seed:Math.floor(rng.random()*4294967296),realm:s.v3!.realm??'garden',exposure:[],candidates:[],slots,massGene:seed.massGene,soil:s.v3!.soil[plot],sunBonus:Math.min(2,s.v3!.sunActive??0)*.03}};
 }
 const massRange=(t:Trait):[number,number]=>t==='giant'?[5,5.6]:t==='large'?[3,4.2]:t==='plump'?[1.5,2.4]:[.45,.58];
+// Resolve slot collisions automatically; strongest rarity wins, stable ties keep the earlier roll.
+export function settleFactors(traits:Trait[]):Trait[]{return cappedTraits([...new Set(traits)].filter(t=>traitSlot(t)!=='size').sort((a,b)=>FACTOR_SCORE[TRAITS[b].tier]-FACTOR_SCORE[TRAITS[a].tier]));}
 export function advanceV3(s:GardenState,now:number):boolean {
  if(!s.v3)return false;refreshV3Day(s,now);let changed=false;
  for(const [plot,p] of s.plots.entries()){
-  const b=p?.batch;if(!p||p.growthVersion!==3||!b||b.settled||now<b.seedlingEnd)continue;
+  const b=p?.batch;if(!p||p.growthVersion!==3||!b)continue;
+  // Migrate a saved choice without rerolling or requiring another player action.
+  if(b.settled&&b.candidates.length){p.traits=withSize(settleFactors([...p.traits,...b.candidates]),p.kg/SPECIES[p.species].kg);p.slots=stableSlots(p.traits,p.slots);b.candidates=[];p.value=v3Value(p);if(!p.revealed&&qualityOf(p)==='rainbow')p.readyAt=Math.min(p.readyAt,now);changed=true;}
+  if(p.cultivation&&p.cultivation.remainingMs>V3.cultivationMs){p.cultivation.remainingMs=V3.cultivationMs;changed=true;}
+  if(b.settled||now<b.seedlingEnd)continue;
   b.exposure=exposures(p.plantedAt,b.seedlingEnd,b.realm);b.settled=true;changed=true;
   const random=dailyRandom(`batch3:${p.id}:${b.seed}`),old=[...p.traits],candidates:Trait[]=[];
   const propose=(t:Trait|undefined)=>{if(!t||p.traits.includes(t)||candidates.includes(t))return;if(fits(p.traits,t))p.traits.push(t);else candidates.push(t);};
@@ -43,7 +49,7 @@ export function advanceV3(s:GardenState,now:number):boolean {
   const ssr=b.exposure.filter(e=>V3_WEATHER[e.kind].grade==='SSR'),fresh=ssr.filter(e=>!s.v3!.pityEvents.includes(`${plot}:${e.id}`));
   s.v3.pityEvents=[...s.v3.pityEvents,...fresh.map(e=>`${plot}:${e.id}`)].slice(-2048);
   if(naturalRainbow)s.v3.rainbowMisses=0;
-  else for(const e of fresh){if(s.v3.rainbowMisses>=V3.rainbowPity){const chosen=weighted(ssr,e=>e.ms,random),pool=([...V3_WEATHER[chosen.kind].pool] as Trait[]).filter(t=>TRAITS[t].tier==='rainbow');const unseen=pool.filter(t=>!p.traits.includes(t)),candidate=choose(unseen.length?unseen:pool,random);if(p.traits.includes(candidate))candidates.push(candidate);else propose(candidate);s.v3.rainbowMisses=0;recordGarden(s,now,'rainbowPity','第 33 次传说天气结算：为你留下一枚彩色候选。',undefined,p.id);}else s.v3.rainbowMisses++;}
+  else for(const e of fresh){if(s.v3.rainbowMisses>=V3.rainbowPity){const chosen=weighted(ssr,e=>e.ms,random),pool=([...V3_WEATHER[chosen.kind].pool] as Trait[]).filter(t=>TRAITS[t].tier==='rainbow');const unseen=pool.filter(t=>!p.traits.includes(t)),candidate=choose(unseen.length?unseen:pool,random);if(p.traits.includes(candidate))candidates.push(candidate);else propose(candidate);s.v3.rainbowMisses=0;recordGarden(s,now,'rainbowPity','第 33 次传说天气结算：出现了彩色因子。',undefined,p.id);}else s.v3.rainbowMisses++;}
   const lv=speciesLevel(s.xp[p.species]);
   for(let i=0,n=Math.min(V3.affinityMax,poisson(V3.affinity,random));i<n;i++)propose(drawFactor(AFFINITIES[p.species].filter(t=>TRAITS[t].level<=lv),AFFINITY_WEIGHTS[lv-1],random));
   // Rare natural giants remain attainable without appraisal. Ordinary mass spans mini to plump.
@@ -53,16 +59,16 @@ export function advanceV3(s:GardenState,now:number):boolean {
   for(const e of b.exposure){const [lo,hi]=V3_WEATHER[e.kind].mass;mass+=(lo+random()*(hi-lo))*e.ms/exposureMs;}
   if(fertilizer?.effect==='weight')mass+=fertilizer.mass[0]+random()*(fertilizer.mass[1]-fertilizer.mass[0]);
   if(b.soil===2)mass+=.05+random()*.1;if(b.soil===3)mass+=.15+random()*.1;mass+=b.sunBonus;
-  mass=Math.min(8,mass);p.kg=Math.round(SPECIES[p.species].kg*mass*1000)/1000;p.traits=withSize(p.traits,p.kg/SPECIES[p.species].kg);p.slots=stableSlots(p.traits,p.slots);b.candidates=candidates;p.value=v3Value(p);
+  mass=Math.min(8,mass);p.kg=Math.round(SPECIES[p.species].kg*mass*1000)/1000;p.traits=withSize(settleFactors([...p.traits,...candidates]),p.kg/SPECIES[p.species].kg);p.slots=stableSlots(p.traits,p.slots);b.candidates=[];p.value=v3Value(p);
   if(qualityOf(p)==='rainbow'){p.readyAt=Math.min(p.readyAt,b.seedlingEnd);if(!b.candidates.length)recordGarden(s,now,'question','发现一颗可以共同培育的果实',undefined,p.id);}
-  recordGarden(s,now,'settlement',`${SPECIES[p.species].name}结算：${p.traits.filter(t=>!old.includes(t)).map(t=>TRAITS[t].name).join('、')||'原生小惊喜'}${candidates.length?'，有新候选可以选择':''}`,undefined,p.id);
+  recordGarden(s,now,'settlement',`${SPECIES[p.species].name}结算：${p.traits.filter(t=>!old.includes(t)).map(t=>TRAITS[t].name).join('、')||'原生小惊喜'}`,undefined,p.id);
  }
  return changed;
 }
 export function v3HarvestXp(s:GardenState,p:Produce,now:number):number {refreshV3Day(s,now);const used=s.v3!.xpToday[p.species]??0,xp=Math.min(60-used,Math.round(4*Math.sqrt(SPECIES[p.species].minutes/5))+(used===0?8:0));s.v3!.xpToday[p.species]=used+xp;return Math.max(0,xp);}
 export function protectV3(s:GardenState,c:GardenCommand):void {
  if(!s.v3)return;
- const targets=s.plots.filter((p):p is Plant=>!!p&&!!p.batch?.candidates.length).map(p=>p.id);
+ const targets:string[]=[];
  for(const [id,a] of Object.entries(s.v3.appraisals))if(!a.done)targets.push(id);
  if(['resolveFactors','appraisePick','appraiseStop'].includes(c.type))return;
  const touches=(id:string)=>('id'in c&&c.id===id)||('target'in c&&c.target===id)||('produce'in c&&c.produce===id)||('first'in c&&(c.first===id||c.second===id))||('ids'in c&&c.ids.includes(id))||('plot'in c&&s.plots[c.plot]?.id===id);
@@ -91,7 +97,7 @@ export function v3Transition(s:GardenState,c:GardenCommand,now:number,rng:Random
  if(!s.v3)return {handled:false};const v=s.v3;refreshV3Day(s,now);
  const find=(id:string)=>s.produce.find(p=>p.id===id)??s.plots.find(p=>p?.id===id);
  switch(c.type){
- case 'resolveFactors':{const p=s.plots.find(p=>p?.id===c.target),b=p?.batch;if(!p||!b?.candidates.length)throw Error('没有待选词条');const pool=[...p.traits,...b.candidates];if(!Array.isArray(c.chosen)||c.chosen.some(t=>!pool.includes(t)||traitSlot(t)==='size')||cappedTraits(c.chosen).length!==c.chosen.length)throw Error('请选择符合槽位和互斥规则的词条');p.traits=withSize(c.chosen,p.kg/SPECIES[p.species].kg);p.slots=stableSlots(p.traits,p.slots);b.candidates=[];p.value=v3Value(p);p.readyAt=b.naturalReadyAt??p.readyAt;if(qualityOf(p)==='rainbow'){p.readyAt=Math.min(p.readyAt,now);p.revealed=false;recordGarden(s,now,'question','选出了可以共同培育的果实',undefined,p.id);}recordGarden(s,now,'choose','选好了这批果实的模样',undefined,p.id);return {handled:true};}
+ case 'resolveFactors':throw Error('果实现在自动结算，无需选择词条');
  case 'collectionGoal':if(!Object.hasOwn(SPECIES,c.species)||!Array.isArray(c.traits)||!c.traits.length||c.traits.some(t=>!Object.hasOwn(TRAITS,t))||cappedTraits(c.traits).length!==c.traits.length)throw Error('请选择兼容的收藏目标');v.goal={species:c.species,traits:[...c.traits]};return {handled:true};
  case 'clearCollectionGoal':delete v.goal;return {handled:true};
  case 'buyOil':{if(!['normal','rich'].includes(c.kind))throw Error('精油不存在');const price=c.kind==='normal'?35:80;if(s.coins<price)throw Error('花园币不足');s.coins-=price;v.oils[c.kind]++;return {handled:true,reveal:{title:'繁育精油已放好',message:`${c.kind==='normal'?'普通 · 最多保留3因子':'浓缩 · 最多保留4因子'}，每次繁育消耗一瓶`}};}

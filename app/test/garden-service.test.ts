@@ -137,12 +137,12 @@ it('persists real test events and deduplicates repeated activation until restore
 
 it('restart pauses a saved cultivation instead of counting closed-app time',async()=>{
  const api=await import('../src/main/garden/service');const state=await api.getGarden();
- delete state.v3; // Explicit legacy asset: its original 30-second promise survives the v3 upgrade.
+ delete state.v3; // Explicit legacy asset: new cultivation also uses the three-minute reveal flow.
  const {transition}=await import('../src/main/garden/rules');let id=0;const rng={random:()=>.99,id:()=>String(id++)};
  state.seeds[0].genes=['rainbow'];let s=transition(state,{type:'plant',plot:0,seed:state.seeds[0].id},Date.now(),rng).state;
  s.plots[0]!.readyAt=Date.now()-60000;s=transition(s,{type:'cultivate',plot:0},Date.now()-60000,rng).state;
  await writeFile(path.join(mock.dir,'garden-demo.json'),JSON.stringify({state:s}));vi.resetModules();
  const restarted=await import('../src/main/garden/service');const restored=await restarted.getGarden();
- expect(restored.plots[0]!.cultivation).toEqual({remainingMs:30000});
+ expect(restored.plots[0]!.cultivation).toEqual({remainingMs:180000});
  expect((await restarted.gardenAction({type:'revealPlant',plot:0})).ok).toBe(false);
 });

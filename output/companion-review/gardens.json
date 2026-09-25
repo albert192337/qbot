@@ -1,0 +1,335 @@
+[
+  {
+    "owner": "B803C709DE9C",
+    "name": "苔苔",
+    "actorName": "未命名",
+    "landOpen": true,
+    "shopOpen": true,
+    "plots": [
+      {
+        "id": "d8f49f27-5420-46f4-89e5-bdf1e2b7fc7b",
+        "species": "strawberry",
+        "traits": [],
+        "kg": 0.2,
+        "value": 0,
+        "bred": false,
+        "growthVersion": 3,
+        "plantedAt": 1790331352738,
+        "readyAt": 1790333152738,
+        "fertilizers": [],
+        "baseTraits": [],
+        "harvestsLeft": 3,
+        "harvestIndex": 0,
+        "yieldCount": 3,
+        "slots": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "batch": {
+          "seedlingEnd": 1790332792738,
+          "naturalReadyAt": 1790333152738,
+          "settled": false,
+          "seed": 0,
+          "realm": "garden",
+          "exposure": [],
+          "candidates": [],
+          "slots": [
+            null,
+            null,
+            null,
+            null
+          ],
+          "soil": 1,
+          "sunBonus": 0
+        },
+        "publicQuality": "blue"
+      },
+      {
+        "id": "465f86b6-0711-425a-b737-2d30cda1c015",
+        "species": "lotus",
+        "traits": [],
+        "kg": 0.6,
+        "value": 0,
+        "bred": false,
+        "growthVersion": 3,
+        "plantedAt": 1790329984738,
+        "readyAt": 1790333584738,
+        "fertilizers": [],
+        "baseTraits": [],
+        "harvestsLeft": 1,
+        "harvestIndex": 0,
+        "yieldCount": 1,
+        "slots": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "batch": {
+          "seedlingEnd": 1790332864738,
+          "naturalReadyAt": 1790333584738,
+          "settled": false,
+          "seed": 0,
+          "realm": "garden",
+          "exposure": [],
+          "candidates": [],
+          "slots": [
+            null,
+            null,
+            null,
+            null
+          ],
+          "soil": 1,
+          "sunBonus": 0
+        },
+        "publicQuality": "blue"
+      },
+      null,
+      null,
+      null,
+      null
+    ],
+    "offers": [
+      {
+        "id": "20721:spray:charm",
+        "kind": "spray",
+        "item": "charm",
+        "price": 180,
+        "limit": 1
+      },
+      {
+        "id": "20721:spray:moon",
+        "kind": "spray",
+        "item": "moon",
+        "price": 260,
+        "limit": 1
+      },
+      {
+        "id": "20721:seed:sunflower",
+        "kind": "seed",
+        "item": "sunflower",
+        "price": 45,
+        "limit": 3
+      },
+      {
+        "id": "20721:seed:apple",
+        "kind": "seed",
+        "item": "apple",
+        "price": 240,
+        "limit": 3
+      },
+      {
+        "id": "20721:seed:lotus",
+        "kind": "seed",
+        "item": "lotus",
+        "price": 65,
+        "limit": 3
+      }
+    ],
+    "day": 20721,
+    "visibility": "public",
+    "actorLevel": 3,
+    "rewardsLeft": 5,
+    "tasks": []
+  },
+  {
+    "owner": "99E5CC1446A2",
+    "name": "橘子汽水",
+    "actorName": "豆包",
+    "landOpen": true,
+    "shopOpen": true,
+    "plots": [
+      {
+        "id": "8a97ae1c-e8e3-4f50-997c-45f6d3277162",
+        "species": "tomato",
+        "traits": [
+          "honey"
+        ],
+        "kg": 0.3,
+        "value": 0,
+        "bred": false,
+        "growthVersion": 3,
+        "plantedAt": 1790330740749,
+        "readyAt": 1790332540749,
+        "fertilizers": [],
+        "baseTraits": [
+          "honey"
+        ],
+        "harvestsLeft": 3,
+        "harvestIndex": 0,
+        "yieldCount": 3,
+        "slots": [
+          "honey",
+          null,
+          null,
+          null
+        ],
+        "batch": {
+          "seedlingEnd": 1790332180749,
+          "naturalReadyAt": 1790332540749,
+          "settled": false,
+          "seed": 0,
+          "realm": "garden",
+          "exposure": [],
+          "candidates": [],
+          "slots": [
+            "honey",
+            null,
+            null,
+            null
+          ],
+          "soil": 1,
+          "sunBonus": 0
+        },
+        "publicQuality": "blue"
+      },
+      {
+        "id": "c8252127-6a9a-4e61-82d5-10b3c94dc639",
+        "species": "pineapple",
+        "traits": [],
+        "kg": 1.2,
+        "value": 0,
+        "bred": false,
+        "growthVersion": 3,
+        "plantedAt": 1790320984749,
+        "readyAt": 1790335384749,
+        "fertilizers": [],
+        "baseTraits": [],
+        "harvestsLeft": 3,
+        "harvestIndex": 0,
+        "yieldCount": 3,
+        "slots": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "batch": {
+          "seedlingEnd": 1790332504749,
+          "naturalReadyAt": 1790335384749,
+          "settled": false,
+          "seed": 0,
+          "realm": "garden",
+          "exposure": [],
+          "candidates": [],
+          "slots": [
+            null,
+            null,
+            null,
+            null
+          ],
+          "soil": 1,
+          "sunBonus": 0
+        },
+        "publicQuality": "blue"
+      },
+      {
+        "id": "573b6f97-1314-4ed9-9587-c47920cc4dd2",
+        "species": "tomato",
+        "traits": [
+          "wax",
+          "plump"
+        ],
+        "kg": 0.59,
+        "value": 41,
+        "bred": false,
+        "growthVersion": 3,
+        "plantedAt": 1790329516749,
+        "readyAt": 1790331316749,
+        "fertilizers": [],
+        "baseTraits": [
+          "wax"
+        ],
+        "harvestsLeft": 3,
+        "harvestIndex": 0,
+        "yieldCount": 3,
+        "slots": [
+          null,
+          "wax",
+          null,
+          null
+        ],
+        "batch": {
+          "seedlingEnd": 1790330956749,
+          "naturalReadyAt": 1790331316749,
+          "settled": true,
+          "seed": 0,
+          "realm": "garden",
+          "exposure": [
+            {
+              "id": "garden:497313",
+              "kind": "sunny",
+              "start": 1790329516749,
+              "end": 1790330400000,
+              "ms": 883251
+            },
+            {
+              "id": "garden:497314",
+              "kind": "daylight",
+              "start": 1790330400000,
+              "end": 1790330956749,
+              "ms": 556749
+            }
+          ],
+          "candidates": [],
+          "slots": [
+            null,
+            null,
+            null,
+            null
+          ],
+          "soil": 1,
+          "sunBonus": 0
+        },
+        "publicQuality": "blue"
+      },
+      null,
+      null,
+      null
+    ],
+    "offers": [
+      {
+        "id": "20721:spray:fruit",
+        "kind": "spray",
+        "item": "fruit",
+        "price": 150,
+        "limit": 1
+      },
+      {
+        "id": "20721:spray:color",
+        "kind": "spray",
+        "item": "color",
+        "price": 90,
+        "limit": 1
+      },
+      {
+        "id": "20721:seed:pineapple",
+        "kind": "seed",
+        "item": "pineapple",
+        "price": 180,
+        "limit": 3
+      },
+      {
+        "id": "20721:seed:lotus",
+        "kind": "seed",
+        "item": "lotus",
+        "price": 65,
+        "limit": 3
+      },
+      {
+        "id": "20721:seed:blueberry",
+        "kind": "seed",
+        "item": "blueberry",
+        "price": 110,
+        "limit": 3
+      }
+    ],
+    "day": 20721,
+    "visibility": "public",
+    "actorLevel": 6,
+    "rewardsLeft": 5,
+    "tasks": []
+  }
+]

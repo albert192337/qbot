@@ -1,4 +1,6 @@
+import { GARDEN_ICON } from './toolbar-icons';
 import { attachWeatherButton } from './weather-button';
+import { EYE_ICON } from './desktop-visibility';
 /**
  * 桌宠窗底部 HUD —— 点数药丸 + 宝箱按钮。
  * 纯 DOM 构造，不依赖 Player / StateMachine。
@@ -92,7 +94,7 @@ export class ProgressHud {
     this.root.appendChild(this.chestBtn);
     const garden = document.createElement('button');
     garden.className = 'hud-chat hud-garden'; garden.title = '展开 / 收起花园'; garden.setAttribute('aria-label', '展开或收起花园');
-    garden.innerHTML = '<svg viewBox="0 0 32 32" fill="none"><path d="M16 28V13M16 19C3 18 4 6 5 5c10 0 12 8 11 14ZM16 15C15 5 24 3 28 4c0 8-4 12-12 11Z" fill="#83b589" stroke="#302d27" stroke-width="2.4" stroke-linejoin="round"/><path d="M7 28h19" stroke="#302d27" stroke-width="2.4" stroke-linecap="round"/></svg>';
+    garden.innerHTML = GARDEN_ICON;
     garden.addEventListener('pointerdown', e => e.stopPropagation());
     garden.addEventListener('click', e => { e.stopPropagation(); window.qbot.garden.toggle(); });
     this.root.appendChild(garden);
@@ -104,6 +106,8 @@ export class ProgressHud {
       b.addEventListener('pointerdown',e=>e.stopPropagation());b.addEventListener('click',e=>{e.stopPropagation();window.qbot.garden.open(page);});this.root.append(b);
     }
     const stopWeather=attachWeatherButton(this.root,window.qbot.garden);
+    const hide=document.createElement('button');hide.className='hud-chat hud-hide';hide.title='隐藏全部角色';hide.setAttribute('aria-label',hide.title);hide.innerHTML=EYE_ICON;
+    hide.onpointerdown=e=>e.stopPropagation();hide.onclick=e=>{e.stopPropagation();void window.qbot.desktop.toggle().catch(()=>this.toast('暂时无法切换，请重试'));};this.root.append(hide);
     window.addEventListener('pagehide',stopWeather,{once:true});
     const stopGardenHint = attachGardenHint(garden, window.qbot.garden);
     window.addEventListener('pagehide', stopGardenHint, { once: true });

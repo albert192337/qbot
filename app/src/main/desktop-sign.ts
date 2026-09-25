@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain, screen } from 'electron';
+import { desktopQuiet, trackDesktopWindow, allowDesktopWindow } from './desktop-visibility';
 import { moveFixedSize } from './fixed-window';
 import { attachPetWindowLayer, raisePetWindowGroup } from './pet-window-layer';
 
@@ -42,11 +43,13 @@ export function createDesktopSign(pet: BrowserWindow, group: () => Array<Browser
   }
   function sync() {
     if (!win || win.isDestroyed()) return;
-    if (!text || !pet.isVisible() || !ready) { stopHover(); win.hide(); return; }
+    if (desktopQuiet() || !text || !pet.isVisible() || !ready) { stopHover(); win.hide(); return; }
     const position = desktopSignPosition(pet.getBounds(), screen.getDisplayMatching(pet.getBounds()).workArea);
+    const body=pet.getBounds();
+    if(position.x<body.x+body.width&&position.x+SIGN_SIZE.width>body.x&&position.y<body.y+body.height&&position.y+SIGN_SIZE.height>body.y){stopHover();win.hide();return;}
     moveFixedSize(win, position.x, position.y, SIGN_SIZE);
     win.webContents.send('sign:display', text);
-    if (!win.isVisible()) win.showInactive();
+    if (!win.isVisible()) {allowDesktopWindow(win);win.showInactive();}
     if (!hoverTimer) { hoverTimer = setInterval(updateHover, 80); hoverTimer.unref(); }
     updateHover();
     raisePetWindowGroup(group());
@@ -58,6 +61,7 @@ export function createDesktopSign(pet: BrowserWindow, group: () => Array<Browser
         resizable: false, focusable: false, skipTaskbar: true, show: false,
         webPreferences: { preload, contextIsolation: true, sandbox: false } });
       win.setIgnoreMouseEvents(true, { forward: true });
+      trackDesktopWindow(win);
       win.setAlwaysOnTop(true, 'floating');
       win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
       attachPetWindowLayer(win, group, pet);

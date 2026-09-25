@@ -2,7 +2,7 @@ import {SPECIES,TRAITS,FERTILIZERS,traitSlot,type Trait,type Species,type Produc
 import {dailyRandom,gardenDay,traitSource} from './garden-life';
 
 /** Original reference / project tuning are separate in docs/garden-v3-balance.md. */
-export const V3={version:3,seedling:.8,lambda:1.1,affinity:.25,affinityMax:4,weatherPity:12,rainbowPity:32,cultivationMs:600000,weeklyBreeds:90,breedPity:9,hourIncome:24,dayXp:60} as const;
+export const V3={version:3,seedling:.8,lambda:1.1,affinity:.25,affinityMax:4,weatherPity:12,rainbowPity:32,cultivationMs:180000,weeklyBreeds:90,breedPity:9,hourIncome:24,dayXp:60} as const;
 export const V3_XP=[0,20,50,100,170,260,380,540,740,1000] as const;
 export function factorDefinition(id:Trait){const slot=traitSlot(id);return {id,name:TRAITS[id].name,slot,quality:TRAITS[id].tier,score:slot==='size'?0:FACTOR_SCORE[TRAITS[id].tier],source:traitSource(id),affinities:(Object.keys(AFFINITIES) as Species[]).filter(sp=>AFFINITIES[sp].includes(id)),conflicts:(Object.keys(TRAITS) as Trait[]).filter(other=>other!==id&&conflicts(id,other)),inheritance:slot==='size'?'independent-mass':'ordinary-slot',visual:{layer:slot==='fruit'?0:slot==='skin'?1:slot==='accessory'?2:3,effect:id},version:3,sourceStatus:'project-adaptation'};}
 export const speciesLevel=(xp:number)=>Math.max(1,V3_XP.filter(n=>xp>=n).length);

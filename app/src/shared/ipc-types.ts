@@ -291,6 +291,7 @@ export type RoomKind = 'idle' | 'study' | 'night' | 'coop';
 
 /** 房间列表条目（不含聊天/成员详情/token） */
 export interface RoomBrief {
+  companion?: boolean;
   description?: string;
   language?: string;
   chatEnabled?: boolean;
@@ -306,6 +307,7 @@ export interface RoomBrief {
 
 /** 房内成员（含当前在场状态） */
 export interface RoomMember {
+  companion?: boolean;
   title?: string;
   testing?: boolean;
   memberId: string;
@@ -339,6 +341,8 @@ export interface RoomSnapshot {
 
 /** 一条发言（nickname 是快照：改昵称不追溯改历史） */
 export interface RoomChatMsg {
+  companion?: boolean;
+  interaction?: 'petting';
   garden?:{owner:string;plot:number;plant:string;species?:string;traits?:{name:string;quality:string}[];done?:boolean;remaining?:number;active?:number;members?:{name:string;qualified:boolean}[];chance?:number;room?:string};
   id: string;
   memberId: string;
@@ -434,7 +438,23 @@ export type CraftResult =
   | { ok: false; error: string };
 
 export interface QBotApi {
+  desktop: {
+    get(): Promise<import('./desktop-visibility').DesktopVisibility>;
+    toggle(): Promise<import('./desktop-visibility').DesktopVisibility>;
+    setMemberHidden(id: string, hidden: boolean): Promise<void>;
+    drop(): Promise<boolean>;
+    unpeek(): void;
+    reportHits(hits: import('./desktop-visibility').DesktopHitRect[]): void;
+    onChanged(cb: (state: import('./desktop-visibility').DesktopVisibility) => void): () => void;
+    onPeerControlsClose(cb: () => void): () => void;
+    openPeerControls(): void;
+  };
   overlays: {
+    hint(value:import('./pet-hint').PetHint|null):void;
+    onHint(cb:(value:import('./pet-hint').PetHint)=>void):()=>void;
+    hintAction(action:'open'|'dismiss'):void;
+    onHintAction(cb:(action:'open'|'dismiss')=>void):()=>void;
+    hintHover(hit:boolean):void;
     report(kind:import('./desktop-overlays').HeadOverlay,active:boolean):void;
     onChanged(cb:(snapshot:import('./desktop-overlays').HeadSnapshot)=>void):()=>void;
   };
@@ -529,6 +549,9 @@ export interface QBotApi {
    * 主进程按窗口定向推送（不带 memberId——一个窗只服务一个成员，天然隔离）。
    */
   roomPet: {
+    interactions(): Promise<Array<{id: import('./pair-interaction').PairKind; label: string; level?: number}>>;
+    interact(kind: import('./pair-interaction').PairKind): Promise<string>;
+    popupMenu(): void;
     move(x: number, y: number): void;
     onHello(cb: (info: { nickname: string;memberId?:string }) => void): () => void;
     onCharacter(cb: (meta: LinkPeerCharacter) => void): () => void;

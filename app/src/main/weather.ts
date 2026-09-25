@@ -1,4 +1,5 @@
 import { beginGardenWeatherTest, endGardenWeatherTest } from './garden/service';
+import { desktopQuiet, onDesktopVisibilityChanged } from './desktop-visibility';
 import { app, dialog, powerMonitor, screen } from 'electron';
 
 import { WEATHER_PRESETS, WEATHER_TEST_MS, type WeatherKind } from '../shared/weather';
@@ -17,6 +18,11 @@ let initialized = false;
 let onChanged = () => {};
 export function onWeatherTestChanged(listener: () => void): void { onChanged = listener; }
 const session = new WeatherSession(createSurface);
+onDesktopVisibilityChanged(() => {
+  if (!desktopQuiet()) return;
+  reactionRequest++; cancelWeatherReaction(); session.stop(); visualSource=null;
+  clearTimeout(expiry); expiry=undefined; onChanged();
+});
 
 async function createSurface(): Promise<WeatherSurface> {
   if (process.platform !== 'win32') throw new Error('天气背景测试目前支持 Windows');
@@ -44,6 +50,7 @@ export function initWeatherTest(): void {
 }
 
 export async function changeWeatherTest(kind: WeatherKind | null, bounds?: Electron.Rectangle, durationMs=WEATHER_TEST_MS, source:'test'|'scheduled'='test'): Promise<void> {
+  if (kind && desktopQuiet()) return;
   initWeatherTest();
   const startedAt=Date.now();
   visualSource=kind?source:null;
@@ -66,6 +73,7 @@ export function weatherTestMenu(bounds?: Electron.Rectangle): Electron.MenuItemC
     console.info('[weather] requested', kind ?? 'restore');
     void changeWeatherTest(kind, bounds).catch(error => {
       console.error('[weather] failed', error);
+      if(desktopQuiet())return;
       void dialog.showMessageBox({ type: 'error', title: '天气背景测试', message: '暂时无法显示天气背景',
         detail: `已恢复桌面显示。${error instanceof Error ? error.message : String(error)}` });
     });

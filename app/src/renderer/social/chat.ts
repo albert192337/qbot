@@ -41,14 +41,14 @@ export class ChatView {
     if (!this.messages.length) {const empty=document.createElement('p');empty.className='empty';empty.textContent=this.world ? '世界很安静，打个招呼吧。' : '聊天留在这里，安心做自己的事。';this.list.append(empty);}
     for (const m of this.messages) {
       const row=document.createElement('article');row.className='message' + (m.memberId === this.self() ? ' mine' : '');
-      const who=document.createElement('div');who.className='message-who';who.textContent=`${m.nickname} · ${new Date(m.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+      const who=document.createElement('div');who.className='message-who';who.textContent=`${m.nickname}${m.companion?' · 陪伴角色':''} · ${new Date(m.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
       who.tabIndex=0;who.setAttribute('role','button');who.title='查看土地和商店';who.onclick=()=>window.qbot.garden.open('visit:'+m.memberId);who.onkeydown=e=>{if(e.key==='Enter')who.click();};
-      const text=document.createElement('p');text.textContent=m.text;
+      const text=document.createElement('p');if(m.interaction==='petting'){row.classList.add('interaction-message');text.setAttribute('aria-label','摸摸互动记录');}text.textContent=m.garden&&!m.garden.done?(m.garden.species??'神秘果实')+' · ？ ？ ？ · 培育后揭晓':m.text;
       const action=document.createElement('button');action.className='message-action';action.textContent=m.memberId === this.self() ? '撤回' : '举报';
       action.onclick=async () => {action.disabled=true;try {await window.qbot.social.moderate(m.id,m.memberId === this.self() ? 'delete' : 'report',this.world);if(m.memberId!==this.self())this.error('举报已提交，等待处理');}catch(e){this.error(String(e));}finally{action.disabled=false;}};
       row.append(who,text,action);this.list.append(row);
       const invitation=/\[培育:([0-9A-Z]{12}):([0-5])\]/.exec(m.text);
-      if(m.garden){const traits=document.createElement('p');traits.textContent=(m.garden.species??'果实')+' · '+(m.garden.traits??[]).map(t=>t.name+'（'+t.quality+'）').join(' / ');row.append(traits);const status=document.createElement('p');status.textContent=m.garden.done?'已完成 · '+(m.garden.members??[]).map(p=>p.name).join('、'):`${m.garden.active??0} 人培育中 · 约 ${Math.ceil((m.garden.remaining??600)/Math.max(1,m.garden.active??0))} 秒 · 好奖励 ${((m.garden.chance??.18)*100).toFixed(1)}%`;row.append(status);}
+      if(m.garden){const traits=document.createElement('p');traits.textContent=(m.garden.species??'果实')+' · '+(m.garden.done?(m.garden.traits??[]).map(t=>t.name+'（'+t.quality+'）').join(' / '):'？ ？ ？');row.append(traits);const status=document.createElement('p');status.textContent=m.garden.done?'已完成 · '+(m.garden.members??[]).map(p=>p.name).join('、'):`${m.garden.active??0} 人培育中 · 约 ${Math.ceil((m.garden.remaining??180)/Math.max(1,m.garden.active??0))} 秒 · 好奖励 ${((m.garden.chance??.18)*100).toFixed(1)}%`;row.append(status);}
       if(invitation&&invitation[1]===m.memberId){const join=document.createElement('button');join.textContent=m.garden?.done?'查看共同培育记录':'查看果实 · 一起培育';join.onclick=()=>window.qbot.garden.open('visit:'+invitation[1]+(m.garden?':'+m.garden.plot+':'+m.garden.plant:''));row.append(join);}
     }
     this.list.scrollTop = bottom ? this.list.scrollHeight : oldTop;

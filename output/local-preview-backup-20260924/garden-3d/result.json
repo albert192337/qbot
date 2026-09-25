@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "pid": 35448,
+  "checks": [
+    "five field stages",
+    "existing non-strawberry preserved",
+    "2D/3D switch in both windows without save changes",
+    "strawberry-only seed picker",
+    "plant",
+    "fertilize",
+    "harvest and regrow",
+    "3D harvest basket"
+  ],
+  "errors": []
+}

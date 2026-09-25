@@ -1,0 +1,26 @@
+import { afterEach, expect, it, vi } from 'vitest';
+const mock = vi.hoisted(() => ({ show: vi.fn(), clear: vi.fn(), quiet: false, changed: () => {}, quit: () => {} }));
+vi.mock('electron', () => ({ app: { once: (_: string, fn: () => void) => { mock.quit = fn; } } }));
+vi.mock('../src/main/weather', () => ({ showScheduledWeather: mock.show, clearScheduledWeather: mock.clear }));
+vi.mock('../src/main/desktop-visibility', () => ({ desktopQuiet: () => mock.quiet, onDesktopVisibilityChanged: (fn: () => void) => { mock.changed = fn; return () => {}; } }));
+vi.mock('../src/main/garden/service', () => ({ getGarden: async () => ({ v3: { realm: 'garden' } }) }));
+import { hourlyWeather } from '../src/shared/garden-v3';
+afterEach(() => { mock.quit(); vi.useRealTimers(); vi.restoreAllMocks(); });
+it('retries failed aurora backgrounds and restores after hiding within the same hour', async () => {
+  vi.useFakeTimers(); vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  let hour = 497000; while (hourlyWeather(hour) !== 'aurora') hour++;
+  vi.setSystemTime(hour * 3600000 + 60000);
+  mock.show.mockRejectedValueOnce(new Error('shell not ready')).mockResolvedValue(undefined);
+  const { startGardenWeatherClock } = await import('../src/main/garden/weather-clock');
+  startGardenWeatherClock(); await vi.advanceTimersByTimeAsync(0);
+  expect(mock.show).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(15000);
+  expect(mock.show).toHaveBeenLastCalledWith('aurora', (hour + 1) * 3600000);
+  expect(mock.show).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(15000); expect(mock.show).toHaveBeenCalledTimes(2);
+  mock.quiet = true; mock.changed(); await vi.advanceTimersByTimeAsync(15000);
+  expect(mock.show).toHaveBeenCalledTimes(2);
+  mock.quiet = false; mock.changed(); await vi.advanceTimersByTimeAsync(0);
+  expect(mock.show).toHaveBeenCalledTimes(3);
+});

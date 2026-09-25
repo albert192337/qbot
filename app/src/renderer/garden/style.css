@@ -201,7 +201,12 @@ p{
 .quality-rainbow{
   filter:drop-shadow(0 0 14px #a8c3fa)
 }
-.tags{
+/* Quality surrounds the natural green foliage; never recolor the plant. */
+.juvenile-art{width:100%;height:100%;overflow:hidden;pointer-events:none}
+.growing-quality.quality-blue{filter:drop-shadow(0 0 5px #7bbcec) drop-shadow(0 0 9px #9dd5fa)}
+.growing-quality.quality-purple{filter:drop-shadow(0 0 5px #b991e0) drop-shadow(0 0 9px #d0adee)}
+.growing-quality.quality-gold{filter:drop-shadow(0 0 5px #dfb952) drop-shadow(0 0 9px #ffe39a)}
+.growing-quality.quality-rainbow{filter:drop-shadow(-4px 0 6px #e8a4cb) drop-shadow(4px 0 6px #9ecded) drop-shadow(0 -4px 6px #d2b3ec)}.tags{
   display:flex;
   flex-wrap:wrap;
   gap:5px
@@ -736,7 +741,11 @@ html:has(body.strip){
 .result-card .art { height:64px; width:88px; margin:2px auto; flex-shrink:0; }
 .result-card .tags { justify-content:center; }
 .result-card .result-stats { font-weight:700; font-size:15px; margin:4px 0; }
-.result-card .quick-list { padding-top:4px; overflow:visible; flex-shrink:0; gap:5px; }
+.result-card .quick-list { padding-top:4px; overflow:auto; flex:1 1 auto; min-height:0; gap:5px; }
+.result-card>.quick-heading,.result-card>.result-action-area{flex-shrink:0}
+.result-card>.result-action-area{padding-top:8px;background:#fff9e8}
+.result-card>.quick-list>*{flex-shrink:0}
+.result-popup.result-card{overflow:hidden}
 .strip .result-card .tag { font-size:9px; padding:2px 5px; }
 .strip .result-card .quick-list > strong { font-size:12px; }
 .strip .result-card .quick-list > button { padding:5px 9px; }
@@ -897,3 +906,18 @@ body:not(.strip) .tag,.strip .tag { border-radius:14px 3px 14px 3px; }
 
 /* Head-area priority is shared with the independent pet and speech windows. */
 body.strip[data-head-overlay=interaction] .quest-pill,body.strip[data-head-overlay=wish] .quest-pill,body.strip[data-head-overlay=speech] .quest-pill {display:none;pointer-events:none;}
+
+.research-mark{position:absolute;left:55%;bottom:65%;font-size:26px;pointer-events:none;animation:garden-research 2.6s ease-in-out infinite}
+@keyframes garden-research{0%,100%{transform:translate(-8px,0) rotate(-12deg)}50%{transform:translate(10px,-8px) rotate(12deg)}}
+@media(prefers-reduced-motion:reduce){.research-mark{animation:none}}
+
+.result-action-area{display:flex;flex-direction:column;gap:5px;width:100%}.result-actions{display:flex;gap:8px;width:100%}.result-actions>button{flex:1;min-width:0;padding:7px 10px}.result-action-area>small{line-height:1.5}
+
+.strip .garden-controls.cultivation-hint {width:224px;box-sizing:border-box;display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:9px 12px;border-radius:15px;flex-wrap:nowrap;}
+.cultivation-hint-title {font-size:12px;line-height:18px;white-space:nowrap;}
+.strip .cultivation-hint .cultivation-pause {font-size:11px;line-height:18px;padding:0;border:0;background:transparent;box-shadow:none;color:#82745a;min-width:0;}
+.strip .cultivation-hint .cultivation-pause:hover {color:#453a2b;text-decoration:underline;}
+.cultivation-hint-progress {grid-column:1 / -1;appearance:none;width:100%;height:5px;margin:0;border:0;border-radius:4px;overflow:hidden;background:#e5dfcd;}
+.cultivation-hint-progress::-webkit-progress-bar {background:#e5dfcd;border-radius:4px;}
+.cultivation-hint-progress::-webkit-progress-value {background:#86aa72;border-radius:4px;transition:width .8s linear;}
+@media(prefers-reduced-motion:reduce){.cultivation-hint-progress::-webkit-progress-value{transition:none}}

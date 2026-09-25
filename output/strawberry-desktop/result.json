@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "pid": 11992,
+  "bounds": {
+    "x": 1130,
+    "y": 562,
+    "width": 280,
+    "height": 320
+  },
+  "checks": [
+    "transparent corners",
+    "visible specimen",
+    "four desktop presets"
+  ],
+  "time": "2026-09-21T16:11:35.401Z"
+}

@@ -5,7 +5,10 @@ export function createNameplate(parent: HTMLElement): (name: string, title?: str
   const el=document.createElement('div');el.className='player-nameplate';
   const name=document.createElement('strong');const title=document.createElement('span');title.className='player-title';
   el.append(name,title);parent.append(el);el.hidden=true;
-  return (text,subtitle='')=>{el.hidden=!text;name.textContent=text;el.title=text;title.textContent=subtitle;};
+  const reserve = () => document.body.style.setProperty('--nameplate-bottom', el.hidden ? '0px' : `${el.getBoundingClientRect().bottom + 6}px`);
+  new ResizeObserver(reserve).observe(el);
+  window.addEventListener('resize', reserve);
+  return (text,subtitle='')=>{el.hidden=!text;name.textContent=text;el.title=text;title.textContent=subtitle;reserve();};
 }
 export function mountLocalNameplate(parent: HTMLElement):void {
   const set=createNameplate(parent);

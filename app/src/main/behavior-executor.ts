@@ -17,6 +17,7 @@
  *  - 拖拽中全停：drag 状态下什么行为都不做（由入口层判断）
  */
 import { sendToWindows } from './windows';
+import { desktopQuiet, onDesktopVisibilityChanged } from './desktop-visibility';
 import { getSettings } from './config';
 import { leavePetMessage, clearPetMessage } from './pet-message';
 import { recordBehavior } from './perception';
@@ -44,6 +45,7 @@ const MAX_QUEUE = 3;
  *  静态 import 安全：behavior-rules 不反向依赖本模块（execute 回调靠 setter 注入） */
 export function startBehaviorExecutor(): void {
   setBehaviorExecutor(execute);
+  onDesktopVisibilityChanged(() => { if (desktopQuiet()) stopAllBehaviors(); });
 }
 
 /**
@@ -54,6 +56,7 @@ export function startBehaviorExecutor(): void {
  *  - 低于当前 → 丢弃（低优先级的等不到高优先级结束也没关系）
  */
 export function execute(script: BehaviorScript): void {
+  if (desktopQuiet()) return;
   // 先校验（LLM 输出可能不合法；规则输出一般合法，但也验一下保险）
   const v = validateScript(script);
   if (!v.ok) {

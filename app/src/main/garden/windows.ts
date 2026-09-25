@@ -1,5 +1,9 @@
+import {publicGardenState} from '../../shared/garden-public';
+import { allowDesktopWindow, trackDesktopWindow, desktopQuiet, onDesktopVisibilityChanged } from '../desktop-visibility';
+import {scenePool,resourceText} from '../../shared/action-resources';
+import type {GardenVisit} from '../../shared/garden-life';
 import {cultivationRemaining} from '../../shared/garden';
-import { gardenWeather } from '../../shared/garden-weather';
+import { gardenWeatherStatus } from '../../shared/garden-weather-status';
 import { startGardenWeatherClock } from './weather-clock';
 import { app, BrowserWindow, ipcMain, screen, powerMonitor } from 'electron';
 import path from 'node:path';
@@ -12,6 +16,7 @@ import { gardenSide } from '../../shared/garden-layout';
 import { moveFixedSize } from '../fixed-window';
 let strip: BrowserWindow | null = null, panel: BrowserWindow | null = null, pet: BrowserWindow | null = null;
 let expanded = false;
+onDesktopVisibilityChanged(() => { if (desktopQuiet()) stopPerformance(); });
 let travelPanel: BrowserWindow | null = null;
 let stripSize = {width:1100,height:800};
 let speechBounds: { left: number; right: number; top: number; bottom: number } | null = null;
@@ -28,9 +33,12 @@ let performanceTimer: ReturnType<typeof setTimeout> | undefined;
 let cooperationTimer: ReturnType<typeof setInterval> | undefined;
 let performanceVersion = 0;
 let cultivatingPlot: number | null = null;
+let cultivatingOwner: string | undefined;
+let cultivationScene: GardenVisit | undefined;
 function stopPerformance(restore = true): void {
     performanceVersion++;
-    if(cultivatingPlot!==null){const plot=cultivatingPlot;cultivatingPlot=null;void gardenAction({type:'pauseCultivation',plot});}
+    if(cultivatingPlot!==null){const plot=cultivatingPlot,owner=cultivatingOwner;cultivatingPlot=null;cultivatingOwner=undefined;if(owner)void import('./network').then(n=>n.cooperateGarden(owner,plot,'leave')).catch(()=>{});else void gardenAction({type:'pauseCultivation',plot});}
+    cultivatingOwner=undefined;cultivationScene=undefined;strip?.webContents.send('garden:changed');
     clearTimeout(performanceTimer);
     clearInterval(cooperationTimer);cooperationTimer=undefined;
     const origin = home; home = null;
@@ -41,25 +49,27 @@ function stopPerformance(restore = true): void {
     }
     anchor();
 }
-async function perform(plot: number, kind: 'plant' | 'harvest' | 'cultivate', duration?:number, owner?:string): Promise<boolean> {
+async function perform(plot: number, kind: 'plant' | 'harvest' | 'cultivate', duration?:number, owner?:string,scene?:GardenVisit): Promise<boolean> {
+    if (desktopQuiet()) return false;
     stopPerformance();
     if(kind==='cultivate'&&!expanded)toggle();
     const version = performanceVersion;
     if(kind==='cultivate'&&strip?.webContents.isLoading())await new Promise<void>(resolve=>{const win=strip!;const timer=setTimeout(resolve,3000);win.webContents.once('did-finish-load',()=>{clearTimeout(timer);resolve();});});
     const settings = await getSettings();
     const meta = settings.activeCharacter ? await getCharacter(settings.activeCharacter) : null;
-    if (version !== performanceVersion || !meta?.manifest || !expanded || !strip?.isVisible() || !pet?.isVisible()) return false;
+    if (desktopQuiet() || version !== performanceVersion || !meta?.manifest || !expanded || !strip?.isVisible() || !pet?.isVisible()) return false;
     const actions: Record<string, {status?:string;durationSec?:number}> = {...meta.manifest.actions, ...meta.manifest.importedActions, ...meta.manifest.expressionActions, ...meta.manifest.customActions};
-    const action = [kind === 'cultivate' ? 'garden_sow' : kind === 'plant' ? 'garden_sow' : 'garden_harvest', kind === 'plant' ? 'wave' : 'talk_happy', 'idle'].find(id => actions[id] && (!actions[id].status || actions[id].status === 'done'));
+    const research=[meta.manifest.agentActions?.thinking,...scenePool(meta.manifest,'focus'),...Object.keys(actions).filter(id=>/研究|观察|思考|看书|记录|research|inspect|think|study/i.test(JSON.stringify(resourceText(meta.manifest,id)))),'writing','idle','garden_sow'];
+    const action = (kind==='cultivate'?research:[kind === 'plant' ? 'garden_sow' : 'garden_harvest',kind==='plant'?'wave':'talk_happy','idle']).filter((id):id is string=>!!id).find(id => actions[id] && (!actions[id].status || actions[id].status === 'done'));
     if (!action) return false;
     const bounds = pet.getBounds(); home = {x:bounds.x,y:bounds.y};
     const target = plotPetPosition(plot, bounds, strip.getBounds(), screen.getDisplayMatching(bounds).workArea);
     pet.webContents.send('garden:performance', action);
     pet.setPosition(target.x, target.y);
     if(kind==='cultivate'){
-        cultivatingPlot=plot;
-        if(owner){let pending=false;cooperationTimer=setInterval(()=>{if(pending||version!==performanceVersion)return;pending=true;void import('./network').then(n=>n.cooperateGarden(owner,plot,'join')).then(v=>{if(version!==performanceVersion)return;if(v.tasks?.some(t=>t.plot===plot&&t.done)){cultivatingPlot=null;stopPerformance();for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');}}).catch(()=>{if(version===performanceVersion)stopPerformance();}).finally(()=>{pending=false;});},5000);}
-        else performanceTimer=setTimeout(()=>{cultivatingPlot=null;void gardenAction({type:'revealPlant',plot}).then(result=>{if(!result.ok)return gardenAction({type:'pauseCultivation',plot});}).finally(()=>stopPerformance());},Math.max(1,duration??30000)+100);
+        cultivatingPlot=plot;cultivatingOwner=owner;cultivationScene=scene;strip?.webContents.send('garden:changed');
+        if(owner){let pending=false;cooperationTimer=setInterval(()=>{if(pending||version!==performanceVersion)return;pending=true;void import('./network').then(n=>n.cooperateGarden(owner,plot,'join')).then(v=>{if(version!==performanceVersion)return;if(cultivationScene)cultivationScene=v;strip?.webContents.send('garden:changed');if(v.tasks?.some(t=>t.plant===v.plots[plot]?.id&&t.done)){cultivatingPlot=null;stopPerformance();for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');}}).catch(()=>{if(version===performanceVersion)stopPerformance();}).finally(()=>{pending=false;});},5000);}
+        else performanceTimer=setTimeout(()=>{cultivatingPlot=null;void gardenAction({type:'revealPlant',plot}).then(result=>{if(!result.ok)return gardenAction({type:'pauseCultivation',plot});}).finally(()=>stopPerformance());},Math.max(1,duration??180000)+100);
     } else performanceTimer = setTimeout(() => stopPerformance(), Math.min(12000, (actions[action].durationSec ?? 5) * 1000 + 600));
     return true;
 }
@@ -75,7 +85,7 @@ function anchor(): void {
     const p = pet.getBounds(), wa = screen.getDisplayMatching(p).workArea, b = strip.getBounds();
     if (home) {
         syncSpeechBounds();
-        strip.webContents.send('garden:anchor', { left: home.x - b.x, right: home.x + p.width - b.x,
+        strip.webContents.send('garden:anchor', { performer:{left:p.x-b.x,right:p.x+p.width-b.x,top:p.y-b.y,bottom:p.y+p.height-b.y}, left: home.x - b.x, right: home.x + p.width - b.x,
             side: gardenSide({x:home.x,width:p.width},wa), top: Math.min(home.y, p.y) - b.y, bottom: Math.min(b.height - 66, home.y + p.height - b.y - 25) });
         return;
     }
@@ -101,7 +111,7 @@ export function attachGarden(p: BrowserWindow): void {
 function toggle(): void {
     if (!pet || pet.isDestroyed())
         return;
-    expanded = !expanded;
+    expanded = !expanded || (!!strip && !strip.isVisible());
     if (!expanded) {
         stopPerformance();
         strip?.hide();
@@ -113,6 +123,7 @@ function toggle(): void {
         strip = new BrowserWindow({ ...stripSize, frame: false, transparent: true, hasShadow: false, resizable: false, skipTaskbar: true, show: false,
             webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
         strip.setAlwaysOnTop(true, 'floating');
+        trackDesktopWindow(strip,'decoration'); allowDesktopWindow(strip);
         strip.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         strip.setIgnoreMouseEvents(true, { forward: true });
         strip.on('closed', () => { strip = null; expanded = false; stopPerformance(); });
@@ -121,6 +132,7 @@ function toggle(): void {
         load(strip, 'strip');
     }
     else {
+        allowDesktopWindow(strip);
         anchor();
         strip.showInactive();
     }
@@ -129,16 +141,19 @@ function toggle(): void {
 }
 let weatherPanel: BrowserWindow | null=null;
 export function openGardenPanel(page: string): void {
+
     const allowed = /^(weather|travel|moments|bag|shop|book|plots|sow|daily|sprays|feeding|friends|notebook|visit:(?:test:[a-zA-Z0-9_.-]{1,160}|[0-9A-Z]{12})(?::[0-5]:[a-zA-Z0-9_-]{1,160})?|plot:[0-5])$/.test(page) ? page : 'bag';
     if(allowed==='weather'){
+        allowDesktopWindow(weatherPanel);
         if(weatherPanel&&!weatherPanel.isDestroyed()){weatherPanel.show();weatherPanel.focus();return;}
         const wa=screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
         const width=Math.min(420,wa.width),height=Math.min(620,wa.height);
         const petBounds=pet?.getBounds();
         const win=new BrowserWindow({title:'花园气象台',width,height,x:Math.max(wa.x,Math.min((petBounds?.x??wa.x)+ (petBounds?.width??0),wa.x+wa.width-width)),y:Math.max(wa.y,Math.min(petBounds?.y??wa.y,wa.y+wa.height-height)),resizable:false,backgroundColor:'#f4efe5',show:false,webPreferences:{preload:path.join(__dirname,'../preload/index.js'),contextIsolation:true,sandbox:false}});
-        weatherPanel=win;win.setMenuBarVisibility(false);win.setAlwaysOnTop(true,'floating');win.on('closed',()=>{if(weatherPanel===win)weatherPanel=null;});win.once('ready-to-show',()=>win.show());load(win,'weather');return;
+        weatherPanel=win;allowDesktopWindow(win);win.setMenuBarVisibility(false);win.setAlwaysOnTop(true,'floating');win.on('closed',()=>{if(weatherPanel===win)weatherPanel=null;});win.once('ready-to-show',()=>win.show());load(win,'weather');return;
     }
     if (allowed === 'travel' || allowed === 'moments') {
+        allowDesktopWindow(travelPanel);
         if (!travelPanel || travelPanel.isDestroyed()) {
             const wa = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
             const height = Math.min(850, wa.height - 24), width = Math.min(560, wa.width - 24, Math.round(height * .72));
@@ -146,16 +161,19 @@ export function openGardenPanel(page: string): void {
                 frame:false,transparent:true,hasShadow:true,backgroundColor:'#00000000',show:false,
                 webPreferences:{preload:path.join(__dirname,'../preload/index.js'),contextIsolation:true,sandbox:false}});
             travelPanel=win;win.setMenuBarVisibility(false);win.setAlwaysOnTop(true,'floating');
+            allowDesktopWindow(win);
             win.on('closed',()=>{if(travelPanel===win)travelPanel=null;});
             win.once('ready-to-show',()=>win.show());load(win,allowed);
         } else {travelPanel.webContents.send('garden:page',allowed);travelPanel.show();travelPanel.focus();}
         return;
     }
+    allowDesktopWindow(panel);
     if (!panel || panel.isDestroyed()) {
         const wa = screen.getPrimaryDisplay().workArea;
         panel = new BrowserWindow({ title: '小小花园 · 实验室', width: Math.min(860, wa.width), height: Math.min(720, wa.height), minWidth: 540, minHeight: 440, backgroundColor: '#faf6eb', show: false,
             webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
         panel.setMenuBarVisibility(false);
+        allowDesktopWindow(panel);
         panel.setAlwaysOnTop(true, 'floating');
         panel.on('closed', () => { panel = null; });
         panel.once('ready-to-show', () => panel?.show());
@@ -172,18 +190,32 @@ export function registerGardenIpc(): void {
     ipcMain.handle('garden:answerInteraction',async(_ev,id,accept,response)=>(await import('./network')).answerInteraction(id,accept===true,response));
     ipcMain.handle('garden:online',async (_ev,enable)=>{await (await import('./network')).setNetworkGarden(enable===true);for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');});
     ipcMain.handle('garden:visit',async (_ev,owner,preview,task)=> (await import('./network')).visitGarden(owner,preview===true,task));
-    ipcMain.handle('garden:cooperate',async (_ev,owner,plot,action,target,task)=> (await import('./network')).cooperateGarden(owner,plot,action,target,task));
+    ipcMain.handle('garden:cooperate',async (_ev,owner,plot,action,target,task)=> {
+        const network=await import('./network');
+        const visit=await network.cooperateGarden(owner,plot,action,target,task);
+        if(action==='leave'&&cultivatingOwner===owner&&cultivatingPlot===plot){cultivatingPlot=null;stopPerformance();}
+        if(action==='join'&&!visit.tasks?.some(t=>t.plant===visit.plots[plot]?.id&&t.done)&&!(cultivatingOwner===owner&&cultivatingPlot===plot)){
+            let playing=false;try{playing=await perform(plot,'cultivate',undefined,owner,visit);}catch{stopPerformance();}
+            if(!playing){await network.cooperateGarden(owner,plot,'leave');throw Error('请先显示桌宠并选择可播放动作的角色，再继续培育');}
+        }
+        return visit;
+    });
     ipcMain.handle('garden:saveRehearsal', async (_ev,request) => (await import('./rehearsal-store')).saveRehearsal(request));
     ipcMain.handle('garden:journalStatus', async () => (await import('./journal-service')).journalStatus());
     ipcMain.handle('garden:rewriteDiary', async (_ev,request) => (await import('./journal-service')).rewriteDiary(request));
     ipcMain.handle('garden:generateMoment', async (_ev,requestId) => (await import('./journal-service')).generateMoment(requestId));
-    ipcMain.handle('garden:weather', async () => {const state=await getGarden(),status=gardenWeather();const test=state.testWeather&&state.testWeather.start<=status.now&&state.testWeather.end>status.now?state.testWeather:null;return {...status,current:test??status.current,test};});
+    ipcMain.handle('garden:weather', async () => gardenWeatherStatus(await getGarden()));
     startGardenWeatherClock();
     powerMonitor.on('suspend',()=>stopPerformance());
-    ipcMain.handle('garden:get', () => getGarden());
+    ipcMain.handle('garden:get', async (ev) => {
+        const state=publicGardenState(await getGarden());
+        if(cultivationScene&&cultivatingPlot!==null&&ev.sender===strip?.webContents){state.plots=structuredClone(cultivationScene.plots);state.cooperations=structuredClone(cultivationScene.tasks);state.cultivationVisit={owner:cultivationScene.owner,plot:cultivatingPlot};}
+        return state;
+    });
     ipcMain.handle('garden:act', async (_ev, command) => {
+        if(cultivationScene&&_ev.sender===strip?.webContents)return {ok:false,error:'正在朋友的花园培育，请先暂停再操作自己的土地'};
         const result = await gardenAction(command);
-        if(result.ok && command.type==='cultivate' && !result.state.rehearsal){
+        if(result.ok && command.type==='cultivate' && !(cultivatingPlot===command.plot&&cultivatingOwner===(result.state.online?result.state.life?.owner:undefined))){
             const p=result.state.plots[command.plot]!;
             let playing=false;try{playing=await perform(command.plot,'cultivate',cultivationRemaining(p,Date.now()),result.state.online?result.state.life?.owner:undefined);}catch{stopPerformance();}
             if(!playing){await gardenAction({type:'pauseCultivation',plot:command.plot});return {ok:false,error:'请先显示桌宠并选择可播放动作的角色，再继续培育'};}

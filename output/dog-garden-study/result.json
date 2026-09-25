@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "character": "小黄狗 · 表情包",
+  "pid": 28688,
+  "errors": [],
+  "checks": [
+    "active dog video decoded",
+    "two WebGL scenes ready",
+    "three backgrounds captured"
+  ]
+}
