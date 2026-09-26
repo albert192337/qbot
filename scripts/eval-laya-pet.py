@@ -4,6 +4,8 @@ import json
 import os
 import random
 import time
+import platform
+import importlib.metadata
 from pathlib import Path
 
 REACTIONS = {
@@ -89,7 +91,7 @@ def main():
         rows.append(row)
         with (dest/'results.jsonl').open('a',encoding='utf-8') as f: f.write(json.dumps(row,ensure_ascii=False,default=str)+'\n')
         print(json.dumps({k:row.get(k) for k in ['count','case','order','reaction','behavior','pair_ok','seconds','rss_mb','error']},ensure_ascii=False),flush=True)
-    summary={'load_seconds':load_seconds,'torch':torch.__version__,'threads':2,'model_path':args.model,'config':agent.cfg,'synthetic_cases':True,'groups':{}}
+    summary={'load_seconds':load_seconds,'torch':torch.__version__,'libraries':{k:importlib.metadata.version(k) for k in ['laya','transformers','safetensors','psutil']},'platform':platform.platform(),'threads':2,'model_path':args.model,'config':agent.cfg,'synthetic_cases':True,'groups':{}}
     for n in (4,8,16):
         group=[r for r in rows if r['count']==n]
         if not group: continue
