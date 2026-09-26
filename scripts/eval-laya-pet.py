@@ -58,6 +58,8 @@ def main():
     torch.set_num_interop_threads(1)
     dest = Path(args.output)
     dest.mkdir(parents=True, exist_ok=True)
+    if (dest/'results.jsonl').exists():
+        raise SystemExit('Choose a fresh --output directory; existing results are preserved.')
     start = time.perf_counter()
     agent = laya.load(str(Path(args.model).resolve()), device='cpu')
     load_seconds = time.perf_counter()-start
@@ -92,7 +94,10 @@ def main():
         group=[r for r in rows if r['count']==n]
         if not group: continue
         times=sorted(r['seconds'] for r in group)
-        summary['groups'][str(n)]={'pairs':len(group),'reaction_correct':sum(r['reaction_ok'] for r in group),'behavior_correct':sum(r['behavior_ok'] for r in group),'both_correct':sum(r['pair_ok'] for r in group),'median_pair_seconds':times[len(times)//2],'max_pair_seconds':max(times),'max_rss_mb':max(r['rss_mb'] for r in group),'errors':sum('error' in r for r in group)}
+        original={r['case']:r for r in group if r['order']=='original'}
+        reversed_rows=[r for r in group if r['order']=='reversed' and r['case'] in original]
+        changed=sum((r.get('reaction'),r.get('behavior'))!=(original[r['case']].get('reaction'),original[r['case']].get('behavior')) for r in reversed_rows)
+        summary['groups'][str(n)]={'pairs':len(group),'reaction_correct':sum(r['reaction_ok'] for r in group),'behavior_correct':sum(r['behavior_ok'] for r in group),'both_correct':sum(r['pair_ok'] for r in group),'median_pair_seconds':times[len(times)//2],'max_pair_seconds':max(times),'max_rss_mb':max(r['rss_mb'] for r in group),'errors':sum('error' in r for r in group),'order_comparisons':len(reversed_rows),'order_changed_pairs':changed}
     (dest/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2,default=str),encoding='utf-8')
     print(json.dumps(summary,ensure_ascii=False,default=str),flush=True)
 
