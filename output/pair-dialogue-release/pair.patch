@@ -1,0 +1,92 @@
+diff --git a/rooms/companions.mjs b/rooms/companions.mjs
+index 556c206..ce25675 100644
+--- a/rooms/companions.mjs
++++ b/rooms/companions.mjs
+@@ -17,6 +17,15 @@ const THEMES = [
+   {roomId:'CMPNIGHT',name:'晚风慢慢聊',kind:'night',description:'闲聊、发呆，给疲惫的一天留个座位 · 陪伴角色小屋',lines:[['要是能把好心情装进饭团就好了。','那今晚的馅料就叫轻松一点。'],['今天想给自己放个小假。','批准，先坐下来喝杯茶。'],['有时候没什么特别的事也挺好。','平平常常的一天也值得好好收尾。']]},
+ ];
+ const hash = value => createHash('sha256').update(value).digest('hex');
++const PERSONAS = {
++  moss: '温和细心的园艺爱好者，喜欢晒太阳和观察植物，说话朴实柔软，不催促别人。',
++  orange: '开朗爽快，像橘子汽水一样有活力，爱分享花园小趣事，热情但不冒失。',
++  page: '安静克制的读书伙伴，认真体贴，言简意赅，偶尔用书页作比喻，不说教。',
++  cloud: '慢半拍、柔和松弛，喜欢泡茶和发呆，有一点天然呆，给人从容陪伴。',
++  moon: '夜里温柔清醒的倾听者，细腻含蓄，喜欢晚风和月色，不强行安慰。',
++  rice: '朴实可爱的新手园丁，直率好奇，喜欢食物和小小进步，不装作无所不知。',
++};
++for (const profile of RESIDENTS) profile.persona = PERSONAS[profile.key];
+ 
+ /** Validate the same asset-only container consumed by the desktop client. */
+ export function readMarketPack(buffer, expected) {
+diff --git a/rooms/server.mjs b/rooms/server.mjs
+index 99d6b29..3e1d7f2 100644
+--- a/rooms/server.mjs
++++ b/rooms/server.mjs
+@@ -25,6 +25,7 @@ import { WebSocketServer } from 'ws';
+ import { Contacts } from './contacts.mjs';
+ import { Gardens } from './garden.mjs';
+ import { Companions } from './companions.mjs';
++import { PairDialogue } from './pair-dialogue.mjs';
+ import gardenCore from './generated/garden-core.cjs';
+ 
+ const PORT = Number(process.env.PORT || 24252);
+@@ -443,6 +444,8 @@ function upsertMember(room, ws) {
+ 
+ /** 离房：清在线表 + 广播；不动 members（常驻） */
+ function leaveRoom(ws, notify = true) {
++  ws.pairEpoch = (ws.pairEpoch || 0) + 1;
++  pairDialogue.cancel(ws);
+   companions?.left(ws);
+   const roomId = ws.roomId;
+   if (!roomId) return;
+@@ -514,6 +517,7 @@ function noteChatSent(ws, text) {
+ const worldPeers = new Set();
+ const gardenInvites=new Map();
+ const pairInvites=new Map();
++const pairDialogue=new PairDialogue();
+ const pairBusy=new Map();
+ let worldChat = [];
+ const worldReports = [];
+@@ -569,12 +573,14 @@ const handlers = {
+     ws.nickname = clampText(f.nickname, NICK_MAX) || '匿名';
+     ws.avatarHash = typeof f.avatarHash === 'string' ? f.avatarHash.slice(0, 32) : undefined;
+     ws.hello = true;
++    ws.pairDialogue = f.pairDialogue === 1 ? 1 : 0;
+     send(ws, {t:'hello:ack', social:1, contacts:1, garden:1, petting:2, memberId:ws.memberId, contactToken:identity.token, serverTime:Date.now()});
+     notifyContacts();
+   },
+   'contacts:get'(ws, f) { if (typeof f.character === 'string' && contacts.people[ws.memberId].character !== clampText(f.character,32)) { contacts.transaction(()=>{contacts.people[ws.memberId].character=clampText(f.character,32);}); notifyContacts(); } ws.contactsSubscribed = true; send(ws, {t:'contacts:snapshot', ...contactSnapshot(ws)}); },
+   'garden:request'(ws,f){
+     try {
++      if(f.action==='pair:line'){send(ws,{t:'garden:result',ok:pairDialogue.answer(ws,f)});return;}
+       if(f.action==='pair:invite'||f.action==='pair:answer'){
+         const result=handleGardenInteraction(ws,f);send(ws,{t:'garden:result',...result});return;
+       }
+@@ -1053,14 +1059,23 @@ function handleGardenInteraction(ws,f){
+   pairInvites.delete(f.id);notifyContacts();
+   const beats=gardenCore.pairBeats(invite.kind);if(invite.kind==='relay'){const response=['happy','heart','wave'].includes(f.response)?f.response:'happy';beats[1]={...beats[1],guest:response,caption:response==='heart'?'送你一个小心心！':response==='wave'?'嗨，我接住啦！':'开心接住！轮到我啦！'};}
+   for(const [who,other] of [[ws.memberId,host.memberId],[host.memberId,ws.memberId]])gardens.transaction(()=>gardenCore.recordGarden(gardens.data.people[who].state,now,'interaction','一起玩了'+invite.label,other));
+-  const until=now+beats.length*4500;
++  const until=now+30000+beats.length*4500;
+   pairBusy.set(ws.memberId,until);pairBusy.set(host.memberId,until);
++  const epochs=[host.pairEpoch,ws.pairEpoch],packs=[host.packHash,ws.packHash];
++  const valid=()=>[host,ws].every((p,i)=>p.readyState===p.OPEN&&p.roomId===invite.roomId&&p.pairEpoch===epochs[i]&&p.packHash===packs[i])&&
++    gardens.data.people[host.memberId]?.state.activeActor===invite.actor&&gardens.data.people[ws.memberId]?.state.activeActor===f.actor;
+   const play=(beat,step)=>{
+-    if([host,ws].some(p=>p.readyState!==p.OPEN||p.roomId!==invite.roomId))return;
++    if(!valid())return;
+     for(const [peer,actor,intent] of [[host,invite.actor,beat.host],[ws,f.actor,beat.guest]])
+-      peer.send(JSON.stringify({t:'garden:interaction',roomId:invite.roomId,kind:invite.kind,actor,intent,step,partner:peer===host?ws.memberId:host.memberId,caption:beat.caption,effect:beat.effect}));
++      peer.send(JSON.stringify({t:'garden:interaction',roomId:invite.roomId,kind:invite.kind,actor,intent,step,partner:peer===host?ws.memberId:host.memberId,caption:beat.caption,effect:beat.effect,session:f.id,recipient:peer!==host,lines:beats.map(b=>b.caption)}));
+   };
+-  beats.forEach((beat,i)=>{if(!i)play(beat,i);else setTimeout(()=>play(beat,i),i*4500).unref();});
++  void pairDialogue.prepare({host,guest:ws,actor:invite.actor,guestActor:f.actor,kind:invite.kind,beats,valid}).then(lines=>{
++    if(!lines){for(const peer of [host,ws])if(pairBusy.get(peer.memberId)===until)pairBusy.delete(peer.memberId);return;}
++    beats.forEach((beat,i)=>{beat.caption=lines[i];});
++    const ends=Date.now()+beats.length*4500;
++    pairBusy.set(ws.memberId,ends);pairBusy.set(host.memberId,ends);
++    beats.forEach((beat,i)=>{if(!i)play(beat,i);else setTimeout(()=>play(beat,i),i*4500).unref();});
++  }).catch(()=>{});
+   return {ok:true};
+ }
+ const contactInvites = new Map();

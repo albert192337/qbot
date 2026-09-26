@@ -73,7 +73,7 @@ function template(settings: Settings): string {
     <section class="settings-section"><h3>隐私与数据</h3>
       ${toggleRow('set-show-pet', '在联机空间展示桌宠形象', '开启后上传动作资产供房友显示；关闭后房友只看到缩略图。', settings.roomsShowMyPet !== false)}
       ${toggleRow('set-foreground-observation', '记录前台应用和窗口标题', '默认关闭；元数据本地保留 7 天。开启后，聊天与自动 LLM 脑会使用应用名和窗口标题，不读取窗口正文。', settings.foregroundObservationEnabled === true)}
-      <div class="privacy-note">键盘监控只累计次数，不记录具体按键。联机空间可能同步状态、动作和当前牌面，但不会同步未展示的会话正文、项目路径或角色人设。</div>
+      <div class="privacy-note">键盘监控只累计次数，不记录具体按键。联机空间可能同步状态、动作和当前牌面，并分享角色昵称和人设；不会同步未展示的会话正文或项目路径。</div>
     </section>
 
     <section class="settings-section"><h3>高级</h3>

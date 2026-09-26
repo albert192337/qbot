@@ -248,7 +248,7 @@ export type PerceptionInteractKind = 'click' | 'drag_start' | 'drag_end' | 'sign
 /** 原生右键菜单点选后回渲染端执行的命令 */
 export type PetMenuCommand =
   | { type:'networkPhoto'; guest:CharacterMeta }
-  | { type:'networkPair'; partner?:string; kind:import('./pair-interaction').PairKind; recipient:boolean; guest:CharacterMeta }
+  | { type:'networkPair'; partner?:string; kind:import('./pair-interaction').PairKind; recipient:boolean; guest:CharacterMeta; lines?:string[] }
   | { type: 'pair'; kind: import('./pair-interaction').PairKind; guestId: string }
   | { type: 'pairEnd' }
   | { type: 'speak' }
@@ -342,6 +342,9 @@ export interface RoomSnapshot {
 
 /** 一条发言（nickname 是快照：改昵称不追溯改历史） */
 export interface RoomChatMsg {
+  speaker?: 'user' | 'character';
+  characterName?: string;
+  pairSession?: string;
   companion?: boolean;
   interaction?: 'petting';
   garden?:{owner:string;plot:number;plant:string;species?:string;traits?:{name:string;quality:string}[];done?:boolean;remaining?:number;active?:number;members?:{name:string;qualified:boolean}[];chance?:number;room?:string};
@@ -494,6 +497,7 @@ export interface QBotApi {
     saveCard(rect: { x: number; y: number; width: number; height: number }): Promise<string | null>;
   };
   characters: {
+    pairDialogue(guestId: string, kind: import('./pair-interaction').PairKind): Promise<string[]>;
     list(): Promise<CharacterMeta[]>;
     activate(dirId: string): Promise<void>;
     /** 改名（写回 manifest.json） */
@@ -506,6 +510,7 @@ export interface QBotApi {
     getActive(): Promise<CharacterMeta | null>;
   };
   pet: {
+    getCursor(): Promise<{x:number;y:number}>;
     perch(): Promise<{ok:boolean; reason?:string}>;
     detachPerch(): void;
     getPerch(): Promise<import('./window-perch').PerchState | null>;

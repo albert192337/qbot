@@ -1,0 +1,11 @@
+const {app,BrowserWindow}=require('electron');const fs=require('fs'),path=require('path'),assert=require('assert/strict');const root=path.resolve(__dirname,'..');app.setPath('userData',path.join(root,'.superpowers/chat-identity-data'));
+app.whenReady().then(async()=>{let win;try{
+ const esbuild=require(require.resolve('esbuild',{paths:[fs.realpathSync(path.join(root,'app/node_modules/electron-vite'))]}));
+ const result=esbuild.buildSync({entryPoints:[path.join(root,'app/src/renderer/social/chat.ts')],bundle:true,write:false,format:'iife',globalName:'IdentityChat'});
+ win=new BrowserWindow({width:620,height:560,show:false,webPreferences:{offscreen:true}});
+ await win.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent('<style>'+fs.readFileSync(path.join(root,'app/src/renderer/social/style.css'),'utf8')+'body{padding:24px}#fixture{height:490px}.messages{height:340px}</style><h2>房间聊天</h2><div id="fixture"></div>'));
+ await win.webContents.executeJavaScript(result.outputFiles[0].text+`;window.qbot={social:{send:async()=>{},moderate:async()=>{}},garden:{open:()=>{}}};const view=new IdentityChat.ChatView(document.querySelector('#fixture'),false,()=> 'me',()=>{});view.configure('room','同一位用户与他的角色，分别显示身份',true);view.set([{id:'1',memberId:'me',nickname:'匿名',text:'晚上好，大家还没睡？',at:Date.now()},{id:'2',memberId:'npc',nickname:'翻到第七页',companion:true,speaker:'user',text:'还醒着呢，今晚又看书看晚了。',at:Date.now()},{id:'3',memberId:'npc',nickname:'翻到第七页',companion:true,speaker:'character',characterName:'小白',text:'谢谢，茶还温着。',at:Date.now()},{id:'4',memberId:'me',nickname:'匿名',speaker:'character',characterName:'张起灵',text:'嗯，慢慢喝。',at:Date.now()}]);`);
+ const badges=await win.webContents.executeJavaScript(`[...document.querySelectorAll('.speaker-badge')].map(x=>({label:x.textContent,title:x.title}))`);
+ assert.deepEqual(badges.map(b=>b.label),['● 用户','☻ 虚拟用户','✦ 角色自主','✦ 角色自主']);assert.equal(badges[2].title,'所属用户：翻到第七页');
+ const out=path.join(root,'output/chat-identity');fs.mkdirSync(out,{recursive:true});await new Promise(r=>setTimeout(r,400));fs.writeFileSync(path.join(out,'chat.png'),(await win.webContents.capturePage()).toPNG());console.log('PASS: human, virtual user and autonomous character labels; owner attribution');
+ }catch(e){console.error(e);process.exitCode=1;}finally{win?.destroy();app.quit();}});

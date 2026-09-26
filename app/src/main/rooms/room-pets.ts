@@ -7,7 +7,7 @@
  * 为什么不是 P2P 盲转（1v1 的老路）：12 人房里发送方要为每个接收方重传一遍
  * （11 × 12MB 上行），而且晚进房的人赶不上发送方在线窗口。
  *
- * 隐私：包内容经 asset-pack sanitize（persona 剥离，有测试守着）；
+ * 公开角色名字、人设随包同步；生成提示与本地路径经 asset-pack 剥离。
  * `roomsShowMyPet` 关 = 不上传角色包，房友只见缩略图；presence 状态与牌面仍由 rooms.ts 广播。
  *
  * 本模块只管状态与分发；窗口开合/布局/推送由 onRoomPetEvent 订阅方负责（M2）。
@@ -93,6 +93,7 @@ let pendingUploadBuffer: Buffer | null = null;
  * 在线成员循环调 onMemberIn 会在同一轮同步代码里把这个函数触发多次。
  */
 let announcing = false;
+let identityRefresh: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * 打包并播报本机角色。房里只有自己时不传（白占带宽），等有人进来再补。
@@ -141,7 +142,15 @@ async function startUpload(hash: string, buffer: Buffer): Promise<void> {
 export function notifyRoomCharacterChanged(): void {
   localPackOnServer = false; // 新包服务端大概率没有
   announcedHash = null;
-  void announceLocalPack();
+  if(identityRefresh)clearTimeout(identityRefresh);
+  const refresh=()=>{
+    identityRefresh=null;
+    if(!myMemberId)return;
+    if(uploading||pendingUploadBuffer||announcing){identityRefresh=setTimeout(refresh,250);return;}
+    void announceLocalPack();
+  };
+  // Name and persona are saved together; an in-flight old upload must not drop the newer identity.
+  identityRefresh=setTimeout(refresh,250);
 }
 
 // ── 成员包（下载侧）────────────────────────────────────────
@@ -432,6 +441,7 @@ export function onChat(memberId: string, nickname: string, text: string): void {
 
 /** 退房/被踢/断线：状态全清（磁盘缓存留着走 LRU） */
 export function onLeftRoom(): void {
+  if(identityRefresh)clearTimeout(identityRefresh);identityRefresh=null;
   for (const dl of downloads.values()) {
     if (dl.retryTimer) clearTimeout(dl.retryTimer);
     if (dl.timeoutTimer) clearTimeout(dl.timeoutTimer);

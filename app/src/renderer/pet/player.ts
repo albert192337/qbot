@@ -1,4 +1,5 @@
 import { scenePool } from '../../shared/action-resources';
+import { SpinePlayer } from './spine-player';
 /**
  * WebM 播放器：每个已生成动作一个 <video> 预创建堆叠，新动作开始播放后才切 visibility（保留上一帧）。
  * idle/drag 循环播放；auto 动作不 loop，靠 ended 事件计数。
@@ -9,10 +10,12 @@ import type { Manifest, ManifestAction, PlayableId } from '@qbot/pipeline';
 const LOOPING: ReadonlySet<string> = new Set(['idle', 'drag', 'perch', 'perch_sit', 'perch_lie']);
 
 export class Player {
+  private spine: SpinePlayer | null = null;
   private suspended = false;
   /** Keep assets, but cancel decoder retries and one-shot completions while concealed. */
   setSuspended(value: boolean): void {
     this.suspended=value;
+    this.spine?.setSuspended(value);
     if(!value)return;
     this.generation++;
     this.cancelAttempt?.();this.cancelAttempt=null;
@@ -38,6 +41,7 @@ export class Player {
 
   /** Stop detached visitors / release decoders before replacing a character. */
   dispose(): void {
+    this.spine?.dispose();this.spine=null;
     this.generation++;
     this.cancelAttempt?.();
     this.cancelAttempt = null;
@@ -68,6 +72,11 @@ export class Player {
     this.dispose();
     this.failed.clear();
     this.manifest = manifest;
+    if(manifest.spine){
+      this.spine=new SpinePlayer(this.container,dirId,manifest,this.onEnded);
+      this.spine.setSuspended(this.suspended);
+      return Object.keys(manifest.spine.actions);
+    }
     // 只清理 video + poof 元素，保留 signboard 等其他 DOM
     for (const el of Array.from(this.container.querySelectorAll('video,.stage-poof'))) {
       el.remove();
@@ -149,6 +158,7 @@ export class Player {
 
   private playImpl(action: PlayableId, forceLoop: boolean, forceOnce = false, usePool = true): void {
     if(this.suspended)return;
+    if(this.spine){this.spine.play(action,!forceOnce&&(forceLoop||LOOPING.has(action)));return;}
     if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
     this.recoveryTimer = null;
     const generation = ++this.generation;

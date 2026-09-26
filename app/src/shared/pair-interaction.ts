@@ -20,7 +20,7 @@ export function pairActions(manifest: Manifest): Map<string, Clip> {
     const source = m.stickerLibrary?.scenes[id] ?? id;
     const item = m.stickerLibrary?.items.find(i => i.id === source);
     const variant = m.stickerLibrary?.variants?.[source];
-    return !!clip?.webm && (!clip.status || clip.status === 'done') &&
+    return !!(clip?.webm || m.spine?.actions[id]) && (!clip.status || clip.status === 'done') &&
       (!item || (item.enabled && !item.error)) && (!variant || variant.enabled);
   }));
 }

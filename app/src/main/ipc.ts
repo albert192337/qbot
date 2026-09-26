@@ -11,7 +11,7 @@ import { cloudAccount, acknowledgeCloudJob, forgetCloudJob } from './cloud-gener
 import { tryPerch, detachPerch, getPerchState } from './window-perch';
 import { initUserMemory, editUserMemory, resumeMemoryExtraction } from './user-memory';
 /** IPC 注册：preload 契约的主进程实现 */
-import { BrowserWindow, Menu, dialog, ipcMain, powerMonitor } from 'electron';
+import { BrowserWindow, Menu, dialog, ipcMain, powerMonitor, screen } from 'electron';
 import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
@@ -47,7 +47,7 @@ import {
   getProgress,
   openBox,
 } from './progress';
-import { rebuildTray } from './tray';
+import { rebuildTray, characterSection } from './tray';
 import { weatherTestMenu } from './weather';
 import { PAIR_INTERACTIONS, pairActions } from '../shared/pair-interaction';
 import { getAgentStatus } from './agent-server';
@@ -141,6 +141,26 @@ export function registerIpc(): void {
 
   // ── characters ─────────────────────────────────────────
   ipcMain.handle('characters:list', () => listCharacters());
+  let pairWriting = false;
+  ipcMain.handle('characters:pairDialogue', async (_ev, guestId: string, kind: import('../shared/pair-interaction').PairKind) => {
+    const { PAIR_INTERACTIONS } = await import('../shared/pair-interaction');
+    if (pairWriting || typeof guestId !== 'string' || !PAIR_INTERACTIONS.some(k => k.id === kind)) return [];
+    pairWriting = true;
+    try {
+      const s = await getSettings();
+      if (!s.activeCharacter || s.activeCharacter === guestId) return [];
+      const [host, guest] = await Promise.all([getCharacter(s.activeCharacter), getCharacter(guestId)]);
+      if (!host || !guest) return [];
+      const { writePairDialogue } = await import('./pair-dialogue');
+      const lines = await writePairDialogue(s.arkApiKey, kind, host.manifest, guest.manifest);
+      const latest = await getSettings();
+      const [h, g] = await Promise.all([getCharacter(s.activeCharacter), getCharacter(guestId)]);
+      if (!h || !g || latest.activeCharacter !== s.activeCharacter || latest.arkApiKey !== s.arkApiKey ||
+          h.manifest.persona !== host.manifest.persona || g.manifest.persona !== guest.manifest.persona ||
+          h.manifest.name !== host.manifest.name || g.manifest.name !== guest.manifest.name) return [];
+      return lines;
+    } finally { pairWriting = false; }
+  });
   ipcMain.handle('characters:activate', async (_ev, dirId: string) => {
     const meta = await getCharacter(dirId);
     if (!meta || !meta.manifest) throw new Error(`character not found: ${dirId}`);
@@ -156,6 +176,7 @@ export function registerIpc(): void {
   });
   ipcMain.handle('characters:rename', async (_ev, dirId: string, name: string) => {
     await renameCharacter(dirId, name);
+    if((await getSettings()).activeCharacter===dirId)notifyRoomCharacterChanged();
     await rebuildTray();
   });
   ipcMain.handle('characters:delete', async (_ev, dirId: string) => {
@@ -173,6 +194,11 @@ export function registerIpc(): void {
   ipcMain.handle('pet:perch', ev => !desktopQuiet() && ev.sender === getPetWindow()?.webContents ? tryPerch() : {ok:false});
   app.once('before-quit',detachPerch);
   ipcMain.handle('pet:getPerch', ev => ev.sender === getPetWindow()?.webContents ? getPerchState() : null);
+  ipcMain.handle('pet:getCursor', ev => {
+    const win=BrowserWindow.fromWebContents(ev.sender);
+    const point=screen.getCursorScreenPoint(),bounds=win?.getContentBounds();
+    return {x:point.x-(bounds?.x??0),y:point.y-(bounds?.y??0)};
+  });
   ipcMain.on('pet:detachPerch', ev => { if(ev.sender === getPetWindow()?.webContents)detachPerch(); });
   ipcMain.on('pet:move', (_ev, x: number, y: number) => movePetWindow(x, y));
   ipcMain.handle('pet:setVisitMode', (ev, enter: boolean, partner?:string) => {
@@ -325,8 +351,10 @@ export function registerIpc(): void {
     const {CHARACTER_UNLOCKS,currentGrowth,characterLevel}=await import('../shared/garden-life');
     const garden=await (await import('./garden/service')).getGarden().catch(()=>null);
     const actorLevel=garden?characterLevel(currentGrowth(garden)?.xp??0):1;
+    const switchCharacter = (await characterSection()).find(item => item.label === '切换角色');
     if (win.isDestroyed()) return;
     const menu = Menu.buildFromTemplate([
+      ...(switchCharacter ? [switchCharacter] : []),
       // ── 玩宠（最高频，一级直达）─────────────────────────
       { label: '说句话', click: () => send({ type: 'speak' }) },
       { label: '双人互动（本地试演）', submenu: [
@@ -369,6 +397,7 @@ export function registerIpc(): void {
   });
   ipcMain.handle('studio:savePersona', async (_ev, dirId: string, persona: string) => {
     await savePersona(dirId, persona);
+    if((await getSettings()).activeCharacter===dirId)notifyRoomCharacterChanged();
   });
   ipcMain.handle('studio:addCustomAction', async (_ev, dirId: string, name: string, poseDesc: string, motionDesc: string, durationSec: number) => {
     await addCustomAction(dirId, name, poseDesc, motionDesc, durationSec);

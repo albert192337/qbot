@@ -135,7 +135,7 @@ function render(): void {
     ${selected && stage!==3 ? detail() : ''}
     ${stage===1 && library.items.length ? `<div class="sw-paper"><label>主形象（首帧） <select data-reference>${options(library.referenceId,false)}</select></label><p>选择单角色、全身清晰的一张；不要把双角色表情当主形象。透明背景保留原样，不把白色身体当背景删除。</p><button data-next-stage class="sw-primary">下一步：配置动作</button></div>` : ''}
     ${stage===2 && library.items.length ? `<div class="sw-row">${dirId?'<button data-analyze>AI 分析整库语义</button><button class="sw-primary" data-save>保存表达与场景</button><button data-refresh>刷新版本</button><button data-finish>下一步：完成</button>':'<button class="sw-primary" data-create>导入并创建角色</button>'}</div>` : ''}
-    ${stage===3 ? `<div class="sw-paper"><h3>${esc(name)}的素材</h3><p>本地原件不会上传。公开包只带可播放动作与表达标签，不带人设、生成提示词或本地路径。</p><button data-check>检查上传包</button><button data-activate>放到桌面</button><button data-upload>确认后发布到装扮市场</button><p>只有拥有分享授权的素材才可以公开发布；本地使用不等于获准公开。</p></div>` : ''}
+    ${stage===3 ? `<div class="sw-paper"><h3>${esc(name)}的素材</h3><p>本地原件不会上传。公开包包含角色昵称、人设、可播放动作与表达标签，不带生成提示词或本地路径。</p><button data-check>检查上传包</button><button data-activate>放到桌面</button><button data-upload>确认后发布到装扮市场</button><p>只有拥有分享授权的素材才可以公开发布；本地使用不等于获准公开。</p></div>` : ''}
     </fieldset></section>`;
   const bind=(q:string,fn:(e:Event)=>void)=>root.querySelector(q)?.addEventListener('click',fn);
   root.querySelectorAll<HTMLButtonElement>('[data-step]').forEach(b=>b.onclick=()=>{if (!busy) {if (b.dataset.step==='3'&&!dirId) {notice='请先导入素材并创建角色。';render();return;}stage=Number(b.dataset.step);render();}});

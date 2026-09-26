@@ -36,6 +36,7 @@ const roomPetWindows = new Map<string, BrowserWindow>();
 const roomPetSizes = new WeakMap<BrowserWindow, number>();
 let roomWindow: BrowserWindow | null = null;
 let panoramicRoom = false;
+let panoramicSizePreset: RoomSizePreset = 'small';
 let cozyPreviewWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let nurseryWindow: BrowserWindow | null = null;
@@ -539,8 +540,8 @@ export function setPetVisitMode(enter: boolean, partner?: string): void {
 }
 
 export function moveRoomWindow(x: number, y: number): void {
-  const s = panoramicRoom ? Math.min(({small:600,medium:800,large:1000})[roomSizePreset], screen.getPrimaryDisplay().workArea.width) : roomSize();
-  moveFixedSize(roomWindow, x, y, { width: s, height: panoramicRoom ? Math.ceil(s*.295)+68 : s });
+  const s = panoramicRoom ? Math.min(({small:600,medium:800,large:1000})[panoramicSizePreset], screen.getPrimaryDisplay().workArea.width) : roomSize();
+  moveFixedSize(roomWindow, x, y, { width: s, height: panoramicRoom ? Math.ceil(s*.295) : s });
   roomWindowBoundsChanged?.();
 }
 
@@ -563,16 +564,17 @@ function roomSize(display = screen.getPrimaryDisplay()): number {
 }
 
 export function getRoomSizePreset(): RoomSizePreset {
-  return roomSizePreset;
+  return panoramicRoom ? panoramicSizePreset : roomSizePreset;
 }
 
 export function setRoomSizePreset(preset: RoomSizePreset): RoomSizePreset {
-  roomSizePreset = normalizeRoomSizePreset(preset);
-  if (!roomWindow || roomWindow.isDestroyed()) return roomSizePreset;
+  if (panoramicRoom) panoramicSizePreset = normalizeRoomSizePreset(preset);
+  else roomSizePreset = normalizeRoomSizePreset(preset);
+  if (!roomWindow || roomWindow.isDestroyed()) return panoramicRoom ? panoramicSizePreset : roomSizePreset;
   const current = roomWindow.getBounds();
   const display = screen.getDisplayMatching(current);
-  const size = panoramicRoom ? Math.min(({small:600,medium:800,large:1000})[roomSizePreset],display.workArea.width) : roomSize(display);
-  const height = panoramicRoom ? Math.ceil(size * .295) + 68 : size;
+  const size = panoramicRoom ? Math.min(({small:600,medium:800,large:1000})[panoramicSizePreset],display.workArea.width) : roomSize(display);
+  const height = panoramicRoom ? Math.ceil(size * .295) : size;
   const x = Math.max(
     display.workArea.x,
     Math.min(
@@ -589,7 +591,7 @@ export function setRoomSizePreset(preset: RoomSizePreset): RoomSizePreset {
   );
   moveFixedSize(roomWindow, x, y, { width: size, height }, true);
   roomWindowBoundsChanged?.();
-  return roomSizePreset;
+  return panoramicRoom ? panoramicSizePreset : roomSizePreset;
 }
 
 export function openRoomWindow(title: string, panoramic = false): BrowserWindow {
@@ -603,8 +605,8 @@ export function openRoomWindow(title: string, panoramic = false): BrowserWindow 
   if (process.platform === 'darwin') void app.dock?.show();
   const display = screen.getPrimaryDisplay();
   panoramicRoom = panoramic;
-  const size = panoramic ? Math.min(({small:600,medium:800,large:1000})[roomSizePreset],display.workArea.width) : roomSize(display);
-  const height = panoramic ? Math.ceil(size * .295) + 68 : size;
+  const size = panoramic ? Math.min(({small:600,medium:800,large:1000})[panoramicSizePreset],display.workArea.width) : roomSize(display);
+  const height = panoramic ? Math.ceil(size * .295) : size;
   const { workArea } = display;
   roomWindow = new BrowserWindow({
     show:false,
@@ -616,8 +618,8 @@ export function openRoomWindow(title: string, panoramic = false): BrowserWindow 
     useContentSize: true,
     title,
     // 贴纸小屋：只显示房间实体，外沿透明；关闭/拖动由 renderer 自绘
-    transparent: !panoramic,
-    backgroundColor: panoramic ? '#191a1c' : '#00000000',
+    transparent: true,
+    backgroundColor: '#00000000',
     frame: false,
     hasShadow: false, // 不显式关会有残影阴影框（同 pet 窗）
     resizable: false, // 透明窗 resize 有渲染 bug

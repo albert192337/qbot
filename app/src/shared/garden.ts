@@ -133,6 +133,7 @@ export interface Produce {
     bred: boolean;
 }
 export interface Plant extends Produce {
+    companionTest?:boolean;
     legacyLevel?:number;
     batch?:import('./garden-v3').BatchV3;
     baseTraits?: Trait[];
@@ -151,6 +152,7 @@ export interface Offer {
     stock: number;
 }
 export interface GardenState {
+    friendBreeding?: import('./garden-friends').FriendBreedRequest[];
     cultivationVisit?: {owner:string;plot:number};
     rehearsal?: { members: {id:string;name:string}[] };
     cooperationRewardsLeft?:number;
@@ -180,7 +182,7 @@ export interface GardenState {
         offers: Offer[];
     };
 }
-export type GardenCommand = import('./garden-v3').V3Command | import('./garden-life').LifeCommand | TravelCommand | { type: 'cultivate' | 'pauseCultivation' | 'revealPlant'; plot: number } | {
+export type GardenCommand = import('./garden-friends').FriendBreedCommand | import('./garden-v3').V3Command | import('./garden-life').LifeCommand | TravelCommand | { type: 'cultivate' | 'pauseCultivation' | 'revealPlant'; plot: number } | {
     type: 'buyMany'; items: { offer: string; count: number }[];
 } | { type: 'sellMany'; ids: string[];
 } | { type: 'plantMany'; seed: string;

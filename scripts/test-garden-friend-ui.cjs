@@ -1,0 +1,67 @@
+if(!process.versions.electron){
+ const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
+ const child=require('node:child_process').spawn(require('../app/node_modules/electron'),[__filename],{env,stdio:'inherit',windowsHide:true});
+ child.on('exit',code=>process.exitCode=code??1);setTimeout(()=>child.kill(),60000).unref();
+}else{
+const {app,BrowserWindow,ipcMain,session}=require('electron');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),{randomUUID}=require('node:crypto');
+const root=path.resolve(__dirname,'..'),core=require('../rooms/generated/garden-core.cjs');
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'qbot-friend-ui-'));app.setPath('userData',dir);
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+app.whenReady().then(async()=>{try{
+ session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_,cb)=>cb({cancel:true}));
+ const {Gardens}=await import('../rooms/garden.mjs');const now=Date.now(),owner='AAAAAAAAAAAA',helper='BBBBBBBBBBBB';let viewer=helper;
+ const contacts={people:{[owner]:{nickname:'小夏'},[helper]:{nickname:'小秋'}},areFriends:()=>true};
+ const db=new Gardens(path.join(dir,'gardens.json'),contacts,()=>now,{random:()=>0,id:randomUUID});
+ for(const id of [owner,helper])db.handle(id,{action:'get',actor:'pet'});
+ const crop=(id,traits=['golden'])=>({id,species:'carrot',traits,kg:.2,value:100,bred:false,growthVersion:2,revealed:true,plantedAt:now-3600000,readyAt:now-1,fertilizers:[]});
+ db.data.people[owner].state.plots[0]=crop('gold');db.data.people[owner].state.plots[1]=crop('used');db.data.people[owner].state.plots[1].bred=true;
+ db.data.people[owner].state.plots[2]={...crop('mystery',['rainbow']),revealed:false};
+ db.data.people[helper].state.produce=[crop('bag-gold')];
+ // A revealed cooperative crop must still expose breeding independently of the reward card.
+ db.data.tasks.gold={id:'gold',plant:'gold',owner,plot:0,remaining:0,workBudget:core.COOP_RULES.work,updatedAt:now,members:{},done:true,claimed:[],fruit:crop('gold')};
+ ipcMain.handle('overlays:get',()=>({revision:0,winner:null}));ipcMain.handle('characters:getActive',()=>null);ipcMain.handle('characters:list',()=>[]);ipcMain.handle('settings:get',()=>({}));
+ ipcMain.handle('garden:get',()=>db.handle(viewer,{action:'get'}).state);
+ ipcMain.handle('garden:visit',(_,who)=>db.handle(viewer,{action:'visit',owner:who}).visit);
+ ipcMain.handle('social:contacts',()=>({people:[{id:owner,nickname:'小夏',relation:'friend',online:true}]}));
+ ipcMain.handle('garden:act',(_,command)=>{try{return db.handle(viewer,{action:'act',command,operation:`${now}-${randomUUID()}`});}catch(e){return {ok:false,error:e.message};}});
+ ipcMain.handle('garden:cooperate',(_,who,plot,command)=>db.handle(viewer,{action:'coop',owner:who,plot,command}));
+ ipcMain.on('garden:cancelPerformance',()=>{});
+ const win=new BrowserWindow({width:900,height:800,show:false,webPreferences:{preload:path.join(root,'app/out/preload/index.js'),offscreen:true,backgroundThrottling:false}});
+ const errors=[];win.webContents.on('console-message',e=>{if(e.level==='error')errors.push(e.message);});
+ const js=code=>win.webContents.executeJavaScript(code);
+ const until=async fn=>{for(let i=0;i<70;i++){if(await fn())return;await wait(100);}throw Error('UI timeout');};
+ const click=async label=>{await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(label)}&&!b.disabled);if(!b)throw Error('missing '+${JSON.stringify(label)});b.click()})()`);await wait(200);};
+ const out=path.join(root,'output/garden-friends');fs.mkdirSync(out,{recursive:true});
+ const shot=async name=>fs.writeFileSync(path.join(out,name+'.png'),(await win.webContents.capturePage()).toPNG());
+ await win.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'visit:'+owner}});
+ await until(()=>js('document.body.textContent.includes("小夏的花园名片")'));
+ assert.equal(await js('document.body.textContent.includes("邀请成为向日葵伙伴")'),false);
+ assert.equal(await js('[...document.querySelectorAll("button")].filter(b=>b.textContent==="申请繁育").length'),1);
+ assert.ok(await js('document.body.textContent.includes("剩余繁育 0 次")'));
+ assert.ok(await js('[...document.querySelectorAll("button")].some(b=>b.textContent==="帮忙培育"&&!b.disabled)'));
+ await js('document.querySelector(".life-card").scrollIntoView({block:"center"})');await shot('visit');await click('申请繁育');await until(()=>js('!!document.querySelector("dialog[open]")'));
+ assert.ok(await js('document.querySelector("dialog").textContent.includes("由你提供一瓶精油")'));await shot('request');
+ win.setSize(560,760);await wait(200);assert.ok(await js('(()=>{const d=document.querySelector("dialog"),r=d.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&d.scrollWidth<=d.clientWidth})()'));await shot('request-small');win.setSize(900,800);await wait(200);
+ await js('document.querySelector("dialog button").click()');await until(()=>js('document.body.textContent.includes("繁育申请已送达")'));
+ assert.equal(db.data.people[owner].state.plots[0].bred,false);
+ await js('document.querySelectorAll(".result-popup button").forEach(b=>b.click())');
+ await until(()=>js('document.body.textContent.includes("等待小夏同意")'));await shot('pending');
+ viewer=owner;await win.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'friends'}});
+ await until(()=>js('document.body.textContent.includes("小秋申请繁育")'));await shot('answer');
+ await click('同意繁育');await until(()=>js('document.body.textContent.includes("共同繁育成功")'));
+ assert.equal(db.data.people[owner].state.plots[0].bred,true);assert.equal(db.data.people[helper].state.produce[0].bred,true);
+ assert.equal(db.data.people[owner].state.seeds.at(-1).genes[0],'golden');await shot('success');
+ await js('document.querySelectorAll(".result-popup button").forEach(b=>b.click())');await click('背包');
+ await until(()=>js('document.body.textContent.includes("神秘种子")'));
+ win.setSize(560,760);await wait(250);assert.ok(await js('document.documentElement.scrollWidth<=innerWidth'),'narrow view must fit');
+ viewer=helper;contacts.people[owner].companion=true;
+ await win.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'visit:'+owner}});
+ await until(()=>js('document.body.textContent.includes("↻ 刷新测试")'));await click('↻ 刷新测试');await until(()=>js('document.body.textContent.includes("测试作物已刷新")'));
+ assert.ok(core.canBreed(db.data.people[owner].state.plots[0]));assert.ok(core.needsReveal(db.data.people[owner].state.plots[1]));
+ await js('document.querySelectorAll(".result-popup button").forEach(b=>b.click())');await wait(250);
+ await js('document.querySelector(".garden-test-refresh").scrollIntoView({block:"start"})');await shot('refresh-test');
+ assert.ok(await js('(()=>{const b=document.querySelector(".garden-test-refresh");return b.getBoundingClientRect().height<45})()'));
+ assert.deepEqual(errors,[]);console.log('PASS: actual garden renderer, friend breeding, small companion refresh button and guaranteed test crops. '+out);app.exit(0);
+ }catch(e){console.error(e);app.exit(1);}});
+}

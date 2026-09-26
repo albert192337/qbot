@@ -1,0 +1,85 @@
+diff --git a/rooms/garden.mjs b/rooms/garden.mjs
+index 0a5ca89..3796ee4 100644
+--- a/rooms/garden.mjs
++++ b/rooms/garden.mjs
+@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
+ import {existsSync,readFileSync,writeFileSync,renameSync,mkdirSync,copyFileSync} from 'node:fs';
+ import path from 'node:path';
+ import core from './generated/garden-core.cjs';
++import {breedingRequests,friendBreed} from './garden-breeding.mjs';
+ const rng={random:Math.random,id:randomUUID};
+ const requireThat=(ok,msg)=>{if(!ok)throw Error(msg);};
+ const actorKey=s=>typeof s==='string'&&/^[\w.\-]{1,160}$/.test(s)&&!['__proto__','constructor','prototype'].includes(s)?s:undefined;
+@@ -35,7 +36,7 @@ export class Gardens {
+   }
+   allow(viewer,owner,scope='land'){requireThat(this.permitted(viewer,owner,scope),'主人尚未向你开放'+(scope==='shop'?'商店':'土地'));}
+   taskAllowed(viewer,t){return !!t&&(viewer===t.owner||t.shared||t.invited?.includes(viewer)||t.members[viewer]);}
+-  publicState(state){const s=core.publicGardenState(state);s.cooperationRewardsLeft=Math.max(0,5-(this.data.rewards[`${s.life.owner}:${core.gardenDay(this.now())}`]??0));for(const p of s.plots)if(p?.batch)p.batch.seed=0;for(const a of Object.values(s.v3?.appraisals??{}))a.board=[];return s;}
++  publicState(state){const s=core.publicGardenState(state);s.friendBreeding=breedingRequests(this,s.life.owner);s.cooperationRewardsLeft=Math.max(0,5-(this.data.rewards[`${s.life.owner}:${core.gardenDay(this.now())}`]??0));for(const p of s.plots)if(p?.batch)p.batch.seed=0;for(const a of Object.values(s.v3?.appraisals??{}))a.board=[];return s;}
+   publicPlant(p){return p?core.publicGardenPlant(p):null;}
+   box(row,id,f){
+     requireThat(f.owner===id,'开箱账号已切换，请切回原账号');
+@@ -71,7 +72,7 @@ export class Gardens {
+     requireThat(this.data.people[owner],'这位朋友还没有开通联机花园');const s=this.ensure(owner).state,landOpen=this.permitted(viewer,owner),shopOpen=this.permitted(viewer,owner,'shop');
+     const tasks=Object.values(this.data.tasks).filter(t=>t.owner===owner&&(!task||t.id===task)&&(landOpen||this.taskAllowed(viewer,t))).slice(-20);
+     requireThat(landOpen||shopOpen||tasks.length,'主人尚未向你开放土地或商店');
+-    return {plotCount:core.unlockedPlots(s),owner,name:this.contacts.people[owner].nickname,actorName:this.contacts.people[owner].character,landOpen,shopOpen,plots:s.plots.map(p=>p&&(landOpen||tasks.some(t=>t.plant===p.id))?this.publicPlant(p):null),offers:shopOpen?core.dailyOffers(owner,s.life.day):[],day:s.life.day,visibility:s.life.visibility,actorLevel:core.characterLevel(s.life.characters[s.activeActor]?.xp??0),rewardsLeft:Math.max(0,5-(this.data.rewards[`${viewer}:${core.gardenDay(this.now())}`]??0)),tasks:structuredClone(tasks)};
++    return {friend:viewer!==owner&&this.contacts.areFriends(viewer,owner),plotCount:core.unlockedPlots(s),owner,name:this.contacts.people[owner].nickname,actorName:this.contacts.people[owner].character,landOpen,shopOpen,plots:s.plots.map(p=>p&&(landOpen||tasks.some(t=>t.plant===p.id))?this.publicPlant(p):null),offers:shopOpen?core.dailyOffers(owner,s.life.day):[],day:s.life.day,visibility:s.life.visibility,actorLevel:core.characterLevel(s.life.characters[s.activeActor]?.xp??0),rewardsLeft:Math.max(0,5-(this.data.rewards[`${viewer}:${core.gardenDay(this.now())}`]??0)),tasks:structuredClone(tasks)};
+   }
+   sun(id,c){
+     requireThat(typeof c.target==='string'&&Object.hasOwn(this.contacts.people,c.target),'玩家不存在');const a=this.ensure(id).state,b=this.ensure(c.target).state;
+@@ -110,9 +111,9 @@ export class Gardens {
+       const m=t.members[id];requireThat(t.done&&m?.seconds>=core.COOP_RULES.minSeconds&&m.work>=TOTAL_WORK*.02,'需要培育完成，且参与至少20秒并贡献2%工作量');
+       if(!t.claimed.includes(id)){
+         const row=this.ensure(id),day=core.gardenDay(this.now()),key=`${id}:${day}`;requireThat((this.data.rewards[key]??0)<5,'今日 5 次物资奖励已领满');
+-        const n=Math.min(8,Object.values(t.members).filter(m=>m.seconds>=core.COOP_RULES.minSeconds&&m.work>=TOTAL_WORK*.02).length),q=core.coopRareChance(n),roll=Math.random();
+-        if(roll<q*8/18){const types=Object.keys(core.SPRAYS),kind=types[Math.floor(Math.random()*types.length)];row.state.life.sprays[kind]=(row.state.life.sprays[kind]??0)+1;}
+-        else {const pool=roll<q?['pineapple','apple']:['strawberry','tomato','blueberry'];row.state.seeds.push({id:randomUUID(),species:pool[Math.floor(Math.random()*pool.length)],genes:[],bred:false});}
++        const n=Math.min(8,Object.values(t.members).filter(m=>m.seconds>=core.COOP_RULES.minSeconds&&m.work>=TOTAL_WORK*.02).length);
++        requireThat(t.fruit,'培育成果暂不可用，请稍后再试');
++        const seed=core.cultivationSeed(t.fruit,n,this.rng);row.state.seeds.push(seed);
+         this.data.rewards[key]=(this.data.rewards[key]??0)+1;t.claimed.push(id);core.recordGarden(row.state,this.now(),'coopReward','领到了共同培育礼物',owner,t.plant);
+       }
+     }else if(command==='share'||command==='invite'){requireThat(id===owner&&!t.done,'只能邀请培育自己尚未完成的果实');if(command==='share')t.shared=true;core.recordGarden(s,this.now(),command==='share'?'share':'invite','邀请伙伴一起培育',undefined,t.plant);}
+@@ -143,6 +144,7 @@ export class Gardens {
+       let result;
+       if(['cultivate','pauseCultivation'].includes(f.command.type)){this.coop(id,id,f.command.plot,f.command.type==='cultivate'?'join':'leave');result={state:row.state};}
+       else if(['sunRequest','sunAnswer','sunRemove'].includes(f.command.type))result=this.sun(id,f.command);
++      else if(['friendBreedRequest','friendBreedAnswer','friendBreedCancel'].includes(f.command.type))result=friendBreed(this,id,f.command);
+       else result=core.transition(row.state,f.command,now,this.rng,{actor:actorKey(f.actor),shopOwner:f.command.type==='buyDaily'?f.command.owner:undefined});
+       row.state=result.state;row.state.online=true;if(result.points>0){row.state.coins+=result.points;if(result.reveal)result.reveal.message=`领取 ${result.points} 花园币，各物种同时获得图鉴经验。`;}
+       const response={ok:true,...(result.reveal?{reveal:result.reveal}:{})};
+diff --git a/rooms/generated/garden-core.cjs b/rooms/generated/garden-core.cjs
+index 6a2389b..b16826a 100644
+--- a/rooms/generated/garden-core.cjs
++++ b/rooms/generated/garden-core.cjs
+@@ -58,6 +58,7 @@ __export(server_entry_exports, {
+   conflicts: () => conflicts,
+   coopRareChance: () => coopRareChance,
+   cultivationRemaining: () => cultivationRemaining,
++  cultivationSeed: () => cultivationSeed,
+   currentGrowth: () => currentGrowth,
+   dailyOffers: () => dailyOffers,
+   dailyRandom: () => dailyRandom,
+@@ -1665,6 +1666,13 @@ function publicGardenState(state) {
+   }
+   return s;
+ }
++
++// app/src/shared/garden-friends.ts
++function cultivationSeed(fruit, participants, rng) {
++  const pool = [...new Set(fruit.traits.filter((t) => traitSlot(t) !== "size"))];
++  const genes = pool.length && rng.random() < coopRareChance(participants) ? [pool[Math.min(pool.length - 1, Math.floor(rng.random() * pool.length))]] : [];
++  return { id: rng.id(), species: fruit.species, genes, slots: geneSlots(genes), bred: false };
++}
+ // Annotate the CommonJS export names for ESM import in node:
+ 0 && (module.exports = {
+   AFFINITIES,
+@@ -1704,6 +1712,7 @@ function publicGardenState(state) {
+   conflicts,
+   coopRareChance,
+   cultivationRemaining,
++  cultivationSeed,
+   currentGrowth,
+   dailyOffers,
+   dailyRandom,

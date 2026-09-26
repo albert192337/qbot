@@ -12,6 +12,11 @@ it('shows both cached characters once after a consented photo begins, without re
 it('uses a compatible local action when partner media is unavailable, and ignores another role',async()=>{mock.guest=false;await playNetworkInteraction({actor:'host',partner:'friend',kind:'photo',intent:'happy',step:0});expect(mock.send).toHaveBeenCalledWith('pet:menuCommand',{type:'play',action:'idle'});mock.send.mockClear();await playNetworkInteraction({actor:'different',partner:'friend',kind:'photo',intent:'happy',step:0});expect(mock.send).not.toHaveBeenCalled();});
 
 import {PAIR_INTERACTIONS,pairBeats} from '../src/shared/pair-interaction';
+it('forwards the synchronized generated dialogue and explicit recipient identity',async()=>{
+ const lines=['读完这页，一起喝茶。','好呀，茶还温着。'];
+ await playNetworkInteraction({actor:'host',partner:'friend',kind:'tea',intent:'wave',step:0,recipient:true,lines});
+ expect(mock.send).toHaveBeenCalledWith('pet:menuCommand',expect.objectContaining({type:'networkPair',recipient:true,lines}));
+});
 it('routes every kind and both roles into the shared director exactly once',async()=>{
  for(const {id:kind} of PAIR_INTERACTIONS){
   const first=pairBeats(kind)[0];expect(first.host).not.toBe(first.guest);

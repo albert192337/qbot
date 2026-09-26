@@ -2,8 +2,8 @@ import { SPECIES, TRAITS, needsReveal, traitSlot, type Species, type Trait, type
 import {V3_WEATHER,AFFINITIES} from './garden-v3';
 
 export const DAY_MS = 86400000;
-// Reference: 8 participants, 360 work/second, solo 82/8/10 loot. Work budget,
-// multiplayer rarity bonus and reward eligibility are QBot's initial tuning.
+// Up to 8 participants at 360 work/second. Qualified participants receive seeds;
+// the chance of a seed carrying a crop trait rises from 18% to 27% with participation.
 export const COOP_RULES={work:64800,speed:360,maxPlayers:8,leaseMs:15000,minSeconds:20,minContribution:.02,dailyRewards:5} as const;
 export const coopRareChance=(participants:number)=>.18+.09*(Math.max(1,Math.min(8,participants))-1)/7;
 /** 04:00 Asia/Shanghai. Persisted day keys never move backwards. */
@@ -61,5 +61,5 @@ export function dailyOffers(owner:string,day:number):DailyOffer[] {
 export function wishMatches(w:FoodWish,p:Produce):boolean {return !w.done&&!p.locked&&!needsReveal(p)&&p.species===w.species&&w.traits.every(t=>p.traits.includes(t));}
 export function wishLabel(w:FoodWish):string {return `${SPECIES[w.species].name} ×1${w.traits.length?' · '+w.traits.map(t=>TRAITS[t].name).join('＋'):''}`;}
 export function currentGrowth(s:GardenState):CharacterGrowth|undefined {return s.activeActor?s.life?.characters[s.activeActor]:undefined;}
-export interface GardenVisit {plotCount?:number;owner:string;name:string;plots:GardenState['plots'];offers:DailyOffer[];day:number;visibility:GardenLife['visibility'];actorLevel:number;actorName?:string;landOpen?:boolean;shopOpen?:boolean;rewardsLeft?:number;tasks?:CoopTask[]}
+export interface GardenVisit {companion?:boolean;friend?:boolean;plotCount?:number;owner:string;name:string;plots:GardenState['plots'];offers:DailyOffer[];day:number;visibility:GardenLife['visibility'];actorLevel:number;actorName?:string;landOpen?:boolean;shopOpen?:boolean;rewardsLeft?:number;tasks?:CoopTask[]}
 export interface CoopTask {workBudget?:number;id:string;owner:string;plant:string;plot:number;remaining:number;updatedAt:number;members:Record<string,{work:number;seconds:number;seenAt:number}>;done:boolean;claimed:string[];shared?:boolean;invited?:string[];room?:string;fruit?:import('./garden').Plant}

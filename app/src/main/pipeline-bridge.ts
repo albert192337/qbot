@@ -261,7 +261,7 @@ export async function redoFailed(dirId: string): Promise<void> {
 export async function regenerateActions(dirId: string, actionIds: ActionId[]): Promise<void> {
   if (isCloudJob(dirId)) {
     const status = await syncCloudJob(dirId);
-    if (actionIds.some(id => status.actions[id]?.status !== 'failed')) throw new Error('此操作仅支持修复失败动作；重新设计动作请使用本地高级生成');
+    if (!actionIds.length || actionIds.some(id => status.actions[id]?.status !== 'failed' && !(id === 'perch' && !status.actions[id]))) throw new Error('此操作仅支持修复失败动作或补充窗沿停靠；重新设计动作请使用本地高级生成');
     return cloudOperation(dirId, 'resume', undefined, actionIds);
   }
   const meta = await getCharacter(dirId);

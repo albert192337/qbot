@@ -25,6 +25,8 @@ import { WebSocketServer } from 'ws';
 import { Contacts } from './contacts.mjs';
 import { Gardens } from './garden.mjs';
 import { Companions } from './companions.mjs';
+import { PairDialogue } from './pair-dialogue.mjs';
+import { characterProfile } from './character-profile.mjs';
 import gardenCore from './generated/garden-core.cjs';
 
 const PORT = Number(process.env.PORT || 24252);
@@ -443,6 +445,8 @@ function upsertMember(room, ws) {
 
 /** 离房：清在线表 + 广播；不动 members（常驻） */
 function leaveRoom(ws, notify = true) {
+  ws.pairEpoch = (ws.pairEpoch || 0) + 1;
+  pairDialogue.cancel(ws);
   companions?.left(ws);
   const roomId = ws.roomId;
   if (!roomId) return;
@@ -514,6 +518,7 @@ function noteChatSent(ws, text) {
 const worldPeers = new Set();
 const gardenInvites=new Map();
 const pairInvites=new Map();
+const pairDialogue=new PairDialogue();
 const pairBusy=new Map();
 let worldChat = [];
 const worldReports = [];
@@ -569,12 +574,15 @@ const handlers = {
     ws.nickname = clampText(f.nickname, NICK_MAX) || '匿名';
     ws.avatarHash = typeof f.avatarHash === 'string' ? f.avatarHash.slice(0, 32) : undefined;
     ws.hello = true;
+    ws.pairDialogue = f.pairDialogue === 1 ? 1 : 0;
+    ws.companionChat = f.companionChat === 1 ? 1 : 0;
     send(ws, {t:'hello:ack', social:1, contacts:1, garden:1, petting:2, memberId:ws.memberId, contactToken:identity.token, serverTime:Date.now()});
     notifyContacts();
   },
   'contacts:get'(ws, f) { if (typeof f.character === 'string' && contacts.people[ws.memberId].character !== clampText(f.character,32)) { contacts.transaction(()=>{contacts.people[ws.memberId].character=clampText(f.character,32);}); notifyContacts(); } ws.contactsSubscribed = true; send(ws, {t:'contacts:snapshot', ...contactSnapshot(ws)}); },
   'garden:request'(ws,f){
     try {
+      if(f.action==='pair:line'){send(ws,{t:'garden:result',ok:pairDialogue.answer(ws,f)});return;}
       if(f.action==='pair:invite'||f.action==='pair:answer'){
         const result=handleGardenInteraction(ws,f);send(ws,{t:'garden:result',...result});return;
       }
@@ -766,6 +774,8 @@ const handlers = {
     const hash = typeof f.hash === 'string' ? f.hash : '';
     if (hash && !HASH_RE.test(hash)) { fail(ws, 'bad_frame'); return; }
     ws.packHash = hash || undefined;
+    ws.character = {name:'伙伴',persona:''};
+    if(hash&&packs.has(hash))try{ws.character=characterProfile(readFileSync(packPath(hash)));}catch{}
     if (ws.roomId && hash) {
       broadcast(ws.roomId, {
         t: 'member:pack',
@@ -1053,14 +1063,29 @@ function handleGardenInteraction(ws,f){
   pairInvites.delete(f.id);notifyContacts();
   const beats=gardenCore.pairBeats(invite.kind);if(invite.kind==='relay'){const response=['happy','heart','wave'].includes(f.response)?f.response:'happy';beats[1]={...beats[1],guest:response,caption:response==='heart'?'送你一个小心心！':response==='wave'?'嗨，我接住啦！':'开心接住！轮到我啦！'};}
   for(const [who,other] of [[ws.memberId,host.memberId],[host.memberId,ws.memberId]])gardens.transaction(()=>gardenCore.recordGarden(gardens.data.people[who].state,now,'interaction','一起玩了'+invite.label,other));
-  const until=now+beats.length*4500;
+  const until=now+30000+beats.length*4500;
   pairBusy.set(ws.memberId,until);pairBusy.set(host.memberId,until);
+  const epochs=[host.pairEpoch,ws.pairEpoch],packs=[host.packHash,ws.packHash];
+  const valid=()=>[host,ws].every((p,i)=>p.readyState===p.OPEN&&p.roomId===invite.roomId&&p.pairEpoch===epochs[i]&&p.packHash===packs[i])&&
+    gardens.data.people[host.memberId]?.state.activeActor===invite.actor&&gardens.data.people[ws.memberId]?.state.activeActor===f.actor;
   const play=(beat,step)=>{
-    if([host,ws].some(p=>p.readyState!==p.OPEN||p.roomId!==invite.roomId))return;
+    if(!valid())return;
+    const speaker=beat.speaker==='host'?host:ws, room=rooms.get(invite.roomId);
+    if(room&&room.chatEnabled!==false){
+      const msg={id:genId(12),memberId:speaker.memberId,nickname:speaker.nickname,companion:!!speaker.companion,speaker:'character',characterName:speaker.character?.name||'伙伴',pairSession:f.id,text:beat.caption,at:Date.now()};
+      room.chat=[...room.chat,msg].slice(-CHAT_KEEP);dirty=true;
+      broadcast(room.roomId,{t:'chat',roomId:room.roomId,msg});
+    }
     for(const [peer,actor,intent] of [[host,invite.actor,beat.host],[ws,f.actor,beat.guest]])
-      peer.send(JSON.stringify({t:'garden:interaction',roomId:invite.roomId,kind:invite.kind,actor,intent,step,partner:peer===host?ws.memberId:host.memberId,caption:beat.caption,effect:beat.effect}));
+      peer.send(JSON.stringify({t:'garden:interaction',roomId:invite.roomId,kind:invite.kind,actor,intent,step,partner:peer===host?ws.memberId:host.memberId,caption:beat.caption,effect:beat.effect,session:f.id,recipient:peer!==host,lines:beats.map(b=>b.caption)}));
   };
-  beats.forEach((beat,i)=>{if(!i)play(beat,i);else setTimeout(()=>play(beat,i),i*4500).unref();});
+  void pairDialogue.prepare({host,guest:ws,actor:invite.actor,guestActor:f.actor,kind:invite.kind,beats,valid}).then(lines=>{
+    if(!lines){for(const peer of [host,ws])if(pairBusy.get(peer.memberId)===until)pairBusy.delete(peer.memberId);return;}
+    beats.forEach((beat,i)=>{beat.caption=lines[i];});
+    const ends=Date.now()+beats.length*4500;
+    pairBusy.set(ws.memberId,ends);pairBusy.set(host.memberId,ends);
+    beats.forEach((beat,i)=>{if(!i)play(beat,i);else setTimeout(()=>play(beat,i),i*4500).unref();});
+  }).catch(()=>{});
   return {ok:true};
 }
 const contactInvites = new Map();
@@ -1100,12 +1125,20 @@ if(process.env.QBOT_COMPANIONS==='1'){
       const action=peer.actions.find(a=>patterns[frame.intent]?.test(a.label))?.id??peer.action;
       broadcast(peer.roomId,{t:'presence',roomId:peer.roomId,memberId:peer.memberId,mode:'idle',action});
     };
-    const say=(peer,text,world=false)=>{
+    const speaking=new Set();
+    const say=(peer,topic,world=false)=>{void (async()=>{
       const room=rooms.get(peer.roomId);if(!room||!world&&room.chatEnabled===false)return;
-      const msg={id:genId(12),memberId:peer.memberId,nickname:peer.nickname,companion:true,text,at:Date.now()};
+      if(speaking.has(room.roomId))return;
+      const client=[...(online.get(room.roomId)??[])].find(p=>!p.companion&&p.companionChat===1&&p.readyState===p.OPEN);
+      if(!client)return;
+      const valid=()=>client.readyState===client.OPEN&&client.roomId===room.roomId&&peer.roomId===room.roomId&&(world||room.chatEnabled!==false);
+      speaking.add(room.roomId);
+      let text;try{text=await pairDialogue.userChat({peer:client,companion:peer,topic,history:room.chat.slice(-6).map(m=>`${m.speaker==='character'?'角色 '+(m.characterName||'伙伴'):'用户 '+m.nickname}：${m.text}`),valid});}finally{speaking.delete(room.roomId);}
+      if(!text||!valid())return;
+      const msg={id:genId(12),memberId:peer.memberId,nickname:peer.nickname,companion:true,speaker:'user',text,at:Date.now()};
       if(world){worldChat=[...worldChat,msg].slice(-CHAT_KEEP);worldBroadcast({t:'world:chat',msg});}
       else{room.chat=[...room.chat,msg].slice(-CHAT_KEEP);room.lastActiveAt=msg.at;broadcast(room.roomId,{t:'chat',roomId:room.roomId,msg});}
-    };
+    })().catch(()=>{});};
     companions.say=say;
     companionTimer=setInterval(()=>{try{companions.tick({humans:[...wss.clients].filter(p=>p.hello),worldActive:worldPeers.size>0,say,pending:pairInvites,notifyContacts,moveCompanion,
       invite:(peer,user,kind)=>handleGardenInteraction(peer,{action:'pair:invite',target:user.memberId,actor:peer.actor,kind}),

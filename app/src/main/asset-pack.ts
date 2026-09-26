@@ -8,7 +8,7 @@
  * 使用方：公共房间的服务端缓存分发（rooms/）、皮肤市场下载（market）。
  * （曾经的 1v1 盲转分块也走这里；块大小以 rooms 服务 128KB 帧上限为准）
  *
- * 隐私（spec §四硬规则）：persona 文本永不出本机，打包前从 manifest 剥离。
+ * 角色名字与人设随市场/联机角色包分享；生成提示和本机路径仍剥离。
  */
 import { createHash } from 'node:crypto';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
@@ -20,7 +20,7 @@ export const CHUNK_SIZE = 64 * 1024;
 /** 总块数上限（× 64KB = 512MB，防对端恶意 total 撑爆内存） */
 const MAX_CHUNKS = 8192;
 /** 包内合法路径：manifest.json 或 actions/ 下一层的 .webm（防路径穿越） */
-const SAFE_PATH_RE = /^(manifest\.json|source\.png|actions\/[^/\\]+\.webm)$/;
+const SAFE_PATH_RE = /^(manifest\.json|source\.png|actions\/[^/\\]+\.webm|spine\/[a-zA-Z0-9_-]+\.(json|atlas|png))$/;
 
 interface PackEntry {
   path: string;
@@ -36,6 +36,11 @@ export interface PackedCharacter {
 /** 从 manifest 收集要打包的动作文件（标准 + 自定义，只要 done 的） */
 function collectActionFiles(manifest: Record<string, unknown>): string[] {
   const out: string[] = [];
+  const spine=manifest.spine as {skeleton?:string;atlas?:string;texture?:string}|undefined;
+  if(spine)for(const file of [spine.skeleton,spine.atlas,spine.texture]){
+    if(typeof file!=='string'||!/^spine\/[a-zA-Z0-9_-]+\.(json|atlas|png)$/.test(file))throw Error('Invalid Spine asset');
+    out.push(file);
+  }
   for (const group of [manifest.actions, manifest.importedActions, manifest.expressionActions, manifest.customActions]) {
     if (!group || typeof group !== 'object') continue;
     for (const action of Object.values(group as Record<string, { status?: string; webm?: string }>)) {
@@ -45,9 +50,11 @@ function collectActionFiles(manifest: Record<string, unknown>): string[] {
   return [...new Set(out)];
 }
 
-/** 脱敏：persona 等文本永不出本机（spec §四） */
+/** 保留公开角色资料，移除生成过程资料。 */
 export function sanitizeManifest(manifest: Record<string, unknown>): Record<string, unknown> {
-  const { persona: _persona, turnaroundPromptFull: _prompt, spareStickers: _spares, coverImage: _cover, cover: _coverMeta, ...rest } = structuredClone(manifest);
+  const { turnaroundPromptFull: _prompt, spareStickers: _spares, coverImage: _cover, cover: _coverMeta, ...rest } = structuredClone(manifest);
+  if (typeof rest.persona === 'string') rest.persona = rest.persona.slice(0, 4000);
+  else delete rest.persona;
   for (const group of ['actions','importedActions','expressionActions','customActions']) {
     const entries = rest[group];
     if (!entries || typeof entries !== 'object') continue;
@@ -116,6 +123,7 @@ export async function unpackCharacter(buffer: Buffer, destDir: string): Promise<
   }
   let offset = 4 + headerLen;
   await mkdir(path.join(destDir, 'actions'), { recursive: true });
+  await mkdir(path.join(destDir, 'spine'), { recursive: true });
   for (const entry of files) {
     if (!SAFE_PATH_RE.test(entry.path)) throw new Error(`unsafe path in package: ${entry.path}`);
     if (!Number.isInteger(entry.size) || entry.size < 0 || offset + entry.size > buffer.length) {

@@ -58,6 +58,7 @@ __export(server_entry_exports, {
   conflicts: () => conflicts,
   coopRareChance: () => coopRareChance,
   cultivationRemaining: () => cultivationRemaining,
+  cultivationSeed: () => cultivationSeed,
   currentGrowth: () => currentGrowth,
   dailyOffers: () => dailyOffers,
   dailyRandom: () => dailyRandom,
@@ -1665,6 +1666,13 @@ function publicGardenState(state) {
   }
   return s;
 }
+
+// app/src/shared/garden-friends.ts
+function cultivationSeed(fruit, participants, rng) {
+  const pool = [...new Set(fruit.traits.filter((t) => traitSlot(t) !== "size"))];
+  const genes = pool.length && rng.random() < coopRareChance(participants) ? [pool[Math.min(pool.length - 1, Math.floor(rng.random() * pool.length))]] : [];
+  return { id: rng.id(), species: fruit.species, genes, slots: geneSlots(genes), bred: false };
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   AFFINITIES,
@@ -1704,6 +1712,7 @@ function publicGardenState(state) {
   conflicts,
   coopRareChance,
   cultivationRemaining,
+  cultivationSeed,
   currentGrowth,
   dailyOffers,
   dailyRandom,

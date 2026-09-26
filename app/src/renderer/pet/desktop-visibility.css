@@ -11,10 +11,10 @@ body.member-hidden .peer-controls { display:block!important;visibility:visible!i
 body[data-peek="left"] #stage,body[data-peek="right"] #stage { transform:none!important; }
 body[data-peek="left"] #stage { clip-path:inset(0); }
 body[data-peek="right"] #stage { clip-path:inset(0); }
-body[data-peek="left"] #stage video,body[data-peek="left"] #stage > img { transform:translateX(-40%) rotate(55deg)!important; transform-origin:50% 32%; }
-body[data-peek="right"] #stage video,body[data-peek="right"] #stage > img { transform:translateX(40%) rotate(-55deg)!important; transform-origin:50% 32%; }
+body[data-peek="left"] #stage video,body[data-peek="left"] #stage > img,body[data-peek="left"] #stage > canvas { transform:translateX(-40%) rotate(55deg)!important; transform-origin:50% 32%; }
+body[data-peek="right"] #stage video,body[data-peek="right"] #stage > img,body[data-peek="right"] #stage > canvas { transform:translateX(40%) rotate(-55deg)!important; transform-origin:50% 32%; }
 body[data-peek="left"] > :not(#stage):not(#pet-hud),body[data-peek="right"] > :not(#stage):not(#pet-hud),
-body[data-peek="left"] #stage > :not(video):not(img),body[data-peek="right"] #stage > :not(video):not(img) { display:none!important; pointer-events:none!important; }
+body[data-peek="left"] #stage > :not(video):not(img):not(canvas),body[data-peek="right"] #stage > :not(video):not(img):not(canvas) { display:none!important; pointer-events:none!important; }
 body[data-peek="left"] #pet-hud,body[data-peek="right"] #pet-hud { visibility:hidden; }
 body.peek-controls #pet-hud { visibility:visible!important; opacity:1!important; }
 body.desktop-hidden #pet-hud { right:0!important; }

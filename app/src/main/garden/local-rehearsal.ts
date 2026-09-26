@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {SPECIES,needsReveal,type GardenState,type GardenCommand,type GardenResult,type Species,type Trait} from '../../shared/garden';
 import {SPRAYS,COOP_RULES,dailyOffers,type GardenVisit,type CoopTask,type SprayKind} from '../../shared/garden-life';
 import {geneSlots} from '../../shared/garden-v3';
+import {cultivationSeed} from '../../shared/garden-friends';
 import {initialGarden,transition,value,refreshShop} from './rules';
 import {enableV3,advanceV3,makeV3Plant} from './v3-rules';
 import {ensureLife} from './life-rules';
@@ -99,7 +100,7 @@ export class LocalGardenRehearsal {
     }else if(action==='leave'){for(const m of Object.values(t.members))m.seenAt=0;}
     else if(action==='claim'){
       const me=t.members['test:me'];if(!t.done||!me||me.seconds<COOP_RULES.minSeconds||me.work<COOP_RULES.work*COOP_RULES.minContribution)throw Error('培育完成并参与至少20秒、贡献2%后可领取');
-      if(!t.claimed.includes('test:me')){const mine=this.ensure('test:me'),key=String(mine.life!.day),count=this.rewards.get(key)??0;if(count>=5)throw Error('今日助育奖励已领满');mine.seeds.push({id:randomUUID(),species:'strawberry',genes:[],bred:false});t.claimed.push('test:me');this.rewards.set(key,count+1);}
+      if(!t.claimed.includes('test:me')){const mine=this.ensure('test:me'),key=String(mine.life!.day),count=this.rewards.get(key)??0;if(count>=5)throw Error('今日助育奖励已领满');if(!t.fruit)throw Error('培育成果暂不可用');const qualified=Object.values(t.members).filter(m=>m.seconds>=COOP_RULES.minSeconds&&m.work>=COOP_RULES.work*COOP_RULES.minContribution).length;mine.seeds.push(cultivationSeed(t.fruit,qualified,this.rng));t.claimed.push('test:me');this.rewards.set(key,count+1);}
     }else {
       if(owner!=='test:me'||t.done)throw Error('只能邀请培育自己尚未完成的作物');
       const ids=action==='invite'?[target!]:this.members.filter(m=>m.id!=='test:me').map(m=>m.id);for(const id of ids)this.requireMember(id);

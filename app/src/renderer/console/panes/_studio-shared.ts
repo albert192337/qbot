@@ -106,7 +106,7 @@ export function collectActions(m: Manifest, prompts?: PromptData, includeUnfinis
     actions.push({
       id,
       label: STD_LABELS[id] ?? id,
-      status: a.status,
+      status: id === 'perch' && !m.actions.perch ? 'missing' : a.status,
       poseDesc: pa?.poseDesc ?? '',
       motionDesc: pa?.motionDesc ?? '',
       durationSec: a.durationSec,

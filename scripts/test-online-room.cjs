@@ -5,9 +5,9 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'output/online-room')
  await fs.mkdir(out,{recursive:true});let app,server,ws;
  try{
   app=await electron.launch({executablePath:require('../app/node_modules/electron'),args:[path.join(root,'app/test/fixtures/cozy-main.cjs')],env:{...process.env,QBOT_ONLINE_PREVIEW:'1',QBOT_QA_DATA:await fs.mkdtemp(path.join(os.tmpdir(),'qbot-panorama-')),QBOT_COZY_REAL_CHARACTERS:path.join(process.env.APPDATA,'@qbot/app/characters')}});
-  let page=await app.firstWindow();page.setDefaultTimeout(25000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.waitForSelector('body[data-ready=true][data-members="4"]');assert.equal(await page.locator('#theme').inputValue(),'greenhouse');await page.waitForFunction(()=>[...document.querySelectorAll('#sources video')].filter(v=>v.currentTime>.1&&v.style.visibility==='visible').length===4);
-  for(const theme of ['halloween','space','observatory','greenhouse']){await page.locator('#theme').selectOption(theme);await page.waitForFunction(t=>localStorage.getItem('qbot.onlineRoom.theme.v2')===t,theme);await page.waitForTimeout(600);await page.screenshot({path:path.join(out,theme+'.png')});}
+  let page=await app.firstWindow();await app.evaluate(()=>{global.cozyQA.win.show();global.cozyQA.win.focus();});page.setDefaultTimeout(25000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.waitForSelector('body[data-ready=true][data-members="4"]');assert.equal(await page.locator('#theme').inputValue(),'greenhouse');assert.equal(await page.locator('#size').inputValue(),'small');assert.ok(await page.evaluate(()=>innerWidth===600&&Math.abs(innerHeight-177)<=1));assert.equal(await page.locator('footer').count(),0);await page.mouse.move(300,140);await page.waitForTimeout(250);assert.equal(await page.locator('nav').evaluate(e=>getComputedStyle(e).opacity),'0');await page.mouse.move(500,15);await page.waitForTimeout(250);assert.equal(await page.locator('nav').evaluate(e=>getComputedStyle(e).opacity),'1');await page.waitForFunction(()=>[...document.querySelectorAll('#sources video')].filter(v=>v.currentTime>.1&&v.style.visibility==='visible').length===4);
+  for(const theme of ['halloween','space','observatory','greenhouse']){await page.locator('#theme').selectOption(theme);await page.waitForFunction(t=>localStorage.getItem('qbot.onlineRoom.theme.v2')===t,theme);await page.locator('#theme').blur();await page.mouse.move(300,140);await page.waitForTimeout(600);await page.screenshot({path:path.join(out,theme+'.png')});}
   await page.reload();await page.waitForSelector('body[data-ready=true]');assert.equal(await page.locator('#theme').inputValue(),'greenhouse');
   await page.locator('#size').selectOption('small');await page.waitForTimeout(300);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   assert.deepEqual(errors,[]);await app.close();app=null;
@@ -20,13 +20,13 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'output/online-room')
   const id=await page.evaluate(()=>window.qbot.rooms.create({name:'横向联机验收',kind:'idle',capacity:12,listed:false}));
   ws=new WebSocket(`ws://127.0.0.1:${port}`);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});let seq=0;const pending=new Map();ws.onmessage=e=>{const f=JSON.parse(e.data);const p=pending.get(f.requestId);if(p){pending.delete(f.requestId);p(f);}};
   const request=f=>new Promise((resolve,reject)=>{const requestId='qa-'+(++seq),timer=setTimeout(()=>reject(Error('request timeout '+f.t)),8000);pending.set(requestId,result=>{clearTimeout(timer);resolve(result);});ws.send(JSON.stringify({...f,requestId}));});
-  const hello=await request({t:'hello',protoVer:2,nickname:'真实连接房友',character:'测试'});const joined=await request({t:'join',roomId:id});await fs.writeFile(path.join(out,'network-frames.json'),JSON.stringify({hello,joined},null,2));
+  const hello=await request({t:'hello',protoVer:2,nickname:'真实连接房友',character:'测试'});const joined=await request({t:'join',roomId:id});await fs.writeFile(path.join(out,'network-frames.json'),JSON.stringify({hello,joined},(key,value)=>key==='contactToken'?'[redacted]':value,2));
   await page.waitForFunction(()=>window.qbot.rooms.getSceneMembers().then(a=>a.length===1));
   const manifest=JSON.parse(await fs.readFile(path.join(data,'characters/guest/manifest.json'),'utf8'));
   await app.evaluate((_electron,manifest)=>{const q=globalThis.qa;for(const [id,s]of q.Pets.memberStates){s.character={dirId:'guest',manifest};q.Pets.onPresence(id,'idle','idle');}},manifest);
   await page.evaluate(()=>window.qbot.rooms.setDisplayMode('room'));
   let room;for(let i=0;i<60&&!room;i++){room=app.windows().find(p=>p.url().includes('/online-room/'));if(!room)await page.waitForTimeout(100);}assert.ok(room);room.on('pageerror',e=>errors.push(e.message));
-  await room.waitForSelector('body[data-ready=true][data-members="2"]');await room.waitForFunction(()=>[...document.querySelectorAll('#sources video')].filter(v=>v.currentTime>.1&&v.style.visibility==='visible').length===2);
+  await room.waitForSelector('body[data-ready=true][data-members="2"]');assert.ok(await room.evaluate(()=>innerWidth===600&&Math.abs(innerHeight-177)<=1));await room.waitForFunction(()=>[...document.querySelectorAll('#sources video')].filter(v=>v.currentTime>.1&&v.style.visibility==='visible').length===2);
   assert.equal(app.windows().filter(p=>p.url().includes('roomPet=1')).length,0);
   const before=(await page.evaluate(()=>window.qbot.rooms.getCache())).room.roomId;
   await app.evaluate(({Menu})=>{Menu.prototype.popup=function(){globalThis.visibilityMenu=this;};});

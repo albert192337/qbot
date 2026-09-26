@@ -3,7 +3,7 @@ import type { StickerManifest } from './sticker-behavior';
 
 export function playableResources(m: Manifest) {
   return Object.fromEntries([...Object.entries(m.actions??{}), ...Object.entries(m.importedActions??{}), ...Object.entries(m.expressionActions??{}), ...Object.entries(m.customActions??{})]
-    .filter(([, a]) => a.webm && (!('status' in a) || a.status === 'done')));
+    .filter(([id, a]) => (a.webm || m.spine?.actions[id]) && (!('status' in a) || a.status === 'done')));
 }
 export function scenePool(m: Manifest, scene: string): string[] {
   const lib = (m as StickerManifest).stickerLibrary;

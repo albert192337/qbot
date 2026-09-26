@@ -1,4 +1,6 @@
-import { test } from 'node:test';
+import { test, mock, after } from 'node:test';
+import fsPromises from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, writeFile, mkdir } from 'node:fs/promises';
 import os from 'node:os';
@@ -7,12 +9,19 @@ import { randomUUID } from 'node:crypto';
 import { createGenerationService } from '../service.mjs';
 import { atomicJson, digest } from '../store.mjs';
 
+// These tiny mock jobs do not need the production 2 GiB disk reserve.
+// Keep generation/routing tests independent of the developer machine's free space.
+mock.method(fsPromises, 'statfs', async () => ({ bavail: 1024 ** 2, bsize: 4096 }));
+syncBuiltinESMExports();
+after(() => { mock.restoreAll(); syncBuiltinESMExports(); });
+
 const token = 'test-invite-abcdefghijklmnopqrstuvwxyz';
 const other = 'test-other-abcdefghijklmnopqrstuvwxyz';
 const actions = ['idle','drag','sleep','tea','talk_happy','talk_annoyed','wave','stretch'];
 function fakePipeline() {
   const wrap = (outDir, state) => ({ outDir, state, save: () => atomicJson(path.join(outDir,'.job/state.json'),state) });
   return {
+    ACTION_IDS: [...actions, 'perch'],
     Job: {
       async create(outDir, opts) {
         await writeFile(path.join(outDir,'source.png'),await readFile(opts.refImagePath));
@@ -104,5 +113,34 @@ test('merged perch is accepted by targeted cloud failure retry', async()=>{
   await phase('awaiting_pick');await request('/jobs/'+id+'/pick','POST',{index:0});await phase('failed');
   assert.equal((await request('/jobs/'+id+'/resume','POST',{actions:['perch']})).status,202);
   await phase('done');assert.deepEqual(selected,['perch']);
+ }finally{app?.stop();await rm(dir,{recursive:true,force:true});}
+});
+
+test('old completed cloud jobs add only explicitly requested perch and reject regenerating completed clips', async()=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'qbot-perch-add-'));let app;
+ try {
+  const pipeline=fakePipeline(), original=pipeline.runActions;const selections=[];
+  pipeline.runActions=async(j,...args)=>{
+   const ids=args[4];selections.push(ids);
+   if(!ids)return original(j);
+   assert.deepEqual(ids,['perch']);assert.ok(j.state.baseActionIds.includes('perch'));
+   j.state.actions.perch.status='done';await j.save();
+  };
+  app=await createGenerationService({dataDir:dir,pipeline,config:{},invites:[{token}]});
+  await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
+  const base='http://127.0.0.1:'+app.server.address().port;
+  const request=(p,method='GET',data)=>fetch(base+p,{method,headers:{Authorization:'Bearer '+token},body:data?JSON.stringify(data):undefined});
+  const id=randomUUID(),png=Buffer.alloc(24);Buffer.from('89504e470d0a1a0a','hex').copy(png);png.writeUInt32BE(64,16);png.writeUInt32BE(64,20);
+  await request('/jobs','POST',{id,image:png.toString('base64'),characterForm:'humanoid',characterStyle:'chibi'});
+  const phase=expected=>until(async()=>(await(await request('/jobs/'+id)).json()).phase===expected);
+  await phase('awaiting_pick');await request('/jobs/'+id+'/pick','POST',{index:0});await phase('done');
+  await request('/jobs/'+id+'/resume','POST',{});assert.equal(selections.length,1);
+  assert.equal((await request('/jobs/'+id+'/resume','POST',{actions:['idle']})).status,400);
+  assert.equal((await request('/jobs/'+id+'/resume','POST',{actions:['unknown']})).status,400);
+  assert.equal((await request('/jobs/'+id+'/resume','POST',{actions:['perch']})).status,202);
+  await phase('done');assert.deepEqual(selections,[undefined,['perch']]);
+  assert.equal((await request('/jobs/'+id+'/resume','POST',{actions:['perch']})).status,400);
+  const state=(await(await request('/jobs/'+id)).json()).state;
+  assert.equal(state.actions.idle.status,'done');assert.equal(state.actions.perch.status,'done');
  }finally{app?.stop();await rm(dir,{recursive:true,force:true});}
 });

@@ -41,7 +41,10 @@ export class ChatView {
     if (!this.messages.length) {const empty=document.createElement('p');empty.className='empty';empty.textContent=this.world ? '世界很安静，打个招呼吧。' : '聊天留在这里，安心做自己的事。';this.list.append(empty);}
     for (const m of this.messages) {
       const row=document.createElement('article');row.className='message' + (m.memberId === this.self() ? ' mine' : '');
-      const who=document.createElement('div');who.className='message-who';who.textContent=`${m.nickname}${m.companion?' · 陪伴角色':''} · ${new Date(m.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+      const character=m.speaker==='character';row.classList.add(character?'character-message':'user-message');
+      const who=document.createElement('div');who.className='message-who';who.textContent=`${character?(m.characterName||'角色'):m.nickname} · ${new Date(m.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+      const badge=document.createElement('span');badge.className='speaker-badge';badge.textContent=character?'✦ 角色自主':m.companion?'☻ 虚拟用户':'● 用户';
+      badge.title=character?`所属用户：${m.nickname}`:m.companion?'按虚拟用户性格发言':'用户发言';who.prepend(badge);
       who.tabIndex=0;who.setAttribute('role','button');who.title='查看土地和商店';who.onclick=()=>window.qbot.garden.open('visit:'+m.memberId);who.onkeydown=e=>{if(e.key==='Enter')who.click();};
       const text=document.createElement('p');if(m.interaction==='petting'){row.classList.add('interaction-message');text.setAttribute('aria-label','摸摸互动记录');}text.textContent=m.garden&&!m.garden.done?(m.garden.species??'神秘果实')+' · ？ ？ ？ · 培育后揭晓':m.text;
       const action=document.createElement('button');action.className='message-action';action.textContent=m.memberId === this.self() ? '撤回' : '举报';

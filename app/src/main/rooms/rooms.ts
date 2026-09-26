@@ -344,7 +344,7 @@ async function hello(generation: number): Promise<void> {
   const identity = readContactCache(activeUrl!);
   const character = settings.activeCharacter ? await getCharacter(settings.activeCharacter) : null;
   const ack = await request(
-    { t: 'hello', protoVer: PROTO_VER, nickname, memberId: identity.id || settings.roomsMemberId, contactToken: identity.token, character: character?.manifest.name },
+    { t: 'hello', pairDialogue: 1, companionChat: 1, protoVer: PROTO_VER, nickname, memberId: identity.id || settings.roomsMemberId, contactToken: identity.token, character: character?.manifest.name },
     'hello:ack',
   );
   if (generation !== connectionGeneration) throw new Error('连接已取消');
@@ -411,6 +411,16 @@ function handleMessage(data: unknown): void {
   }
   if (frame.roomId && ['chat','chat:deleted','member:in','member:out','member:pack','presence','wave','kicked'].includes(frame.t) && frame.roomId !== currentRoomId) return;
   switch (frame.t) {
+    case 'companion:user-line': {
+      const connection=ws,room=currentRoomId;
+      if(room&&frame.roomId===room)void import('../companion-user-dialogue').then(m=>m.respondCompanionUser(frame,()=>ws===connection&&currentRoomId===room)).catch(()=>{});
+      break;
+    }
+    case 'garden:pair-line': {
+      const connection=ws,room=currentRoomId;
+      if(frame.roomId===room)void import('../pair-dialogue-network').then(m=>m.respondPairLine(frame,()=>ws===connection&&currentRoomId===room)).catch(()=>{});
+      break;
+    }
     case 'garden:interaction': if(frame.roomId===currentRoomId)void import('../garden/network').then(m=>m.playNetworkInteraction(frame)).catch(()=>{});break;
     case 'garden:result': settle(frame.t,frame);break;
     case 'garden:changed': push('garden:changed',{});break;
@@ -538,7 +548,8 @@ function handleMessage(data: unknown): void {
       const msg = frame.msg as RoomChatMsg | undefined;
       if (!msg) break;
       chatCache = [...chatCache, msg].slice(-50);
-      if(!msg.interaction)RoomPets.onChat(msg.memberId, msg.nickname, msg.text);
+      // User chat is not autonomous character speech; pair captions already have their own bubble.
+      if(msg.speaker==='character'&&!msg.interaction&&!msg.pairSession)RoomPets.onChat(msg.memberId, msg.characterName||'伙伴', msg.text);
       push('rooms:chat', msg);
       break;
     }

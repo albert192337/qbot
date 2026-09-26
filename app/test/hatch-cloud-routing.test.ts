@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const cloud = vi.hoisted(() => ({ isCloudJob:vi.fn(),cloudOperation:vi.fn() }));
+const cloud = vi.hoisted(() => ({ isCloudJob:vi.fn(),cloudOperation:vi.fn(),syncCloudJob:vi.fn() }));
 vi.mock('../src/main/cloud-generation',()=>cloud);
 vi.mock('../src/main/windows',()=>({}));
 vi.mock('../src/main/tray',()=>({}));
@@ -23,4 +23,15 @@ it('retains the local active-task guard',async()=>{
   const {pickTurnaround}=await import('../src/main/pipeline-bridge');cloud.isCloudJob.mockReturnValue(false);
   await expect(pickTurnaround('not-active',0)).rejects.toThrow('no active hatch');
   expect(cloud.cloudOperation).not.toHaveBeenCalled();
+});
+it('allows an explicit missing perch addition for an old cloud character but rejects completed or arbitrary actions',async()=>{
+  const {regenerateActions}=await import('../src/main/pipeline-bridge');
+  cloud.syncCloudJob.mockResolvedValue({actions:{idle:{status:'done'},wave:{status:'failed'}}});
+  await regenerateActions('cloud-task',['perch']);
+  expect(cloud.cloudOperation).toHaveBeenLastCalledWith('cloud-task','resume',undefined,['perch']);
+  await regenerateActions('cloud-task',['wave']);
+  await expect(regenerateActions('cloud-task',['idle'])).rejects.toThrow('此操作仅支持');
+  await expect(regenerateActions('cloud-task',['bogus' as never])).rejects.toThrow('此操作仅支持');
+  cloud.syncCloudJob.mockResolvedValue({actions:{perch:{status:'done'}}});
+  await expect(regenerateActions('cloud-task',['perch'])).rejects.toThrow('此操作仅支持');
 });

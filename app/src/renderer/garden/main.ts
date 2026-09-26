@@ -478,7 +478,7 @@ function render(): void {
 }
 function seedCard(seed: Seed, plot?: number, count = 1): HTMLElement {
     const card = el('article', undefined, 'card seed-card');
-    card.append(art(seed.species, seed.genes, 1, 'seed'), el('h3', `${SPECIES[seed.species].name}${seed.bred ? ' · 繁育种子' : '种子'} ×${count}`), el('p', growthLabel(seed.species,state), 'muted'));
+    card.append(art(seed.species, seed.genes, 1, 'seed'), el('h3', `${SPECIES[seed.species].name}${seed.genes.length||seed.massGene ? ' · 神秘种子' : seed.bred ? ' · 繁育种子' : '种子'} ×${count}`), el('p', growthLabel(seed.species,state), 'muted'));
     if (seed.genes.length || seed.bred) {
         card.append(tags(seed.genes));
         if (seed.parents)

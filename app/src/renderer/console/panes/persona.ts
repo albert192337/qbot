@@ -29,16 +29,28 @@ let unsubCustomAction: (() => void) | null = null;
 let paneRoot: HTMLElement | null = null;
 let boundDirId: string | null = null;
 let generationRequests=0;
+const generationErrors = new Map<string, string>();
+let unsubCloud: (() => void) | null = null;
+let refreshVersion = 0;
 
 export async function mount(root: HTMLElement): Promise<void> {
   paneRoot = root;
+  unsubCloud?.();
+  unsubCloud = window.qbot.hatch.onCloudStatus(({dirId,status}) => {
+    for (const [id, action] of Object.entries(status.actions)) {
+      if (action.status === 'done') generationErrors.delete(`${dirId}/${id}`);
+    }
+    if (paneRoot && dirId === boundDirId && !hasUnsavedChanges()) void refresh();
+  });
   // 订阅注册一次；后台生成完成/失败只刷本 pane，别的 pane 未保存输入不受影响
   unsubCustomAction?.();
   unsubCustomAction = window.qbot.studio.onCustomAction((ev) => {
     if (!paneRoot || ev.dirId !== boundDirId) return;
     if (ev.status === 'failed') {
+      generationErrors.set(`${ev.dirId}/${ev.name}`, ev.error ?? '未知错误');
       toast(paneRoot, `动作「${ev.name}」生成失败：${ev.error ?? '未知错误'}`, 'warn');
     } else if (ev.status === 'done') {
+      generationErrors.delete(`${ev.dirId}/${ev.name}`);
       toast(paneRoot, `动作「${ev.name}」生成完成 ✓`);
     }
     if (ev.status !== 'pending' && !hasUnsavedChanges()) void refresh();
@@ -48,6 +60,8 @@ export async function mount(root: HTMLElement): Promise<void> {
 }
 
 export function unmount(): void {
+  refreshVersion++;
+  unsubCloud?.(); unsubCloud = null;
   unsubCustomAction?.();
   unsubCustomAction = null;
   paneRoot = null;
@@ -67,10 +81,12 @@ export async function discardChanges(): Promise<void> {
 }
 
 async function refresh(force = false): Promise<void> {
+  const version = ++refreshVersion;
   const root = paneRoot;
   if (!root) return;
   bumpAssetNonce(); // 重生动作后要击穿 <video> 缓存
   const ctx = await loadStudioContext(root);
+  if (version !== refreshVersion || root !== paneRoot) return;
   if (!ctx) {
     boundDirId = null;
     return;
@@ -78,10 +94,18 @@ async function refresh(force = false): Promise<void> {
   if (!force && boundDirId === ctx.dirId && (generationRequests>0 || hasUnsavedChanges() || root.querySelector('.studio-confirm-mask'))) return;
   boundDirId = ctx.dirId;
   const actions = collectActions(ctx.m, ctx.prompts, true);
-  const statusPriority: Record<string, number> = { failed: 0, pending: 1, done: 2 };
+  const jobStatus = await window.qbot.hatch.getStatus(ctx.dirId).catch(()=>null);
+  if (version !== refreshVersion || root !== paneRoot || (!force && (generationRequests > 0 || hasUnsavedChanges() || root.querySelector('.studio-confirm-mask')))) return;
+  for (const a of actions) {
+    const current = jobStatus?.actions[a.id as keyof typeof jobStatus.actions];
+    if (!a.isImported && !a.isCustom && !a.isExpression && current) {
+      if (current.status === 'failed') a.status = 'failed';
+      else if (jobStatus?.running && current.status !== 'done') a.status = 'pending';
+    }
+  }
+  const statusPriority: Record<string, number> = { failed: 0, missing: 0, pending: 1, done: 2 };
   actions.sort((a, b) => (statusPriority[a.status] ?? 2) - (statusPriority[b.status] ?? 2));
   const failedCount = actions.filter((a) => a.status === 'failed').length;
-  const jobStatus = await window.qbot.hatch.getStatus(ctx.dirId).catch(()=>null);
 
   let html = '<div class="studio-body">';
   html += `<div class="page-heading"><div><p class="eyebrow">角色工作台</p><h2>动作库</h2><p class="page-summary">预览已有动作，为角色添加更多表达。</p></div><button class="btn primary" id="action-add-menu" aria-expanded="false">添加动作</button></div>`;
@@ -101,16 +125,18 @@ async function refresh(force = false): Promise<void> {
     html += `<div class="action-card" data-action="${esc(a.id)}" data-label="${esc(a.label.toLowerCase())}" data-status="${esc(a.status)}" data-kind="${actionKind}">`;
     html += `<div class="meta">`;
     html += `<b>${esc(a.label)}</b> `;
-    html += `<span class="status status-${a.status}">${({ done: '可用', pending: '生成中', failed: '生成失败' } as Record<string, string>)[a.status] ?? a.status}</span> `;
+    html += `<span class="status status-${a.status}">${({ done: '可用', pending: '生成中', failed: '生成失败', missing: '未生成' } as Record<string, string>)[a.status] ?? a.status}</span> `;
     html += `时长 ${a.durationSec}s`;
     if (a.isCustom) html += ` <button class="del-action btn danger" data-id="${esc(a.id)}">删除</button>`;
     html += `</div>`;
     if(a.motionDesc)html+=`<p class="studio-hint">${esc(a.motionDesc)}</p>`;
+    const error = generationErrors.get(`${ctx.dirId}/${a.id}`) || (!a.isCustom && !a.isImported && !a.isExpression ? jobStatus?.actions[a.id as keyof typeof jobStatus.actions]?.error : undefined);
+    if (error) html += `<p class="studio-hint action-generation-error" role="alert">${esc(error)}</p>`;
     if (frameUrl) html += `<video src="${frameUrl}" poster="qbot-asset://${ctx.dirId}/__portrait.png" aria-label="${esc(a.label)}动作预览" muted controls loop playsinline preload="none"></video>`;
     html += `<p class="studio-hint">${a.isImported ? '导入 GIF' : a.isCustom ? '自定义动作' : a.isExpression ? '预设动作' : '随角色生成'}</p>`;
     if (a.status === 'done') html += `<button class="preview-action btn ghost" data-id="${esc(a.id)}">${root.closest('#house-book') ? '上台练习' : '在桌面播放'}</button>`;
     if (a.isExpression && a.status === 'failed') html += `<button class="gen-expr btn" data-id="${esc(a.id)}">重试生成（约 ¥1）</button>`;
-    if (!a.isImported && !a.isCustom && !a.isExpression && a.status !== 'pending') html += `<button class="regenerate-action btn" data-id="${esc(a.id)}">${jobStatus?.regenerating && jobStatus.actions[a.id as keyof typeof jobStatus.actions]?.needsFrameApproval ? '继续确认首帧' : a.status === 'failed' ? '重试生成' : '重新生成'}</button>`;
+    if (!a.isImported && !a.isCustom && !a.isExpression && a.status !== 'pending') html += `<button class="regenerate-action btn" data-id="${esc(a.id)}">${jobStatus?.regenerating && jobStatus.actions[a.id as keyof typeof jobStatus.actions]?.needsFrameApproval ? '继续确认首帧' : a.status === 'missing' ? '补充生成' : a.status === 'failed' ? '重试生成' : '重新生成'}</button>`;
     const annotation=resourceText(ctx.m,a.id);
     if(scenePool(ctx.m,'idle').includes(a.id))html+='<span class="status-chip muted">待机候选</span>';
     html+=`<details class="resource-annotation"><summary>名称与含义</summary><label>名称<input type="text" data-resource-name maxlength="80" value="${esc(annotation.name===a.id?a.label:annotation.name)}"></label><label>含义说明<textarea data-resource-meaning maxlength="500" placeholder="描述这个动作表达什么，适合什么情况">${esc(annotation.meaning)}</textarea></label><label>标签<input type="text" data-resource-tags value="${esc(annotation.tags.join('，'))}"></label><button class="btn ghost" data-save-resource="${esc(a.id)}">保存标注</button></details>`;
@@ -221,8 +247,15 @@ function bind(root: HTMLElement, dirId: string): void {
     void (async () => {
       if (!(await confirmBox(root, '重新生成这个动作？会生成新的首帧和视频并产生模型费用，完成后替换当前动作。'))) return;
       generationRequests++;
+      const errorKey = `${dirId}/${button.dataset.id!}`;
+      generationErrors.delete(errorKey);
       try { await guard(root, button, '生成中…', async () => {
-        if (!await regenerateWithReference(root, dirId, button.dataset.id!)) return;
+        try {
+          if (!await regenerateWithReference(root, dirId, button.dataset.id!)) return;
+        } catch (error) {
+          generationErrors.set(errorKey, error instanceof Error ? error.message : String(error));
+          throw error;
+        }
         if (!hasUnsavedChanges()) await refresh();
         else toast(root, '动作已更新，当前输入已保留。');
       }); } finally { generationRequests--; if(!generationRequests&&!hasUnsavedChanges()&&boundDirId===dirId)await refresh(); }

@@ -1,0 +1,14 @@
+{
+  "skins": 2,
+  "actionsEach": 22,
+  "realtime": true,
+  "pairFacesPartner": true,
+  "pairSwapped": true,
+  "mouseCannotOverridePartner": true,
+  "endRestoresPointer": true,
+  "sleepSuppressesGaze": true,
+  "petting": true,
+  "videoSwitch": true,
+  "onlineRoomCanvas": true,
+  "errors": []
+}

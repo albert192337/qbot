@@ -9,3 +9,10 @@
 .art[data-dye] > img,.art[data-dye] > canvas { filter:sepia(.55) saturate(.85) hue-rotate(var(--dye-hue)); }
 .tabs { flex-wrap:wrap; }
 .life-card:has(select:focus-visible) { outline:2px solid #7fa494;outline-offset:3px; }
+.garden-test-refresh { font-size:12px; padding:5px 10px; min-height:28px; opacity:.8; box-shadow:none; }
+.garden-invite-dialog { box-sizing:border-box; width:min(560px,calc(100vw - 32px)); max-height:calc(100vh - 40px); overflow:auto; padding:24px; border:2px solid #e7ddc2; border-radius:24px; background:#fff9e9; color:#665b42; box-shadow:0 16px 60px #493e342b; }
+.garden-invite-dialog::backdrop { background:#493e3459; }
+.garden-invite-dialog h2 { margin:0 0 16px; }
+.garden-invite-dialog p { line-height:1.7; }
+.garden-invite-dialog select { display:block; width:100%; padding:12px; margin:16px 0; border:1px solid #e7ddc2; border-radius:12px; background:#fffdf6; color:inherit; font:inherit; }
+.garden-invite-dialog button { margin:4px; max-width:100%; white-space:normal; }

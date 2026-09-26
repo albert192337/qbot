@@ -7,12 +7,13 @@ class Node {
  append(..._nodes:unknown[]){} setAttribute(){} replaceChildren(){} remove(){}
 }
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals()});
-it('repeats short clips, keeps a finished actor moving, and advances after both complete at a clip boundary',()=>{
+it('repeats short clips, keeps a finished actor moving, and advances after both complete at a clip boundary',async()=>{
  vi.useFakeTimers();vi.setSystemTime(0);vi.stubGlobal('document',{body:new Node(),createElement:()=>new Node()});
  const clip={status:'done',webm:'x.webm',durationSec:1};
  const meta={dirId:'a',manifest:{name:'A',actions:{idle:clip,talk_happy:clip,tea:clip}}} as unknown as CharacterMeta;
  const callbacks={start:vi.fn(),play:vi.fn(),replay:vi.fn(),rest:vi.fn(),end:vi.fn()};
  const pair=new PairInteraction(callbacks);pair.start(meta,{...meta,dirId:'b'},'tea');
+ await Promise.resolve(); // The director waits for the main-process handoff before playing.
  for(let t=1000;t<4500;t+=1000){vi.setSystemTime(t);pair.ended('host');}
  expect(callbacks.replay).toHaveBeenCalledTimes(4);expect(callbacks.rest).not.toHaveBeenCalled();expect(callbacks.play).toHaveBeenCalledTimes(1);
  vi.setSystemTime(5000);pair.ended('host');

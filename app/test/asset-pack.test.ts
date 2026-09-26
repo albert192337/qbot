@@ -1,6 +1,6 @@
 /**
  * 联机 L1 资产分发：打包/分块/重组单测（全本地文件操作，不联网）。
- * 重点守隐私铁律（persona 不出包）与恶意包防御（路径穿越/尺寸炸弹/乱序块）。
+ * 重点守角色资料保留（persona 随包分享）与恶意包防御（路径穿越/尺寸炸弹/乱序块）。
  */
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -74,11 +74,11 @@ describe('packCharacterDir / unpackCharacter', () => {
     expect(existsSync(path.join(dest, 'actions/tea.webm'))).toBe(false);
   });
 
-  it('隐私铁律：persona 不出包（spec §四）', async () => {
+  it('角色人设随市场和联机包保留', async () => {
     const charDir = await makeCharDir();
     const { buffer } = await packCharacterDir(charDir);
-    expect(buffer.includes(Buffer.from('绝不能出本机'))).toBe(false);
-    expect(sanitizeManifest({ persona: 'x', name: 'a' })).toEqual({ name: 'a' });
+    expect(buffer.includes(Buffer.from('绝不能出本机'))).toBe(true);
+    expect(sanitizeManifest({ persona: 'x', name: 'a' })).toEqual({ name: 'a', persona: 'x' });
   });
 
   it('hash 内容寻址：内容变则 hash 变，不变则稳定', async () => {

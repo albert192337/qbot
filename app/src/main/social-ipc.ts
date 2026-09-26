@@ -18,7 +18,7 @@ export function registerSocialIpc(steamService: () => Pick<ReturnType<typeof get
     if ((await getSettings()).roomsChatConsent) return true;
     const win=BrowserWindow.fromWebContents(event.sender);if(!win)return false;
     const result=await dialog.showMessageBox(win,{type:'info',title:'一起玩之前',message:'让朋友看到你的小屋与桌宠',
-      detail:'房间会同步昵称、角色动作、当前状态，以及桌宠实际举起的牌面文字（可能包含歌曲名或工作提示）。角色美术素材会缓存供房友展示，不含人设和私人对话。手动发送的聊天保留最近 50 条，世界聊天对广场用户公开。'+(Rooms.isSecureTransport()?'':'\n\n当前房间连接未加密，聊天与牌面文字将通过此连接传输。'),
+      detail:'房间会同步昵称、角色动作、当前状态，以及桌宠实际举起的牌面文字（可能包含歌曲名或工作提示）。角色昵称、人设和美术素材会同步给房友，用于展示和角色互动，不含私人对话。手动发送的聊天保留最近 50 条，世界聊天对广场用户公开。'+(Rooms.isSecureTransport()?'':'\n\n当前房间连接未加密，聊天与牌面文字将通过此连接传输。'),
       buttons:['知道了，继续','暂不加入'],defaultId:0,cancelId:1});
     if(result.response!==0)return false;
     await setSettings({roomsChatConsent:true});return true;

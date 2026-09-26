@@ -40,6 +40,7 @@ app.whenReady().then(async()=>{try{
  'behavior:getIdlePlan':()=>null,'settings:get':()=>({voiceEnabled:false,talkFrequency:'quiet',freeMode:true}),
  'progress:get':()=>({points:0,boxes:0,inventory:{},idleMs:0}), 'characters:getActive':()=>active,
  'characters:list':async()=>{await wait(delayList);return [host,guest]},
+ 'characters:pairDialogue':async(_event,_guestId,kind)=>kind==='chat'?['书里有个有趣的故事。','讲给我听听呀。','慢慢说给你听。']:['先歇一会儿吧。','好呀，我陪着你。'],
  'agent:getStatus':()=>({activity:'idle',sessions:0}), 'meeting:getStatus':()=>({inMeeting:false}), 'music:getStatus':()=>({playing:false})};
  for(const [key,fn] of Object.entries(handlers))ipcMain.handle(key,fn);
  win=new BrowserWindow({width:360,height:360,frame:false,transparent:true,show:false,webPreferences:{preload:path.join(root,'app/out/preload/index.js'),offscreen:true,backgroundThrottling:false}});
@@ -81,6 +82,16 @@ app.whenReady().then(async()=>{try{
    await end();
    assert.equal(peer.isVisible(),true,'original peer restored on completion');
   }
+ }
+ for(const recipient of [false,true]){
+  win.webContents.send('pet:menuCommand',{type:'networkPair',partner:'friend',kind:'tea',recipient,guest,lines:['翻完这页，一起喝茶吧。','好呀，茶还温着呢。']});
+  await until(()=>evaluate(`document.querySelector('#pair-interaction')?.dataset.beat==='0'`),'generated host line');
+  assert.equal(await evaluate(`document.querySelector('.pair-caption:not([hidden])')?.textContent`),'翻完这页，一起喝茶吧。');
+  assert.equal(await evaluate(`document.querySelector('.pair-caption:not([hidden])')?.dataset.speaker`),recipient?'guest':'host');
+  await until(()=>evaluate(`document.querySelector('#pair-interaction')?.dataset.beat==='1'`),'generated guest line');
+  assert.equal(await evaluate(`document.querySelector('.pair-caption:not([hidden])')?.textContent`),'好呀，茶还温着呢。');
+  assert.equal(await evaluate(`document.querySelector('.pair-caption:not([hidden])')?.dataset.speaker`),recipient?'host':'guest');
+  await end();
  }
  win.webContents.send('pet:menuCommand',{type:'networkPair',partner:'friend',kind:'heart',recipient:false,guest});
  await until(()=>evaluate(`!!document.querySelector('#pair-interaction')`),'network departure setup');

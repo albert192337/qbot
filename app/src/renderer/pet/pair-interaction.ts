@@ -28,7 +28,7 @@ export class PairInteraction {
   private transitionVersion = 0;
   constructor(private callbacks: PairCallbacks) {}
   isActive(): boolean { return this.root !== null; }
-  start(host: CharacterMeta, guest: CharacterMeta, kind: PairKind, live=false, recipient=false, partner?:string): void {
+  start(host: CharacterMeta, guest: CharacterMeta, kind: PairKind, live=false, recipient=false, partner?:string, lines?:string[]): void {
     this.cancel();
     this.host = host; this.guest = guest; this.swapped = false; this.overrides.clear();
     this.root = document.createElement('div'); this.root.id = 'pair-interaction';
@@ -43,7 +43,7 @@ export class PairInteraction {
     const toolbar = document.createElement('div'); toolbar.className = 'pair-toolbar';
     const names = document.createElement('span'); names.className = 'pair-names';
     names.textContent = `${host.manifest.name} · ${guest.manifest.name}`;
-    names.title = live?'双方同意的互动；缺少朝向信息时可手动转向。':'本地双人试演；缺少朝向信息时可手动转向。回应为试演台词。';
+    names.title = live?'双方同意的互动；缺少朝向信息时可手动转向。':'本地双人试演；缺少朝向信息时可手动转向。回应按角色人设生成，模型不可用时使用备用台词。';
     toolbar.append(names);
     const button = (label: string, click: () => void) => {
       const b = document.createElement('button'); b.textContent = label; b.onclick = click; toolbar.append(b);
@@ -56,7 +56,7 @@ export class PairInteraction {
     document.body.classList.add('pair-mode');
     const scene=this.root;
     const ready=this.callbacks.start(guest,partner);
-    const beats = pairBeats(kind).map(beat=>recipient?{...beat,host:beat.guest,guest:beat.host,speaker:beat.speaker==='host'?'guest' as const:'host' as const,effect:beat.effect==='host-talk'?'guest-talk' as const:beat.effect==='guest-talk'?'host-talk' as const:beat.effect}:beat);
+    const beats = pairBeats(kind).map((beat,i)=>({...beat,caption:lines?.[i]??beat.caption})).map(beat=>recipient?{...beat,host:beat.guest,guest:beat.host,speaker:beat.speaker==='host'?'guest' as const:'host' as const,effect:beat.effect==='host-talk'?'guest-talk' as const:beat.effect==='guest-talk'?'host-talk' as const:beat.effect}:beat);
     const advance = (index: number) => {
       if (!this.root || this.ending) return;
       const beat = beats[index];
@@ -71,7 +71,7 @@ export class PairInteraction {
       this.root.dataset.beat = String(index);
       this.applyFacing();
       for (const who of ['host', 'guest'] as const) {
-        captions[who].hidden = live || who !== beat.speaker;
+        captions[who].hidden = (live && !lines?.length) || who !== beat.speaker;
         captions[who].textContent = who === beat.speaker ? beat.caption : '';
         captions[who].title = who === 'host' ? host.manifest.name : guest.manifest.name;
       }

@@ -69,6 +69,6 @@ it('offers one merged perch repair entry for older characters',()=>{
  manifest.actions.perch_lie={...done,status:'failed'};
  const prompts={actions:{perch:{poseDesc:'pose',motionDesc:'motion'}}} as Parameters<typeof collectActions>[1];
  const entries=collectActions(manifest,prompts).filter(a=>a.id.startsWith('perch'));
- expect(entries).toHaveLength(1);expect(entries[0]).toMatchObject({id:'perch',label:'窗沿停靠'});
+ expect(entries).toHaveLength(1);expect(entries[0]).toMatchObject({id:'perch',label:'窗沿停靠',status:'missing'});
  expect(manifest.actions.perch).toBeUndefined();
 });

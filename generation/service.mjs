@@ -194,11 +194,20 @@ export async function createGenerationService({ dataDir, pipeline, config, invit
             if (m.phase === 'awaiting_pick') return;
             const job = await pipeline.Job.load(dirFor(id));
             const failed = Object.keys(job.state.actions).filter(a => job.state.actions[a]?.status === 'failed');
-            if (m.phase === 'done' && !failed.length) return;
             if (input.actions !== undefined) {
-              if (!Array.isArray(input.actions) || !input.actions.length || input.actions.some(a => !failed.includes(a))) throw fail(400, '仅能选择失败的动作进行修复');
+              const canAdd = a => a === 'perch' && pipeline.ACTION_IDS?.includes(a) &&
+                (!job.state.actions[a] || job.state.actions[a].status === 'pending' && !job.state.baseActionIds?.includes(a));
+              if (!Array.isArray(input.actions) || !input.actions.length || input.actions.some(a => !failed.includes(a) && !canAdd(a))) throw fail(400, '仅能修复失败动作或补充尚未生成的窗沿停靠');
               m.actions = [...new Set(input.actions)];
-            } else m.actions = undefined;
+              // Explicit opt-in only: never expand an old task during ordinary resume.
+              const base = job.state.baseActionIds ?? Object.keys(job.state.actions);
+              for (const a of m.actions) job.state.actions[a] ??= { status: 'pending', attempts: { frame: 0, video: 0 } };
+              job.state.baseActionIds = [...new Set([...base, ...m.actions])];
+              await job.save();
+            } else {
+              if (m.phase === 'done' && !failed.length) return;
+              m.actions = undefined;
+            }
             m.attempts++;
           }
           if (input.persona !== undefined) {

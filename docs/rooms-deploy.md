@@ -1,5 +1,35 @@
 # 公共房间服务部署（rooms）
 
+## 2026-09-26 21:31：假人花园刷新测试
+
+- 沿用用户本任务的上线授权与临时 SSH 登录，严格匹配既有主机指纹；未保存密码。仅更新 garden.mjs 和 garden-breeding.mjs，不覆盖其他线上模块或生成核心。
+- 候选专项验证假人/好友权限、金色与待培育作物、冷却/回执、保护正在合作的作物、测试繁育自动接受。停服落盘备份 `/root/qbot-garden-refresh-20260926/state-before.tgz`（0600），SHA256 `a26931def5f7593a73404e970504fe1749ff41d82136a0a4fce5e3113751cedb8`；原两份模块保存在同目录。
+- 正式服务21:31:30恢复，rooms/market/generation均active，rooms NRestarts=0。回退时停rooms、恢复同目录旧两份模块后启动，保留当前玩家数据。
+- 客户端构建/类型检查/隔离Electron通过，正常重启正式客户端后在现有假人好友花园点一次刷新，实际返回成功、1个申请繁育与1个帮忙培育入口。未改变用户背包或发起繁育交易。
+
+## 2026-09-26 21:10：好友花园助育与繁育申请已上线
+
+- 用户明确要求上线；SSH 登录先匹配既有 ED25519 指纹，密码仅通过临时会话不回显输入，未写入文件。
+- 在正式代码副本上仅应用好友花园增量：`garden.mjs`、新增 `garden-breeding.mjs`、`generated/garden-core.cjs`。保留线上旧版地块返回和开箱协议；未将本地其他花园改动整体覆盖到线上。server/companions/pair-dialogue 的 SHA256 前后相同。
+- 服务器候选副本通过好友繁育专项、共同培育、v3 服务端和真实回环 WebSocket 四组回归；17 个已有花园通过规则校验。21:10:15 停服落盘，21:10:20 恢复，加载原有6房间、25份角色包、6位陪伴角色。三个服务 active，rooms `NRestarts=0`。
+- 备份目录 `/root/qbot-garden-friends-20260926/`；完整停服后数据 `state-before.tgz`（0600），SHA256 `f65be2f8dad84aa1546457d641160a42f7319d3657bd09cb3aae3edc37b3c3a9`。旧代码 `garden.before.mjs`、`core.before.cjs`；候选目录、增量补丁和未变文件校验同时保留。回退只恢复旧代码并重启，保留当前玩家数据。
+- 公网独立巡检确认新 `friendBreeding` 返回及无效申请拒绝；三陪伴房/花园读取正常。巡检未聊天、邀请或交易。入口 `scripts/verify-garden-friends-online.mjs`。
+- 客户端重新构建并通过隔离真实界面验收；正式实例正常退出保存后重启，打开好友花园。实际账号只读验证 `online=true`、新繁育接口存在、好友页与2张好友卡加载正常。未发布安装包。
+
+发布 SHA256：garden `4bab415c3405c9eeabd8576ed895f606ae2a8880f407953419abde542302483c1`；garden-breeding `fc9f1e187c2d8a8d2e04ef1859e1e43e89437d6882dcb182148b6f008f46df8f`；core `c4edef3ae6717e871a4b0faac88adfac835a4922dbcba710e7fe89008c599411`。
+
+## 2026-09-26 晚：双人互动人设台词已上线
+
+- 用户明确要求部署。沿用已核验的 ED25519 主机指纹，密码只输入临时 SSH 会话，没有写入文件。仅将双人对话增量应用到线上 `server.mjs` / `companions.mjs`，新增 `pair-dialogue.mjs`，保留线上其他逻辑和 generated 花园规则。
+- 候选目录 `/root/qbot-pair-20260926/candidate` 通过 11 项服务端测试，以及真实回环 WS 邀请/各自回答/冒名拒绝/对话同步/离房重进清理预演。
+- 停服落盘后的备份 `/root/qbot-pair-20260926/state-before.tgz`（0600），SHA256 `56e267f093ad5cdda8d8b7309cd2ff79e20f8fe784ea4ab79ce2baa5d7d88807`。原代码 `server.before.mjs` / `companions.before.mjs` 同目录保留。
+- 正式服务 20:42（北京时间）恢复，加载原有 6 个房间、25 个角色包和 6 位陪伴角色；`active`、`NRestarts=0`，market/generation 服务保持 active。公网三陪伴房、素材/花园读取验证通过。
+- 客户端已正常退出并保存状态，再启动最新构建；核验当前张起灵人设和双人写作 IPC 已加载。天气固定感叹另改为本机人设生成，不依赖房间服务器。
+- 用户额外批准的 3 次实际文本调用全部成功：1 句极光、2 句喝茶。后者经公网服务发起并同步，与生成输出逐字一致；使用独立「人设部署验收」账号，完成后离房，无玩家聊天/交易。详细结果与限制见 `docs/pair-dialogue.md`。
+- 回退：停止 qbot-rooms，将两份 before 文件 install -m644 回 `/opt/qbot-rooms/` 后启动；保留当前玩家数据，不用备份覆盖新增数据。未改 nginx 或系统服务配置。
+
+发布校验：server `59ec285ca53aa7da30714b7a4f35d4fa534c710adb411c85994e8e10d92a9b3a`；companions `cd51e86b6bf0ea0039b3ab28a97a5cf746dc20cf1f034835da193e114543e02c`；pair-dialogue `f2748179c4958f489a356938f7be24c35691c5eed05009ad3014be8eb1bc1526`。
+
 ## 2026-09-25：陪伴角色已上线
 
 - 用户明确授权部署，SSH ED25519 主机指纹通过用户控制台提供值严格核验后登录；凭据没有写入仓库或部署文件。

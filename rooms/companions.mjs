@@ -17,6 +17,15 @@ const THEMES = [
   {roomId:'CMPNIGHT',name:'晚风慢慢聊',kind:'night',description:'闲聊、发呆，给疲惫的一天留个座位 · 陪伴角色小屋',lines:[['要是能把好心情装进饭团就好了。','那今晚的馅料就叫轻松一点。'],['今天想给自己放个小假。','批准，先坐下来喝杯茶。'],['有时候没什么特别的事也挺好。','平平常常的一天也值得好好收尾。']]},
 ];
 const hash = value => createHash('sha256').update(value).digest('hex');
+const USER_PERSONAS = {
+  moss: '虚拟用户，喜欢园艺和早起晒太阳。耐心细心，说话朴实，不催人。',
+  orange: '虚拟用户，直性子，爱吐槽也热心。喜欢游戏和汽水，说话爽快，不故作温柔。',
+  page: '虚拟用户，爱熬夜看书，聊天慢热，偶尔冷幽默，表达简短自然。昵称只是网名，不表示正在读第七页。',
+  cloud: '虚拟用户，做事慢半拍，喜欢泡茶发呆，随性松弛，口吻随和。',
+  moon: '虚拟用户，经常熬夜，夜里精神好，观察细腻，说话直白但顾及他人。',
+  rice: '虚拟用户，喜欢美食，是种花新手，好奇心强，直率，不懂就问。',
+};
+for (const profile of RESIDENTS) profile.userPersona = USER_PERSONAS[profile.key];
 
 /** Validate the same asset-only container consumed by the desktop client. */
 export function readMarketPack(buffer, expected) {
@@ -34,7 +43,7 @@ export function readMarketPack(buffer, expected) {
   const actions=Object.entries({...manifest?.actions,...manifest?.importedActions,...manifest?.expressionActions,...manifest?.customActions})
     .filter(([,a])=>a?.webm&&seen.has(a.webm)&&(!a.status||a.status==='done')).map(([id,a])=>({id,label:a.sourceName??id}));
   if(offset!==buffer.length||!manifest||!actions.length)throw Error('missing playable assets');
-  return {name:String(manifest.name||'市场角色').slice(0,32),actions};
+  return {name:String(manifest.name||'市场角色').slice(0,32),persona:typeof manifest.persona==='string'?manifest.persona.slice(0,4000):'',actions};
 }
 
 export class Companions {
@@ -82,7 +91,7 @@ export class Companions {
         }
         core.advanceV3(s,this.now());
       });
-      const peer={memberId:id,nickname:profile.name,companion:true,profile,actor,packHash:asset.hash,mode:profile.room===1?'working':'idle',action:asset.actions.find(a=>a.id==='idle')?.id??asset.actions[0].id,actions:asset.actions,homeRoomId:THEMES[profile.room].roomId,roomId:THEMES[profile.room].roomId,readyState:1,OPEN:1,hello:true};
+      const peer={memberId:id,nickname:profile.name,companion:true,profile,character:{name:asset.name,persona:asset.persona},actor,packHash:asset.hash,mode:profile.room===1?'working':'idle',action:asset.actions.find(a=>a.id==='idle')?.id??asset.actions[0].id,actions:asset.actions,homeRoomId:THEMES[profile.room].roomId,roomId:THEMES[profile.room].roomId,readyState:1,OPEN:1,hello:true};
       // Virtual peers receive only animation frames; no sockets or hidden external messages.
       peer.send=raw=>{const frame=JSON.parse(raw);if(frame.t==='garden:interaction')this.animate?.(peer,frame);};
       this.peers.push(peer);

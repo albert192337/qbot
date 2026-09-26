@@ -49,14 +49,14 @@ app.whenReady().then(async()=>{
     ipcMain.removeHandler('characters:getActive');ipcMain.handle('characters:getActive',()=>chosen[0]);
     ipcMain.handle('rooms:getSceneMembers',()=>chosen.slice(1).map((m,i)=>({id:'preview-'+i,nickname:m.manifest.name,character:{dirId:m.dirId,manifest:m.manifest},mode:'idle'})));
     ipcMain.handle('desktop:get',()=>({revision:0,hidden:false,hiddenMembers:[],peek:null}));
-    let preset='medium';ipcMain.handle('room:getSizePreset',()=>preset);
-    ipcMain.handle('room:setSizePreset',(_e,value)=>{if(!['small','medium','large'].includes(value))return preset;preset=value;const width={small:600,medium:800,large:1000}[value];win.setContentSize(width,Math.ceil(width*.295)+68);return preset;});
+    let preset='small';ipcMain.handle('room:getSizePreset',()=>preset);
+    ipcMain.handle('room:setSizePreset',(_e,value)=>{if(!['small','medium','large'].includes(value))return preset;preset=value;const width={small:600,medium:800,large:1000}[value];win.setContentSize(width,Math.ceil(width*.295));return preset;});
     ipcMain.handle('rooms:setDisplayMode',()=>{win.close();return 'desktop';});
     ipcMain.on('desktop:menu',()=>require('electron').Menu.buildFromTemplate([
       {label:'这是背景试住，显隐功能请在联机房间中使用',enabled:false},
       {label:'关闭试住窗口',click:()=>win.close()},
     ]).popup({window:win}));
-    win.setContentSize(800,304);win.setAlwaysOnTop(true);win.setTitle('QBot · 联机房间背景试住');
+    win.setContentSize(600,177);win.setAlwaysOnTop(true);win.setTitle('QBot · 联机房间背景试住');
   }
   win.once('ready-to-show',()=>{if(process.env.QBOT_COZY_SHOW==='1'){win.show();win.focus();}});
   if(process.env.QBOT_TEAROOM==='1')win.setTitle('QBot · 窗边茶室试住');

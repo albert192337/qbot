@@ -68,9 +68,10 @@ export async function playNetworkInteraction(frame:Record<string,unknown>):Promi
       paired=true;
       // All first beats have distinct intents, so existing servers also identify the
       // recipient without a protocol upgrade. Later network beats must not restart media.
-      if(frame.step===0)getPetWindow()?.webContents.send('pet:menuCommand',{type:'networkPair',partner:frame.partner,kind,recipient:intent===pairBeats(kind)[0].guest,guest:{...guest,hasUnfinishedJob:false}});
+      if(frame.step===0)getPetWindow()?.webContents.send('pet:menuCommand',{type:'networkPair',partner:frame.partner,kind,recipient:typeof frame.recipient==='boolean'?frame.recipient:intent===pairBeats(kind)[0].guest,lines:Array.isArray(frame.lines)&&frame.lines.length===pairBeats(kind).length&&frame.lines.every(l=>typeof l==='string'&&l.length<=120)?frame.lines:undefined,guest:{...guest,hasUnfinishedJob:false}});
     }
   }
   if(!paired&&action)getPetWindow()?.webContents.send('pet:menuCommand',{type:'play',action:action.id});
+  if(paired&&Array.isArray(frame.lines))return;
   for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:interaction',{kind:frame.kind,caption:frame.caption,effect:frame.effect});
 }

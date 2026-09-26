@@ -95,6 +95,7 @@ const api: QBotApi = {
     saveCard: (rect) => ipcRenderer.invoke('hatch:saveCard', rect),
   },
   characters: {
+    pairDialogue: (guestId, kind) => ipcRenderer.invoke('characters:pairDialogue', guestId, kind),
     list: () => ipcRenderer.invoke('characters:list'),
     activate: (dirId) => ipcRenderer.invoke('characters:activate', dirId),
     rename: (dirId, name) => ipcRenderer.invoke('characters:rename', dirId, name),
@@ -107,6 +108,7 @@ const api: QBotApi = {
     getActive: () => ipcRenderer.invoke('characters:getActive'),
   },
   pet: {
+    getCursor: () => ipcRenderer.invoke('pet:getCursor'),
     perch: () => ipcRenderer.invoke('pet:perch'),
     detachPerch: () => ipcRenderer.send('pet:detachPerch'),
     getPerch: () => ipcRenderer.invoke('pet:getPerch'),

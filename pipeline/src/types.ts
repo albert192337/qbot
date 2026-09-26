@@ -171,6 +171,14 @@ export interface ManifestVoice {
 
 /** 角色资产包 manifest.json（spec §4，两模块唯一接口） */
 export interface Manifest {
+  /** Local realtime renderer; action ids remain the existing interaction contract. */
+  spine?: {
+    skeleton: string;
+    atlas: string;
+    texture: string;
+    skin: 'wuxie' | 'hood';
+    actions: Record<string, string>;
+  };
   resourceAnnotations?: Record<string, { name: string; meaning: string; tags: string[] }>;
   scenePools?: Record<string, string[]>;
   /** Preserve imported artwork without anatomy/style assumptions. */

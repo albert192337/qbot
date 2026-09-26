@@ -1,1 +1,13 @@
-*{box-sizing:border-box}body{margin:0;background:#191a1c;color:#dedbd2;font:12px 'Microsoft YaHei',sans-serif;overflow:hidden}header{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;-webkit-app-region:drag}nav{display:flex;gap:7px;-webkit-app-region:no-drag}button,select{font:inherit;color:inherit;border:1px solid #47484b;background:#303135;border-radius:4px;padding:4px 6px;cursor:pointer}button:hover{background:#544833}button:focus-visible,select:focus-visible{outline:2px solid #dbbd7a}canvas{width:100%;height:auto;aspect-ratio:1000/295;display:block}footer{height:30px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 10px;font-size:10px;color:#afa99a}#status{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}#sources{position:fixed;left:-10000px;top:0}#sources>div{position:relative;width:256px;height:256px}#sources video,#sources img{position:absolute;width:100%;height:100%;object-fit:contain}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;color:#eee7d6;font:12px 'Microsoft YaHei',sans-serif}
+main{width:100%;height:100%;border-radius:7px;overflow:hidden}
+canvas{width:100%;height:100%;display:block}
+header{position:fixed;z-index:2;inset:0 0 auto;height:34px;padding:5px 7px;display:flex;justify-content:flex-end;-webkit-app-region:drag}
+nav{display:flex;gap:4px;opacity:0;transition:opacity .18s;-webkit-app-region:no-drag}
+header:hover nav,header:focus-within nav{opacity:1}
+button,select{font:inherit;color:inherit;border:1px solid #ffffff24;background:#252922b8;border-radius:5px;padding:2px 5px;cursor:pointer;backdrop-filter:blur(8px)}
+button{min-width:25px}button:hover{background:#535544dc}button:focus-visible,select:focus-visible{outline:2px solid #dbbd7a}select option{background:#34382e}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#sources{position:fixed;left:-10000px;top:0}#sources>div{position:relative;width:256px;height:256px}#sources video,#sources img{position:absolute;width:100%;height:100%;object-fit:contain}
+
+button svg{width:15px;height:15px;display:block;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}

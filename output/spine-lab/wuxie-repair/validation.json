@@ -1,0 +1,898 @@
+{
+  "runtime": "4.0.31",
+  "sourceVersion": "4.0.64",
+  "animations": [
+    {
+      "name": "ship_spine_caoduo_eat",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_caoduo_overlook",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_cehui_draw",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_cehui_lookmap",
+      "duration": 8,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_cehui_standread",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_chuanzhang_write",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_drag",
+      "duration": 1.600000023841858,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_dragdown",
+      "duration": 0.6000000238418579,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_idle",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_operate",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_rest_sitchat_L",
+      "duration": 4,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_rest_sitchat_R",
+      "duration": 4,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_run",
+      "duration": 0.800000011920929,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_slack",
+      "duration": 5.3333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_sleep_arrogant",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_sleep_cool",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_sleep_cute",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_sleep_polite",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_think",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_trigger01",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_trigger02_calm",
+      "duration": 2.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_trigger02_confused",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_trigger02_happy",
+      "duration": 2.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_trigger02_vigilant",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_trigger02_wink",
+      "duration": 2.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_walk",
+      "duration": 1.333299994468689,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_xiuxian_touhu_1",
+      "duration": 6,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_xiuxian_touhu_2",
+      "duration": 6,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_xiuxian_touhu_3",
+      "duration": 6.3333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "ship_spine_xiuxian_zizouqi",
+      "duration": 8,
+      "finiteTransforms": true
+    },
+    {
+      "name": "smalltown_spine_player_recruitpartner",
+      "duration": 2.3333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "smalltown_spine_player_visitfriend",
+      "duration": 1.2000000476837158,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_bowuguan_kanshou_loop",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_bowuguan_kanshou_loop_qun",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_bowuguan_konglong_hudong",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_bowuguan_pinkonglong",
+      "duration": 14.33329963684082,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_bowuguan_pinkonglong_nan",
+      "duration": 14.33329963684082,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_bowuguan_pinkonglong_qun",
+      "duration": 14.33329963684082,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_chaguan_shuoshu_hudong",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_chaguan_shuoshu_loop",
+      "duration": 3.233299970626831,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_danren_chigua",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_danren_daqi",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_danren_zhenglun01",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_danren_zhenglun01_nan",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_danren_zhenglun02",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_danren_zhenglun03",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_danren_zhenglun04",
+      "duration": 1.600000023841858,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_dog_player",
+      "duration": 9.600000381469727,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_chuanghuo",
+      "duration": 2.1333000659942627,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_deyi",
+      "duration": 2.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_haixiu",
+      "duration": 3.5332999229431152,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_haixiu_nan",
+      "duration": 3.5332999229431152,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_jingya",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_nanguo",
+      "duration": 2.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_qigugu",
+      "duration": 3.3333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_shengqi",
+      "duration": 2.433300018310547,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_shengqi_nan",
+      "duration": 2.433300018310547,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_weiqu",
+      "duration": 3.5332999229431152,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_wuyu",
+      "duration": 2.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_xianqi",
+      "duration": 3,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_xinxi",
+      "duration": 2.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_xinxi_nan",
+      "duration": 2.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_yiwen",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_zhengzha",
+      "duration": 2.799999952316284,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_face_zhuangsha",
+      "duration": 2.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_gewufang_geshou_loop01",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_gewufang_geshou_loop02",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_gewufang_wuzhe_hudong",
+      "duration": 6.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_gewufang_wuzhe_loop_nan",
+      "duration": 6.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_gewufang_wuzhe_loop_nan_lengku",
+      "duration": 6.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_gewufang_wuzhe_loop_nv",
+      "duration": 6.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_gewufang_wuzhe_xiemu",
+      "duration": 3.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_hunjianghu_jiaomen",
+      "duration": 2.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_hunjianghu_jingjiu",
+      "duration": 4,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_hunjianghu_jingjiu_player",
+      "duration": 4,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_jiulou_chushi_hudong_npc",
+      "duration": 4.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_jiulou_chushi_hudong_player",
+      "duration": 2.9000000953674316,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_jiulou_chushi_loop01",
+      "duration": 2.8333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_jiulou_chushi_loop02",
+      "duration": 4.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_jiulou_chushi_loop03",
+      "duration": 4.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_jiulou_yaohe_hudong_npc",
+      "duration": 8.16670036315918,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_jiulou_yaohe_hudong_player",
+      "duration": 8.66670036315918,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_jiulou_yaohe_loop",
+      "duration": 1.9333000183105469,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_jiulou_yaohe_wangci",
+      "duration": 2.266700029373169,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_jiulou_zhanggui_loop",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_lujiangpu_tiejiang_hudong_npc",
+      "duration": 3.5999999046325684,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_lujiangpu_tiejiang_hudong_player",
+      "duration": 2.266700029373169,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_lujiangpu_tiejiang_loop",
+      "duration": 1.833299994468689,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_lujiangpu_train_loop",
+      "duration": 1.333299994468689,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_lujiangpu_train_stop",
+      "duration": 1.666700005531311,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_lujiangpu_xunlian_hudong",
+      "duration": 3.5,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_malei_guanzhong_loop01",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_malei_guanzhong_loop02",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_malei_qishou_loop",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_malei_qishou_loop_player",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_malei_qishou_walk",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_malei_qishou_walk_player",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_malei_shangren_hudong_npc",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_malei_shangren_hudong_player",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_malei_shangren_loop",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_diaoyu_defeat",
+      "duration": 4.3333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_diaoyu_hudong_npc",
+      "duration": 3,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_diaoyu_hudong_player",
+      "duration": 4,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_diaoyu_loop01",
+      "duration": 2,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_diaoyu_loop02",
+      "duration": 8.33329963684082,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_diaoyu_victory",
+      "duration": 4.3333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_huachuan_douli",
+      "duration": 3.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_huachuan_hudong01_player",
+      "duration": 4.26669979095459,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_huachuan_hudong02_player",
+      "duration": 2.0332999229431152,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_huachuan_hudong_npc01",
+      "duration": 2.3333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_huachuan_hudong_npc02",
+      "duration": 2.3333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_huachuan_hudong_npc03",
+      "duration": 1.666700005531311,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_huachuan_loop",
+      "duration": 1.333299994468689,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_huachuan_loop_kaixin",
+      "duration": 1.333299994468689,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_matou_xiuxi_hudong_npc",
+      "duration": 4,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_banyun_diu",
+      "duration": 0.666700005531311,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_banyun_diu_lianhong",
+      "duration": 0.666700005531311,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_banyun_hudong01",
+      "duration": 6.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_banyun_hudong01_lianhong",
+      "duration": 6.6666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_banyun_hudong01_player",
+      "duration": 6.23330020904541,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_banyun_hudong02_npc01",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_banyun_hudong02_npc02",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_banyun_hudong02_player",
+      "duration": 3,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_banyun_loop",
+      "duration": 2,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_banyun_loop_lianhong",
+      "duration": 2,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_nongzuo_loop",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_xiuxi_arrogant",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_xiuxi_arrogant_hudong_npc",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_xiuxi_cool",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_xiuxi_cool_hudong_npc",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_xiuxi_cute",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_xiuxi_cute_hudong_npc",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_xiuxi_hudong_player",
+      "duration": 3,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_xiuxi_polite",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_minjv_xiuxi_polite_hudong_npc",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_post_landlady_brewtea",
+      "duration": 7.466700077056885,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_post_landlady_sendtea",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_post_player_changeface_sit",
+      "duration": 5.466700077056885,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_post_player_changeface_stand",
+      "duration": 5.466700077056885,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_post_player_sit",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_post_player_stand",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_post_player_taketea",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_post_player_walk",
+      "duration": 1.333299994468689,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_beichuolian",
+      "duration": 3,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_chuolian",
+      "duration": 3,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_egao",
+      "duration": 6,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_hello01",
+      "duration": 2.700000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_hello02",
+      "duration": 2.700000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_niupigu",
+      "duration": 6,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_qianshou_idle_left",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_qianshou_idle_right",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_qianshou_left",
+      "duration": 1.333299994468689,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_qianshou_right",
+      "duration": 1.333299994468689,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_qiaoqiaohua_listen",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_qiaoqiaohua_talk",
+      "duration": 6.400000095367432,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_tietie01",
+      "duration": 4.599999904632568,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_shuangren_tietie02",
+      "duration": 4.599999904632568,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_baifo_loop",
+      "duration": 2.5,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_kanshu_hudong_player",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_kanshu_loop",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_hudong01_npc",
+      "duration": 5,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_hudong01_player",
+      "duration": 2.3333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_hudong02_npc",
+      "duration": 5,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_hudong03_npc",
+      "duration": 4.26669979095459,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_hudong03_player",
+      "duration": 3.4667000770568848,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_hudong04_npc",
+      "duration": 3.233299970626831,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_hudong04_player",
+      "duration": 2.700000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_hudong05_npc",
+      "duration": 10.5,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_hudong06_npc",
+      "duration": 10.5,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_huichen01",
+      "duration": 2,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_huichen02",
+      "duration": 2.1666998863220215,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_loop01",
+      "duration": 3.5332999229431152,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_simiao_qingsao_loop02",
+      "duration": 3.5332999229431152,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_yuchong_huiyin_loop",
+      "duration": 7.3333001136779785,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_yuchong_wanchongwu_bianbie",
+      "duration": 3.200000047683716,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_yuchong_wanchongwu_hudong_npc",
+      "duration": 4.800000190734863,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_yuchong_wanchongwu_hudong_player",
+      "duration": 4.800000190734863,
+      "finiteTransforms": true
+    },
+    {
+      "name": "town_yuchong_wanchongwu_loop",
+      "duration": 4.3333001136779785,
+      "finiteTransforms": true
+    }
+  ],
+  "errors": [],
+  "scope": "All animations: finite bone transforms at five samples, six actions screenshot-reviewed; not a visual approval of every animation."
+}

@@ -1,0 +1,405 @@
+{
+  "id": "spine-wuxie",
+  "name": "Spine 吴邪",
+  "createdAt": "2026-09-26T00:00:00Z",
+  "tier": "S",
+  "pipelineVersion": "1",
+  "sourceImage": "source.png",
+  "sourceImagePurpose": "portrait",
+  "turnaround": "",
+  "persona": "你是吴邪，温和好奇、重情义，善于观察，讲话自然有生活气息。",
+  "voice": {
+    "pack": "soft",
+    "pitchScale": 1,
+    "rateScale": 1
+  },
+  "actions": {
+    "idle": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 3.2,
+      "status": "done",
+      "facing": "left"
+    },
+    "drag": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 1.6,
+      "status": "done",
+      "facing": "left"
+    },
+    "sleep": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 3.2,
+      "status": "done",
+      "facing": "left"
+    },
+    "tea": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 3.2,
+      "status": "done",
+      "facing": "left"
+    },
+    "talk_happy": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 2.6667,
+      "status": "done",
+      "facing": "left"
+    },
+    "talk_annoyed": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 3.3333,
+      "status": "done",
+      "facing": "left"
+    },
+    "wave": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 2.7,
+      "status": "done",
+      "facing": "left"
+    },
+    "stretch": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 5.3333,
+      "status": "done",
+      "facing": "left"
+    },
+    "perch": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 3.2,
+      "status": "done",
+      "facing": "left",
+      "perchAnchor": 0.79
+    },
+    "writing": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 3.2,
+      "status": "done",
+      "facing": "left"
+    }
+  },
+  "customActions": {
+    "walk": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 1.3333,
+      "status": "done",
+      "facing": "left"
+    },
+    "run": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 0.8,
+      "status": "done",
+      "facing": "left"
+    },
+    "heart": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 4.6,
+      "status": "done",
+      "facing": "left"
+    },
+    "talk": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 6.4,
+      "status": "done",
+      "facing": "right"
+    },
+    "listen": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 6.4,
+      "status": "done",
+      "facing": "left"
+    },
+    "thinking": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 6.4,
+      "status": "done",
+      "facing": "left"
+    },
+    "working": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 3.2,
+      "status": "done",
+      "facing": "left"
+    },
+    "garden_sow": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 6.4,
+      "status": "done",
+      "facing": "left"
+    },
+    "garden_harvest": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 4.3333,
+      "status": "done",
+      "facing": "left"
+    }
+  },
+  "expressionActions": {
+    "cheer": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 3.2,
+      "status": "done",
+      "facing": "left"
+    },
+    "curious": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 3.2,
+      "status": "done",
+      "facing": "left"
+    },
+    "dance": {
+      "webm": "",
+      "gif": "",
+      "durationSec": 6.6667,
+      "status": "done",
+      "facing": "left"
+    }
+  },
+  "resourceAnnotations": {
+    "idle": {
+      "name": "安静待机",
+      "meaning": "安静待机",
+      "tags": [
+        "idle"
+      ]
+    },
+    "drag": {
+      "name": "被拎起来",
+      "meaning": "被拎起来",
+      "tags": [
+        "drag"
+      ]
+    },
+    "sleep": {
+      "name": "侧躺睡觉",
+      "meaning": "侧躺睡觉",
+      "tags": [
+        "sleep"
+      ]
+    },
+    "tea": {
+      "name": "坐下喝茶",
+      "meaning": "坐下喝茶",
+      "tags": [
+        "tea"
+      ]
+    },
+    "talk_happy": {
+      "name": "开心回应",
+      "meaning": "开心回应",
+      "tags": [
+        "talk_happy"
+      ]
+    },
+    "talk_annoyed": {
+      "name": "不高兴",
+      "meaning": "不高兴",
+      "tags": [
+        "talk_annoyed"
+      ]
+    },
+    "wave": {
+      "name": "挥手打招呼",
+      "meaning": "挥手打招呼",
+      "tags": [
+        "wave"
+      ]
+    },
+    "stretch": {
+      "name": "伸展放松",
+      "meaning": "伸展放松",
+      "tags": [
+        "stretch"
+      ]
+    },
+    "perch": {
+      "name": "坐在窗沿",
+      "meaning": "坐在窗沿",
+      "tags": [
+        "perch"
+      ]
+    },
+    "writing": {
+      "name": "记录手账",
+      "meaning": "记录手账",
+      "tags": [
+        "writing"
+      ]
+    },
+    "walk": {
+      "name": "向左走路",
+      "meaning": "向左走路",
+      "tags": [
+        "walk"
+      ]
+    },
+    "run": {
+      "name": "小跑",
+      "meaning": "小跑",
+      "tags": [
+        "run"
+      ]
+    },
+    "heart": {
+      "name": "亲近送心",
+      "meaning": "亲近送心",
+      "tags": [
+        "heart"
+      ]
+    },
+    "talk": {
+      "name": "轻声聊天",
+      "meaning": "轻声聊天",
+      "tags": [
+        "talk"
+      ]
+    },
+    "listen": {
+      "name": "认真倾听",
+      "meaning": "认真倾听",
+      "tags": [
+        "listen"
+      ]
+    },
+    "thinking": {
+      "name": "思考",
+      "meaning": "思考",
+      "tags": [
+        "thinking"
+      ]
+    },
+    "working": {
+      "name": "专心忙碌",
+      "meaning": "专心忙碌",
+      "tags": [
+        "working"
+      ]
+    },
+    "cheer": {
+      "name": "加油庆祝",
+      "meaning": "加油庆祝",
+      "tags": [
+        "cheer"
+      ]
+    },
+    "curious": {
+      "name": "疑惑歪头",
+      "meaning": "疑惑歪头",
+      "tags": [
+        "curious"
+      ]
+    },
+    "dance": {
+      "name": "随音乐摇摆",
+      "meaning": "随音乐摇摆",
+      "tags": [
+        "dance"
+      ]
+    },
+    "garden_sow": {
+      "name": "照料花草",
+      "meaning": "照料花草",
+      "tags": [
+        "garden_sow"
+      ]
+    },
+    "garden_harvest": {
+      "name": "收获的喜悦",
+      "meaning": "收获的喜悦",
+      "tags": [
+        "garden_harvest"
+      ]
+    }
+  },
+  "scenePools": {
+    "idle": [
+      "idle"
+    ],
+    "sleep": [
+      "sleep"
+    ],
+    "tea": [
+      "tea"
+    ],
+    "talk_happy": [
+      "talk_happy"
+    ],
+    "talk_annoyed": [
+      "talk_annoyed"
+    ],
+    "wave": [
+      "wave"
+    ],
+    "perch": [
+      "perch"
+    ],
+    "writing": [
+      "writing"
+    ],
+    "garden_sow": [
+      "garden_sow"
+    ],
+    "garden_harvest": [
+      "garden_harvest"
+    ]
+  },
+  "agentActions": {
+    "thinking": "thinking",
+    "working": "working",
+    "waiting": "curious",
+    "error": "talk_annoyed",
+    "doneAction": "cheer",
+    "doneLoops": 1,
+    "musicAction": "dance",
+    "meetingAction": "listen"
+  },
+  "spine": {
+    "skeleton": "spine/character.json",
+    "atlas": "spine/character.atlas",
+    "texture": "spine/character.png",
+    "skin": "wuxie",
+    "actions": {
+      "idle": "ship_spine_idle",
+      "drag": "ship_spine_drag",
+      "sleep": "ship_spine_sleep_cute",
+      "tea": "town_post_player_taketea",
+      "talk_happy": "town_face_xinxi",
+      "talk_annoyed": "town_face_qigugu",
+      "wave": "town_shuangren_hello01",
+      "stretch": "ship_spine_slack",
+      "perch": "town_post_player_sit",
+      "writing": "ship_spine_chuanzhang_write",
+      "walk": "ship_spine_walk",
+      "run": "ship_spine_run",
+      "heart": "town_shuangren_tietie01",
+      "talk": "town_shuangren_qiaoqiaohua_talk",
+      "listen": "town_shuangren_qiaoqiaohua_listen",
+      "thinking": "ship_spine_think",
+      "working": "ship_spine_operate",
+      "cheer": "town_danren_daqi",
+      "curious": "ship_spine_trigger02_confused",
+      "dance": "town_gewufang_wuzhe_loop_nan",
+      "garden_sow": "town_minjv_nongzuo_loop",
+      "garden_harvest": "town_matou_diaoyu_victory"
+    }
+  }
+}

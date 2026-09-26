@@ -209,9 +209,12 @@ async function startPair(kind: PairKind, guestId: string): Promise<void> {
     }
     if (gardenPerforming) { hud.toast('请等花园动作完成再互动'); return; }
     if (state.kind === 'drag' || pointerDown) return;
+    const lines = await window.qbot.characters.pairDialogue(guestId, kind);
+    if (request !== pairRequest || host !== currentCharacter || document.hidden || gardenPerforming || pointerDown || isDesktopQuiet()) return;
+    if (!lines.length) return;
     window.qbot.pet.detachPerch(); applyPerch(null);
     speaker.interrupt(); cancelHold(); stopDesktopWalk(); clearTimer();
-    pairInteraction.start(host, guest, kind);
+    pairInteraction.start(host, guest, kind, false, false, undefined, lines);
   } catch { if (request === pairRequest) hud.toast('读取角色失败，请重试'); }
 }
 
@@ -730,7 +733,7 @@ stage.addEventListener('contextmenu', (e) => {
 });
 
 window.qbot.pet.onMenuCommand((cmd) => {
-  if(cmd.type==='networkPhoto'||cmd.type==='networkPair'){const host=currentCharacter,guest=cmd.guest;if(!host||document.hidden||isDesktopQuiet()||pointerDown||gardenPerforming||!pairActions(host.manifest).size||!pairActions(guest.manifest).size)return;window.qbot.pet.detachPerch();applyPerch(null);speaker.interrupt();cancelHold();stopDesktopWalk();clearTimer();pairInteraction.start(host,guest,cmd.type==='networkPair'?cmd.kind:'photo',true,cmd.type==='networkPair'&&cmd.recipient,cmd.type==='networkPair'?cmd.partner:undefined);networkPartner=cmd.type==='networkPair'?cmd.partner:undefined;return;}
+  if(cmd.type==='networkPhoto'||cmd.type==='networkPair'){pairRequest++;const host=currentCharacter,guest=cmd.guest;if(!host||document.hidden||isDesktopQuiet()||pointerDown||gardenPerforming||!pairActions(host.manifest).size||!pairActions(guest.manifest).size)return;window.qbot.pet.detachPerch();applyPerch(null);speaker.interrupt();cancelHold();stopDesktopWalk();clearTimer();pairInteraction.start(host,guest,cmd.type==='networkPair'?cmd.kind:'photo',true,cmd.type==='networkPair'&&cmd.recipient,cmd.type==='networkPair'?cmd.partner:undefined,cmd.type==='networkPair'?cmd.lines:undefined);networkPartner=cmd.type==='networkPair'?cmd.partner:undefined;return;}
   if (cmd.type === 'pair') { void startPair(cmd.kind, cmd.guestId); return; }
   if (cmd.type === 'pairEnd') { pairRequest++; pairInteraction.finish(); return; }
   if (cmd.type === 'speak' || cmd.type === 'play') visitOrchestrator.cancelVisit();
