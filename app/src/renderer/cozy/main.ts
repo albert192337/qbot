@@ -7,6 +7,11 @@ compare3d.href = '../cozy3d/index.html';
 compare3d.textContent = '试试真正的 3D 小屋 ↗';
 compare3d.style.cssText = 'color:#788868;font-size:12px;margin-left:auto;margin-right:20px';
 document.querySelector('header')!.insertBefore(compare3d, document.getElementById('save'));
+const tearoom = document.createElement('a');
+tearoom.href = '../tearoom/index.html';
+tearoom.textContent = '试住窗边茶室 ↗';
+tearoom.style.cssText = 'color:#788868;font-size:12px;margin-right:16px';
+document.querySelector('header')!.insertBefore(tearoom, document.getElementById('save'));
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('roomCanvas'), ctx = canvas.getContext('2d')!;
@@ -201,7 +206,7 @@ async function showCharacter(meta: NonNullable<Meta>): Promise<void> {
   const generation = ++characterGeneration; portrait = null;
   actions = player.load(meta.dirId, meta.manifest);
   if (actions.includes('idle')) player.playLooping('idle'); else if (actions.length) player.playLooping(actions[0]);
-  const img = new Image(); img.src = `qbot-asset://${meta.dirId}/${meta.manifest.sourceImage || 'source.png'}`;
+  const img = new Image(); img.src = `qbot-asset://${meta.dirId}/__portrait.png`;
   try { await img.decode(); if (generation === characterGeneration) portrait = img; } catch { /* The playable asset remains the primary source. */ }
 }
 $('friend').addEventListener('change', () => { const meta = characters.find(m => m.dirId === $<HTMLSelectElement>('friend').value); if (meta) void showCharacter(meta); });

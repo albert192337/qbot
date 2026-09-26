@@ -11,6 +11,19 @@ function garden(){const r=rng(),s=initialGarden(now,r);ensureLife(s,now,r,'pet')
 function seed(s:ReturnType<typeof garden>,sp:Species='strawberry',genes:Trait[]=[]){const x={id:`seed-${++id}`,species:sp,genes,bred:false};s.seeds.push(x);return x;}
 function planted(sp:Species='strawberry',genes:Trait[]=[]){let s=garden();s=transition(s,{type:'plant',seed:seed(s,sp,genes).id,plot:0},now,rng()).state;return s;}
 describe('garden v3 numeric and asset invariants',()=>{
+ it('immediately matures seedlings and settled crops, preserves the roll and remains valid on refresh',()=>{
+  for(const settled of [false,true]){
+   let s=planted();const at=settled?s.plots[0]!.batch!.seedlingEnd:now+1000;
+   if(settled)advanceV3(s,at);
+   s=transition(s,{type:'mature'},at,rng()).state;
+   expect(s.plots[0]!.readyAt).toBeLessThanOrEqual(at);expect(s.plots[0]!.batch!.settled).toBe(true);
+   expect(()=>validateGarden(s)).not.toThrow();
+   const fruit=structuredClone(s.plots[0]);advanceV3(s,at+1000);
+   expect(s.plots[0]).toEqual(fruit);
+   s=transition(s,{type:'mature'},at+1000,rng()).state;
+   expect(s.plots[0]).toEqual(fruit);
+  }
+ });
  it('gives one daily safety seed per account, never per actor or repeated refresh',()=>{const s=garden(),r=rng();ensureLife(s,now,r,'pet');const count=s.seeds.length;for(const actor of ['pet','two','three','four','five'])ensureLife(s,now,r,actor);expect(s.seeds).toHaveLength(count);ensureLife(s,now+86400000,r,'two');expect(s.seeds).toHaveLength(count+1);ensureLife(s,now,r,'pet');expect(s.seeds).toHaveLength(count+1);});
  it('never turns discovering a rare fruit into mandatory expensive daily food',()=>{const s=garden(),r=rng();s.discovered=Object.keys(SPECIES).map(sp=>sp+':base');for(let day=1;day<=30;day++){ensureLife(s,now+day*86400000,r,'pet');expect(s.life!.characters.pet.wishes.slice(0,2).every(w=>['strawberry','tomato'].includes(w.species)&&w.traits.length===0)).toBe(true);}});
  it('rejects a damaged appraisal board and missing batch before loading assets',()=>{const s=planted();delete s.plots[0]!.batch;expect(()=>validateGarden(s)).toThrow('批次');const other=garden();other.v3!.appraisals.fake={row:0,factor:1,done:false,baseKg:1,maxRows:3,history:[],board:Array(7).fill([99,99,99])};expect(()=>validateGarden(other)).toThrow('鉴定记录');});

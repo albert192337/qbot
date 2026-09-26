@@ -67,6 +67,58 @@ test('latest message wins, spontaneous dialogue yields, and asking for quiet sup
 test('missing market does not advertise empty actors',()=>{
   const f=setup();try{const m=new Companions({...f.options,marketDir:path.join(f.dir,'missing')});m.start();assert.equal(m.peers.length,0);assert.equal(m.rooms.length,0);}finally{f.close();}
 });
+
+test('friend requests are delayed, cancellation wins and pending requests resume after restart',()=>{
+  const f=setup();try{
+    let m=f.module;const peer=m.peers[0],user=f.contacts.login(undefined,undefined,'来客','角色');
+    f.contacts.transaction(()=>f.contacts.meet(user.id,peer.memberId));
+    f.contacts.change(user.id,peer.memberId,'request');
+    assert.equal(m.friendsTick(),false);f.advance(7000);assert.equal(m.friendsTick(),false);
+    f.contacts.change(user.id,peer.memberId,'cancel');m.contactChanged(user.id,peer.memberId,'cancel');f.advance(20000);m.friendsTick();assert.equal(f.contacts.areFriends(user.id,peer.memberId),false);
+    f.contacts.change(user.id,peer.memberId,'request');m.friendsTick();
+    m=new Companions(f.options);m.start();m.friendsTick();f.advance(19000);assert.equal(m.friendsTick(),true);
+    assert.equal(f.contacts.snapshot(user.id,new Set([peer.memberId])).find(p=>p.id===peer.memberId).relation,'friend');
+    assert.equal(new Contacts(f.contacts.file).areFriends(user.id,peer.memberId),true);
+    assert.equal(m.friendsTick(),false);
+  }finally{f.close();}
+});
+
+test('one proactive friend request per day, no auto-consent, quiet/left/busy guards and rejection cooldown survive restart',()=>{
+  const f=setup();try{
+    let m=f.module;const peers=m.peers.slice(0,2),identity=f.contacts.login(undefined,undefined,'来客','角色');
+    const user={memberId:identity.id,roomId:peers[0].roomId,readyState:1,OPEN:1,mode:'idle'};
+    f.contacts.transaction(()=>peers.forEach(p=>f.contacts.meet(user.memberId,p.memberId)));
+    m.joined(user);f.advance(160000);m.visits.get(user).quiet=true;assert.equal(m.friendsTick(),false);
+    m.visits.get(user).quiet=false;user.mode='working';assert.equal(m.friendsTick(),false);user.mode='idle';
+    assert.equal(m.friendsTick(),true);const from=f.contacts.people[user.memberId].incoming[0];assert.ok(from);assert.equal(f.contacts.areFriends(from,user.memberId),false);
+    assert.equal(m.friendsTick(),false);assert.equal(f.contacts.people[user.memberId].incoming.length,1);
+    f.contacts.change(user.memberId,from,'reject');m.contactChanged(user.memberId,from,'reject');
+    m=new Companions(f.options);m.start();m.joined(user);f.advance(160000);assert.equal(m.friendsTick(),false);
+    // Tomorrow another room companion may ask, but the rejected one cannot.
+    f.advance(86400000);assert.equal(m.friendsTick(),true);const second=f.contacts.people[user.memberId].incoming[0];assert.notEqual(second,from);
+    f.contacts.change(user.memberId,second,'accept');assert.equal(f.contacts.areFriends(second,user.memberId),true);
+    f.contacts.change(user.memberId,second,'remove');m.contactChanged(user.memberId,second,'remove');
+    f.advance(86400000);assert.equal(m.friendsTick(),false);
+    f.advance(8*86400000);m.left(user);assert.equal(m.friendsTick(),false);
+  }finally{f.close();}
+});
+test('friend visits delay arrival, move one identity, cancel stale invitations and return home',()=>{
+  const f=setup();try{
+    const m=f.module,p=m.peers[0],home=p.roomId,id=f.contacts.login(undefined,undefined,'朋友','角色').id;
+    f.contacts.transaction(()=>f.contacts.meet(id,p.memberId));f.contacts.change(id,p.memberId,'request');f.contacts.change(p.memberId,id,'accept');
+    const user={memberId:id,roomId:'PRIVATE',readyState:1,OPEN:1},moves=[];m.say=()=>{};
+    const move=(peer,room)=>{moves.push(room);peer.roomId=room;return true;};
+    m.inviteToRoom(p,user);assert.throws(()=>m.inviteToRoom(p,user),/busy/);
+    f.advance(3000);m.travelTick(move);assert.equal(p.roomId,home);
+    f.advance(6000);m.travelTick(move);assert.equal(p.roomId,'PRIVATE');assert.equal(m.peers.filter(x=>x.memberId===p.memberId).length,1);
+    assert.throws(()=>m.inviteToRoom(p,user),/same_room/);
+    user.roomId=null;m.travelTick(move);assert.equal(p.roomId,home);
+    user.roomId='PRIVATE';m.inviteToRoom(p,user);user.roomId=null;f.advance(9000);m.travelTick(move);assert.equal(moves.length,2);
+    user.roomId='PRIVATE';m.inviteToRoom(p,user);f.advance(9000);m.travelTick(move);f.advance(15*60000);m.travelTick(move);assert.equal(p.roomId,home);
+    m.inviteToRoom(p,user);f.advance(9000);m.travelTick(move);f.contacts.change(id,p.memberId,'remove');m.travelTick(move);assert.equal(p.roomId,home);
+  }finally{f.close();}
+});
+
 test('tending uses harvest/sale rules, preserves showcase plot and does not touch human assets',()=>{
   const f=setup();try{
     const human=f.contacts.login(undefined,undefined,'真人','角色');f.gardens.transaction(()=>f.gardens.ensure(human.id,'human'));

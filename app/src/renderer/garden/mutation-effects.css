@@ -12,6 +12,7 @@
 .mutation-surface > div { position:absolute;inset:0; }
 .surface-life {background:linear-gradient(125deg,transparent 22%,var(--material-a) 45%,var(--material-b) 52%,transparent 70%);opacity:.48;mix-blend-mode:soft-light;}
 .surface-life-striped {background:repeating-linear-gradient(35deg,transparent 0 12%,#9f764570 13% 16%);mix-blend-mode:multiply;}
+.surface-life-wax {background:linear-gradient(125deg,transparent 38%,#fff9eb 49%,transparent 60%);opacity:.28;mix-blend-mode:soft-light;}
 .surface-life-celadon,.surface-life-nightdye,.surface-life-obsidian,.surface-life-redgold,.surface-life-silver {background:linear-gradient(130deg,var(--material-a) 30%,var(--material-b) 50%,var(--material-a) 75%);mix-blend-mode:color;opacity:.7;}
 .surface-life-prism,.surface-life-iridescent,.surface-life-galaxycore,.surface-life-nebula {background:linear-gradient(130deg,var(--material-a),var(--material-b),#b4e5df);background-size:200% 200%;animation:plant-gold 9s ease-in-out infinite;mix-blend-mode:color;}
 .surface-life-sugar,.surface-life-honey,.surface-life-glassheart {background:radial-gradient(ellipse at 46% 61%,var(--material-a) 0 8%,transparent 9%),radial-gradient(ellipse at 55% 61%,var(--material-a) 0 8%,transparent 9%),radial-gradient(ellipse at 50% 68%,var(--material-b) 0 7%,transparent 8%);mix-blend-mode:screen;opacity:.7;}
@@ -44,7 +45,11 @@
 .arc-glow { stroke:#60cfff;stroke-width:2.6;filter:drop-shadow(0 0 2px #4ebeff); }
 .arc-core { stroke:#f4fcff;stroke-width:.9; }
 .particles-charge i { width:4px;height:4px;background:#fff4ab;box-shadow:0 0 5px #5fcfff;border-radius:50%;animation:plant-charge-particle 2.8s ease-out infinite;animation-delay:calc(var(--i)*-.5s); }
-.particles-star i { width:clamp(4px,8%,12px);aspect-ratio:1;background:#fff0a7;clip-path:polygon(50% 0,61% 38%,100% 50%,61% 62%,50% 100%,39% 62%,0 50%,39% 38%);animation:plant-star 3.2s ease-in-out infinite;animation-delay:calc(var(--i)*-.43s); }
+.particles-star i { width:clamp(4px,8%,12px);aspect-ratio:1;background:#e7f7ff;filter:drop-shadow(0 0 1px #6794b8);clip-path:polygon(50% 0,61% 38%,100% 50%,61% 62%,50% 100%,39% 62%,0 50%,39% 38%);animation:plant-star 3.2s ease-in-out infinite;animation-delay:calc(var(--i)*-.43s); }
+.particles-gold-quality { z-index:3; }
+.particles-gold-quality i { width:clamp(5px,6%,9px);aspect-ratio:1;border-radius:50%;background:#ffd452;border:1px solid #c08722;box-shadow:0 0 4px #ffcf48,0 0 8px #ffe7a480;animation:plant-gold-rise 3.6s ease-in-out infinite;animation-delay:calc(var(--i)*-.72s); }
+.particles-gold-quality i:nth-child(odd) { border-radius:1px;transform:rotate(45deg); }
+@keyframes plant-gold-rise { 0%{translate:0 12px;scale:.65;opacity:.3}35%{opacity:1;scale:1}100%{translate:4px -16px;scale:.55;opacity:.15} }
 .botanical-accessory svg { width:100%;height:100%;overflow:visible; }
 .botanical-accessory { z-index:2;filter:drop-shadow(0 1px 1px #59394530); }
 .art[data-species="apple"][data-art-mode="plant"] .botanical-accessory svg { transform:translateY(6%); }

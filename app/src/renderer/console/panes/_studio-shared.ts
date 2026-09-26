@@ -13,7 +13,8 @@ import { actionDisplayName, type StickerManifest } from '../../../shared/sticker
 /** 标准动作的中文标签（自定义动作直接用动作名）。
  *  口径统一：原先 hatch 叫「呼吸/悬空」、studio 叫「待机/拖拽」，收进同一窗会同屏出现。 */
 export const STD_LABELS: Partial<Record<ActionId, string>> = {
-  perch_sit: '坐窗沿', perch_lie: '趴窗沿',
+  perch: '窗沿停靠',
+  perch_sit: '坐窗沿（旧版）', perch_lie: '趴窗沿（旧版）',
   writing: '写手账',
   idle: '待机', drag: '拖拽', sleep: '睡觉', tea: '喝茶',
   talk_happy: '聊天·开心', talk_annoyed: '聊天·嫌弃',
@@ -92,9 +93,15 @@ export const EXPRESSION_LABELS: Record<string, string> = {
 };
 
 /** 汇总已生成的默认动作、预设动作和自定义动作，供动作列表与联动下拉共用。 */
-export function collectActions(m: Manifest, prompts?: PromptData): ActionInfo[] {
+export function collectActions(m: Manifest, prompts?: PromptData, includeUnfinishedExpressions = false): ActionInfo[] {
   const actions: ActionInfo[] = [];
-  for (const [id, a] of Object.entries(m.actions) as [ActionId, ManifestAction][]) {
+  const standard = { ...m.actions };
+  // Give older characters a single repair entry when no window-edge clip exists.
+  if (prompts?.actions.perch && !standard.perch && standard.perch_sit?.status !== 'done' && standard.perch_lie?.status !== 'done') {
+    standard.perch = { status: 'failed', durationSec: 5, webm: '', gif: '' };
+  }
+  for (const [id, a] of Object.entries(standard) as [ActionId, ManifestAction][]) {
+    if ((id === 'perch_sit' || id === 'perch_lie') && a.status !== 'done') continue;
     const pa = prompts?.actions[id];
     actions.push({
       id,
@@ -116,7 +123,7 @@ export function collectActions(m: Manifest, prompts?: PromptData): ActionInfo[] 
       isCustom: false, isImported: true });
   }
   for (const [id, a] of Object.entries(m.expressionActions ?? {})) {
-    if (a.status !== 'done') continue;
+    if (a.status !== 'done' && !includeUnfinishedExpressions) continue;
     actions.push({
       id,
       label: EXPRESSION_LABELS[id] ?? id,

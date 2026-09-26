@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>窗边茶室 · QBot</title></head>
+<body>
+<header><div><span class="eyebrow">QBOT · A QUIET AFTERNOON</span><h1>窗边，留了几个位置。</h1></div><nav><a href="../diyroom/index.html">新版自由布置 ↗</a><a href="../cozy/index.html">奶油小屋</a><button id="photo">保存照片</button><button id="edit" aria-expanded="true">收起布置</button></nav></header>
+<main><div class="scene"><canvas id="scene" aria-label="窗边茶室，角色在四个固定位置休息"></canvas><p id="loading" role="status">正在请朋友进来…</p></div></main>
+<section id="controls" aria-label="安排角色"><div id="spots" role="group" aria-label="选择位置"></div><div class="fields"><label>这里的朋友<select id="character"></select></label><label>已有动作<select id="action"></select></label><label>角色大小 <output id="sizeValue"></output><input id="size" type="range" min="65" max="145" value="100"></label><label>落脚微调<input id="offset" type="range" min="-45" max="45" value="0"></label><button id="save">记住这次安排</button></div><p id="note" role="status"></p></section>
+<footer><span>窗边茶室 · 固定位置试住</span><span id="summary">午后，适合一起发会儿呆。</span></footer><div id="sources" aria-hidden="true"></div>
+<script type="module" src="./main.ts"></script></body></html>

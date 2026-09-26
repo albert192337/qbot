@@ -5,6 +5,7 @@ import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsSt
 
 const api: QBotApi = {
   desktop: {
+    openMenu: () => ipcRenderer.send('desktop:menu'),
     get: () => ipcRenderer.invoke('desktop:get'),
     toggle: () => ipcRenderer.invoke('desktop:toggle'),
     setMemberHidden: (id, hidden) => ipcRenderer.invoke('desktop:member', id, hidden),
@@ -61,6 +62,8 @@ const api: QBotApi = {
     get: () => ipcRenderer.invoke('garden:get'),
     act: command => ipcRenderer.invoke('garden:act', command),
     toggle: () => ipcRenderer.send('garden:toggle'),
+    collapse: () => ipcRenderer.send('garden:collapse'),
+    drag: (phase, x, y) => ipcRenderer.send('garden:drag', phase, x, y),
     open: page => ipcRenderer.send('garden:open', page),
     ignoreMouse: ignore => ipcRenderer.send('garden:ignore', ignore),
     onAnchor: cb => { const fn = (_ev: unknown, anchor: Parameters<typeof cb>[0]) => cb(anchor); ipcRenderer.on('garden:anchor', fn); return () => ipcRenderer.removeListener('garden:anchor', fn); },
@@ -74,8 +77,8 @@ const api: QBotApi = {
       ipcRenderer.on('hatch:cloudStatus', listener);
       return () => ipcRenderer.removeListener('hatch:cloudStatus', listener);
     },
-    start: (refImagePath, imageProvider, characterForm, characterStyle, name) =>
-      ipcRenderer.invoke('hatch:start', refImagePath, imageProvider, characterForm, characterStyle, name),
+    start: (refImagePath, imageProvider, characterForm, characterStyle, name, persona) =>
+      ipcRenderer.invoke('hatch:start', refImagePath, imageProvider, characterForm, characterStyle, name, persona),
     deleteTask: (dirId) => ipcRenderer.invoke('hatch:deleteTask', dirId),
     resume: (dirId) => ipcRenderer.invoke('hatch:resume', dirId),
     redo: (dirId) => ipcRenderer.invoke('hatch:redo', dirId),
@@ -217,6 +220,8 @@ const api: QBotApi = {
     open: () => ipcRenderer.send('rooms:open'),
     getDisplayMode: () => ipcRenderer.invoke('rooms:getDisplayMode'),
     setDisplayMode: (mode) => ipcRenderer.invoke('rooms:setDisplayMode', mode),
+    getSceneMembers: () => ipcRenderer.invoke('rooms:getSceneMembers'),
+    onSceneChanged: cb => { const fn=()=>cb(); ipcRenderer.on('rooms:sceneChanged',fn); return()=>ipcRenderer.removeListener('rooms:sceneChanged',fn); },
     list: (kind, q) => ipcRenderer.invoke('rooms:list', kind, q),
     create: (input) => ipcRenderer.invoke('rooms:create', input),
     join: (roomId) => ipcRenderer.invoke('rooms:join', roomId),

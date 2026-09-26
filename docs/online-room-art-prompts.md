@@ -1,0 +1,16 @@
+# 联机房间原画提示词
+
+使用内置 image_gen（非 CLI）。目标为 3.39:1 横向浅纵深房间，实际结果约 3:1，客户端等比裁显至 1000×295。
+
+## 太空舱
+
+Create a finished game background only: a panoramic spaceship habitation cabin for tiny chibi desktop companions. Exactly 3.39:1 wide shallow room composition, near-frontal camera very slightly looking down, side wall reveals narrow at both edges, full back wall, thin ceiling strip, floor bottom 22%. Rich tactile hand-painted 3D game diorama aesthetic, dark defined contours, subtle aged metal panel texture, bevels, warm amber practical lights balanced with cool blue planet light, strong contact shadows, restrained bloom, sophisticated cozy sci-fi atmosphere. Large central rear panoramic porthole shows a planet and starfield, left wall storage lockers and life support pipes, right back wall compact workbench and seats. All furniture clustered against rear wall and side edges. Keep entire FRONT floor lane unobstructed across width for a row of 6 characters, feet at 93% image height. Detailed but legible at 600px width. Absolutely NO people, creatures, characters, logos, words, watermarks, UI, outside border. Single full bleed room image, desired resolution 2032x600 or nearest supported wide panoramic aspect, not a collage.
+
+## 观星书房
+
+Create one finished panoramic game room background, no characters: a cozy nocturnal observatory library inside a fantasy airship, a large round star-map window in rear wall, antique brass telescope at far right, bookshelves left and right, teal upholstered rear bench, warm shaded wall lamps, dark walnut carved paneling, astronomy charts without readable text. SAME shallow near-frontal diorama camera suitable for a row of tiny chibi desktop companions. Target panoramic aspect 3.39:1 (2032x600 desired), full bleed single image. Thin ceiling, narrow side wall reveals, back wall straight horizontal, floor bottom 22 percent. All furniture against back wall or extreme sides, entire front floor lane clear for 6 characters feet at 93% image height. Rich hand-painted 3D game texture, defined dark edges, weathered wood/brass, tactile materials, ambient occlusion contact shadows, warm amber contrasted midnight blue, moderately stylized rather than photoreal, readable reduced to 600px width. No people, animals, silhouettes, logos, UI, text, border or collage.
+
+## 雨夜温室
+
+Single finished panoramic game background: rainy midnight greenhouse cafe in a whimsical fantasy city. Wide shallow near-frontal room, desired 2032x600 aspect 3.39:1, full bleed no border. Back wall made of dark iron greenhouse windows with rain droplets and blue rainy garden outside, warm hanging lanterns, terracotta plants on back shelves, small ivory espresso machine and wood bar at far left, moss green rear bench, copper watering can and tall ferns at far right. Rich hand-painted stylized 3D diorama aesthetic with detailed woodgrain, metal bevels, textile texture, strong grounding shadows and tasteful warm/cool contrast, crisp silhouettes readable when shrunk to 600px. Thin ceiling strip, narrow left/right wall reveals, floor bottom 22 percent. Furniture pushed against rear wall, completely unobstructed front floor path across entire width for 6 tiny chibi companions, feet at 93 percent height. No humans, no animals, no characters, no words, no logos, no watermark, no UI, no collage. Peaceful and tactile, not flat vector pastel.
+

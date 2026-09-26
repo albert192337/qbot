@@ -11,7 +11,7 @@ import { registerSocialIpc } from '../../src/main/social-ipc';
 import * as Rooms from '../../src/main/rooms/rooms';
 import * as Windows from '../../src/main/windows';
 import * as Pets from '../../src/main/rooms/room-pets';
-import { wireRoomPetDisplay, getRoomDisplayMode, setRoomDisplayMode } from '../../src/main/rooms/room-pet-display';
+import { wireRoomPetDisplay, getRoomDisplayMode, getRoomSceneMembers, setRoomDisplayMode } from '../../src/main/rooms/room-pet-display';
 
 const root=process.env.QBOT_QA_ROOT!;
 app.setPath('userData',process.env.QBOT_QA_DATA!);
@@ -25,7 +25,7 @@ app.whenReady().then(async()=>{
     await writeFile(path.join(target,'manifest.json'),JSON.stringify(manifest));
   }
   await writeFile(path.join(chars,'.peer-0123456789abcdef','.social-origin.json'),JSON.stringify({nickname:'昨日房友'}));
-  await writeFile(path.join(app.getPath('userData'),'config.json'),JSON.stringify({activeCharacter:'host',nickname:'小岛来客',roomsShowMyPet:false,roomsChatConsent:true}));
+  await writeFile(path.join(app.getPath('userData'),'config.json'),JSON.stringify({activeCharacter:'host',nickname:'小岛来客',roomsShowMyPet:false,roomsChatConsent:true,roomsDisplayMode:'desktop'}));
   session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_r,cb)=>cb({cancel:true}));
   protocol.handle('qbot-asset',async request=>{
     const u=new URL(request.url);const file=path.resolve(chars,u.hostname,decodeURIComponent(u.pathname).slice(1));
@@ -57,6 +57,10 @@ app.whenReady().then(async()=>{
   }
   registerSocialIpc(fakeSteam ? () => fakeSteam! : getSteam);
   const handlers:Record<string,(...args:any[])=>unknown>={
+    'rooms:getSceneMembers':()=>getRoomSceneMembers(),
+    'room:getSizePreset':()=>Windows.getRoomSizePreset(),
+    'room:setSizePreset':(_e,preset)=>Windows.setRoomSizePreset(preset),
+    'characters:getActive':async()=>({dirId:'host',manifest:JSON.parse(await readFile(path.join(chars,'host/manifest.json'),'utf8')),hasUnfinishedJob:false}),
     'rooms:getCache':()=>Rooms.getRoomsCache(),'rooms:getStatus':()=>Rooms.getRoomsStatus(),
     'rooms:list':(_e,kind,q)=>Rooms.listRooms(kind,q),'rooms:create':(_e,input)=>Rooms.createRoom(input),'rooms:join':(_e,id)=>Rooms.joinRoom(id),
     'rooms:leave':()=>Rooms.leaveRoom(),'rooms:update':(_e,patch)=>Rooms.updateRoom(patch),'rooms:kick':(_e,id)=>Rooms.kickMember(id),

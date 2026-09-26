@@ -227,7 +227,7 @@ function flush() {
   dirty = false;
   try {
     const tmp = `${DATA_FILE}.tmp`;
-    writeFileSync(tmp, JSON.stringify({ rooms: [...rooms.values()].filter(r=>!r.companion) }));
+    writeFileSync(tmp, JSON.stringify({ rooms: [...rooms.values()].filter(r=>!r.companion).map(r=>({...r,members:r.members.filter(m=>!m.companion)})) }));
     renameSync(tmp, DATA_FILE); // 原子替换：崩在写一半也不会留下坏档
   } catch (err) {
     console.error('[rooms] flush failed:', err.message);
@@ -433,6 +433,7 @@ function upsertMember(room, ws) {
     room.members.push(m);
   }
   m.nickname = ws.nickname;
+  if(ws.companion)m.companion=true;
   if (ws.avatarHash) m.avatarHash = ws.avatarHash;
   m.lastSeenAt = now;
   room.lastActiveAt = now;
@@ -455,8 +456,32 @@ function leaveRoom(ws, notify = true) {
   if (room) {
     const m = room.members.find((x) => x.memberId === ws.memberId);
     if (m) { m.lastSeenAt = Date.now(); dirty = true; }
+    if(ws.companion&&roomId!==ws.homeRoomId)room.members=room.members.filter(m=>m.memberId!==ws.memberId);
   }
   if (notify) broadcast(roomId, { t: 'member:out', roomId, memberId: ws.memberId });
+}
+
+function occupiedCount(roomId){
+  return onlineCount(roomId)+(companions?.peers.filter(p=>p.homeRoomId===roomId&&p.roomId!==roomId).length??0);
+}
+function moveCompanion(peer,roomId,user){
+  const room=rooms.get(roomId);
+  if(!room)return false;
+  if(peer.roomId===roomId)return true;
+  if(user&&(room.banned.includes(peer.memberId)||occupiedCount(roomId)>=room.capacity||pairBusy.get(peer.memberId)>Date.now())){
+    fail(user,'invite_unavailable');return false;
+  }
+  for(const [id,i] of pairInvites)if(i.from===peer.memberId||i.to===peer.memberId)pairInvites.delete(id);
+  pairBusy.delete(peer.memberId);
+  leaveRoom(peer);
+  peer.roomId=roomId;peer.mode=roomId===peer.homeRoomId&&peer.profile.room===1?'working':'idle';
+  if(!online.has(roomId))online.set(roomId,new Set());
+  online.get(roomId).add(peer);
+  const member=upsertMember(room,peer);
+  contacts.transaction(()=>{for(const p of online.get(roomId))contacts.meet(peer.memberId,p.memberId);});
+  broadcast(roomId,{t:'member:in',roomId,member:{...member,online:true,mode:peer.mode,action:peer.action,packHash:peer.packHash}});
+  for(const p of online.get(roomId))if(!p.companion){companions.joined(p);const visit=companions.visits.get(p);if(visit)visit.lastSpoke=Date.now();}
+  notifyContacts();return true;
 }
 
 // ── 聊天限流（spec §5.2）──────────────────────────────────
@@ -580,15 +605,24 @@ const handlers = {
     if (!contactRate(ws)) return;
     try { contacts.change(ws.memberId, f.id, f.action); }
     catch(e) { fail(ws, /^contact|^request|^already|^bad_frame/.test(e.message) ? e.message : 'server_error'); return; }
+    companions?.contactChanged(ws.memberId,f.id,f.action);
     send(ws, {t:'contacts:ack'}); notifyContacts();
   },
   'contacts:invite'(ws, f) {
     if (!contactRate(ws)) return;
     const room = rooms.get(ws.roomId);
     if (!room || !contacts.areFriends(ws.memberId, f.id)) { fail(ws, 'invite_unavailable'); return; }
+    const companion=companions?.peers.find(p=>p.memberId===f.id);
+    if(companion){
+      if(room.banned.includes(f.id)){fail(ws,'invite_unavailable');return;}
+      if(occupiedCount(room.roomId)>=room.capacity){fail(ws,'room_full');return;}
+      if(pairBusy.get(f.id)>Date.now()){fail(ws,'companion_busy');return;}
+      try{companions.inviteToRoom(companion,ws);}catch(e){fail(ws,e.message);return;}
+      send(ws,{t:'contacts:ack'});return;
+    }
     const targets = [...wss.clients].filter(p => p.memberId === f.id && p.hello && p.readyState === p.OPEN);
     if (!targets.length) { fail(ws, 'contact_offline'); return; }
-    if (onlineCount(room.roomId) >= room.capacity) { fail(ws, 'room_full'); return; }
+    if (occupiedCount(room.roomId) >= room.capacity) { fail(ws, 'room_full'); return; }
     for (const [id, invite] of contactInvites) if (invite.expiresAt < Date.now() || invite.from === ws.memberId && invite.to === f.id) contactInvites.delete(id);
     const id = randomBytes(16).toString('hex');
     contactInvites.set(id, {from:ws.memberId, to:f.id, roomId:room.roomId, expiresAt:Date.now()+120000});
@@ -607,7 +641,7 @@ const handlers = {
     const inviter = [...wss.clients].find(p => p.memberId === invitation.from && p.roomId === invitation.roomId && p.readyState === p.OPEN);
     if (f.action !== 'accept' || !inviter || invitation.expiresAt < Date.now() || !contacts.areFriends(invitation.from, ws.memberId)) { fail(ws, 'invite_expired'); return; }
     const room = rooms.get(invitation.roomId);
-    if (!room || room.banned.includes(ws.memberId) || onlineCount(room.roomId) >= room.capacity && ws.roomId !== room.roomId) { fail(ws, 'invite_unavailable'); return; }
+    if (!room || room.banned.includes(ws.memberId) || occupiedCount(room.roomId) >= room.capacity && ws.roomId !== room.roomId) { fail(ws, 'invite_unavailable'); return; }
     // Joining is explicit; normal join enforces capacity and bans again on arrival.
     send(ws, {t:'contacts:ack', roomId:room.roomId});
   },
@@ -665,7 +699,7 @@ const handlers = {
     if (room.banned.includes(ws.memberId)) { fail(ws, 'banned'); return; }
     // 已在别的房：先退（一条连接同时只在一个房里）
 
-    if (ws.roomId !== room.roomId && onlineCount(room.roomId) >= room.capacity) {
+    if (ws.roomId !== room.roomId && occupiedCount(room.roomId) >= room.capacity) {
       fail(ws, 'room_full');
       return;
     }
@@ -938,7 +972,7 @@ const handlers = {
     if (f.token !== room.ownerToken) { fail(ws, 'not_owner'); return; }
     if (f.roomId && f.roomId !== ws.roomId) { fail(ws, 'not_in_room'); return; }
     if (f.capacity !== undefined) {
-      if (!Number.isInteger(f.capacity) || f.capacity < Math.max(CAPACITY_MIN, onlineCount(room.roomId)) || f.capacity > CAPACITY_MAX) { fail(ws, 'bad_capacity'); return; }
+      if (!Number.isInteger(f.capacity) || f.capacity < Math.max(CAPACITY_MIN, occupiedCount(room.roomId)) || f.capacity > CAPACITY_MAX) { fail(ws, 'bad_capacity'); return; }
       room.capacity = f.capacity;
     }
     if (typeof f.description === 'string') room.description = clampText(f.description, 200);
@@ -1073,7 +1107,7 @@ if(process.env.QBOT_COMPANIONS==='1'){
       else{room.chat=[...room.chat,msg].slice(-CHAT_KEEP);room.lastActiveAt=msg.at;broadcast(room.roomId,{t:'chat',roomId:room.roomId,msg});}
     };
     companions.say=say;
-    companionTimer=setInterval(()=>{try{companions.tick({humans:[...wss.clients].filter(p=>p.hello),worldActive:worldPeers.size>0,say,pending:pairInvites,
+    companionTimer=setInterval(()=>{try{companions.tick({humans:[...wss.clients].filter(p=>p.hello),worldActive:worldPeers.size>0,say,pending:pairInvites,notifyContacts,moveCompanion,
       invite:(peer,user,kind)=>handleGardenInteraction(peer,{action:'pair:invite',target:user.memberId,actor:peer.actor,kind}),
       answer:(peer,id)=>handleGardenInteraction(peer,{action:'pair:answer',id,accept:true,actor:peer.actor,response:'happy'})});}catch{console.error('[companions] tick failed');}},1000);
     companionTimer.unref();console.log(`[companions] residents=${companions.peers.length} rooms=${companions.rooms.length}`);

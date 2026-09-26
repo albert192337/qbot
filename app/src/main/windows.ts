@@ -1,6 +1,6 @@
 /** 窗口管理：桌宠透明置顶窗 + 孵化常规窗 + 小房间窗 + dock 显隐协调 */
 import { BrowserWindow, app, screen, shell } from 'electron';
-import { trackDesktopWindow, allowDesktopWindow, desktopQuiet, desktopHidden, onDesktopVisibilityChanged, windowPeeking, setPairedMember } from './desktop-visibility';
+import { trackDesktopWindow, allowDesktopWindow, desktopQuiet, desktopHidden, desktopSnapshot, onDesktopVisibilityChanged, windowPeeking, setPairedMember } from './desktop-visibility';
 import path from 'node:path';
 import type { CharacterMeta, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
 import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset, resolveRoomSceneSize } from './rooms/rooms-rules';
@@ -13,8 +13,6 @@ import { moveFixedSize } from './fixed-window';
 import { attachPetWindowLayer, raisePetWindowGroup } from './pet-window-layer';
 
 const PET_SIZE = 360;
-/** 房间宠上屏窗：比本地宠小一档（房友是客人体量），固定尺寸永不 resize */
-const ROOM_PET_SIZE = 200;
 const ROOM_PET_GAP = 20;
 const ROOM_SCENE_PET_SIZE = 180;
 const ROOM_SCENE_PET_GAP = 12;
@@ -37,6 +35,7 @@ let petWindow: BrowserWindow | null = null;
 const roomPetWindows = new Map<string, BrowserWindow>();
 const roomPetSizes = new WeakMap<BrowserWindow, number>();
 let roomWindow: BrowserWindow | null = null;
+let panoramicRoom = false;
 let cozyPreviewWindow: BrowserWindow | null = null;
 let consoleWindow: BrowserWindow | null = null;
 let nurseryWindow: BrowserWindow | null = null;
@@ -75,6 +74,22 @@ let roomSizePreset: RoomSizePreset = 'large';
 /** 桌宠缩放（0.5~2）：窗口即画布，改窗口尺寸即改桌宠大小；右下角锚定 */
 export function setPetScale(scale: number): void {
   petScale = clampPetScale(scale);
+  // 桌面房友跟随本机单人画布，保留手动摆放位置；双人表演的宽度不参与。
+  const peerSize = petTargetSize(petScale);
+  for (const win of roomPetWindows.values()) {
+    if (win.isDestroyed() || win.getParentWindow()) continue;
+    const oldSize = roomPetSizes.get(win) ?? peerSize.width;
+    if (oldSize === peerSize.width) continue;
+    const b = win.getBounds();
+    const area = screen.getDisplayMatching(b).workArea;
+    const peek = desktopSnapshot(win).peek;
+    const x = peek === 'left' ? area.x : peek === 'right' ? area.x + area.width - peerSize.width : b.x + oldSize - peerSize.width;
+    roomPetSizes.set(win, peerSize.width);
+    moveFixedSize(win,
+      Math.max(area.x, Math.min(x, area.x + area.width - peerSize.width)),
+      Math.max(area.y, Math.min(b.y + oldSize - peerSize.height, area.y + area.height - peerSize.height)),
+      peerSize, true);
+  }
   if (!petWindow || petWindow.isDestroyed()) return;
   if (petVisitMode) {
     const b = pairWindowBounds(petScale, petWindow.getBounds(), screen.getDisplayMatching(petWindow.getBounds()).workArea);
@@ -87,7 +102,7 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds();
 }
 
-type RendererPage = 'social' | 'pet' | 'room' | 'cozy' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat' | 'sign';
+type RendererPage = 'social' | 'pet' | 'room' | 'online-room' | 'cozy' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat' | 'sign';
 
 /** A local, framed preview: never changes room membership or the active desktop pet. */
 export function openCozyPreview(): BrowserWindow {
@@ -278,7 +293,7 @@ export function createPetWindow(): BrowserWindow {
 }
 
 // ── 公共房间宠上屏（2026-08-24）──────────────────────────────
-// 固定尺寸键控多窗，永不 resize（血泪坑 4/18）；位置由 layoutRoomPets 算，
+// 键控多窗，尺寸跟随本机桌宠缩放；位置由 layoutRoomPets 算，
 // 每次成员进出整体重排。窗数量 = 在线成员数，用户已明确选择「尽量全部在线」。
 
 export function getRoomPetWindow(memberId: string): BrowserWindow | null {
@@ -290,11 +305,12 @@ export function ensureRoomPetWindow(memberId: string): BrowserWindow {
   const existing = roomPetWindows.get(memberId);
   if (existing && !existing.isDestroyed()) return existing;
   const { workArea } = screen.getPrimaryDisplay();
+  const size = petTargetSize(petScale).width;
   const win = new BrowserWindow({
-    width: ROOM_PET_SIZE,
-    height: ROOM_PET_SIZE,
-    x: workArea.x + workArea.width - ROOM_PET_SIZE, // 摆位前的占位坐标，随即被 layout 覆盖
-    y: workArea.y + workArea.height - ROOM_PET_SIZE,
+    width: size,
+    height: size,
+    x: workArea.x + workArea.width - size, // 摆位前的占位坐标，随即被 layout 覆盖
+    y: workArea.y + workArea.height - size,
     transparent: true,
     frame: false,
     hasShadow: false, // 同 pet 窗：不显式关会有残影阴影框
@@ -315,7 +331,7 @@ export function ensureRoomPetWindow(memberId: string): BrowserWindow {
     if (roomPetWindows.get(memberId) === win) roomPetWindows.delete(memberId);
   });
   roomPetWindows.set(memberId, win);
-  roomPetSizes.set(win, ROOM_PET_SIZE);
+  roomPetSizes.set(win, size);
   load(win, 'pet', { roomPet: '1' });
   return win;
 }
@@ -344,32 +360,34 @@ export function findRoomPetMemberId(win: BrowserWindow): string | null {
 /** Drag only the sending member window, using its last authoritative logical size. */
 export function moveRoomPetWindow(win: BrowserWindow, x: number, y: number): void {
   if (!findRoomPetMemberId(win)) return;
-  const size = roomPetSizes.get(win) ?? ROOM_PET_SIZE;
+  const size = roomPetSizes.get(win) ?? petTargetSize(petScale).width;
   moveFixedSize(win, x, y, {width:size, height:size});
 }
 
 /**
  * 按当前在线成员顺序重排所有宠窗：屏幕底部居中排开，超一行往上叠
  * （layoutRoomPets 是纯函数，这里只管把结果换算成绝对坐标 + setBounds）。
- * 成员进出、petScale 变化后都要调一次；只挪位置，窗口尺寸恒定不变。
+ * 成员进出时重排；缩放设置变化另行原地调整，避免打乱手动摆放。
  *
  * 用 setBounds 而不是 setPosition：分数 DPI 下 setPosition 会让窗口逐次胀大，
  * 必须每次重申权威尺寸（血泪坑 DPI-setPosition）。
  */
 export function layoutRoomPetWindows(orderedMemberIds: readonly string[]): void {
   const { workArea } = screen.getPrimaryDisplay();
-  const slots = layoutRoomPets(orderedMemberIds, workArea.width, ROOM_PET_SIZE, ROOM_PET_GAP);
-  const size = { width: ROOM_PET_SIZE, height: ROOM_PET_SIZE };
+  const size = petTargetSize(petScale);
+  const slots = layoutRoomPets(orderedMemberIds, workArea.width, size.width, ROOM_PET_GAP);
   for (const slot of slots) {
     const win = roomPetWindows.get(slot.memberId);
     if (!win || win.isDestroyed()) continue;
     if(windowPeeking(win))continue;
-    roomPetSizes.set(win, ROOM_PET_SIZE);
+    const changesSize = roomPetSizes.get(win) !== size.width;
+    roomPetSizes.set(win, size.width);
     moveFixedSize(
       win,
       workArea.x + slot.x,
       workArea.y + workArea.height - slot.bottomOffset,
       size,
+      changesSize,
     );
   }
 }
@@ -521,8 +539,8 @@ export function setPetVisitMode(enter: boolean, partner?: string): void {
 }
 
 export function moveRoomWindow(x: number, y: number): void {
-  const s = roomSize();
-  moveFixedSize(roomWindow, x, y, { width: s, height: s });
+  const s = panoramicRoom ? Math.min(({small:600,medium:800,large:1000})[roomSizePreset], screen.getPrimaryDisplay().workArea.width) : roomSize();
+  moveFixedSize(roomWindow, x, y, { width: s, height: panoramicRoom ? Math.ceil(s*.295)+68 : s });
   roomWindowBoundsChanged?.();
 }
 
@@ -553,7 +571,8 @@ export function setRoomSizePreset(preset: RoomSizePreset): RoomSizePreset {
   if (!roomWindow || roomWindow.isDestroyed()) return roomSizePreset;
   const current = roomWindow.getBounds();
   const display = screen.getDisplayMatching(current);
-  const size = roomSize(display);
+  const size = panoramicRoom ? Math.min(({small:600,medium:800,large:1000})[roomSizePreset],display.workArea.width) : roomSize(display);
+  const height = panoramicRoom ? Math.ceil(size * .295) + 68 : size;
   const x = Math.max(
     display.workArea.x,
     Math.min(
@@ -564,16 +583,17 @@ export function setRoomSizePreset(preset: RoomSizePreset): RoomSizePreset {
   const y = Math.max(
     display.workArea.y,
     Math.min(
-      Math.round(current.y + (current.height - size) / 2),
-      display.workArea.y + display.workArea.height - size,
+      Math.round(current.y + (current.height - height) / 2),
+      display.workArea.y + display.workArea.height - height,
     ),
   );
-  moveFixedSize(roomWindow, x, y, { width: size, height: size }, true);
+  moveFixedSize(roomWindow, x, y, { width: size, height }, true);
   roomWindowBoundsChanged?.();
   return roomSizePreset;
 }
 
-export function openRoomWindow(title: string): BrowserWindow {
+export function openRoomWindow(title: string, panoramic = false): BrowserWindow {
+  if(roomWindow && !roomWindow.isDestroyed() && panoramicRoom !== panoramic) roomWindow.close();
   if (roomWindow && !roomWindow.isDestroyed()) {
     roomWindow.focus();
     return roomWindow;
@@ -582,19 +602,22 @@ export function openRoomWindow(title: string): BrowserWindow {
   hideBubbleWindow(); // 角色进小房间：气泡跟着走
   if (process.platform === 'darwin') void app.dock?.show();
   const display = screen.getPrimaryDisplay();
-  const size = roomSize(display);
+  panoramicRoom = panoramic;
+  const size = panoramic ? Math.min(({small:600,medium:800,large:1000})[roomSizePreset],display.workArea.width) : roomSize(display);
+  const height = panoramic ? Math.ceil(size * .295) + 68 : size;
   const { workArea } = display;
   roomWindow = new BrowserWindow({
     show:false,
     width: size,
-    height: size,
+    height,
     // 原来完全没定位，Electron 默认摆放常常偏上角；房间是主要观赏面，居中
     x: Math.round(workArea.x + (workArea.width - size) / 2),
-    y: Math.round(workArea.y + (workArea.height - size) / 2),
+    y: Math.round(workArea.y + (workArea.height - height) / 2),
     useContentSize: true,
     title,
     // 贴纸小屋：只显示房间实体，外沿透明；关闭/拖动由 renderer 自绘
-    transparent: true,
+    transparent: !panoramic,
+    backgroundColor: panoramic ? '#191a1c' : '#00000000',
     frame: false,
     hasShadow: false, // 不显式关会有残影阴影框（同 pet 窗）
     resizable: false, // 透明窗 resize 有渲染 bug
@@ -606,6 +629,7 @@ export function openRoomWindow(title: string): BrowserWindow {
     },
   });
   trackDesktopWindow(roomWindow,'decoration');
+  if(panoramic)roomWindow.setAlwaysOnTop(true,'floating');
   roomWindow.once('ready-to-show',()=>roomWindow?.show());
   roomWindow.on('closed', () => {
     roomWindow = null;
@@ -614,7 +638,7 @@ export function openRoomWindow(title: string): BrowserWindow {
     if (process.platform === 'darwin' && !consoleWindow && !nurseryWindow && !loungeWindow) app.dock?.hide();
   });
   roomWindow.on('move', () => roomWindowBoundsChanged?.());
-  load(roomWindow, 'room');
+  load(roomWindow, panoramic ? 'online-room' : 'room');
   return roomWindow;
 }
 

@@ -20,7 +20,26 @@ export function openPineapplePreview(): BrowserWindow {
   });
   pineappleWindow = win;
   win.on('closed', () => { pineappleWindow = null; });
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  const specimenWindows = new Set<BrowserWindow>();
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    const target = new URL(url), source = new URL(win.webContents.getURL());
+    if (target.origin !== source.origin || target.pathname !== source.pathname || target.searchParams.get('desktop') !== '1') return { action: 'deny' };
+    const slot=specimenWindows.size, columns=Math.max(1,Math.floor(area.width/300));
+    return { action: 'allow', overrideBrowserWindowOptions: {
+      show: true, width: 360, height: 460, x: area.x + Math.max(0,area.width-370-(slot%columns)*300), y: area.y + Math.max(0,area.height-470-(Math.floor(slot/columns)%2)*180),
+      frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false,
+      alwaysOnTop: true, resizable: false, autoHideMenuBar: true,
+      webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+    } };
+  });
+  win.webContents.on('did-create-window', child => {
+    specimenWindows.add(child);
+    child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    child.webContents.once('did-finish-load', () => child.webContents.on('will-navigate', event => event.preventDefault()));
+    child.webContents.on('before-input-event', (_event, input) => { if (input.key === 'Escape') child.close(); });
+    child.on('closed', () => { specimenWindows.delete(child); });
+  });
+  win.on('closed', () => { for (const child of specimenWindows) if (!child.isDestroyed()) child.close(); });
   win.webContents.on('will-navigate', event => event.preventDefault());
   if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/pineapple-preview/index.html`);
   else void win.loadFile(path.join(__dirname, '../renderer/pineapple-preview/index.html'));

@@ -3,7 +3,7 @@ export interface PerchRect { x: number; y: number; width: number; height: number
 /** Contact line within the normalized square animation canvas. */
 export function perchAnchor(action: string, calibrated?: number): number {
   return typeof calibrated === 'number' && Number.isFinite(calibrated) && calibrated > 0 && calibrated <= 1
-    ? calibrated : action === 'perch_sit' ? 0.61 : 0.81;
+    ? calibrated : action === 'perch' ? 0.86 : action === 'perch_sit' ? 0.61 : 0.81;
 }
 export function perchPosition(target: PerchRect, pet: PerchRect, area: PerchRect, fraction: number, anchor: number): { x: number; y: number } | null {
   if (target.width < 120 || target.height < 80) return null;

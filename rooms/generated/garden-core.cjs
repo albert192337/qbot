@@ -34,8 +34,10 @@ __export(server_entry_exports, {
   FERTILIZERS: () => FERTILIZERS,
   FOOD_ICONS: () => FOOD_ICONS,
   FRUITS: () => FRUITS,
+  FRUIT_DRAG_TYPE: () => FRUIT_DRAG_TYPE,
   HARVEST_XP: () => HARVEST_XP,
   LEVEL_XP: () => LEVEL_XP,
+  MAX_GARDEN_PLOTS: () => MAX_GARDEN_PLOTS,
   PAIR_INTERACTIONS: () => PAIR_INTERACTIONS,
   REFRESH_MS: () => REFRESH_MS,
   SLOT_NAMES: () => SLOT_NAMES,
@@ -59,10 +61,12 @@ __export(server_entry_exports, {
   currentGrowth: () => currentGrowth,
   dailyOffers: () => dailyOffers,
   dailyRandom: () => dailyRandom,
+  emptyPlots: () => emptyPlots,
   enableV3: () => enableV3,
   ensureLife: () => ensureLife,
   exposures: () => exposures,
   factorDefinition: () => factorDefinition,
+  feedingWish: () => feedingWish,
   fertilizerDescription: () => fertilizerDescription,
   fertilizerV3: () => fertilizerV3,
   fits: () => fits,
@@ -83,6 +87,7 @@ __export(server_entry_exports, {
   pairActions: () => pairActions,
   pairBeats: () => pairBeats,
   pairFlip: () => pairFlip,
+  plotsAtLevel: () => plotsAtLevel,
   poisson: () => poisson,
   protectPending: () => protectPending,
   protectV3: () => protectV3,
@@ -107,6 +112,7 @@ __export(server_entry_exports, {
   traitSlot: () => traitSlot,
   traitSource: () => traitSource,
   transition: () => transition,
+  unlockedPlots: () => unlockedPlots,
   v3HarvestXp: () => v3HarvestXp,
   v3Transition: () => v3Transition,
   v3Value: () => v3Value,
@@ -114,6 +120,7 @@ __export(server_entry_exports, {
   validateLife: () => validateLife,
   validateV3: () => validateV3,
   value: () => value,
+  visiblePlot: () => visiblePlot,
   weatherRoll: () => weatherRoll,
   weatherWeights: () => weatherWeights,
   weekKey: () => weekKey,
@@ -122,157 +129,6 @@ __export(server_entry_exports, {
   withSize: () => withSize
 });
 module.exports = __toCommonJS(server_entry_exports);
-
-// app/src/shared/travel.ts
-var DESTINATIONS = [
-  { id: "kyoto", name: "\u4EAC\u90FD", region: "\u4E9A\u6D32", subtitle: "\u628A\u65E5\u5B50\u6CE1\u8FDB\u4E00\u676F\u62B9\u8336\u91CC", color: "#d9b5ba", projects: [
-    { name: "\u8336\u5C4B", icon: "tea", steps: ["\u5C1D\u4E00\u676F\u62B9\u8336", "\u5B66\u505A\u548C\u83D3\u5B50", "\u53C2\u52A0\u8336\u4F1A"] },
-    { name: "\u53E4\u8857", icon: "street", steps: ["\u901B\u53E4\u8857\u5C0F\u5E97", "\u6311\u9009\u6D74\u8863", "\u591C\u6E38\u82B1\u706F\u8857"] },
-    { name: "\u5EAD\u9662", icon: "garden", steps: ["\u770B\u5EAD\u9662\u6A31\u82B1", "\u6A31\u82B1\u4E0B\u91CE\u9910", "\u7559\u4E00\u5F20\u5EAD\u9662\u5408\u5F71"] },
-    { name: "\u6E29\u6CC9", icon: "spring", steps: ["\u6CE1\u4E00\u4F1A\u8DB3\u6C64", "\u4F53\u9A8C\u9732\u5929\u6E29\u6CC9", "\u6E29\u6CC9\u65C5\u9986\u7559\u5BBF"] },
-    { name: "\u624B\u4F5C", icon: "craft", steps: ["\u542C\u98CE\u94C3", "\u5236\u4F5C\u98CE\u94C3", "\u5E26\u56DE\u7EAA\u5FF5\u98CE\u94C3"] }
-  ], costs: [80, 140, 220] },
-  { id: "paris", name: "\u5DF4\u9ECE", region: "\u6B27\u6D32", subtitle: "\u6CBF\u7740\u6CB3\u5CB8\uFF0C\u6162\u6162\u8D70", color: "#bbcad9", projects: [
-    { name: "\u9762\u5305\u623F", icon: "tea", steps: ["\u5C1D\u9EC4\u6CB9\u53EF\u9882", "\u70E4\u4E00\u6761\u6CD5\u68CD", "\u51C6\u5907\u91CE\u9910\u7BEE"] },
-    { name: "\u585E\u7EB3\u6CB3", icon: "spring", steps: ["\u6CBF\u6CB3\u6563\u6B65", "\u4E58\u4E00\u6BB5\u6E38\u8239", "\u770B\u843D\u65E5\u6CB3\u5CB8"] },
-    { name: "\u7F8E\u672F\u9986", icon: "craft", steps: ["\u6B23\u8D4F\u753B\u4F5C", "\u753B\u4E00\u5F20\u901F\u5199", "\u6311\u9009\u827A\u672F\u660E\u4FE1\u7247"] },
-    { name: "\u94C1\u5854", icon: "street", steps: ["\u94C1\u5854\u4E0B\u5408\u5F71", "\u767B\u9AD8\u770B\u57CE\u5E02", "\u7B49\u94C1\u5854\u4EAE\u706F"] },
-    { name: "\u82B1\u56ED", icon: "garden", steps: ["\u901B\u82B1\u56ED", "\u55B7\u6CC9\u8FB9\u91CE\u9910", "\u7559\u4E00\u675F\u5E72\u82B1"] }
-  ], costs: [220, 360, 540] },
-  { id: "island", name: "\u6D77\u5C9B", region: "\u5927\u6D0B\u6D32", subtitle: "\u4ECA\u5929\u7684\u8BA1\u5212\uFF0C\u662F\u542C\u6D77", color: "#9ad5ca", projects: [
-    { name: "\u6C99\u6EE9", icon: "garden", steps: ["\u6361\u8D1D\u58F3", "\u5806\u4E00\u5EA7\u6C99\u5821", "\u6C99\u6EE9\u770B\u65E5\u843D"] },
-    { name: "\u6D77\u6E7E", icon: "spring", steps: ["\u5728\u6D45\u6C34\u8E0F\u6D6A", "\u6D6E\u6F5C\u770B\u9C7C\u7FA4", "\u62CD\u4E00\u5F20\u6D77\u5E95\u7167\u7247"] },
-    { name: "\u5C0F\u98DF\u644A", icon: "tea", steps: ["\u559D\u4E00\u676F\u6930\u6C41", "\u54C1\u5C1D\u5F53\u5730\u5C0F\u98DF", "\u51C6\u5907\u6D77\u8FB9\u665A\u9910"] },
-    { name: "\u706F\u5854", icon: "street", steps: ["\u8D70\u8FD1\u706F\u5854", "\u767B\u5854\u770B\u6D77", "\u770B\u706F\u5854\u4EAE\u8D77"] },
-    { name: "\u7EAA\u5FF5\u94FA", icon: "craft", steps: ["\u6311\u8D1D\u58F3", "\u4E32\u8D1D\u58F3\u624B\u94FE", "\u5BC4\u4E00\u5F20\u6D77\u5C9B\u660E\u4FE1\u7247"] }
-  ], costs: [400, 650, 950] }
-];
-function rehearsalTravel(entry) {
-  const t = initialTravel(entry.at);
-  t.current = entry.city;
-  for (let i = 0; i < entry.city; i++) t.progress[i].fill(3);
-  t.progress[entry.city] = [...entry.progress];
-  t.posts = entry.posts;
-  t.diaries = entry.diary ? [entry.diary] : [];
-  return t;
-}
-function initialTravel(now) {
-  return { current: 0, startedAt: now, progress: DESTINATIONS.map((d) => d.projects.map(() => 0)), posts: [], diaries: [] };
-}
-function travelComplete(t, city = t.current) {
-  return t.progress[city].every((n) => n === 3);
-}
-function validateTravel(t) {
-  if (!t || !Number.isInteger(t.current) || t.current < 0 || t.current >= DESTINATIONS.length || !Number.isFinite(t.startedAt) || !Array.isArray(t.progress) || t.progress.length !== DESTINATIONS.length || !t.progress.every((p) => Array.isArray(p) && p.length === 5 && p.every((n) => Number.isInteger(n) && n >= 0 && n <= 3)) || !Array.isArray(t.posts) || !Array.isArray(t.diaries)) throw Error("\u65C5\u884C\u5B58\u6863\u5DF2\u635F\u574F");
-  if (t.progress.some((p, i) => i < t.current && !p.every((n) => n === 3) || i > t.current && p.some((n) => n !== 0))) throw Error("\u65C5\u884C\u8FDB\u5EA6\u4E0D\u4E00\u81F4");
-  for (const p of t.posts) if (!p || typeof p.id !== "string" || !Number.isFinite(p.at) || !Number.isInteger(p.city) || !DESTINATIONS[p.city] || !Number.isInteger(p.project) || !DESTINATIONS[p.city].projects[p.project] || !Number.isInteger(p.step) || p.step < 0 || p.step > 2 || typeof p.title !== "string" || typeof p.text !== "string" || typeof p.liked !== "boolean" || p.portrait !== void 0 && typeof p.portrait !== "string") throw Error("\u65C5\u884C\u56DE\u5FC6\u5DF2\u635F\u574F");
-  if (new Set(t.posts.map((p) => p.id)).size !== t.posts.length) throw Error("\u65C5\u884C\u56DE\u5FC6\u91CD\u590D");
-  for (const d of t.diaries) if (!d || typeof d.day !== "string" || typeof d.actor !== "string" || typeof d.name !== "string" || typeof d.text !== "string" || typeof d.signature !== "string" || !Number.isFinite(d.updatedAt)) throw Error("\u65C5\u884C\u65E5\u8BB0\u5DF2\u635F\u574F");
-  for (const d of t.diaries) if (d.city !== void 0 && (!Number.isInteger(d.city) || !DESTINATIONS[d.city])) throw Error("\u65C5\u884C\u65E5\u8BB0\u5730\u70B9\u65E0\u6548");
-  if (t.moments !== void 0 && (!Array.isArray(t.moments) || t.moments.some((m) => !m || typeof m.id !== "string" || !Number.isFinite(m.at) || typeof m.day !== "string" || typeof m.actor !== "string" || typeof m.name !== "string" || typeof m.text !== "string" || typeof m.liked !== "boolean") || new Set(t.moments.map((m) => m.id)).size !== t.moments.length)) throw Error("\u670B\u53CB\u5708\u8BB0\u5F55\u5DF2\u635F\u574F");
-  if (t.rehearsals !== void 0) {
-    if (!Array.isArray(t.rehearsals) || new Set(t.rehearsals.map((e) => e.id)).size !== t.rehearsals.length) throw Error("\u6D4B\u8BD5\u65C5\u884C\u8BB0\u5F55\u5DF2\u635F\u574F");
-    for (const e of t.rehearsals) {
-      if (!e || typeof e.id !== "string" || typeof e.actor !== "string" || typeof e.name !== "string" || typeof e.liked !== "boolean" || !Number.isFinite(e.at) || !Number.isInteger(e.city) || !DESTINATIONS[e.city] || !Array.isArray(e.progress) || e.progress.length !== 5 || !e.progress.every((n) => Number.isInteger(n) && n >= 0 && n <= 3)) throw Error("\u6D4B\u8BD5\u65C5\u884C\u8BB0\u5F55\u5DF2\u635F\u574F");
-      validateTravel(rehearsalTravel(e));
-    }
-  }
-}
-function travelTransition(s, cmd, now) {
-  const t = s.travel ??= initialTravel(now);
-  validateTravel(t);
-  if (cmd.type === "travelRehearsalLike") {
-    const e = t.rehearsals?.find((e2) => e2.id === cmd.id);
-    if (!e) throw Error("\u8FD9\u6761\u6D4B\u8BD5\u65C5\u884C\u4E0D\u5B58\u5728");
-    e.liked = !e.liked;
-    return;
-  }
-  if (cmd.type === "travelMomentLike") {
-    const m = t.moments?.find((m2) => m2.id === cmd.id);
-    if (!m) throw Error("\u8FD9\u6761\u670B\u53CB\u5708\u4E0D\u5B58\u5728");
-    m.liked = !m.liked;
-    return;
-  }
-  if (cmd.type === "travelLike") {
-    const p = t.posts.find((p2) => p2.id === cmd.id);
-    if (!p) throw Error("\u8FD9\u6761\u56DE\u5FC6\u4E0D\u5B58\u5728");
-    p.liked = !p.liked;
-    return;
-  }
-  if (cmd.city !== t.current) throw Error("\u8BF7\u5728\u5F53\u524D\u76EE\u7684\u5730\u7EE7\u7EED\u65C5\u884C");
-  if (cmd.type === "travelNext") {
-    if (!travelComplete(t)) throw Error("\u5B8C\u6210\u672C\u7AD9\u4F53\u9A8C\u540E\u518D\u51FA\u53D1");
-    if (t.current === DESTINATIONS.length - 1) throw Error("\u65B0\u7684\u76EE\u7684\u5730\u6B63\u5728\u51C6\u5907\u4E2D");
-    t.current++;
-    return;
-  }
-  const d = DESTINATIONS[t.current], project = d.projects[cmd.project];
-  if (!Number.isInteger(cmd.project) || !project || !Number.isInteger(cmd.step) || cmd.step < 0 || cmd.step >= 3 || t.progress[t.current][cmd.project] !== cmd.step) throw Error("\u4F53\u9A8C\u5DF2\u66F4\u65B0\uFF0C\u8BF7\u5237\u65B0\u540E\u518D\u8BD5");
-  const cost = d.costs[cmd.step];
-  if (s.coins < cost) throw Error("\u65C5\u8D39\u8FD8\u5DEE\u4E00\u70B9\uFF0C\u53BB\u6536\u83B7\u4E00\u4E9B\u690D\u7269\u5427");
-  s.coins -= cost;
-  t.progress[t.current][cmd.project]++;
-  const title = project.steps[cmd.step];
-  t.posts.push({ id: `${d.id}-${cmd.project}-${cmd.step}`, at: now, city: t.current, project: cmd.project, step: cmd.step, title, text: `\u4ECA\u5929\u5728${d.name}\uFF0C${title}\u3002\u53C8\u591A\u4E86\u4E00\u6BB5\u548C\u4F60\u4E00\u8D77\u7684\u56DE\u5FC6\u3002`, liked: false });
-}
-
-// app/src/shared/garden-life.ts
-var DAY_MS = 864e5;
-var COOP_RULES = { work: 64800, speed: 360, maxPlayers: 8, leaseMs: 15e3, minSeconds: 20, minContribution: 0.02, dailyRewards: 5 };
-var coopRareChance = (participants) => 0.18 + 0.09 * (Math.max(1, Math.min(8, participants)) - 1) / 7;
-var gardenDay = (now) => Math.floor((now + 4 * 36e5) / DAY_MS);
-var nextGardenDay = (day) => (day + 1) * DAY_MS - 4 * 36e5;
-var CHARACTER_XP = [0, 20, 60, 120, 200, 300, 440, 620, 840, 1100];
-var characterLevel = (xp) => CHARACTER_XP.filter((x) => xp >= x).length;
-var CHARACTER_UNLOCKS = [{ level: 3, kind: "flower", name: "\u9001\u82B1" }, { level: 5, kind: "photo", name: "\u5E76\u6392\u5408\u5F71" }, { level: 8, kind: "relay", name: "\u8868\u60C5\u63A5\u529B" }, { level: 10, kind: "celebrate", name: "\u5171\u540C\u5E86\u795D" }];
-var FRUITS = ["strawberry", "tomato", "blueberry", "pineapple", "apple"];
-var FOOD_ICONS = { lotus: "\u{1FAB7}", strawberry: "\u{1F353}", sunflower: "\u{1F33B}", carrot: "\u{1F955}", tomato: "\u{1F345}", blueberry: "\u{1FAD0}", pineapple: "\u{1F34D}", apple: "\u{1F34E}", tulip: "\u{1F337}" };
-var DYE_COLORS = { cream: { name: "\u5976\u6CB9", hue: 35 }, mint: { name: "\u8584\u8377\u7EFF", hue: 105 }, pink: { name: "\u6A31\u7C89", hue: 320 }, lilac: { name: "\u6DE1\u7D2B", hue: 260 }, ocean: { name: "\u6D77\u84DD", hue: 180 } };
-var SPRAYS = {
-  color: { name: "\u8272\u5F69\u55B7\u96FE", price: 90, description: "\u968F\u673A\u67D3\u6210\u4E00\u79CD\u989C\u8272 \xB7 \u4E0D\u589E\u52A0\u8BCD\u6761\u6216\u552E\u4EF7", pool: [] },
-  fruit: { name: "\u679C\u5B9E\u55B7\u96FE", price: 150, description: "\u679C\u5B9E\u69FD\u968F\u673A\u83B7\u5F97\u4E00\u4E2A\u8BCD\u6761", pool: ["sugar", "fragrant", "juicy", "twin", "honey", "nectar", "milky", "softcore", "delicate", "abundant", "starcore", "nebula", "glassheart", "galaxycore"] },
-  material: { name: "\u6750\u8D28\u55B7\u96FE", price: 180, description: "\u679C\u76AE\u69FD\u968F\u673A\u83B7\u5F97\u4E00\u4E2A\u8BCD\u6761", pool: ["mint", "coral", "velvet", "purple", "frost", "dew", "striped", "celadon", "wax", "pearl", "nightdye", "golden", "jade", "crystal", "amber", "redgold", "silver", "obsidian", "rainbow", "prism", "iridescent", "daylight"] },
-  charm: { name: "\u6302\u9970\u55B7\u96FE", price: 180, description: "\u6302\u9970\u69FD\u968F\u673A\u83B7\u5F97\u4E00\u4E2A\u8BCD\u6761", pool: ["shiny", "firefly", "petals", "mist", "raindrop", "leafwhistle", "punk", "classical", "breezy", "flowerknot", "butterfly", "snowbell", "thunder", "moon", "glowring", "goldbell", "stardust", "halo", "meteorRing", "dreambutterfly"] },
-  moon: { name: "\u6708\u591C\u55B7\u96FE", price: 260, description: "\u6708\u591C\u4E3B\u9898\u968F\u673A\u8BCD\u6761", pool: ["nightdye", "moon", "stardust"] }
-};
-function traitSource(t) {
-  if (traitSlot(t) === "size") return "\u6700\u7EC8\u91CD\u91CF\u6D3E\u751F / \u589E\u91CD\u80A5 / \u91CD\u91CF\u9274\u5B9A" + (t === "mini" ? "" : " / \u4F53\u578B\u9057\u4F20");
-  const sources = Object.keys(SPRAYS).filter((k) => SPRAYS[k].pool.includes(t)).map((k) => SPRAYS[k].name);
-  for (const w of Object.values(V3_WEATHER)) if (w.pool.includes(t)) sources.unshift(w.name);
-  const species2 = Object.entries(AFFINITIES).filter(([, pool]) => pool.includes(t)).map(([sp]) => SPECIES[sp].name);
-  if (species2.length) sources.push(species2.join("\u3001") + "\u4EB2\u548C");
-  sources.push("\u6742\u4EA4\u9057\u4F20");
-  return sources.join(" / ");
-}
-function sprayPool(kind) {
-  if (kind === "color") return Object.keys(DYE_COLORS).map((dye) => ({ dye, weight: 1 }));
-  return SPRAYS[kind].pool.map((trait) => ({ trait, weight: { blue: 60, purple: 30, gold: 9, rainbow: 1, normal: 60, green: 60 }[TRAITS[trait].tier] }));
-}
-function dailyRandom(key) {
-  let s = 2166136261;
-  for (const c of key) s = Math.imul(s ^ c.charCodeAt(0), 16777619);
-  return () => {
-    s += 1831565813;
-    let t = Math.imul(s ^ s >>> 15, 1 | s);
-    t ^= t + Math.imul(t ^ t >>> 7, 61 | t);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
-function dailyOffers(owner, day) {
-  const random = dailyRandom(`shop-v1:${owner}:${day}`);
-  const kinds = Object.keys(SPRAYS).map((k) => ({ k, r: random() })).sort((a, b) => a.r - b.r).slice(0, 2).map((x) => x.k);
-  const seeds = Object.keys(SPECIES).map((k) => ({ k, r: random() })).sort((a, b) => a.r - b.r).slice(0, 3).map((x) => x.k);
-  return [...kinds.map((k) => ({ id: `${day}:spray:${k}`, kind: "spray", item: k, price: SPRAYS[k].price, limit: 1 })), ...seeds.map((k) => ({ id: `${day}:seed:${k}`, kind: "seed", item: k, price: SPECIES[k].price, limit: 3 }))];
-}
-function wishMatches(w, p) {
-  return !w.done && !p.locked && !needsReveal(p) && p.species === w.species && w.traits.every((t) => p.traits.includes(t));
-}
-function wishLabel(w) {
-  return `${SPECIES[w.species].name} \xD71${w.traits.length ? " \xB7 " + w.traits.map((t) => TRAITS[t].name).join("\uFF0B") : ""}`;
-}
-function currentGrowth(s) {
-  return s.activeActor ? s.life?.characters[s.activeActor] : void 0;
-}
 
 // app/src/shared/garden-v3.ts
 var V3 = { version: 3, seedling: 0.8, lambda: 1.1, affinity: 0.25, affinityMax: 4, weatherPity: 12, rainbowPity: 32, cultivationMs: 18e4, weeklyBreeds: 90, breedPity: 9, hourIncome: 24, dayXp: 60 };
@@ -527,6 +383,169 @@ function gardenQuest(s) {
   return { text: count < Object.keys(SPECIES).length ? `\u6536\u96C6\u4E0D\u540C\u690D\u7269\uFF08${count}/${Object.keys(SPECIES).length}\uFF09` : "\u690D\u7269\u56FE\u9274\u5DF2\u96C6\u9F50 \xB7 \u53BB\u770B\u770B\u65B0\u7684\u8BCD\u6761", page: "book" };
 }
 
+// app/src/shared/garden-life.ts
+var DAY_MS = 864e5;
+var COOP_RULES = { work: 64800, speed: 360, maxPlayers: 8, leaseMs: 15e3, minSeconds: 20, minContribution: 0.02, dailyRewards: 5 };
+var coopRareChance = (participants) => 0.18 + 0.09 * (Math.max(1, Math.min(8, participants)) - 1) / 7;
+var gardenDay = (now) => Math.floor((now + 4 * 36e5) / DAY_MS);
+var nextGardenDay = (day) => (day + 1) * DAY_MS - 4 * 36e5;
+var CHARACTER_XP = [0, 20, 60, 120, 200, 300, 440, 620, 840, 1100];
+var characterLevel = (xp) => CHARACTER_XP.filter((x) => xp >= x).length;
+var CHARACTER_UNLOCKS = [{ level: 3, kind: "flower", name: "\u9001\u82B1" }, { level: 5, kind: "photo", name: "\u5E76\u6392\u5408\u5F71" }, { level: 8, kind: "relay", name: "\u8868\u60C5\u63A5\u529B" }, { level: 10, kind: "celebrate", name: "\u5171\u540C\u5E86\u795D" }];
+var FRUITS = ["strawberry", "tomato", "blueberry", "pineapple", "apple"];
+var FOOD_ICONS = { lotus: "\u{1FAB7}", strawberry: "\u{1F353}", sunflower: "\u{1F33B}", carrot: "\u{1F955}", tomato: "\u{1F345}", blueberry: "\u{1FAD0}", pineapple: "\u{1F34D}", apple: "\u{1F34E}", tulip: "\u{1F337}" };
+var DYE_COLORS = { cream: { name: "\u5976\u6CB9", hue: 35 }, mint: { name: "\u8584\u8377\u7EFF", hue: 105 }, pink: { name: "\u6A31\u7C89", hue: 320 }, lilac: { name: "\u6DE1\u7D2B", hue: 260 }, ocean: { name: "\u6D77\u84DD", hue: 180 } };
+var SPRAYS = {
+  color: { name: "\u8272\u5F69\u55B7\u96FE", price: 90, description: "\u968F\u673A\u67D3\u6210\u4E00\u79CD\u989C\u8272 \xB7 \u4E0D\u589E\u52A0\u8BCD\u6761\u6216\u552E\u4EF7", pool: [] },
+  fruit: { name: "\u679C\u5B9E\u55B7\u96FE", price: 150, description: "\u679C\u5B9E\u69FD\u968F\u673A\u83B7\u5F97\u4E00\u4E2A\u8BCD\u6761", pool: ["sugar", "fragrant", "juicy", "twin", "honey", "nectar", "milky", "softcore", "delicate", "abundant", "starcore", "nebula", "glassheart", "galaxycore"] },
+  material: { name: "\u6750\u8D28\u55B7\u96FE", price: 180, description: "\u679C\u76AE\u69FD\u968F\u673A\u83B7\u5F97\u4E00\u4E2A\u8BCD\u6761", pool: ["mint", "coral", "velvet", "purple", "frost", "dew", "striped", "celadon", "wax", "pearl", "nightdye", "golden", "jade", "crystal", "amber", "redgold", "silver", "obsidian", "rainbow", "prism", "iridescent", "daylight"] },
+  charm: { name: "\u6302\u9970\u55B7\u96FE", price: 180, description: "\u6302\u9970\u69FD\u968F\u673A\u83B7\u5F97\u4E00\u4E2A\u8BCD\u6761", pool: ["shiny", "firefly", "petals", "mist", "raindrop", "leafwhistle", "punk", "classical", "breezy", "flowerknot", "butterfly", "snowbell", "thunder", "moon", "glowring", "goldbell", "stardust", "halo", "meteorRing", "dreambutterfly"] },
+  moon: { name: "\u6708\u591C\u55B7\u96FE", price: 260, description: "\u6708\u591C\u4E3B\u9898\u968F\u673A\u8BCD\u6761", pool: ["nightdye", "moon", "stardust"] }
+};
+function traitSource(t) {
+  if (traitSlot(t) === "size") return "\u6700\u7EC8\u91CD\u91CF\u6D3E\u751F / \u589E\u91CD\u80A5 / \u91CD\u91CF\u9274\u5B9A" + (t === "mini" ? "" : " / \u4F53\u578B\u9057\u4F20");
+  const sources = Object.keys(SPRAYS).filter((k) => SPRAYS[k].pool.includes(t)).map((k) => SPRAYS[k].name);
+  for (const w of Object.values(V3_WEATHER)) if (w.pool.includes(t)) sources.unshift(w.name);
+  const species2 = Object.entries(AFFINITIES).filter(([, pool]) => pool.includes(t)).map(([sp]) => SPECIES[sp].name);
+  if (species2.length) sources.push(species2.join("\u3001") + "\u4EB2\u548C");
+  sources.push("\u6742\u4EA4\u9057\u4F20");
+  return sources.join(" / ");
+}
+function sprayPool(kind) {
+  if (kind === "color") return Object.keys(DYE_COLORS).map((dye) => ({ dye, weight: 1 }));
+  return SPRAYS[kind].pool.map((trait) => ({ trait, weight: { blue: 60, purple: 30, gold: 9, rainbow: 1, normal: 60, green: 60 }[TRAITS[trait].tier] }));
+}
+function dailyRandom(key) {
+  let s = 2166136261;
+  for (const c of key) s = Math.imul(s ^ c.charCodeAt(0), 16777619);
+  return () => {
+    s += 1831565813;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t ^= t + Math.imul(t ^ t >>> 7, 61 | t);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function dailyOffers(owner, day) {
+  const random = dailyRandom(`shop-v1:${owner}:${day}`);
+  const kinds = Object.keys(SPRAYS).map((k) => ({ k, r: random() })).sort((a, b) => a.r - b.r).slice(0, 2).map((x) => x.k);
+  const seeds = Object.keys(SPECIES).map((k) => ({ k, r: random() })).sort((a, b) => a.r - b.r).slice(0, 3).map((x) => x.k);
+  return [...kinds.map((k) => ({ id: `${day}:spray:${k}`, kind: "spray", item: k, price: SPRAYS[k].price, limit: 1 })), ...seeds.map((k) => ({ id: `${day}:seed:${k}`, kind: "seed", item: k, price: SPECIES[k].price, limit: 3 }))];
+}
+function wishMatches(w, p) {
+  return !w.done && !p.locked && !needsReveal(p) && p.species === w.species && w.traits.every((t) => p.traits.includes(t));
+}
+function wishLabel(w) {
+  return `${SPECIES[w.species].name} \xD71${w.traits.length ? " \xB7 " + w.traits.map((t) => TRAITS[t].name).join("\uFF0B") : ""}`;
+}
+function currentGrowth(s) {
+  return s.activeActor ? s.life?.characters[s.activeActor] : void 0;
+}
+
+// app/src/shared/garden-progression.ts
+var MAX_GARDEN_PLOTS = 7;
+var plotsAtLevel = (level2) => Math.min(7, Math.max(3, level2 + 2));
+var unlockedPlots = (state) => plotsAtLevel(characterLevel(currentGrowth(state)?.xp ?? 0));
+var visiblePlot = (state, index) => index < unlockedPlots(state) || !!state.plots[index];
+var emptyPlots = (state) => state.plots.filter((p, i) => !p && i < unlockedPlots(state)).length;
+function feedingWish(state, fruit) {
+  if (state.life?.pending?.target === fruit.id || state.v3?.appraisals[fruit.id] && !state.v3.appraisals[fruit.id].done) return void 0;
+  return currentGrowth(state)?.wishes.filter((w) => wishMatches(w, fruit)).sort((a, b) => b.xp - a.xp)[0];
+}
+var FRUIT_DRAG_TYPE = "application/x-qbot-garden-fruit";
+
+// app/src/shared/travel.ts
+var DESTINATIONS = [
+  { id: "kyoto", name: "\u4EAC\u90FD", region: "\u4E9A\u6D32", subtitle: "\u628A\u65E5\u5B50\u6CE1\u8FDB\u4E00\u676F\u62B9\u8336\u91CC", color: "#d9b5ba", projects: [
+    { name: "\u8336\u5C4B", icon: "tea", steps: ["\u5C1D\u4E00\u676F\u62B9\u8336", "\u5B66\u505A\u548C\u83D3\u5B50", "\u53C2\u52A0\u8336\u4F1A"] },
+    { name: "\u53E4\u8857", icon: "street", steps: ["\u901B\u53E4\u8857\u5C0F\u5E97", "\u6311\u9009\u6D74\u8863", "\u591C\u6E38\u82B1\u706F\u8857"] },
+    { name: "\u5EAD\u9662", icon: "garden", steps: ["\u770B\u5EAD\u9662\u6A31\u82B1", "\u6A31\u82B1\u4E0B\u91CE\u9910", "\u7559\u4E00\u5F20\u5EAD\u9662\u5408\u5F71"] },
+    { name: "\u6E29\u6CC9", icon: "spring", steps: ["\u6CE1\u4E00\u4F1A\u8DB3\u6C64", "\u4F53\u9A8C\u9732\u5929\u6E29\u6CC9", "\u6E29\u6CC9\u65C5\u9986\u7559\u5BBF"] },
+    { name: "\u624B\u4F5C", icon: "craft", steps: ["\u542C\u98CE\u94C3", "\u5236\u4F5C\u98CE\u94C3", "\u5E26\u56DE\u7EAA\u5FF5\u98CE\u94C3"] }
+  ], costs: [80, 140, 220] },
+  { id: "paris", name: "\u5DF4\u9ECE", region: "\u6B27\u6D32", subtitle: "\u6CBF\u7740\u6CB3\u5CB8\uFF0C\u6162\u6162\u8D70", color: "#bbcad9", projects: [
+    { name: "\u9762\u5305\u623F", icon: "tea", steps: ["\u5C1D\u9EC4\u6CB9\u53EF\u9882", "\u70E4\u4E00\u6761\u6CD5\u68CD", "\u51C6\u5907\u91CE\u9910\u7BEE"] },
+    { name: "\u585E\u7EB3\u6CB3", icon: "spring", steps: ["\u6CBF\u6CB3\u6563\u6B65", "\u4E58\u4E00\u6BB5\u6E38\u8239", "\u770B\u843D\u65E5\u6CB3\u5CB8"] },
+    { name: "\u7F8E\u672F\u9986", icon: "craft", steps: ["\u6B23\u8D4F\u753B\u4F5C", "\u753B\u4E00\u5F20\u901F\u5199", "\u6311\u9009\u827A\u672F\u660E\u4FE1\u7247"] },
+    { name: "\u94C1\u5854", icon: "street", steps: ["\u94C1\u5854\u4E0B\u5408\u5F71", "\u767B\u9AD8\u770B\u57CE\u5E02", "\u7B49\u94C1\u5854\u4EAE\u706F"] },
+    { name: "\u82B1\u56ED", icon: "garden", steps: ["\u901B\u82B1\u56ED", "\u55B7\u6CC9\u8FB9\u91CE\u9910", "\u7559\u4E00\u675F\u5E72\u82B1"] }
+  ], costs: [220, 360, 540] },
+  { id: "island", name: "\u6D77\u5C9B", region: "\u5927\u6D0B\u6D32", subtitle: "\u4ECA\u5929\u7684\u8BA1\u5212\uFF0C\u662F\u542C\u6D77", color: "#9ad5ca", projects: [
+    { name: "\u6C99\u6EE9", icon: "garden", steps: ["\u6361\u8D1D\u58F3", "\u5806\u4E00\u5EA7\u6C99\u5821", "\u6C99\u6EE9\u770B\u65E5\u843D"] },
+    { name: "\u6D77\u6E7E", icon: "spring", steps: ["\u5728\u6D45\u6C34\u8E0F\u6D6A", "\u6D6E\u6F5C\u770B\u9C7C\u7FA4", "\u62CD\u4E00\u5F20\u6D77\u5E95\u7167\u7247"] },
+    { name: "\u5C0F\u98DF\u644A", icon: "tea", steps: ["\u559D\u4E00\u676F\u6930\u6C41", "\u54C1\u5C1D\u5F53\u5730\u5C0F\u98DF", "\u51C6\u5907\u6D77\u8FB9\u665A\u9910"] },
+    { name: "\u706F\u5854", icon: "street", steps: ["\u8D70\u8FD1\u706F\u5854", "\u767B\u5854\u770B\u6D77", "\u770B\u706F\u5854\u4EAE\u8D77"] },
+    { name: "\u7EAA\u5FF5\u94FA", icon: "craft", steps: ["\u6311\u8D1D\u58F3", "\u4E32\u8D1D\u58F3\u624B\u94FE", "\u5BC4\u4E00\u5F20\u6D77\u5C9B\u660E\u4FE1\u7247"] }
+  ], costs: [400, 650, 950] }
+];
+function rehearsalTravel(entry) {
+  const t = initialTravel(entry.at);
+  t.current = entry.city;
+  for (let i = 0; i < entry.city; i++) t.progress[i].fill(3);
+  t.progress[entry.city] = [...entry.progress];
+  t.posts = entry.posts;
+  t.diaries = entry.diary ? [entry.diary] : [];
+  return t;
+}
+function initialTravel(now) {
+  return { current: 0, startedAt: now, progress: DESTINATIONS.map((d) => d.projects.map(() => 0)), posts: [], diaries: [] };
+}
+function travelComplete(t, city = t.current) {
+  return t.progress[city].every((n) => n === 3);
+}
+function validateTravel(t) {
+  if (!t || !Number.isInteger(t.current) || t.current < 0 || t.current >= DESTINATIONS.length || !Number.isFinite(t.startedAt) || !Array.isArray(t.progress) || t.progress.length !== DESTINATIONS.length || !t.progress.every((p) => Array.isArray(p) && p.length === 5 && p.every((n) => Number.isInteger(n) && n >= 0 && n <= 3)) || !Array.isArray(t.posts) || !Array.isArray(t.diaries)) throw Error("\u65C5\u884C\u5B58\u6863\u5DF2\u635F\u574F");
+  if (t.progress.some((p, i) => i < t.current && !p.every((n) => n === 3) || i > t.current && p.some((n) => n !== 0))) throw Error("\u65C5\u884C\u8FDB\u5EA6\u4E0D\u4E00\u81F4");
+  for (const p of t.posts) if (!p || typeof p.id !== "string" || !Number.isFinite(p.at) || !Number.isInteger(p.city) || !DESTINATIONS[p.city] || !Number.isInteger(p.project) || !DESTINATIONS[p.city].projects[p.project] || !Number.isInteger(p.step) || p.step < 0 || p.step > 2 || typeof p.title !== "string" || typeof p.text !== "string" || typeof p.liked !== "boolean" || p.portrait !== void 0 && typeof p.portrait !== "string") throw Error("\u65C5\u884C\u56DE\u5FC6\u5DF2\u635F\u574F");
+  if (new Set(t.posts.map((p) => p.id)).size !== t.posts.length) throw Error("\u65C5\u884C\u56DE\u5FC6\u91CD\u590D");
+  for (const d of t.diaries) if (!d || typeof d.day !== "string" || typeof d.actor !== "string" || typeof d.name !== "string" || typeof d.text !== "string" || typeof d.signature !== "string" || !Number.isFinite(d.updatedAt)) throw Error("\u65C5\u884C\u65E5\u8BB0\u5DF2\u635F\u574F");
+  for (const d of t.diaries) if (d.city !== void 0 && (!Number.isInteger(d.city) || !DESTINATIONS[d.city])) throw Error("\u65C5\u884C\u65E5\u8BB0\u5730\u70B9\u65E0\u6548");
+  if (t.moments !== void 0 && (!Array.isArray(t.moments) || t.moments.some((m) => !m || typeof m.id !== "string" || !Number.isFinite(m.at) || typeof m.day !== "string" || typeof m.actor !== "string" || typeof m.name !== "string" || typeof m.text !== "string" || typeof m.liked !== "boolean") || new Set(t.moments.map((m) => m.id)).size !== t.moments.length)) throw Error("\u670B\u53CB\u5708\u8BB0\u5F55\u5DF2\u635F\u574F");
+  if (t.rehearsals !== void 0) {
+    if (!Array.isArray(t.rehearsals) || new Set(t.rehearsals.map((e) => e.id)).size !== t.rehearsals.length) throw Error("\u6D4B\u8BD5\u65C5\u884C\u8BB0\u5F55\u5DF2\u635F\u574F");
+    for (const e of t.rehearsals) {
+      if (!e || typeof e.id !== "string" || typeof e.actor !== "string" || typeof e.name !== "string" || typeof e.liked !== "boolean" || !Number.isFinite(e.at) || !Number.isInteger(e.city) || !DESTINATIONS[e.city] || !Array.isArray(e.progress) || e.progress.length !== 5 || !e.progress.every((n) => Number.isInteger(n) && n >= 0 && n <= 3)) throw Error("\u6D4B\u8BD5\u65C5\u884C\u8BB0\u5F55\u5DF2\u635F\u574F");
+      validateTravel(rehearsalTravel(e));
+    }
+  }
+}
+function travelTransition(s, cmd, now) {
+  const t = s.travel ??= initialTravel(now);
+  validateTravel(t);
+  if (cmd.type === "travelRehearsalLike") {
+    const e = t.rehearsals?.find((e2) => e2.id === cmd.id);
+    if (!e) throw Error("\u8FD9\u6761\u6D4B\u8BD5\u65C5\u884C\u4E0D\u5B58\u5728");
+    e.liked = !e.liked;
+    return;
+  }
+  if (cmd.type === "travelMomentLike") {
+    const m = t.moments?.find((m2) => m2.id === cmd.id);
+    if (!m) throw Error("\u8FD9\u6761\u670B\u53CB\u5708\u4E0D\u5B58\u5728");
+    m.liked = !m.liked;
+    return;
+  }
+  if (cmd.type === "travelLike") {
+    const p = t.posts.find((p2) => p2.id === cmd.id);
+    if (!p) throw Error("\u8FD9\u6761\u56DE\u5FC6\u4E0D\u5B58\u5728");
+    p.liked = !p.liked;
+    return;
+  }
+  if (cmd.city !== t.current) throw Error("\u8BF7\u5728\u5F53\u524D\u76EE\u7684\u5730\u7EE7\u7EED\u65C5\u884C");
+  if (cmd.type === "travelNext") {
+    if (!travelComplete(t)) throw Error("\u5B8C\u6210\u672C\u7AD9\u4F53\u9A8C\u540E\u518D\u51FA\u53D1");
+    if (t.current === DESTINATIONS.length - 1) throw Error("\u65B0\u7684\u76EE\u7684\u5730\u6B63\u5728\u51C6\u5907\u4E2D");
+    t.current++;
+    return;
+  }
+  const d = DESTINATIONS[t.current], project = d.projects[cmd.project];
+  if (!Number.isInteger(cmd.project) || !project || !Number.isInteger(cmd.step) || cmd.step < 0 || cmd.step >= 3 || t.progress[t.current][cmd.project] !== cmd.step) throw Error("\u4F53\u9A8C\u5DF2\u66F4\u65B0\uFF0C\u8BF7\u5237\u65B0\u540E\u518D\u8BD5");
+  const cost = d.costs[cmd.step];
+  if (s.coins < cost) throw Error("\u65C5\u8D39\u8FD8\u5DEE\u4E00\u70B9\uFF0C\u53BB\u6536\u83B7\u4E00\u4E9B\u690D\u7269\u5427");
+  s.coins -= cost;
+  t.progress[t.current][cmd.project]++;
+  const title = project.steps[cmd.step];
+  t.posts.push({ id: `${d.id}-${cmd.project}-${cmd.step}`, at: now, city: t.current, project: cmd.project, step: cmd.step, title, text: `\u4ECA\u5929\u5728${d.name}\uFF0C${title}\u3002\u53C8\u591A\u4E86\u4E00\u6BB5\u548C\u4F60\u4E00\u8D77\u7684\u56DE\u5FC6\u3002`, liked: false });
+}
+
 // app/src/main/garden/life-rules.ts
 var safeKey = (s) => typeof s === "string" && s.length > 0 && s.length <= 160 && !["__proto__", "constructor", "prototype"].includes(s);
 function ensureLife(s, now, rng, actor, migrate = true) {
@@ -669,6 +688,7 @@ function lifeTransition(s, cmd, now, rng, actor, shopOwner) {
       return { handled: true, changed, reveal: { title: "\u55B7\u96FE\u751F\u6548\uFF01", message: candidate.trait ? TRAITS[candidate.trait].name : DYE_COLORS[candidate.dye].name } };
     }
     case "feed": {
+      if (cmd.actor !== void 0 && cmd.actor !== actor) throw Error("\u89D2\u8272\u5DF2\u5207\u6362\uFF0C\u8BF7\u91CD\u65B0\u6295\u5582");
       const c = actor && l.characters[actor];
       if (!c) throw Error("\u8BF7\u5148\u9009\u62E9\u81EA\u5DF1\u7684\u89D2\u8272");
       const w = c.wishes.find((w2) => w2.id === cmd.wish), i = s.produce.findIndex((p) => p.id === cmd.produce);
@@ -713,7 +733,7 @@ function enableV3(s, now) {
     const xp = s.xp[sp], i = Math.max(0, LEVEL_XP.filter((n) => xp >= n).length - 1);
     s.xp[sp] = Math.round(V3_XP[i] + (i < 7 ? (xp - LEVEL_XP[i]) / (LEVEL_XP[i + 1] - LEVEL_XP[i]) * (V3_XP[i + 1] - V3_XP[i]) : Math.min(1, (xp - LEVEL_XP[7]) / 400) * (V3_XP[8] - V3_XP[7])));
   }
-  s.v3 = { version: 3, day: gardenDay(now), xpToday: {}, rainbowMisses: 0, pityEvents: [], week: weekKey(now), breeds: 0, geneMisses: 0, sizeMisses: 0, oils: { normal: 2, rich: 0 }, soil: [1, 1, 1, 1, 1, 1], records: [], counters: {}, sunPartners: [], appraisals: {} };
+  s.v3 = { version: 3, day: gardenDay(now), xpToday: {}, rainbowMisses: 0, pityEvents: [], week: weekKey(now), breeds: 0, geneMisses: 0, sizeMisses: 0, oils: { normal: 2, rich: 0 }, soil: Array(s.plots.length).fill(1), records: [], counters: {}, sunPartners: [], appraisals: {} };
   s.shop.refreshAt = 0;
   recordGarden(s, now, "welcome", "\u65B0\u82B1\u56ED\u624B\u518C\uFF1A\u9009\u4E00\u4E2A\u559C\u6B22\u7684\u7EC4\u5408\uFF0C\u6162\u6162\u79CD\u51FA\u81EA\u5DF1\u7684\u6536\u85CF\u3002");
   return true;
@@ -956,7 +976,8 @@ function v3Transition(s, c, now, rng) {
       return { handled: true, reveal: { title: "\u7E41\u80B2\u7CBE\u6CB9\u5DF2\u653E\u597D", message: `${c.kind === "normal" ? "\u666E\u901A \xB7 \u6700\u591A\u4FDD\u75593\u56E0\u5B50" : "\u6D53\u7F29 \xB7 \u6700\u591A\u4FDD\u75594\u56E0\u5B50"}\uFF0C\u6BCF\u6B21\u7E41\u80B2\u6D88\u8017\u4E00\u74F6` } };
     }
     case "upgradeSoil": {
-      if (!Number.isInteger(c.plot) || c.plot < 0 || c.plot >= 6) throw Error("\u571F\u5730\u4E0D\u5B58\u5728");
+      if (!Number.isInteger(c.plot) || c.plot < 0 || c.plot >= s.plots.length) throw Error("\u571F\u5730\u4E0D\u5B58\u5728");
+      if (c.plot >= unlockedPlots(s)) throw Error("\u5F53\u524D\u89D2\u8272\u7B49\u7EA7\u5C1A\u672A\u89E3\u9501\u8FD9\u5757\u571F\u5730");
       const lv = v.soil[c.plot], cost = lv === 1 ? 300 : 700;
       if (lv >= 3) throw Error("\u8FD9\u5757\u5730\u5DF2\u7ECF\u517B\u5F97\u5F88\u597D\u4E86");
       if (s.coins < cost) throw Error("\u82B1\u56ED\u5E01\u4E0D\u8DB3");
@@ -1010,7 +1031,7 @@ function validateV3(s) {
   const v = s.v3;
   if (!v) return;
   const num = (x) => typeof x === "number" && Number.isFinite(x) && x >= 0;
-  if (v.version !== 3 || !num(v.day) || !num(v.week) || !num(v.breeds) || !num(v.rainbowMisses) || !num(v.geneMisses) || !num(v.sizeMisses) || !Array.isArray(v.soil) || v.soil.length !== 6 || v.soil.some((l) => ![1, 2, 3].includes(l)) || !v.oils || !num(v.oils.normal) || !num(v.oils.rich) || !Array.isArray(v.pityEvents) || !Array.isArray(v.records) || !v.counters || !v.xpToday || !Array.isArray(v.sunPartners) || v.sunPartners.length > 2 || !v.appraisals) throw Error("\u65B0\u7248\u82B1\u56ED\u8BB0\u5F55\u635F\u574F");
+  if (v.version !== 3 || !num(v.day) || !num(v.week) || !num(v.breeds) || !num(v.rainbowMisses) || !num(v.geneMisses) || !num(v.sizeMisses) || !Array.isArray(v.soil) || ![6, MAX_GARDEN_PLOTS].includes(v.soil.length) || v.soil.some((l) => ![1, 2, 3].includes(l)) || !v.oils || !num(v.oils.normal) || !num(v.oils.rich) || !Array.isArray(v.pityEvents) || !Array.isArray(v.records) || !v.counters || !v.xpToday || !Array.isArray(v.sunPartners) || v.sunPartners.length > 2 || !v.appraisals) throw Error("\u65B0\u7248\u82B1\u56ED\u8BB0\u5F55\u635F\u574F");
   const slots = (xs, ts) => Array.isArray(xs) && xs.length === 4 && xs.every((t, i) => t === null || Object.hasOwn(TRAITS, t) && ts.includes(t) && traitSlot(t) === (i === 0 ? "fruit" : i === 1 ? "skin" : "accessory")) && new Set(xs.filter(Boolean)).size === xs.filter(Boolean).length;
   if (v.breeds > 90 || v.rainbowMisses > 32 || v.geneMisses > 9 || v.sizeMisses > 9 || new Set(v.sunPartners).size !== v.sunPartners.length || v.sunPartners.some((x) => typeof x !== "string") || v.records.length > 150 || v.pityEvents.length > 2048 || Object.values(v.xpToday).some((x) => !num(x) || x > 60)) throw Error("\u6210\u957F\u8FDB\u5EA6\u635F\u574F");
   for (const a of Object.values(v.appraisals)) if (!a || !Number.isInteger(a.row) || a.row < 0 || a.row > a.maxRows || ![3, 5, 7].includes(a.maxRows) || !num(a.factor) || a.factor === 0 || !num(a.baseKg) || typeof a.done !== "boolean" || !Array.isArray(a.history) || a.history.length !== a.row || !Array.isArray(a.board) || a.board.length !== 7 || a.board.some((row, i) => !Array.isArray(row) || row.length !== 3 || JSON.stringify([...row].sort()) !== JSON.stringify((i < 3 ? [1.15, 1.15, 0.9] : i < 6 ? [1.35, 0.85, 0.85] : [1.6, 0.7, 0.7]).sort()))) throw Error("\u9274\u5B9A\u8BB0\u5F55\u635F\u574F");
@@ -1052,7 +1073,7 @@ function refreshShop(s, now, rng) {
   ] };
 }
 function initialGarden(now, rng) {
-  const s = { version: 1, weatherCheckedAt: now, coins: 180, plots: Array(6).fill(null), seeds: ["lotus", "strawberry", "sunflower"].flatMap((sp) => [0, 1].map(() => ({ id: rng.id(), species: sp, genes: [], bred: false }))), produce: [], fertilizers: Object.fromEntries(Object.keys(FERTILIZERS).map((f) => [f, FERTILIZERS[f].grade === 1 ? 2 : 0])), discovered: [], claimed: [], xp: Object.fromEntries(species.map((sp) => [sp, 0])), journey: { bought: 0, planted: 0, harvested: 0, earned: 0, appleBought: 0 }, boxMisses: 0, shop: { refreshAt: 0, offers: [] } };
+  const s = { version: 1, weatherCheckedAt: now, coins: 180, plots: Array(MAX_GARDEN_PLOTS).fill(null), seeds: ["lotus", "strawberry", "sunflower"].flatMap((sp) => [0, 1].map(() => ({ id: rng.id(), species: sp, genes: [], bred: false }))), produce: [], fertilizers: Object.fromEntries(Object.keys(FERTILIZERS).map((f) => [f, FERTILIZERS[f].grade === 1 ? 2 : 0])), discovered: [], claimed: [], xp: Object.fromEntries(species.map((sp) => [sp, 0])), journey: { bought: 0, planted: 0, harvested: 0, earned: 0, appleBought: 0 }, boxMisses: 0, shop: { refreshAt: 0, offers: [] } };
   refreshShop(s, now, rng);
   return s;
 }
@@ -1071,6 +1092,7 @@ function transition(input, cmd, now, rng, context = {}) {
   if (cmd.type !== "resolveSpray") settlePendingSpray(s, now);
   protectPending(s, cmd);
   protectV3(s, cmd);
+  ensureLife(s, now, rng, context.actor, cmd.type !== "resolveSpray");
   const modern = v3Transition(s, cmd, now, rng);
   if (modern.handled) return { state: s, reveal: modern.reveal };
   const life = lifeTransition(s, cmd, now, rng, context.actor, context.shopOwner);
@@ -1080,7 +1102,7 @@ function transition(input, cmd, now, rng, context = {}) {
   }
   let reveal, points, boxes;
   const plot = (index) => {
-    if (!Number.isInteger(index) || index < 0 || index >= 6)
+    if (!Number.isInteger(index) || index < 0 || index >= s.plots.length)
       throw Error("\u571F\u5730\u4E0D\u5B58\u5728");
     return s.plots[index];
   };
@@ -1118,7 +1140,7 @@ function transition(input, cmd, now, rng, context = {}) {
       const same = (x) => x.species === seed.species && x.bred === seed.bred && JSON.stringify([...x.genes].sort()) === JSON.stringify([...seed.genes].sort()) && JSON.stringify(x.parents) === JSON.stringify(seed.parents);
       const available = s.seeds.filter(same);
       let next = s, count = 0;
-      for (let i = 0; i < s.plots.length && count < available.length; i++) if (!s.plots[i]) next = transition(next, { type: "plant", plot: i, seed: available[count++].id }, now, rng, context).state;
+      for (let i = 0; i < s.plots.length && count < available.length; i++) if (!s.plots[i] && i < unlockedPlots(s)) next = transition(next, { type: "plant", plot: i, seed: available[count++].id }, now, rng, context).state;
       if (!count) throw Error("\u6CA1\u6709\u7A7A\u5730");
       return { state: next };
     }
@@ -1147,6 +1169,7 @@ function transition(input, cmd, now, rng, context = {}) {
       break;
     }
     case "plant": {
+      if (cmd.plot >= unlockedPlots(s)) throw Error("\u5F53\u524D\u89D2\u8272\u7B49\u7EA7\u5C1A\u672A\u89E3\u9501\u8FD9\u5757\u571F\u5730");
       if (plot(cmd.plot))
         throw Error("\u5148\u6536\u83B7\u8FD9\u5757\u571F\u5730");
       const i = s.seeds.findIndex((x) => x.id === cmd.seed);
@@ -1375,7 +1398,7 @@ function validateGarden(raw) {
   const known = (sp) => Object.hasOwn(SPECIES, sp);
   const traits = (ts) => Array.isArray(ts) && ts.every((t) => Object.hasOwn(TRAITS, t));
   const produce = (p) => p && typeof p.id === "string" && known(p.species) && traits(p.traits) && number(p.kg) && number(p.value) && typeof p.bred === "boolean" && (p.growthVersion === void 0 || p.growthVersion === 2 || p.growthVersion === 3) && (p.revealed === void 0 || typeof p.revealed === "boolean") && (p.cultivation === void 0 || p.cultivation && number(p.cultivation.remainingMs) && p.cultivation.remainingMs <= (s.online || p.growthVersion === 3 ? 6e5 : CULTIVATION_MS) && (p.cultivation.startedAt === void 0 || number(p.cultivation.startedAt))) && (p.locked === void 0 || typeof p.locked === "boolean") && (p.yieldCount === void 0 || Number.isInteger(p.yieldCount) && p.yieldCount >= 1 && p.yieldCount <= 3);
-  if (!s || s.version !== 1 || !number(s.boxMisses) || !s.journey || !["bought", "planted", "harvested", "earned", "appleBought"].every((k) => number(s.journey[k])) || !number(s.coins) || !Array.isArray(s.plots) || s.plots.length !== 6 || !s.plots.every((p) => p === null || produce(p) && number(p.plantedAt) && number(p.readyAt) && traits(p.baseTraits) && Number.isSafeInteger(p.harvestsLeft) && p.harvestsLeft >= 1 && p.harvestsLeft <= SPECIES[p.species].harvests && Number.isSafeInteger(p.harvestIndex) && p.harvestIndex >= 0 && (p.keep === void 0 || typeof p.keep === "boolean") && Array.isArray(p.fertilizers) && p.fertilizers.every((f) => Object.hasOwn(FERTILIZERS, f))) || !Array.isArray(s.seeds) || !s.seeds.every((p) => p && typeof p.id === "string" && known(p.species) && traits(p.genes) && typeof p.bred === "boolean") || !Array.isArray(s.produce) || !s.produce.every(produce) || !s.fertilizers || !Object.keys(FERTILIZERS).every((k) => number(s.fertilizers[k])) || !s.xp || !species.every((sp) => number(s.xp[sp])) || !Array.isArray(s.discovered) || !Array.isArray(s.claimed) || ![...s.discovered, ...s.claimed].every((k) => typeof k === "string" && known(k.split(":")[0]) && (k.split(":")[1] === "base" || Object.hasOwn(TRAITS, k.split(":")[1]))) || !s.shop || !number(s.shop.refreshAt) || !Array.isArray(s.shop.offers) || !s.shop.offers.every((o) => o && typeof o.id === "string" && number(o.stock) && number(o.price) && (o.kind === "seed" ? known(o.item) : o.kind === "fertilizer" && Object.hasOwn(FERTILIZERS, o.item))))
+  if (!s || s.version !== 1 || !number(s.boxMisses) || !s.journey || !["bought", "planted", "harvested", "earned", "appleBought"].every((k) => number(s.journey[k])) || !number(s.coins) || !Array.isArray(s.plots) || ![6, MAX_GARDEN_PLOTS].includes(s.plots.length) || !s.plots.every((p) => p === null || produce(p) && number(p.plantedAt) && number(p.readyAt) && traits(p.baseTraits) && Number.isSafeInteger(p.harvestsLeft) && p.harvestsLeft >= 1 && p.harvestsLeft <= SPECIES[p.species].harvests && Number.isSafeInteger(p.harvestIndex) && p.harvestIndex >= 0 && (p.keep === void 0 || typeof p.keep === "boolean") && Array.isArray(p.fertilizers) && p.fertilizers.every((f) => Object.hasOwn(FERTILIZERS, f))) || !Array.isArray(s.seeds) || !s.seeds.every((p) => p && typeof p.id === "string" && known(p.species) && traits(p.genes) && typeof p.bred === "boolean") || !Array.isArray(s.produce) || !s.produce.every(produce) || !s.fertilizers || !Object.keys(FERTILIZERS).every((k) => number(s.fertilizers[k])) || !s.xp || !species.every((sp) => number(s.xp[sp])) || !Array.isArray(s.discovered) || !Array.isArray(s.claimed) || ![...s.discovered, ...s.claimed].every((k) => typeof k === "string" && known(k.split(":")[0]) && (k.split(":")[1] === "base" || Object.hasOwn(TRAITS, k.split(":")[1]))) || !s.shop || !number(s.shop.refreshAt) || !Array.isArray(s.shop.offers) || !s.shop.offers.every((o) => o && typeof o.id === "string" && number(o.stock) && number(o.price) && (o.kind === "seed" ? known(o.item) : o.kind === "fertilizer" && Object.hasOwn(FERTILIZERS, o.item))))
     throw Error("\u82B1\u56ED\u5B58\u6863\u683C\u5F0F\u4E0D\u517C\u5BB9\u6216\u5DF2\u635F\u574F");
   if (s.weatherCheckedAt !== void 0 && !number(s.weatherCheckedAt)) throw Error("\u5929\u6C14\u8BB0\u5F55\u65E0\u6548");
   if (s.weatherGuarantees !== void 0 && (!s.weatherGuarantees || typeof s.weatherGuarantees !== "object" || Array.isArray(s.weatherGuarantees) || !Object.values(s.weatherGuarantees).every((r) => r && number(r.end) && Array.isArray(r.winners) && r.winners.every((id) => typeof id === "string") && new Set(r.winners).size === r.winners.length && (r.evaluated === void 0 || Array.isArray(r.evaluated) && r.evaluated.every((id) => typeof id === "string"))))) throw Error("\u5929\u6C14\u4FDD\u5E95\u8BB0\u5F55\u65E0\u6548");
@@ -1385,6 +1408,8 @@ function validateGarden(raw) {
   }
   if (s.travel !== void 0) validateTravel(s.travel);
   if (s.journalEvents !== void 0 && (!Array.isArray(s.journalEvents) || s.journalEvents.some((e) => !e || !Number.isFinite(e.at) || typeof e.actor !== "string" || typeof e.summary !== "string"))) throw Error("\u82B1\u56ED\u8BB0\u5F55\u5DF2\u635F\u574F");
+  if (s.plots.length === 6) s.plots.push(null);
+  if (s.v3?.soil.length === 6) s.v3.soil.push(1);
   return s;
 }
 function nextBatch(s, p, now, rng, music) {
@@ -1655,8 +1680,10 @@ function publicGardenState(state) {
   FERTILIZERS,
   FOOD_ICONS,
   FRUITS,
+  FRUIT_DRAG_TYPE,
   HARVEST_XP,
   LEVEL_XP,
+  MAX_GARDEN_PLOTS,
   PAIR_INTERACTIONS,
   REFRESH_MS,
   SLOT_NAMES,
@@ -1680,10 +1707,12 @@ function publicGardenState(state) {
   currentGrowth,
   dailyOffers,
   dailyRandom,
+  emptyPlots,
   enableV3,
   ensureLife,
   exposures,
   factorDefinition,
+  feedingWish,
   fertilizerDescription,
   fertilizerV3,
   fits,
@@ -1704,6 +1733,7 @@ function publicGardenState(state) {
   pairActions,
   pairBeats,
   pairFlip,
+  plotsAtLevel,
   poisson,
   protectPending,
   protectV3,
@@ -1728,6 +1758,7 @@ function publicGardenState(state) {
   traitSlot,
   traitSource,
   transition,
+  unlockedPlots,
   v3HarvestXp,
   v3Transition,
   v3Value,
@@ -1735,6 +1766,7 @@ function publicGardenState(state) {
   validateLife,
   validateV3,
   value,
+  visiblePlot,
   weatherRoll,
   weatherWeights,
   weekKey,

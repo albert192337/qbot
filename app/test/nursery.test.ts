@@ -56,7 +56,7 @@ describe('nursery scene boundary', () => {
 describe('honest progress', () => {
   it('counts completed actions, never treating failed actions as completion', () => {
     const st = status({ stage: 'done', actions: { idle: {status:'done'}, sleep:{status:'failed'} } as HatchStatus['actions'] });
-    expect(incubation(st)).toEqual({ phase:'interrupted',done:1,failed:1,total:8 });
+    expect(incubation(st)).toEqual({ phase:'interrupted',done:1,failed:1,total:2 });
   });
   it('requires the package done stage for birth', () => {
     expect(incubation(status({ stage:'package' })).phase).toBe('learning');

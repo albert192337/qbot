@@ -97,12 +97,12 @@ export async function tryPerch(): Promise<{ok:boolean; reason?:string}> {
   const target=await native.query(screen.dipToScreenPoint(point));
   if(token!==generation)return {ok:false};
   if(!target){detachPerch();return {ok:false};}
-  const actions=getActivePlayables().filter(a=>a==='perch_sit'||a==='perch_lie');
-  if(!actions.length){detachPerch();return {ok:false,reason:'这个角色还没有窗沿动作，请在动作库补充“坐窗沿”或“趴窗沿”'};}
+  const actions=getActivePlayables().filter(a=>a==='perch'||a==='perch_sit'||a==='perch_lie');
+  if(!actions.length){detachPerch();return {ok:false,reason:'这个角色还没有窗沿动作，请在动作库补充“窗沿停靠”'};}
   const settings=await getSettings(); if(token!==generation)return {ok:false};
   const character=settings.activeCharacter ? await getCharacter(settings.activeCharacter) : null;
   if(token!==generation)return {ok:false};
-  const action=actions[Math.floor(Math.random()*actions.length)] as 'perch_sit'|'perch_lie';
+  const action=(actions.includes('perch') ? 'perch' : actions[Math.floor(Math.random()*actions.length)]) as 'perch'|'perch_sit'|'perch_lie';
   const bounds=screen.screenToDipRect(null,target.bounds);
   dock={target,fraction:(point.x-bounds.x)/bounds.width,state:{action,title:target.title},character:settings.activeCharacter,anchor:perchAnchor(action,character?.manifest.actions[action]?.perchAnchor)};
   if(!position(target)){detachPerch();return {ok:false,reason:'窗口上方空间不足，无法停靠'};}

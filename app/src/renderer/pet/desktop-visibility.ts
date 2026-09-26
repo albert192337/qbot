@@ -12,7 +12,7 @@ export function mountDesktopVisibility(onChange: (s: DesktopVisibility) => void)
     document.body.classList.toggle('desktop-hidden',s.hidden);
     document.body.dataset.peek=s.peek??'';
     document.querySelectorAll<HTMLButtonElement>('.hud-hide').forEach(b=>{
-      b.title=s.hidden?'显示角色':'隐藏全部角色'; b.setAttribute('aria-label',b.title); b.setAttribute('aria-pressed',String(s.hidden));
+      b.title='显示／隐藏'; b.setAttribute('aria-label',b.title); b.setAttribute('aria-pressed',String(s.hidden));
     });
     if(key!==previous){document.body.classList.remove('peek-controls');previous=key;onChange(s);}
     report();

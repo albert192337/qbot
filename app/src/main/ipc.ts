@@ -29,7 +29,7 @@ import { getLocalSign, setLocalSign } from './local-sign';
 import { getPetMessage, clearPetMessage, onPetMessageChanged } from './pet-message';
 import { notifyRoomCharacterChanged } from './rooms/rooms';
 import { getMemberSnapshot } from './rooms/room-pets';
-import { getRoomDisplayMode, refreshRoomPetLayout, setRoomDisplayMode } from './rooms/room-pet-display';
+import { getRoomDisplayMode, getRoomSceneMembers, refreshRoomPetLayout, setRoomDisplayMode } from './rooms/room-pet-display';
 import { getHatchStatus, pickTurnaround, redoFailed, resumeHatch, startHatch, savePersona, addCustomAction, deleteCustomAction, getPrompts, saveActionPrompt, saveAgentActions, saveFullPrompts, saveTurnaroundPrompt, regenerateActions, regenerateTurnaround, generateExpressionAction } from './pipeline-bridge';
 import { getDecor, setDecor } from './decor';
 import {
@@ -112,7 +112,8 @@ export function registerIpc(): void {
       characterForm?: CharacterForm,
       characterStyle?: CharacterStyle,
       name?: string,
-    ) => startHatch(refImagePath, imageProvider, characterForm, characterStyle, name),
+      persona?: string,
+    ) => startHatch(refImagePath, imageProvider, characterForm, characterStyle, name, persona),
   );
   ipcMain.handle('hatch:cloudAccount', (_ev, invite?: string) => cloudAccount(invite));
   ipcMain.handle('hatch:resume', (_ev, dirId: string) => resumeHatch(dirId));
@@ -275,6 +276,7 @@ export function registerIpc(): void {
   // ── 公共房间（spec 2026-08-21）────────────────────────────
   ipcMain.on('rooms:open', () => createLoungeWindow());
   ipcMain.handle('rooms:getDisplayMode', () => getRoomDisplayMode());
+  ipcMain.handle('rooms:getSceneMembers', () => getRoomSceneMembers());
   ipcMain.handle('rooms:setDisplayMode', (_ev, mode: RoomsDisplayMode) => setRoomDisplayMode(mode));
   ipcMain.handle('rooms:list', (_ev, kind?: RoomKind, q?: string) => listRooms(kind, q));
   ipcMain.handle('rooms:create', (_ev, input: CreateRoomInput) => createRoom(input));

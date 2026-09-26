@@ -22,11 +22,14 @@ describe('Job', () => {
   it('new jobs include writing, while a ten-action legacy job does not schedule it',async()=>{
     const job=await Job.create(path.join(tmpDir,'writing-upgrade'),{refImagePath:await makeRefImage()});
     expect(job.state.baseActionIds).toContain('writing');delete job.state.baseActionIds;delete (job.state.actions as Partial<typeof job.state.actions>).writing;
-    await job.save();const loaded=await Job.load(job.outDir);expect(loaded.state.baseActionIds).toHaveLength(10);expect(loaded.state.baseActionIds).not.toContain('writing');expect(loaded.state.actions.writing.status).toBe('pending');
+    await job.save();const loaded=await Job.load(job.outDir);expect(loaded.state.baseActionIds).toHaveLength(11);expect(loaded.state.baseActionIds).not.toContain('writing');expect(loaded.state.actions.writing.status).toBe('pending');
   });
   it('旧任务升级不自动增加两项付费生成，新任务包含窗沿动作', async () => {
     const job=await Job.create(path.join(tmpDir,'legacy'),{refImagePath:await makeRefImage()});
-    expect(job.state.baseActionIds).toContain('perch_sit');expect(job.state.baseActionIds).toContain('perch_lie');
+    expect(job.state.baseActionIds).toContain('perch');
+    expect(job.state.baseActionIds).not.toContain('perch_sit');expect(job.state.baseActionIds).not.toContain('perch_lie');
+    expect(job.state.baseActionIds).toHaveLength(10);
+    delete (job.state.actions as Partial<typeof job.state.actions>).perch;
     delete job.state.baseActionIds;
     delete (job.state.actions as Partial<typeof job.state.actions>).perch_sit;
     delete (job.state.actions as Partial<typeof job.state.actions>).perch_lie;

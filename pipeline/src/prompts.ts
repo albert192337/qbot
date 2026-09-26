@@ -1,3 +1,4 @@
+import { personaPrompt } from './persona-prompt.js';
 /**
  * 三套 prompt 模板 + 默认动作与可选预设动作的文案常量。
  * 模板文本逐字取自 DESIGN.md §3.3（实测有效），不要随意改写措辞。
@@ -42,6 +43,7 @@ const PROPORTION_LOCK =
  *   凭空长出一条（写实喝茶动作实测长出猫尾巴）；通用动作也不驱动耳朵，避免给人形角色套用兽耳运动
  */
 export const ACTIONS: Record<ActionId, ActionSpec> = {
+  perch: { poseDesc: '根据参考角色的体型、原有结构和人设，选择一种最自然的窗沿停靠姿态：适合坐的角色收拢双腿坐稳，适合趴的角色放松趴伏。只选择一种姿态，重心低而安稳，朝向观众。承托线与角色轮廓最低处重合，所有部位收在承托线上方，不悬垂到线下，适合贴在真实窗口上边缘。只画完整角色，不画窗口、窗框、桌椅、平台或任何支撑物，不增加部位。', motionDesc: '始终保持首帧选定的停靠姿态和同一水平承托位置，只轻微呼吸与原有表情变化。下缘支点固定，不滑动、不漂浮、不站起，不切换姿态。首尾姿态一致，可无缝循环。', durationSec: 5 },
   writing: {
     poseDesc: '角色安稳坐着，面前抱着一本小巧的奶油白手账，一只原有的手握短铅笔停在纸页上，神情专注而温柔。完整身体和手账都在画面内，沿用参考图原本比例，不增加肢体，不画桌椅、其他人物或多余物品。手账无可辨认文字，不使用绿色物品。',
     motionDesc: '保持坐姿和身体位置稳定，在手账上小幅写几笔，短暂停顿思考，再继续轻轻书写，偶尔眨眼。纸笔不漂移，身体不位移，首尾姿态一致，可自然循环。', durationSec: 5,
@@ -120,6 +122,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
  * 一律用"整体""姿态""轮廓"级别的措辞，防翻车排除项与人形档保持一致。
  */
 export const ABSTRACT_ACTIONS: Record<ActionId, ActionSpec> = {
+  perch: { poseDesc: '根据参考角色原有轮廓、形态和人设，选择一种自然放松、低重心的窗沿停靠姿态，保持原有结构。整体下缘贴合想象中的水平承托线，所有轮廓都在承托线上方，适合贴在真实窗口上边缘。只画完整角色，不画窗口、窗框、平台或任何支撑物，不添加任何新部位。', motionDesc: '始终保持首帧选定的停靠姿态和同一水平承托位置，只轻微呼吸与原有表情变化。下缘支点固定，不滑动、不漂浮、不站起，不切换姿态。首尾姿态一致，可无缝循环。', durationSec: 5 },
   writing: {
     poseDesc: '完全保留参考图原本的结构与轮廓，角色安静贴近一本小巧奶油白手账和一支短铅笔，呈现专心记事的姿态。只使用原本已有的结构与纸笔互动，不凭空长出任何部位。画面仅有原角色和纸笔，不画桌椅或其他人物，不出现可辨认文字，不使用绿色物品。',
     motionDesc: '原有轮廓轻微起伏，纸笔附近出现小幅有节奏的记事动作，短暂停顿后继续。保持角色和纸笔相对位置稳定，不增加任何部位，不位移，首尾一致，可循环。', durationSec: 5,
@@ -187,6 +190,7 @@ export const ABSTRACT_ACTIONS: Record<ActionId, ActionSpec> = {
  */
 export const FAITHFUL_ACTIONS: Record<ActionId, ActionSpec> = {
   writing: ACTIONS.writing,
+  perch: ACTIONS.perch,
   perch_sit: ACTIONS.perch_sit,
   perch_lie: ACTIONS.perch_lie,
   idle: {
@@ -449,7 +453,7 @@ export function framePrompt(
       : faithful
         ? `参考图中的角色，保持发型、眼睛、服装、画风、头身比等所有细节完全一致。`
         : `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。`;
-  const personaSuffix = persona ? `角色人设：${persona}。按照此设定表现角色。` : '';
+  const personaSuffix = personaPrompt(persona);
   const poseDesc = poseOverride ?? actionSpec(action, form, style).poseDesc;
   return (
     keep +
@@ -496,7 +500,7 @@ export function videoPrompt(
       : faithful
         ? `参考图中的角色，保持发型、眼睛、服装、画风、头身比等所有细节完全一致。`
         : `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。`;
-  const personaSuffix = persona ? `角色人设：${persona}。按照此设定表现角色。` : '';
+  const personaSuffix = personaPrompt(persona);
   const motionDesc = motionOverride ?? spec.motionDesc;
   return (
     keep +

@@ -2,6 +2,9 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { resolveFfmpegPath } from '@qbot/pipeline';
 const fixture=vi.hoisted(()=>({dir:'',fetch:vi.fn()}));
 vi.mock('electron',()=>({nativeImage:{createFromPath:()=>({isEmpty:()=>true})}}));
 vi.mock('../src/main/characters',()=>({charactersDir:()=>fixture.dir,getCharacter:async(id:string)=>({dirId:id,manifest:{name:'test'}})}));
@@ -9,7 +12,7 @@ vi.mock('../src/main/config',()=>({getSettings:async()=>({}),setSettings:async()
 vi.mock('../src/main/tray',()=>({rebuildTray:async()=>{}}));
 vi.mock('../src/main/windows',()=>({broadcastCharacterActivated:()=>{}}));
 afterEach(async()=>{vi.unstubAllGlobals();vi.resetModules();if(fixture.dir)await rm(fixture.dir,{recursive:true,force:true});});
-it('downloads preview as cover without replacing the packaged original reference',async()=>{
+it('downloads legacy previews without introducing a raw reference into new packs',async()=>{
   fixture.dir=await mkdtemp(path.join(os.tmpdir(),'qbot-market-cover-'));
   const input=path.join(fixture.dir,'input');await mkdir(input);
   await writeFile(path.join(input,'manifest.json'),JSON.stringify({id:'test',actions:{},stickerLibrary:{items:[]}}));
@@ -19,15 +22,34 @@ it('downloads preview as cover without replacing the packaged original reference
   vi.stubGlobal('fetch',fixture.fetch);
   const {downloadSkin}=await import('../src/main/market');await downloadSkin(pack.hash);
   const dest=path.join(fixture.dir,`market-${pack.hash}`);
-  expect(await readFile(path.join(dest,'source.png'),'utf8')).toBe('real-reference');
+  await expect(readFile(path.join(dest,'source.png'))).rejects.toThrow();
   expect(await readFile(path.join(dest,'cover.png'),'utf8')).toBe('display-cover');
 });
-it('does not upload the source as a cover when no cover has been selected',async()=>{
+it('does not publish raw references or unverified legacy covers',async()=>{
   fixture.dir=await mkdtemp(path.join(os.tmpdir(),'qbot-market-preview-'));const input=path.join(fixture.dir,'input');await mkdir(input);
   await writeFile(path.join(input,'manifest.json'),JSON.stringify({id:'test',actions:{}}));await writeFile(path.join(input,'source.png'),'private-reference');
   fixture.fetch.mockReset();fixture.fetch.mockResolvedValue({ok:true,status:200,json:async()=>({hash:'1234567890abcdef',token:'fixture'})});vi.stubGlobal('fetch',fixture.fetch);
   const {uploadSkin}=await import('../src/main/market');await uploadSkin('input');
   expect(fixture.fetch).toHaveBeenCalledTimes(1);
   await writeFile(path.join(input,'cover.png'),'chosen-cover');await uploadSkin('input');
-  expect(fixture.fetch).toHaveBeenLastCalledWith(expect.stringContaining('/preview?'),expect.objectContaining({body:new Uint8Array(Buffer.from('chosen-cover'))}));
+  expect(fixture.fetch).toHaveBeenCalledTimes(2);
+  expect(fixture.fetch.mock.calls.every(([url])=>!url.includes('/preview?'))).toBe(true);
 });
+
+it('uploads the first turnaround panel instead of the old reference cover',async()=>{
+  fixture.dir=await mkdtemp(path.join(os.tmpdir(),'qbot-market-front-'));
+  const input=path.join(fixture.dir,'input');await mkdir(input);
+  await writeFile(path.join(input,'manifest.json'),JSON.stringify({id:'test',sourceImage:'source.png',turnaround:'turnaround.png',actions:{}}));
+  await writeFile(path.join(input,'source.png'),'private-reference');
+  await writeFile(path.join(input,'cover.png'),'private-reference');
+  await promisify(execFile)(await resolveFfmpegPath(),['-v','error','-f','lavfi','-i','color=c=red:s=90x30','-frames:v','1',path.join(input,'turnaround.png')],{windowsHide:true});
+  fixture.fetch.mockReset();fixture.fetch.mockResolvedValue({ok:true,status:200,json:async()=>({hash:'1234567890abcdef',token:'fixture'})});vi.stubGlobal('fetch',fixture.fetch);
+  const {uploadSkin}=await import('../src/main/market');await uploadSkin('input');
+  expect(fixture.fetch).toHaveBeenCalledTimes(2);
+  const [url, request]=fixture.fetch.mock.calls[1];
+  expect(url).toContain('/preview?');
+  const png=Buffer.from(request.body);
+  expect(png.readUInt32BE(16)).toBe(30);
+  expect(png.readUInt32BE(20)).toBe(30);
+  expect(Buffer.from(fixture.fetch.mock.calls[0][1].body).includes(Buffer.from('private-reference'))).toBe(false);
+},20000);

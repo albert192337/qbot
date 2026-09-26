@@ -123,6 +123,12 @@ const root=path.resolve(__dirname,'..');
   // A rejected send preserves its draft.
   await page.evaluate(()=>window.qbot.rooms.update({chatEnabled:false}));await reopened.waitForFunction(()=>document.querySelector('.composer textarea').disabled);
   await page.locator('[data-page=room]').click();await page.locator('#leave').click();await reopened.waitForFunction(()=>document.querySelector('.composer textarea').disabled);
+  await page.locator('[data-page=friends]').click();await page.locator('[data-contact-tab=friends]').click();
+  assert.equal(await friendRow.getByRole('button',{name:'邀请来玩'}).isEnabled(),true);
+  await friendRow.getByRole('button',{name:'邀请来玩'}).click();
+  await page.waitForFunction(async()=>!!(await window.qbot.rooms.getCache()).room);
+  const autoRoom=(await page.evaluate(()=>window.qbot.rooms.getCache())).room;assert.equal(autoRoom.listed,false);assert.notEqual(autoRoom.roomId,code);
+  await page.waitForTimeout(500);assert.ok((await friendReq({t:'contacts:get'})).invitations.length>0);
   const config=JSON.parse(await readFile(path.join(data,'config.json'),'utf8'));assert.equal(config.activeCharacter,'host');assert.equal(config.progress,undefined);
   assert.deepEqual(errors,[]);console.log('PASS: friends/recent-interaction/request/accept/invite/Steam/narrow, native home/form/world, local invite/reply/remove, nameplate, independent chat/pin/reopen, IME, copy code, same-room edits, simultaneous requests, channel isolation, narrow window, untouched character selection');
  }finally{if(friendSocket)friendSocket.close();if(app)await app.close();proc.kill();await new Promise(r=>proc.exitCode!==null?r():proc.once('exit',r));await rm(data,{recursive:true,force:true});}

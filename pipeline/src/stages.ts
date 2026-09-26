@@ -174,7 +174,7 @@ async function runAction(
 
   // 读取自定义 prompt（poseDesc/motionDesc + 全文覆盖）与人设
   // （初次生成时 manifest 尚未写出，redo/重新生成时已有）
-  let persona: string | undefined;
+  let persona: string | undefined = job.state.persona;
   let customPoseDesc: string | undefined;
   let customMotionDesc: string | undefined;
   let framePromptFull: string | undefined;
@@ -195,7 +195,7 @@ async function runAction(
   const original = job.state.generationMode === 'original';
   const spec = original ? originalActionSpec(action) : ACTIONS[action];
   const fp = original && !framePromptFull?.trim() ? originalFramePrompt(customPoseDesc ?? spec.poseDesc, persona) : framePrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customPoseDesc, framePromptFull);
-  const vp = original && !videoPromptFull?.trim() ? originalVideoPrompt(customMotionDesc ?? spec.motionDesc) : videoPrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customMotionDesc, videoPromptFull);
+  const vp = original && !videoPromptFull?.trim() ? originalVideoPrompt(customMotionDesc ?? spec.motionDesc, spec.durationSec, persona) : videoPrompt(action, undefined, job.state.characterForm, job.state.characterStyle, persona, customMotionDesc, videoPromptFull);
   try {
     // ── Stage 2: 绿幕首帧（QC 不过自动重试 1 次）─────────────────
     if (!a.framePath || a.status === 'pending' || a.status === 'generating_frame') {
@@ -330,6 +330,7 @@ export async function runPackage(job: Job): Promise<Manifest> {
   let previous: Partial<Manifest> = {};
   try { previous = JSON.parse(await readFile(path.join(job.outDir, 'manifest.json'), 'utf8')); } catch {}
   const manifest: Manifest = {
+    persona: Object.keys(previous).length ? previous.persona : s.persona,
     ...previous,
     id: s.jobId,
     name: previous.name || '未命名',

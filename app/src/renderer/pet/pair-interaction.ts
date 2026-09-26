@@ -2,6 +2,9 @@ import type { CharacterMeta } from '../../shared/ipc-types';
 import { choosePairAction, pairBeats, pairFlip, type PairAction, type PairKind } from '../../shared/pair-interaction';
 import './pair-interaction.css';
 
+// Replaceable temporary art; swap for the room's final side-view table when ready.
+const pairTableUrl = new URL('./assets/pair-side-table-placeholder.png', import.meta.url).href;
+
 interface PairCallbacks {
   start(guest: CharacterMeta, partner?:string): void | Promise<void>;
   play(host: string, guest: string): void;
@@ -80,7 +83,10 @@ export class PairInteraction {
           heart.style.animationDelay = `${i * .55}s`; effects.append(heart);
         }
       } else if (beat.effect === 'tea') {
-        const tray = document.createElement('span'); tray.className = 'pair-tea'; tray.textContent = '☕  ☕'; effects.append(tray);
+        const table = document.createElement('img');
+        table.className = 'pair-tea'; table.src = pairTableUrl;
+        table.alt = ''; table.draggable = false; table.dataset.artStatus = 'replaceable-placeholder';
+        effects.append(table);
       } else if (beat.effect === 'wave') {
         const bubble = document.createElement('span'); bubble.className = 'pair-talk';
         bubble.textContent = beat.effect === 'wave' ? '✦' : '•••'; effects.append(bubble);

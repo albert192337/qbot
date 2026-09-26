@@ -2,7 +2,7 @@ import { ActionSessions } from './action-sessions';
 import { editManifest } from './manifest-store';
 import { selectedImage } from './character-images';
 import type { ImageSelection } from '../shared/character-images';
-import { generationMotionDesc, originalActionSpec, originalFramePrompt, originalVideoPrompt } from '@qbot/pipeline';
+import { personaPrompt, generationMotionDesc, originalActionSpec, originalFramePrompt, originalVideoPrompt } from '@qbot/pipeline';
 import { isCloudJob, startCloudHatch, cloudOperation, syncCloudJob } from './cloud-generation';
 /**
  * pipeline-bridge：唯一 import @qbot/pipeline 的地方。
@@ -154,15 +154,16 @@ export async function startHatch(
   characterForm?: CharacterForm,
   characterStyle?: CharacterStyle,
   name?: string,
+  persona?: string,
 ): Promise<string> {
-  if ((await getSettings()).generationMode !== 'local') return startCloudHatch(refImagePath, imageProvider, characterForm, characterStyle, name);
+  if ((await getSettings()).generationMode !== 'local') return startCloudHatch(refImagePath, imageProvider, characterForm, characterStyle, name, persona);
   if (imageProvider === 'gpt-image-2' && !(await getSettings()).gptImageApiKey) {
     throw new Error('未配置 gpt-image-2 API key（托盘 → 设置）');
   }
   const dirId = randomUUID();
   const outDir = path.join(charactersDir(), dirId);
   await mkdir(outDir, { recursive: true });
-  const job = await Job.create(outDir, { refImagePath, imageProvider, characterForm, characterStyle });
+  const job = await Job.create(outDir, { refImagePath, imageProvider, characterForm, characterStyle, persona });
   await restoreGenerationTask(dirId);
   runJob(dirId, job);
   return dirId;
@@ -819,7 +820,7 @@ export async function getPrompts(dirId: string): Promise<PromptData> {
       const motionDesc = customMotionDesc || spec.motionDesc;
       // 传入全文覆盖 → 返回的就是实际会用于生成的 prompt（UI 直接展示可编辑）
       const fp = original && !custom?.framePromptFull?.trim() ? originalFramePrompt(poseDesc,persona) : framePrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, custom?.poseDesc, custom?.framePromptFull);
-      const vp = original && !custom?.videoPromptFull?.trim() ? originalVideoPrompt(motionDesc) : videoPrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, customMotionDesc, custom?.videoPromptFull);
+      const vp = original && !custom?.videoPromptFull?.trim() ? originalVideoPrompt(motionDesc, 5, persona) : videoPrompt(id, DEFAULT_CHARACTER_DESC, characterForm, characterStyle, persona, customMotionDesc, custom?.videoPromptFull);
       return [
         id,
         {
@@ -852,11 +853,11 @@ function toDataUrl(buf: Buffer): string {
 
 function buildCustomFramePrompt(poseDesc: string, manifest: Manifest, persona?: string): string {
   if ('stickerLibrary' in manifest || manifest.generationMode === 'original') return originalFramePrompt(poseDesc, persona);
-  const personaSuffix = persona ? `角色人设：${persona}。按照此设定表现角色。` : '';
+  const personaSuffix = personaPrompt(persona);
   return `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。${poseDesc}${personaSuffix}画面中只有这一个角色，不出现其他人的手或身体部位，没有家具、没有白色贴纸描边。背景为纯色绿幕（纯正绿色，无渐变无阴影无纹理），角色边缘描线清晰，全身完整可见，角色占画面高度约70%，粗描边贴纸插画风格，无文字无水印`;
 }
 
 function buildCustomVideoPrompt(motionDesc: string, _manifest: Manifest, durationSec: number): string {
-  if ('stickerLibrary' in _manifest || _manifest.generationMode === 'original') return originalVideoPrompt(motionDesc,durationSec);
-  return `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。${motionDesc}镜头完全固定不动，静止镜头，角色不位移不走出画面，绿幕背景纯绿色保持不变，画面中始终只有这一个角色，绝对不出现其他人物、手或物体。丝滑流畅循环动画。 --resolution 480p --duration ${durationSec} --camerafixed true`;
+  if ('stickerLibrary' in _manifest || _manifest.generationMode === 'original') return originalVideoPrompt(motionDesc,durationSec,_manifest.persona);
+  return `参考图中的角色，保持发型、眼睛、服装、耳朵等所有细节完全一致。${motionDesc}${personaPrompt(_manifest.persona)}镜头完全固定不动，静止镜头，角色不位移不走出画面，绿幕背景纯绿色保持不变，画面中始终只有这一个角色，绝对不出现其他人物、手或物体。丝滑流畅循环动画。 --resolution 480p --duration ${durationSec} --camerafixed true`;
 }

@@ -30,6 +30,7 @@ const PATTERNS: Record<string, RegExp> = {
   drag: /拖拽|悬浮|提起|拎起/, sleep: /睡|瞌睡/, tea: /喝茶|放松|休息/,
   talk_happy: /开心|高兴|快乐|笑/, talk_annoyed: /生气|嫌弃|不高兴|愤怒/,
   wave: /招呼|挥手|你好|问候/, garden_sow: /播种|种花|浇水/,
+  perch: /窗.*沿|沿.*窗|停靠/,
   garden_harvest: /收获|采摘/, perch_sit: /坐.*窗|窗.*坐/,
   perch_lie: /趴.*窗|窗.*趴/, writing: /写字|手账|记录/,
 };

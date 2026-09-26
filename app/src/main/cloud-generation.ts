@@ -13,7 +13,7 @@ const url = new URL(BASE);
 if (url.protocol !== 'https:' && !['127.0.0.1','localhost'].includes(url.hostname)) throw new Error('Hosted generation requires HTTPS');
 const hash = (v: string | Buffer) => createHash('sha256').update(v).digest('hex');
 const VALID_ID = /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
-interface Marker { name?: string; acknowledged?: boolean; owner: string; submitted: boolean; imageProvider: ImageProvider; characterForm: CharacterForm; characterStyle: CharacterStyle; files: Record<string,string>; phase?: string; error?: string; queuePosition?: number }
+interface Marker { persona?: string; name?: string; acknowledged?: boolean; owner: string; submitted: boolean; imageProvider: ImageProvider; characterForm: CharacterForm; characterStyle: CharacterStyle; files: Record<string,string>; phase?: string; error?: string; queuePosition?: number }
 interface Snapshot { id: string; phase: string; error?: string; queuePosition: number; state: JobState; files: { path: string; size: number; hash: string }[] }
 interface Accounts { active?: string; hiddenJobs?: string[]; tokens: Record<string,string> }
 const markerPath = (id: string) => {
@@ -59,7 +59,7 @@ async function auth(m: Marker): Promise<string> {
   if (!token) throw new Error('此任务的邀请码未保存在本机，请先重新连接原邀请码');
   return token;
 }
-export async function startCloudHatch(ref: string, imageProvider: ImageProvider = 'seedream', characterForm: CharacterForm = 'humanoid', characterStyle: CharacterStyle = 'chibi', name?: string): Promise<string> {
+export async function startCloudHatch(ref: string, imageProvider: ImageProvider = 'seedream', characterForm: CharacterForm = 'humanoid', characterStyle: CharacterStyle = 'chibi', name?: string, persona?: string): Promise<string> {
   const saved = await accounts();
   if (!saved.active) throw new Error('请先输入内测邀请码');
   if ((await stat(ref)).size > 20*1024*1024) throw new Error('图片过大，请选择 20MB 以内的图片');
@@ -73,7 +73,7 @@ export async function startCloudHatch(ref: string, imageProvider: ImageProvider 
   const dir = path.join(charactersDir(),id);
   await mkdir(path.join(dir,'.job'),{recursive:true});
   await writeFile(path.join(dir,'source.png'),png);
-  const m: Marker = { name:name?.trim().slice(0,24), owner:saved.active, submitted:false,imageProvider,characterForm,characterStyle,files:{} };
+  const m: Marker = { persona:persona?.trim() || undefined, name:name?.trim().slice(0,24), owner:saved.active, submitted:false,imageProvider,characterForm,characterStyle,files:{} };
   await atomic(markerPath(id),m);
   // Persist a visible task before network submission; a lost response can safely retry the same UUID.
   await atomic(path.join(dir,'.job/state.json'), { jobId:id,stage:'turnaround',imageProvider,turnaround:{candidates:[],picked:null},actions:{} });
@@ -86,7 +86,7 @@ export async function startCloudHatch(ref: string, imageProvider: ImageProvider 
 }
 function errorText(e: unknown): string { return e instanceof Error ? (/fetch|timeout|abort/i.test(e.message) ? '暂时无法连接云端；任务已保留，连接恢复后可继续。' : e.message) : '云端暂不可用，请稍后继续'; }
 async function submit(id: string,m: Marker): Promise<void> {
-  await request('/jobs',await auth(m), { id,name:m.name,image:(await readFile(path.join(charactersDir(),id,'source.png'))).toString('base64'),imageProvider:m.imageProvider,characterForm:m.characterForm,characterStyle:m.characterStyle });
+  await request('/jobs',await auth(m), { id,name:m.name,persona:m.persona,image:(await readFile(path.join(charactersDir(),id,'source.png'))).toString('base64'),imageProvider:m.imageProvider,characterForm:m.characterForm,characterStyle:m.characterStyle });
   m.submitted=true;m.error=undefined;await atomic(markerPath(id),m);
 }
 const inflight = new Map<string,Promise<HatchStatus>>();
@@ -138,7 +138,7 @@ function localStatus(id: string,m: Marker,state: JobState,offline=false): HatchS
   return { stage:m.phase==='failed' ? 'failed' : state.stage, running:!offline && m.submitted && ['queued','running','awaiting_pick'].includes(m.phase??''),imageProvider:m.imageProvider,
     cloud:true,cloudPhase:m.phase,error:m.error,queuePosition:m.queuePosition,
     candidateUrls:state.turnaround.candidates.map(p=>`qbot-asset://${id}/.job/${p}?v=${m.files[`.job/${p}`]??''}`),
-    actions:Object.fromEntries(Object.entries(state.actions).map(([a,v])=>[a,{status:v.status,error:v.error,frameUrl:v.framePath?`qbot-asset://${id}/.job/${v.framePath}?v=${m.files[`.job/${v.framePath}`]??''}`:undefined}])) as HatchStatus['actions'] };
+    actions:Object.fromEntries(Object.entries(state.actions).filter(([a])=>!state.baseActionIds || state.baseActionIds.some(id=>id===a)).map(([a,v])=>[a,{status:v.status,error:v.error,frameUrl:v.framePath?`qbot-asset://${id}/.job/${v.framePath}?v=${m.files[`.job/${v.framePath}`]??''}`:undefined}])) as HatchStatus['actions'] };
 }
 function broadcast(id: string,status: HatchStatus): void {
   const signature = JSON.stringify(status);
@@ -163,7 +163,10 @@ export async function cloudOperation(id: string,operation:'pick'|'resume',index?
   if(inflight.has(id))await inflight.get(id);
   const m=await marker(id);
   if(!m.submitted)await submit(id,m);
-  if(operation==='pick'||m.phase==='failed'||m.phase==='done')await request(`/jobs/${id}/${operation}`,await auth(m),operation==='pick'?{index}:{actions});
+  let persona = m.persona;
+  try { persona = (JSON.parse(await readFile(path.join(charactersDir(),id,'manifest.json'),'utf8')) as Manifest).persona ?? ''; }
+  catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
+  if(operation==='pick'||m.phase==='failed'||m.phase==='done')await request(`/jobs/${id}/${operation}`,await auth(m),operation==='pick'?{index,persona}:{actions,persona});
   await restoreGenerationTask(id);const status=await syncCloudJob(id);broadcast(id,status);watch(id);
 }
 export async function recoverCloudJobs(): Promise<void>{

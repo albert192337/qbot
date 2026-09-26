@@ -9,6 +9,7 @@ import { errorMessage } from './model';
 export interface CreationDraft {
   path: string;
   name: string;
+  persona: string;
   provider: ImageProvider;
   form: CharacterForm;
   style: CharacterStyle;
@@ -22,6 +23,7 @@ export class CreationForm {
   private mode: 'cloud' | 'local' = 'cloud';
   private provider = el('select');
   private name = el('input');
+  private persona = el('textarea');
   private style = el('select');
   private upload = button(
     '把角色图片放上来',
@@ -67,6 +69,11 @@ export class CreationForm {
     }
     const nameField = el('label', '它的名字', 'form-field');
     nameField.append(this.name);
+    this.persona.rows = 3;
+    this.persona.maxLength = 4000;
+    this.persona.placeholder = '例如：冷淡寡言、沉稳克制；开心时只轻微微笑，不夸张蹦跳。';
+    const personaField = el('label', '角色人设（选填）', 'form-field');
+    personaField.append(this.persona, el('small', '从第一批动作开始生效；以后修改只影响后续生成。'));
     const styleField = el('label', '希望它是什么模样', 'form-field');
     styleField.append(this.style);
     this.error.hidden = true;
@@ -97,6 +104,7 @@ export class CreationForm {
       this.upload,
       this.picker,
       nameField,
+      personaField,
       styleField,
       more,
       this.accountPanel,
@@ -180,8 +188,8 @@ export class CreationForm {
         this.provider.value = previous;
       this.note.textContent =
         this.mode === 'cloud'
-          ? '有效邀请码可不限次数孵化、换方案和失败重试。所选图片、名字和形象选项会上传至 QBot 及模型服务。确认形象后生成一套基础动作；关闭小屋或客户端仍会继续。'
-          : '当前使用自己的模型 Key。先生成 1 个形象，确认后生成 11 个动作；提交的模型请求会产生费用。可以离开小屋，退出客户端会暂停本地任务。';
+          ? '有效邀请码可不限次数孵化、换方案和失败重试。所选图片、名字、人设和形象选项会上传至 QBot 及模型服务。确认形象后生成一套基础动作；关闭小屋或客户端仍会继续。'
+          : '当前使用自己的模型 Key。先生成 1 个形象，确认后生成 10 个动作；提交的模型请求会产生费用。可以离开小屋，退出客户端会暂停本地任务。';
       this.submit.textContent =
         this.mode === 'cloud'
           ? '开始孵化 · 不限次数'
@@ -195,8 +203,8 @@ export class CreationForm {
     this.locked = busy || this.submitting;
     this.root
       .querySelectorAll<
-        HTMLInputElement | HTMLButtonElement | HTMLSelectElement
-      >('input,button,select')
+        HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement
+      >('input,button,select,textarea')
       .forEach((node) => {
         node.disabled = this.locked;
       });
@@ -234,6 +242,7 @@ export class CreationForm {
       await this.create({
         path,
         name: this.name.value.trim(),
+        persona: this.persona.value.trim(),
         provider: this.provider.value as ImageProvider,
         form: this.style.value === 'abstract' ? 'abstract' : 'humanoid',
         style: this.style.value === 'faithful' ? 'faithful' : 'chibi',

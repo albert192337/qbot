@@ -921,3 +921,8 @@ body.strip[data-head-overlay=interaction] .quest-pill,body.strip[data-head-overl
 .cultivation-hint-progress::-webkit-progress-bar {background:#e5dfcd;border-radius:4px;}
 .cultivation-hint-progress::-webkit-progress-value {background:#86aa72;border-radius:4px;transition:width .8s linear;}
 @media(prefers-reduced-motion:reduce){.cultivation-hint-progress::-webkit-progress-value{transition:none}}
+
+.strip .strip-drag,.strip .strip-collapse { pointer-events:auto;border:0;background:transparent;padding:3px 6px;min-width:24px; }
+.strip .strip-drag { cursor:grab;touch-action:none; }
+.strip .strip-drag:active { cursor:grabbing; }
+.strip .strip-collapse { font-size:21px;line-height:1; }

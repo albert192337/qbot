@@ -80,7 +80,7 @@ function renderMembers(host:HTMLElement):void {
 function renderRoom():void {
  const host=$('room-details');
  if(!room){host.innerHTML='<div class="card empty"><span class="round-icon">⌂</span><h2>小屋还在等你</h2><p>邀请朋友来玩，或者去世界广场逛逛。</p></div>';return;}
- host.innerHTML=`<article class="card"><div class="section-heading"><div><span class="eyebrow">${room.testing?'LOCAL REHEARSAL':'OUR LITTLE ROOM'}</span><h2>${esc(room.name)}</h2></div>${room.ownerId===status.memberId?'<button id="edit-room">房间设置</button>':''}</div><p>${esc(room.description||'留一点时间，和朋友待在一起。')}</p><div class="room-tags"><span>${esc(kinds[room.kind])}</span><span>${room.testing?'本地试演':room.listed?'公开房间':'房间码访问'}</span><span>${esc(languages[room.language||'all'])}</span><span>${room.chatEnabled===false?'安静陪伴':'可以聊天'}</span></div><div class="display-control"><span>角色在哪里陪你？</span><button id="display-desktop">桌面</button><button id="display-room">房间场景</button><button id="details-chat" class="primary">打开聊天小窗 ↗</button></div><h3>房间成员 <small>${room.members.filter(m=>m.online).length}/${room.capacity}</small></h3><div id="members"></div></article>`;
+ host.innerHTML=`<article class="card"><div class="section-heading"><div><span class="eyebrow">${room.testing?'LOCAL REHEARSAL':'OUR LITTLE ROOM'}</span><h2>${esc(room.name)}</h2></div>${room.ownerId===status.memberId?'<button id="edit-room">房间设置</button>':''}</div><p>${esc(room.description||'留一点时间，和朋友待在一起。')}</p><div class="room-tags"><span>${esc(kinds[room.kind])}</span><span>${room.testing?'本地试演':room.listed?'公开房间':'房间码访问'}</span><span>${esc(languages[room.language||'all'])}</span><span>${room.chatEnabled===false?'安静陪伴':'可以聊天'}</span></div><div class="display-control"><span>房间背景</span><button id="display-desktop">关闭房间背景</button><button id="display-room">开启房间背景</button><button id="details-chat" class="primary">打开聊天小窗 ↗</button></div><h3>房间成员 <small>${room.members.filter(m=>m.online).length}/${room.capacity}</small></h3><div id="members"></div></article>`;
  renderMembers($('members'));click('edit-room',()=>openForm(room!.listed));click('details-chat',()=>api.social.openChat());
  for(const mode of ['desktop','room'] as const)click(`display-${mode}`,async()=>{await api.rooms.setDisplayMode(mode);toast(mode==='desktop'?'角色现在陪在桌面上':'角色现在待在房间里');});
  void api.rooms.getDisplayMode().then(mode=>{for(const m of ['desktop','room'])$(`display-${m}`)?.classList.toggle('selected',mode===m);});
@@ -88,7 +88,7 @@ function renderRoom():void {
 async function loadProfile():Promise<void>{
  profile=await api.social.profile();if(compact)return;
  const c=profile.character;
- $('my-character').innerHTML=c?`<img class="portrait" src="qbot-asset://${encodeURIComponent(c.dirId)}/${esc(c.coverImage||c.manifest.sourceImage)}" alt=""><div><strong>${esc(profile.nickname)}</strong><p>${esc(c.manifest.name)}</p></div>`:'<p class="muted">先在角色库选择一个角色吧。</p>';
+ $('my-character').innerHTML=c?`<img class="portrait" src="qbot-asset://${encodeURIComponent(c.dirId)}/${esc('__portrait.png')}" alt=""><div><strong>${esc(profile.nickname)}</strong><p>${esc(c.manifest.name)}</p></div>`:'<p class="muted">先在角色库选择一个角色吧。</p>';
  $('pose').innerHTML='<option value="">随当前状态</option>'+profile.actions.map(a=>`<option value="${esc(a.id)}">${esc(a.label)}</option>`).join('');
  ($('pose') as HTMLSelectElement).value=profile.pose;
 }
@@ -123,7 +123,7 @@ function renderRooms():void{
 async function enter(code:string):Promise<void>{if(room&&room.roomId!==code&&!confirm('前往这间小屋会离开当前房间，继续吗？'))return;if(!(await api.social.prepareJoin()))return;await mutate(()=>api.rooms.join(code));await showPage('room');api.social.openChat();}
 const dialog=$<HTMLDialogElement>('room-dialog');
 const preview = document.querySelector('.room-preview > span');
-if (preview) { const image=document.createElement('img');image.src=DEFAULT_ROOM.background;image.alt='当前房间场景';image.style.cssText='width:88px;height:88px;object-fit:contain';preview.replaceWith(image); }
+if (preview) { const image=document.createElement('img');image.src=DEFAULT_ROOM.background;image.alt='当前开启房间背景';image.style.cssText='width:88px;height:88px;object-fit:contain';preview.replaceWith(image); }
 if (!compact) {
   const filters=$('world-page').querySelector('.filters')!;
   const details=document.createElement('details'); details.className='filter-panel';
@@ -143,7 +143,7 @@ function openForm(listed:boolean):void{
 async function loadGuests():Promise<void>{
  guests=await api.social.guests();const host=$('guest-list');host.replaceChildren();
  if(!guests.length){host.innerHTML='<p class="empty">还没有其他可播放的角色。先创建或下载一个角色，再回来试演。</p>';return;}
- for(const guest of guests){const card=document.createElement('article');card.className='card guest-card';card.innerHTML=`<img src="qbot-asset://${encodeURIComponent(guest.id)}/${esc(guest.character.manifest.sourceImage)}" alt=""><strong>${esc(guest.name)}</strong><small>${esc(guest.source)}${guest.owner?` · ${esc(guest.owner)}`:''}</small><button class="primary">邀请来试演</button>`;card.querySelector('button')!.onclick=()=>void run(()=>mutate(()=>api.social.inviteTest(guest.id)));host.append(card);}
+ for(const guest of guests){const card=document.createElement('article');card.className='card guest-card';card.innerHTML=`<img src="qbot-asset://${encodeURIComponent(guest.id)}/${esc('__portrait.png')}" alt=""><strong>${esc(guest.name)}</strong><small>${esc(guest.source)}${guest.owner?` · ${esc(guest.owner)}`:''}</small><button class="primary">邀请来试演</button>`;card.querySelector('button')!.onclick=()=>void run(()=>mutate(()=>api.social.inviteTest(guest.id)));host.append(card);}
 }
 function renderTestMembers():void{
  const host=$('test-members');if(!host)return;host.replaceChildren();if(!room?.testing)return;
@@ -177,7 +177,14 @@ api.rooms.onKicked(()=>toast('你已离开这个房间'));
 api.social.onContacts(value=>{contacts=value;const count=value.people.filter(p=>p.relation==='incoming').length+value.invitations.length;const entry=document.querySelector('[data-page=friends]');if(entry)entry.textContent=count?`朋友 · ${count}`:'朋友';void run(sync);});
 api.characters.onActivated(()=>void run(async()=>{await loadProfile();if(contacts.available&&!room?.testing)await api.social.contacts(true);}));
 if (!compact) {
- const friends=mountContacts($('friends-card'),$('steam-card'),api.social,toast,()=>!!room&&!room.testing,()=>{void run(sync);});
+ const friendApi={...api.social,contactAction:async(id: string,action:import('../../shared/social').ContactAction)=>{
+   if(action==='invite'&&!room){
+     if(!(await api.social.prepareJoin()))throw Error('已取消邀请');
+     await api.rooms.create({name:`${profile?.nickname||'我'}的小屋`.slice(0,24),kind:'idle',capacity:6,listed:false});await sync();
+   }
+   await api.social.contactAction(id,action);
+ }};
+ const friends=mountContacts($('friends-card'),$('steam-card'),friendApi,toast,()=>!room?.testing,()=>{void run(sync);});
  const entry=document.createElement('article');entry.className='card';entry.innerHTML='<h3>朋友们</h3><p class="muted">游戏好友、最近见过的人和 Steam 好友，都在这里。</p><button id="find-friends">打开朋友列表 →</button>';$('home-page').querySelector('.home-grid')!.append(entry);click('find-friends',()=>showPage('friends'));
  api.rooms.onStatus(()=>friends.refresh());window.addEventListener('beforeunload',()=>friends.dispose(),{once:true});
  const offSteam = mountSteam($('steam-card'), $('steam-join'), api.social.steam, toast, async () => { await sync(); await showPage('room'); api.social.openChat(); });

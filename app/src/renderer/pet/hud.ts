@@ -106,8 +106,8 @@ export class ProgressHud {
       b.addEventListener('pointerdown',e=>e.stopPropagation());b.addEventListener('click',e=>{e.stopPropagation();window.qbot.garden.open(page);});this.root.append(b);
     }
     const stopWeather=attachWeatherButton(this.root,window.qbot.garden);
-    const hide=document.createElement('button');hide.className='hud-chat hud-hide';hide.title='隐藏全部角色';hide.setAttribute('aria-label',hide.title);hide.innerHTML=EYE_ICON;
-    hide.onpointerdown=e=>e.stopPropagation();hide.onclick=e=>{e.stopPropagation();void window.qbot.desktop.toggle().catch(()=>this.toast('暂时无法切换，请重试'));};this.root.append(hide);
+    const hide=document.createElement('button');hide.className='hud-chat hud-hide';hide.title='显示／隐藏';hide.setAttribute('aria-label',hide.title);hide.setAttribute('aria-haspopup','menu');hide.innerHTML=EYE_ICON;
+    hide.onpointerdown=e=>e.stopPropagation();hide.onclick=e=>{e.stopPropagation();window.qbot.desktop.openMenu();};this.root.append(hide);
     window.addEventListener('pagehide',stopWeather,{once:true});
     const stopGardenHint = attachGardenHint(garden, window.qbot.garden);
     window.addEventListener('pagehide', stopGardenHint, { once: true });

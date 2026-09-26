@@ -10,6 +10,8 @@ class Element extends EventTarget {
   parent: Element | null = null;
   isConnected = true;
   src = '';
+  complete = false;
+  naturalWidth = 0;
   paused = true;
   loop = false;
   readyState = 4;
@@ -112,11 +114,33 @@ describe('Player visibility and recovery', () => {
     expect(video('idle').load).not.toHaveBeenCalled();
   });
   it('keeps source art visible when all video assets fail', async () => {
+    const source = stage.children.find((el) => el.tag === 'img')!;
+    source.complete = true; source.naturalWidth = 256; source.emit('load');
     for (const el of stage.children.filter((el) => el.tag === 'video')) el.play.mockRejectedValue(new Error('bad asset'));
     player.play('idle'); for (let i = 0; i < 8; i++) await flush();
     expect(visible()).toEqual([]);
     expect(stage.children.find((el) => el.tag === 'img')?.style.visibility).not.toBe('hidden');
     expect(vi.getTimerCount()).toBe(1);
+  });
+  it('keeps pending and broken source images hidden even after a visible video fails', async () => {
+    const source = stage.children.find((el) => el.tag === 'img')!;
+    expect(source.style.visibility).toBe('hidden');
+    source.complete = true; source.emit('error');
+    player.play('idle'); await flush();
+    for (const el of stage.children.filter((el) => el.tag === 'video')) el.play.mockRejectedValue(new Error('bad asset'));
+    video('idle').emit('error');
+    for (let i = 0; i < 8; i++) await flush();
+    expect(visible()).toEqual([]);
+    expect(source.style.visibility).toBe('hidden');
+  });
+  it('does not let late source loads cover playing videos or a replacement character', async () => {
+    const source = stage.children.find((el) => el.tag === 'img')!;
+    player.play('idle'); await flush();
+    source.complete = true; source.naturalWidth = 256; source.emit('load');
+    expect(source.style.visibility).toBe('hidden');
+    player.load('other', manifest());
+    source.emit('load');
+    expect(stage.children.find((el) => el.tag === 'img')?.style.visibility).toBe('hidden');
   });
   it('retries a temporarily unavailable visitor without leaving the source photo forever', async () => {
     for (const el of stage.children.filter(el => el.tag === 'video')) el.play.mockRejectedValue(new Error('decoder unavailable'));

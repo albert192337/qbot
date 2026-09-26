@@ -46,7 +46,7 @@ export interface GardenLife {
   visibility:'private'|'friends'|'public';
   shopVisibility?:'private'|'friends'|'public';
 }
-export type LifeCommand = {type:'buyDaily'; owner:string; offer:string} | {type:'spray'; target:string; kind:SprayKind} | {type:'resolveSpray'; id:string; replace?:Trait; accept:boolean} | {type:'feed'; wish:string; produce:string} | {type:'rerollWish'; wish:string} | {type:'gardenVisibility'; visibility:GardenLife['visibility'];scope?:'shop'|'land'};
+export type LifeCommand = {type:'buyDaily'; owner:string; offer:string} | {type:'spray'; target:string; kind:SprayKind} | {type:'resolveSpray'; id:string; replace?:Trait; accept:boolean} | {type:'feed'; wish:string; produce:string; actor?:string} | {type:'rerollWish'; wish:string} | {type:'gardenVisibility'; visibility:GardenLife['visibility'];scope?:'shop'|'land'};
 /** Stable non-secret sampling for published shop offers and daily requests. */
 export function dailyRandom(key:string):()=>number {
   let s=2166136261;for(const c of key)s=Math.imul(s^c.charCodeAt(0),16777619);
@@ -61,5 +61,5 @@ export function dailyOffers(owner:string,day:number):DailyOffer[] {
 export function wishMatches(w:FoodWish,p:Produce):boolean {return !w.done&&!p.locked&&!needsReveal(p)&&p.species===w.species&&w.traits.every(t=>p.traits.includes(t));}
 export function wishLabel(w:FoodWish):string {return `${SPECIES[w.species].name} ×1${w.traits.length?' · '+w.traits.map(t=>TRAITS[t].name).join('＋'):''}`;}
 export function currentGrowth(s:GardenState):CharacterGrowth|undefined {return s.activeActor?s.life?.characters[s.activeActor]:undefined;}
-export interface GardenVisit {owner:string;name:string;plots:GardenState['plots'];offers:DailyOffer[];day:number;visibility:GardenLife['visibility'];actorLevel:number;actorName?:string;landOpen?:boolean;shopOpen?:boolean;rewardsLeft?:number;tasks?:CoopTask[]}
+export interface GardenVisit {plotCount?:number;owner:string;name:string;plots:GardenState['plots'];offers:DailyOffer[];day:number;visibility:GardenLife['visibility'];actorLevel:number;actorName?:string;landOpen?:boolean;shopOpen?:boolean;rewardsLeft?:number;tasks?:CoopTask[]}
 export interface CoopTask {workBudget?:number;id:string;owner:string;plant:string;plot:number;remaining:number;updatedAt:number;members:Record<string,{work:number;seconds:number;seenAt:number}>;done:boolean;claimed:string[];shared?:boolean;invited?:string[];room?:string;fruit?:import('./garden').Plant}

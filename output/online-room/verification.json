@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "checks": [
+    "four real local actors across four backgrounds",
+    "theme retained on reload",
+    "600px layout",
+    "real websocket join and leave",
+    "cached peer media renders with own actor",
+    "background toggle keeps same network room",
+    "no duplicate peer windows",
+    "desktop restoration",
+    "room closes on leave"
+  ],
+  "errors": []
+}

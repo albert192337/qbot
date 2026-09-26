@@ -1,5 +1,6 @@
+import { MAX_GARDEN_PLOTS, unlockedPlots } from '../../shared/garden-progression';
 import { travelTransition, validateTravel } from '../../shared/travel';
-import { lifeTransition, protectPending, validateLife, settlePendingSpray } from './life-rules';
+import { ensureLife, lifeTransition, protectPending, validateLife, settlePendingSpray } from './life-rules';
 import {advanceV3,refreshV3Shop,makeV3Plant,v3HarvestXp,breedV3,protectV3,v3Transition,validateV3} from './v3-rules';
 import {fertilizerV3,v3Value,V3} from '../../shared/garden-v3';
 import { SPECIES, TRAITS, FERTILIZERS, level, HARVEST_XP, CULTIVATION_MS, needsReveal, canBreed, cultivationRemaining, mutationMultiplier, type Species, type Trait, type GardenState, type GardenCommand, type GardenReveal, type Seed, type Produce, type Plant, type Fertilizer } from '../../shared/garden';
@@ -23,7 +24,7 @@ export function refreshShop(s: GardenState, now: number, rng: Random): void {
     ] };
 }
 export function initialGarden(now: number, rng: Random): GardenState {
-    const s: GardenState = { version: 1, weatherCheckedAt: now, coins: 180, plots: Array(6).fill(null), seeds: (['lotus', 'strawberry', 'sunflower'] as Species[]).flatMap(sp => [0, 1].map(() => ({ id: rng.id(), species: sp, genes: [], bred: false }))), produce: [], fertilizers: Object.fromEntries(Object.keys(FERTILIZERS).map(f => [f, FERTILIZERS[f as Fertilizer].grade === 1 ? 2 : 0])) as GardenState['fertilizers'], discovered: [], claimed: [], xp: Object.fromEntries(species.map(sp => [sp, 0])) as GardenState['xp'], journey: { bought: 0, planted: 0, harvested: 0, earned: 0, appleBought: 0 }, boxMisses: 0, shop: { refreshAt: 0, offers: [] } };
+    const s: GardenState = { version: 1, weatherCheckedAt: now, coins: 180, plots: Array(MAX_GARDEN_PLOTS).fill(null), seeds: (['lotus', 'strawberry', 'sunflower'] as Species[]).flatMap(sp => [0, 1].map(() => ({ id: rng.id(), species: sp, genes: [], bred: false }))), produce: [], fertilizers: Object.fromEntries(Object.keys(FERTILIZERS).map(f => [f, FERTILIZERS[f as Fertilizer].grade === 1 ? 2 : 0])) as GardenState['fertilizers'], discovered: [], claimed: [], xp: Object.fromEntries(species.map(sp => [sp, 0])) as GardenState['xp'], journey: { bought: 0, planted: 0, harvested: 0, earned: 0, appleBought: 0 }, boxMisses: 0, shop: { refreshAt: 0, offers: [] } };
     refreshShop(s, now, rng);
     return s;
 }
@@ -47,11 +48,12 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
     if(cmd.type!=='resolveSpray')settlePendingSpray(s,now);
     protectPending(s,cmd);
     protectV3(s,cmd);
+    ensureLife(s,now,rng,context.actor,cmd.type!=='resolveSpray');
     const modern=v3Transition(s,cmd,now,rng);if(modern.handled)return {state:s,reveal:modern.reveal};
     const life=lifeTransition(s,cmd,now,rng,context.actor,context.shopOwner);
     if(life.handled){if(life.changed)life.changed.value=value(life.changed);return {state:s,reveal:life.reveal};}
     let reveal: GardenReveal | undefined, points: number | undefined, boxes: number | undefined;
-    const plot = (index: number) => { if (!Number.isInteger(index) || index < 0 || index >= 6)
+    const plot = (index: number) => { if (!Number.isInteger(index) || index < 0 || index >= s.plots.length)
         throw Error('土地不存在'); return s.plots[index]; };
     const parent = (id: string) => s.produce.find(p => p.id === id) ?? s.plots.find(p => p?.id === id && p.readyAt <= now);
     switch (cmd.type) {
@@ -82,7 +84,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             const same = (x: Seed) => x.species === seed.species && x.bred === seed.bred && JSON.stringify([...x.genes].sort()) === JSON.stringify([...seed.genes].sort()) && JSON.stringify(x.parents) === JSON.stringify(seed.parents);
             const available = s.seeds.filter(same);
             let next = s, count = 0;
-            for (let i = 0; i < s.plots.length && count < available.length; i++) if (!s.plots[i]) next = transition(next, { type: 'plant', plot: i, seed: available[count++].id }, now, rng, context).state;
+            for (let i = 0; i < s.plots.length && count < available.length; i++) if (!s.plots[i] && i < unlockedPlots(s)) next = transition(next, { type: 'plant', plot: i, seed: available[count++].id }, now, rng, context).state;
             if (!count) throw Error('没有空地');
             return { state: next };
         }
@@ -103,6 +105,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             const p = s.produce.find(p => p.id === cmd.id); if (!p) throw Error('收获不存在'); p.locked = !p.locked; break;
         }
         case 'plant': {
+            if (cmd.plot >= unlockedPlots(s)) throw Error('当前角色等级尚未解锁这块土地');
             if (plot(cmd.plot))
                 throw Error('先收获这块土地');
             const i = s.seeds.findIndex(x => x.id === cmd.seed);
@@ -297,7 +300,7 @@ export function validateGarden(raw: unknown): GardenState {
     const known = (sp: string) => Object.hasOwn(SPECIES, sp);
     const traits = (ts: Trait[]) => Array.isArray(ts) && ts.every(t => Object.hasOwn(TRAITS, t));
     const produce = (p: Produce) => p && typeof p.id === 'string' && known(p.species) && traits(p.traits) && number(p.kg) && number(p.value) && typeof p.bred === 'boolean' && (p.growthVersion === undefined || p.growthVersion === 2 || p.growthVersion === 3) && (p.revealed === undefined || typeof p.revealed === 'boolean') && (p.cultivation === undefined || (p.cultivation && number(p.cultivation.remainingMs) && p.cultivation.remainingMs <= (s.online || p.growthVersion===3 ? 600000 : CULTIVATION_MS) && (p.cultivation.startedAt === undefined || number(p.cultivation.startedAt)))) && (p.locked === undefined || typeof p.locked === 'boolean') && (p.yieldCount === undefined || Number.isInteger(p.yieldCount) && p.yieldCount >= 1 && p.yieldCount <= 3);
-    if (!s || s.version !== 1 || !number(s.boxMisses) || !s.journey || !['bought','planted','harvested','earned','appleBought'].every(k => number(s.journey![k as keyof NonNullable<GardenState['journey']>])) || !number(s.coins) || !Array.isArray(s.plots) || s.plots.length !== 6 ||
+    if (!s || s.version !== 1 || !number(s.boxMisses) || !s.journey || !['bought','planted','harvested','earned','appleBought'].every(k => number(s.journey![k as keyof NonNullable<GardenState['journey']>])) || !number(s.coins) || !Array.isArray(s.plots) || ![6, MAX_GARDEN_PLOTS].includes(s.plots.length) ||
         !s.plots.every(p => p === null || (produce(p) && number(p.plantedAt) && number(p.readyAt) && traits(p.baseTraits!) && Number.isSafeInteger(p.harvestsLeft) && p.harvestsLeft! >= 1 && p.harvestsLeft! <= SPECIES[p.species].harvests && Number.isSafeInteger(p.harvestIndex) && p.harvestIndex! >= 0 && (p.keep === undefined || typeof p.keep === 'boolean') && Array.isArray(p.fertilizers) && p.fertilizers.every(f => Object.hasOwn(FERTILIZERS, f)))) ||
         !Array.isArray(s.seeds) || !s.seeds.every(p => p && typeof p.id === 'string' && known(p.species) && traits(p.genes) && typeof p.bred === 'boolean') ||
         !Array.isArray(s.produce) || !s.produce.every(produce) || !s.fertilizers || !Object.keys(FERTILIZERS).every(k => number(s.fertilizers[k as keyof typeof FERTILIZERS])) ||
@@ -310,6 +313,8 @@ export function validateGarden(raw: unknown): GardenState {
     if(s.testWeather){const e=s.testWeather;if(!Array.isArray(e.evaluated)||!e.evaluated.every(id=>typeof id==='string')||typeof e.id!=='string'||!e.id.startsWith('weather-test:')||!['meteor','aurora'].includes(e.kind)||![e.start,e.end,e.checkedAt].every(number)||e.end<=e.start||e.checkedAt<e.start-1||e.checkedAt>e.end)throw Error('测试天气记录无效');}
     if (s.travel !== undefined) validateTravel(s.travel);
     if(s.journalEvents!==undefined&&(!Array.isArray(s.journalEvents)||s.journalEvents.some(e=>!e||!Number.isFinite(e.at)||typeof e.actor!=='string'||typeof e.summary!=='string')))throw Error('花园记录已损坏');
+    if (s.plots.length === 6) s.plots.push(null);
+    if (s.v3?.soil.length === 6) s.v3.soil.push(1);
     return s;
 }
 

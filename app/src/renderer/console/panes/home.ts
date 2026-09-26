@@ -100,7 +100,7 @@ function template(
     </section>` : ''}
     <section class="home-hero ${active ? '' : 'is-empty'}">
       ${active ? `
-        <div class="home-pet-preview"><img src="qbot-asset://${esc(active.dirId)}/source.png" alt="${esc(active.manifest.name || '当前角色')}" /></div>
+        <div class="home-pet-preview"><img src="qbot-asset://${esc(active.dirId)}/__portrait.png" alt="${esc(active.manifest.name || '当前角色')}" /></div>
         <div class="home-hero-copy"><span class="status-dot success"></span><span class="eyebrow">当前在桌面</span><h3>${esc(active.manifest.name || '未命名')}</h3><p>${activeDone} 个动作可用${active.hasUnfinishedJob ? ' · 有生成任务进行中' : ''}</p>
         <div class="btn-row"><button class="btn primary" data-open="profile" data-dir="${esc(active.dirId)}">编辑角色资料</button><button class="btn secondary" data-open="characters">切换角色</button></div></div>
       ` : `

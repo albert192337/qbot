@@ -1,0 +1,69 @@
+{
+  "urls": [
+    "file:///C:/Users/beta/Documents/Codex/2026-08-25/github-albert192337-qbot/app/out/renderer/social/index.html",
+    "file:///C:/Users/beta/Documents/Codex/2026-08-25/github-albert192337-qbot/app/out/renderer/pet/index.html?roomPet=1"
+  ],
+  "members": [
+    {
+      "id": "C1BA97914C18",
+      "nickname": "真实连接房友",
+      "character": {
+        "dirId": "guest",
+        "manifest": {
+          "id": "8a39fa2f-ee3b-4a31-863f-d1cf09f363a9",
+          "name": "棉花糖",
+          "createdAt": "2026-07-11T10:10:20.755Z",
+          "tier": "S",
+          "sourceImage": "source.png",
+          "turnaround": "turnaround.png",
+          "actions": {
+            "idle": {
+              "webm": "actions/idle.webm",
+              "gif": "actions/idle.gif",
+              "durationSec": 3,
+              "status": "done"
+            },
+            "drag": {
+              "webm": "actions/drag.webm",
+              "gif": "actions/drag.gif",
+              "durationSec": 5,
+              "status": "done"
+            },
+            "sleep": {
+              "webm": "actions/sleep.webm",
+              "gif": "actions/sleep.gif",
+              "durationSec": 3,
+              "status": "done"
+            },
+            "tea": {
+              "webm": "actions/tea.webm",
+              "gif": "actions/tea.gif",
+              "durationSec": 5,
+              "status": "done"
+            },
+            "talk_happy": {
+              "webm": "actions/talk_happy.webm",
+              "gif": "actions/talk_happy.gif",
+              "durationSec": 5,
+              "status": "done"
+            },
+            "talk_annoyed": {
+              "webm": "actions/talk_annoyed.webm",
+              "gif": "actions/talk_annoyed.gif",
+              "durationSec": 5,
+              "status": "done"
+            }
+          },
+          "pipelineVersion": "1",
+          "voice": {
+            "pack": "bouncy",
+            "pitchScale": 1.056,
+            "rateScale": 1.05
+          }
+        }
+      },
+      "mode": "idle",
+      "action": "idle"
+    }
+  ]
+}

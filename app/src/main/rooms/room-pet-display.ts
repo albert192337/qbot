@@ -18,6 +18,7 @@ import {
   pushToLounge,
   setRoomSizePreset,
   setRoomPetWindowDisplayMode,
+  sendToWindows,
 } from '../windows';
 import { myMemberId, memberStates, onRoomPetEvent, type RoomPetEvent } from './room-pets';
 
@@ -50,6 +51,7 @@ function pushSnapshot(memberId: string): void {
 
 function ensureVisible(memberId: string): void {
   if (memberId === myMemberId) return;
+  if (displayMode === 'room') return; // The panoramic scene owns all visible players.
   ensureRoomPetWindow(memberId);
   setRoomPetWindowDisplayMode(memberId, displayMode);
   pushSnapshot(memberId);
@@ -61,7 +63,8 @@ function relayout(): void {
 }
 
 function closeRoomSceneForModeChange(): void {
-  closingRoomForModeChange = closeRoomWindow();
+  closingRoomForModeChange = true;
+  if (!closeRoomWindow()) closingRoomForModeChange = false;
 }
 
 function applyDisplayMode(): void {
@@ -73,7 +76,7 @@ function applyDisplayMode(): void {
   }
 
   if (displayMode === 'room') {
-    openRoomWindow('QBot 联机小屋');
+    openRoomWindow('QBot 联机房间', true);
   } else {
     closeRoomSceneForModeChange();
   }
@@ -85,6 +88,10 @@ function applyDisplayMode(): void {
 
 export function getRoomDisplayMode(): RoomsDisplayMode {
   return displayMode;
+}
+
+export function getRoomSceneMembers() {
+  return inRoom ? order.filter(id=>!graceTimers.has(id)).map(id=>({id,...memberStates.get(id)})).filter((m): m is typeof m & {nickname:string;character:import('../../shared/ipc-types').LinkPeerCharacter|null}=>typeof m.nickname==='string') : [];
 }
 
 export async function setRoomDisplayMode(mode: RoomsDisplayMode): Promise<RoomsDisplayMode> {
@@ -185,7 +192,7 @@ let wired = false;
 export function wireRoomPetDisplay(): void {
   if (wired) return;
   wired = true;
-  onRoomPetEvent(handle);
+  onRoomPetEvent(event => { handle(event); sendToWindows('rooms:sceneChanged', undefined); });
   onRoomWindowBoundsChanged(relayout);
   onRoomWindowClosed(() => {
     if (closingRoomForModeChange) {
@@ -196,7 +203,7 @@ export function wireRoomPetDisplay(): void {
   });
   void getSettings().then((settings) => {
     setRoomSizePreset(settings.roomSizePreset ?? 'large');
-    displayMode = settings.roomsDisplayMode === 'room' ? 'room' : 'desktop';
+    displayMode = settings.roomsDisplayMode === 'desktop' ? 'desktop' : 'room';
     if (inRoom) applyDisplayMode();
     else pushToLounge('rooms:displayMode', displayMode);
   });

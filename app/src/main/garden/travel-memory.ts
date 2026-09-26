@@ -1,4 +1,5 @@
 import { app } from 'electron';
+import { displayImage } from '../character-images';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { getSettings } from '../config';
@@ -14,7 +15,7 @@ export async function prepareTravelMemory(t:TravelState,city=t.posts.at(-1)!.cit
  const post=recordLast?t.posts.at(-1)!:t.posts.filter(p=>p.city===city&&p.actor===actor).at(-1);
  if(!post)throw Error('当前角色在这里还没有旅行记录');
  const now=post.at,day=localDay(now);post.actor=actor;post.name=meta?.manifest?.name??'桌宠';
- const filename=meta?.manifest?.actions.idle?.gif??meta?.manifest?.sourceImage;
+ const filename=meta ? await displayImage(path.join(app.getPath('userData'),'characters',meta.dirId)) : undefined;
  if(filename&&settings.activeCharacter){
   const base=path.resolve(app.getPath('userData'),'characters',settings.activeCharacter),full=path.resolve(base,filename);
   if(full.startsWith(base+path.sep))try{const data=await readFile(full);const ext=path.extname(full).slice(1).toLowerCase();if(data.length<1500000&&['png','jpg','jpeg','gif','webp'].includes(ext))post.portrait=`data:image/${ext==='jpg'?'jpeg':ext};base64,${data.toString('base64')}`;}catch{}

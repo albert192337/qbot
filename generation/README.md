@@ -9,7 +9,7 @@
 - `GET /health`：服务状态、可选生图后端。
 - `GET /account`：`unlimited: true`，有效邀请码不限创建次数；兼容旧客户端的 `credits` 固定为 `Number.MAX_SAFE_INTEGER`，不参与扣减，`maxAttempts: null` 表示无累计重试上限；不返回邀请凭据或模型凭据。
 - `GET /jobs`：当前邀请码拥有的任务，用于重新安装后恢复。
-- `POST /jobs`：`id`（客户端 UUID）、`image`（PNG base64，≤8MB、≤4096px）、`name`、`imageProvider`、`characterForm`、`characterStyle`。同 UUID/素材/参数重复请求只保留一个任务，不会重复生成。
+- `POST /jobs`：`id`（客户端 UUID）、`image`（PNG base64，≤8MB、≤4096px）、`name`、`persona`（可选，最多 4000 字）、`imageProvider`、`characterForm`、`characterStyle`。同 UUID/素材/参数重复请求只保留一个任务，不会重复生成。
 - `GET /jobs/:id`：阶段、排队位置、动作状态、可下载文件及 SHA256。
 - `POST /jobs/:id/pick`：`index:0` 确认；`index:-1` 换方案。换方案不限制累计次数。
 - `POST /jobs/:id/resume`：失败后继续；用户主动重试不限制累计次数。已提交的视频 ID 和已成功动作会复用，终态失败/质检不合格的视频才重新生成。
@@ -39,3 +39,5 @@ npm run check
 ## 运维
 
 参见 `docs/p0-release-and-deployment.md`。调整 `registry.json` 前停止服务，修改后原子替换再启动；运行中不要直接改文件，内存快照会覆盖手工修改。增加新邀请码可以追加到服务端邀请码文件后重启服务；已有邀请码无需修改或重新发放。
+
+角色人设随首次创建保存到任务，生成首帧与视频时使用。`pick` / `resume` 可传入最新 `persona`，空字符串表示清空；已提交的视频任务仍复用原任务，已有动作不自动重做。客户端与服务端 pipeline 需一起更新。人设不进入市场或联机分享包。

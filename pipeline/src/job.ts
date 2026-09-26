@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import {
   ACTION_IDS,
+  DEFAULT_ACTION_IDS,
   type ActionId,
   type ActionState,
   type ActionStatus,
@@ -55,6 +56,7 @@ export class Job extends EventEmitter {
       imageProvider?: ImageProvider;
       characterForm?: CharacterForm;
       characterStyle?: CharacterStyle;
+      persona?: string;
     },
   ): Promise<Job> {
     const jobDir = path.join(outDir, JOB_DIR);
@@ -66,7 +68,7 @@ export class Job extends EventEmitter {
     const state: JobState = {
       jobId: randomUUID(),
       pipelineVersion: '1',
-      baseActionIds: [...ACTION_IDS],
+      baseActionIds: [...DEFAULT_ACTION_IDS],
       tier: opts.tier ?? 'S',
       createdAt: new Date().toISOString(),
       stage: 'turnaround',
@@ -74,6 +76,7 @@ export class Job extends EventEmitter {
       imageProvider: opts.imageProvider,
       characterForm: opts.characterForm,
       characterStyle: opts.characterStyle,
+      persona: opts.persona?.trim() || undefined,
       turnaround: { candidates: [], picked: null },
       actions: Object.fromEntries(
         ACTION_IDS.map((id) => [id, initialActionState()]),

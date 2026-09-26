@@ -18,7 +18,7 @@ export function mountContacts(host: HTMLElement, steam: HTMLElement, api: Social
   }
   function button(label: string, fn: () => Promise<unknown>, enabled = true, message?: string) {
     const b = el('button', label); b.disabled = busy || !enabled;
-    b.onclick = () => void action(fn, message); return b;
+    b.onclick = () => void action(fn, message);if(label==='邀请来玩')b.title=enabled?'邀请朋友到当前小屋；还没有房间时会先创建私密小屋':'请连接服务、退出本地试演，并确认好友在线';return b;
   }
   function contactAction(p: ContactPerson, command: ContactAction) { return api.contactAction(p.id, command); }
   function render() {

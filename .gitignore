@@ -26,3 +26,7 @@ rooms/data/
 work/
 .local/
 steam_appid.txt
+
+# 本机部署依赖与 Electron 试住运行档案
+output/deploy-tools/
+output/**/profile/

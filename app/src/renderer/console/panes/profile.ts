@@ -21,7 +21,7 @@ async function refresh(force = false): Promise<void> {
     <div class="profile-layout"><div class="profile-portrait"><img ${meta.coverImage ? `src="qbot-asset://${esc(ctx.dirId)}/${esc(meta.coverImage)}?v=${Date.now()}"` : 'hidden'} alt="${esc(ctx.m.name)}" /><p data-cover-empty ${meta.coverImage?'hidden':''}>尚未选择封面</p><p>${ready} 个可用动作</p><button class="btn" type="button" data-cover>选择封面</button></div>
     <form id="profile-form"><label for="profile-name">角色名字</label><input type="text" id="profile-name" maxlength="24" required value="${esc(ctx.m.name)}" />
     <label for="profile-persona">角色人设</label><textarea id="profile-persona" rows="5" placeholder="例如：温柔、慢热，喜欢喝茶和陪伴。">${esc(ctx.m.persona ?? '')}</textarea>
-    <p class="studio-hint">人设用于之后生成的动作。保存不会自动重新生成已有动画。</p>
+    <p class="studio-hint">人设影响之后生成动作的表情、姿态和幅度。保存不会自动重新生成已有动画；要调整旧动作，请在动作库选择重新生成。</p>
     <div class="btn-row"><button class="btn primary" type="submit">保存资料</button><span class="studio-hint" id="profile-feedback" role="status"></span></div></form></div>
     <div class="workspace-next"><div><h3>接下来，为它增加表达</h3><p>预览已有动作，添加新动作，或设置开会和工作时的表现。</p></div><div class="btn-row"><button class="btn" data-go="persona">管理动作</button><button class="btn ghost" data-go="scene-actions">设置场景联动</button></div></div>
   </div>`;

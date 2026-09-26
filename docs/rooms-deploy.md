@@ -1,5 +1,23 @@
 # 公共房间服务部署（rooms）
 
+## 2026-09-25：陪伴角色已上线
+
+- 用户明确授权部署，SSH ED25519 主机指纹通过用户控制台提供值严格核验后登录；凭据没有写入仓库或部署文件。
+- 正式地址仍是 `wss://albertbeta.cn/rooms`。发布 server/companions/contacts/garden/generated core/package；包含当前 petting:2 能力。五组陪伴模块测试、花园 v3 服务回归和摸摸服务回归通过，服务器 Node 24.13 上再次通过模块测试。
+- 切换前使用正式数据副本、只读市场包副本和回环 24362 端口验证三房六角色；预演数据保存在仅 root 可读的 `/root/qbot-companion-preflight-20260925-215826`，预演进程已停止。
+- 正式启用配置 `/etc/systemd/system/qbot-rooms.service.d/70-companions.conf`：`QBOT_COMPANIONS=1`、`QBOT_COMPANION_MARKET_DIR=/opt/qbot-rooms/market-assets`。市场包单独复制并校验，避免 DynamicUser 服务读取市场私有状态目录，不包含市场管理凭据。
+- 停服落盘后备份，随后切换代码。原数据目录 `/var/lib/qbot-rooms` 保持；旧的 2 房间、21 份缓存包加载正常，新增 6 个陪伴账号和 3 个虚拟房间。服务 `active`、`NRestarts=0`，市场与生成服务均 `active`。
+- 公网运行 `node scripts/verify-companions-online.mjs wss://albertbeta.cn/rooms` 通过：CMPGARDN「苔苔的花园茶会」、CMPSTUDY「翻页声自习室」、CMPNIGHT「晚风慢慢聊」各有 2 名角色；花园等级 3/6、2/3 块种植地差异可读，素材 hash 不同。使用独立「部署巡检」账号，未发送聊天、邀请或交易，不修改既有玩家资产；巡检账号留作部署记录。
+
+备份与回退：
+
+- 数据：`/root/qbot-rooms-backup-companions-20260925-215826/data.tgz`，权限 0600，完整性已验证；SHA256 `870cd4d1622ecbfe1a5e986529175e1a3f48a62622e19853c11cc4e9ac5787e6`。同目录保留旧服务配置和本机验收结果。
+- 旧代码与依赖：`/opt/qbot-rooms-pre-companions-20260925-215826`。
+- 发布包 SHA256：`8df3440ba812ffdc6061ebf71dad0247850ba6ab6b79473c9d22b353356aa1be`。
+- 需要停用陪伴时将专用 drop-in 开关设为 0、重新加载并重启服务；需要代码回退则停服务，另存当前代码、恢复旧代码目录与原配置后启动。始终保留当前玩家数据，不能直接用上线前备份覆盖新产生的账号或资产。
+
+客户端正常打开世界广场刷新即可发现房间。新版小窗邀请卡和陪伴身份标记需要新版客户端；本次未发布安装包，也未强制重启用户正在运行的应用。
+
 ## 2026-09-23：花园 v3 与好友服务已上线
 
 本次更新 `14.103.59.73` 的 `qbot-rooms.service`，生产地址仍为 `wss://albertbeta.cn/rooms`。发布文件为 `server.mjs`、`contacts.mjs`、`garden.mjs`、`generated/garden-core.cjs` 和 `package.json`，复用服务器已有 `ws` 依赖。未更改 nginx、服务权限、客户端默认地址或其他服务。
@@ -187,3 +205,20 @@ ls -la /var/lib/qbot-rooms/rooms.json            # 数据文件（房间 + 成�
 | 内容审核 | 无。这是自部署服务，没有 7×24 审核能力 —— 所以 spec §5.3 把公共房间定位为「熟人小圈子入口」，房间数上限 200、不做推荐排行 |
 | 举报处置 | 客户端可举报（记计数），但**无人工处置流程**。若走向陌生人规模，必须先立项补齐 |
 | 备份 | 无自动备份。需要的话给 `rooms.json` 加个 cron 拷贝即可 |
+# 2026-09-26 陪伴好友增量更新
+
+正式 `qbot-rooms` 已更新陪伴好友逻辑，仅替换 `companions.mjs`，并在服务器现有文件中增加好友操作回调与快照推送回调，保留线上其他服务逻辑和生成规则。没有部署本地尚未上线的花园规则。
+
+- 备份目录 `/root/qbot-friends-20260926/`，原代码 `server.before.mjs`、`companions.before.mjs`，停服落盘后的数据 `state-before.tgz`（0600，SHA256 `ac4a63914daa0ce5bd06aa81640429c6ae0836b89bbaffd7180114118f418b333`）。
+- 副本 `candidate/` 与 `preflight-data/` 只监听回环端口 24362，使用线上市场素材、线上生成规则与独立数据验收延迟接受/好友快照；验收进程已停止，测试身份未写入生产。
+- 本机 `rooms/companions.test.mjs` 七组、`scripts/test-companions-server.mjs` 双向好友与原流程、既有社交回归通过。副本使用 `scripts/verify-companion-friends.mjs`；该脚本会创建测试身份与好友关系，只用于独立副本。
+- 更新后 `active/running`、`NRestarts=0`，公网 `wss://albertbeta.cn/rooms` 三房六角色、素材与花园验证通过。无需更新客户端。
+- 回退时停止 qbot-rooms，将两份 before 文件恢复到 `/opt/qbot-rooms/` 对应文件后启动；正常回退保留当前 Contacts 好友数据，不用旧状态覆盖玩家新增关系。
+
+## 2026-09-26 好友邀请来访
+
+仅更新 server.mjs / companions.mjs，生产花园规则保持原版。先以独立目录复制生产数据，在回环 24362 验证延迟好友、私密房来访、原房人数减少、离房返家，再停止预演服务。
+
+备份目录 `/root/qbot-visits-20260926/`，停服一致性快照 `state-before.tgz`，SHA256 `234a307eaaa4e903d681e00e7b0f1e7152ea6ea16aaee1d8dcd29973bde26146`；原代码 `server.before.mjs` / `companions.before.mjs`。正式服务重启后 active；公网三房六角色和花园验证通过。回滚仅将两份原代码 install -m644 到 /opt/qbot-rooms 后重启，无需覆盖用户数据。
+
+客户端需加载新构建；本机已重启。测试：8 组模块、真实 WS、生产副本、专用 Electron 无房间邀请、类型检查与构建通过。旧综合 UI 脚本此前聊天气泡可见性断言失败；邀请专测独立通过。

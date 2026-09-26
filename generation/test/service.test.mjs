@@ -16,7 +16,7 @@ function fakePipeline() {
     Job: {
       async create(outDir, opts) {
         await writeFile(path.join(outDir,'source.png'),await readFile(opts.refImagePath));
-        const j=wrap(outDir,{ stage:'turnaround', imageProvider:opts.imageProvider,turnaround:{candidates:[],picked:null},actions:Object.fromEntries(actions.map(x=>[x,{status:'pending'}])) });
+        const j=wrap(outDir,{ stage:'turnaround', persona:opts.persona, imageProvider:opts.imageProvider,turnaround:{candidates:[],picked:null},actions:Object.fromEntries(actions.map(x=>[x,{status:'pending'}])) });
         await j.save(); return j;
       },
       async load(outDir) { return wrap(outDir, JSON.parse(await readFile(path.join(outDir,'.job/state.json'),'utf8'))); },
@@ -38,9 +38,11 @@ test('authenticated, idempotent creation; unlimited invites including exhausted 
   const request=(p,method='GET',data,t=token)=>fetch(base+p,{method,headers:{Authorization:`Bearer ${t}`,'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined});
   assert.equal((await request('/account','GET',null,'bad')).status,401);
   const id=randomUUID();const png=Buffer.alloc(24);Buffer.from('89504e470d0a1a0a','hex').copy(png);png.writeUInt32BE(64,16);png.writeUInt32BE(64,20);
-  const input={id,image:png.toString('base64'),characterForm:'humanoid',characterStyle:'chibi'};
+  const input={id,image:png.toString('base64'),characterForm:'humanoid',characterStyle:'chibi',persona:'冷淡寡言'};
   const responses=await Promise.all([request('/jobs','POST',input),request('/jobs','POST',input)]);
   assert.deepEqual(responses.map(r=>r.status),[202,202]);
+  assert.equal((await request('/jobs','POST',{...input,persona:'活泼'})).status,409);
+  assert.equal((await request('/jobs','POST',{...input,id:randomUUID(),persona:42})).status,400);
   assert.equal((await(await request('/account')).json()).unlimited,true);
   assert.ok((await(await request('/account')).json()).credits > 0);
   assert.equal((await request('/jobs','POST',{...input,id:randomUUID()})).status,202);
@@ -49,15 +51,16 @@ test('authenticated, idempotent creation; unlimited invites including exhausted 
   assert.equal(persisted.accounts[digest(token)].credits,0);
   assert.equal((await request(`/jobs/${id}`,'GET',null,other)).status,404);
   await until(async()=> (await(await request(`/jobs/${id}`)).json()).phase==='awaiting_pick');
-  const snapshot=await(await request(`/jobs/${id}`)).json();assert.ok(!JSON.stringify(snapshot).includes('secret'));
+  const snapshot=await(await request(`/jobs/${id}`)).json();assert.equal(snapshot.state.persona,'冷淡寡言');assert.ok(!JSON.stringify(snapshot).includes('secret'));
   assert.equal((await request(`/jobs/${id}/files/registry.json`)).status,404);
   assert.equal((await request(`/jobs/${id}/pick`,'POST',{index:3})).status,400);
   app.stop();base=await launch();
   assert.equal((await(await request('/account')).json()).unlimited,true);
   assert.ok((await(await request('/account')).json()).credits > 0);
-  assert.equal((await request(`/jobs/${id}/pick`,'POST',{index:0})).status,202);
+  assert.equal((await request(`/jobs/${id}/pick`,'POST',{index:0,persona:'沉稳克制'})).status,202);
   await until(async()=> (await(await request(`/jobs/${id}`)).json()).phase==='done');
   assert.equal(await(await request(`/jobs/${id}/files/actions/idle.webm`)).text(),'video');
+  assert.equal((await(await request(`/jobs/${id}`)).json()).state.persona,'沉稳克制');
   await request(`/jobs/${id}/resume`,'POST',{});
   assert.equal((await(await request(`/jobs/${id}`)).json()).attempts,1);
  }finally{app?.stop();await rm(dir,{recursive:true,force:true});}
@@ -76,8 +79,30 @@ test('candidate retries and failure retries exceed former limits; responses reda
   const phase=async expected=>until(async()=> (await(await request(`/jobs/${id}`)).json()).phase===expected);
   await phase('awaiting_pick');
   for(let i=0;i<5;i++){assert.equal((await request(`/jobs/${id}/pick`,'POST',{index:-1})).status,202);await phase('awaiting_pick');}
-  await request(`/jobs/${id}/pick`,'POST',{index:0});await phase('failed');
+  await request(`/jobs/${id}/pick`,'POST',{index:0,persona:'沉稳克制'});await phase('failed');
   assert.ok(!(await(await request(`/jobs/${id}`)).text()).includes('secret-key-token'));
-  for(let i=0;i<5;i++){assert.equal((await request(`/jobs/${id}/resume`,'POST',{})).status,202);await phase('failed');}
+  for(let i=0;i<5;i++){const persona=i===0?'温柔慢热':'';assert.equal((await request(`/jobs/${id}/resume`,'POST',{persona})).status,202);await phase('failed');assert.equal((await(await request(`/jobs/${id}`)).json()).state.persona,persona);}
+ }finally{app?.stop();await rm(dir,{recursive:true,force:true});}
+});
+
+
+test('merged perch is accepted by targeted cloud failure retry', async()=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'qbot-perch-'));let app;
+ try {
+  const pipeline=fakePipeline();let selected;
+  pipeline.runActions=async(j,_ark,_ff,_hooks,_limit,ids)=>{
+   if(!ids){j.state.actions.perch={status:'failed'};await j.save();throw new Error('temporary generation failure');}
+   selected=ids;j.state.actions.perch.status='done';await j.save();
+  };
+  app=await createGenerationService({dataDir:dir,pipeline,config:{},invites:[{token}]});
+  await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
+  const base='http://127.0.0.1:'+app.server.address().port;
+  const request=(p,method='GET',data)=>fetch(base+p,{method,headers:{Authorization:'Bearer '+token},body:data?JSON.stringify(data):undefined});
+  const id=randomUUID(),png=Buffer.alloc(24);Buffer.from('89504e470d0a1a0a','hex').copy(png);png.writeUInt32BE(64,16);png.writeUInt32BE(64,20);
+  assert.equal((await request('/jobs','POST',{id,image:png.toString('base64'),characterForm:'humanoid',characterStyle:'chibi'})).status,202);
+  const phase=async expected=>until(async()=>(await(await request('/jobs/'+id)).json()).phase===expected);
+  await phase('awaiting_pick');await request('/jobs/'+id+'/pick','POST',{index:0});await phase('failed');
+  assert.equal((await request('/jobs/'+id+'/resume','POST',{actions:['perch']})).status,202);
+  await phase('done');assert.deepEqual(selected,['perch']);
  }finally{app?.stop();await rm(dir,{recursive:true,force:true});}
 });

@@ -67,3 +67,10 @@ it.runIf(process.platform==='win32')('switching out of free mode while capture i
   resolve({...target,frame:'fixture'});await vi.advanceTimersByTimeAsync(0);
   expect(m.chat).not.toHaveBeenCalled();
 });
+
+it.runIf(process.platform==='win32')('prefers the merged default pose and aligns its lower edge',async()=>{
+  m.actions=['perch_sit','perch_lie','perch'];
+  expect((await tryPerch()).ok).toBe(true);
+  expect(getPerchState()?.action).toBe('perch');
+  expect(perchAnchor('perch')).toBe(0.86);
+});

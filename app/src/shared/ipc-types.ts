@@ -440,6 +440,7 @@ export type CraftResult =
 
 export interface QBotApi {
   desktop: {
+    openMenu(): void;
     get(): Promise<import('./desktop-visibility').DesktopVisibility>;
     toggle(): Promise<import('./desktop-visibility').DesktopVisibility>;
     setMemberHidden(id: string, hidden: boolean): Promise<void>;
@@ -475,6 +476,7 @@ export interface QBotApi {
       characterForm?: CharacterForm,
       characterStyle?: CharacterStyle,
       name?: string,
+      persona?: string,
     ): Promise<string>;
     /** 续跑一个未完成的孵化 */
     resume(dirId: string): Promise<void>;
@@ -588,6 +590,8 @@ export interface QBotApi {
   rooms: {
     open(): void;
     getDisplayMode(): Promise<RoomsDisplayMode>;
+    getSceneMembers(): Promise<Array<{ id: string; nickname: string; character: LinkPeerCharacter | null; mode?: string; action?: string }>>;
+    onSceneChanged(cb: () => void): () => void;
     setDisplayMode(mode: RoomsDisplayMode): Promise<RoomsDisplayMode>;
     list(kind?: RoomKind, q?: string): Promise<RoomBrief[]>;
     create(input: CreateRoomInput): Promise<string>;

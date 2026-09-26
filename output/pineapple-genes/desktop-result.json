@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "checks": [
+    "three independent snapshots",
+    "mixed species",
+    "staggered placement",
+    "single recall",
+    "recall all",
+    "parent close cleanup"
+  ],
+  "errors": []
+}

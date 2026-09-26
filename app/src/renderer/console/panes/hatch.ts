@@ -8,8 +8,9 @@ import { confirmBox } from './_studio-shared';
 
 /** 动作中文标签。口径与 _studio-shared 的 STD_LABELS 统一 */
 const ACTION_LABELS: Record<ActionId, string> = {
-  perch_sit: '坐窗沿',
-  perch_lie: '趴窗沿',
+  perch: '窗沿停靠',
+  perch_sit: '坐窗沿（旧版）',
+  perch_lie: '趴窗沿（旧版）',
   writing: '写手账',
   idle: '待机',
   drag: '拖拽',
@@ -183,10 +184,10 @@ async function startHatch(file: File): Promise<void> {
     }
     const confirmed = await confirmBox(
       root!,
-      `开始创建「${name}」？\n\n将先生成 1 个角色方案；确认后，再生成${cloud ? '一套基础动作' : ' 11 个常用动作'}。\n` +
+      `开始创建「${name}」？\n\n将先生成 1 个角色方案；确认后，再生成${cloud ? '一套基础动作' : ' 10 个常用动作'}。\n` +
         `模型：${provider === 'gpt-image-2' ? 'gpt-image-2' : 'Seedream'}\n` +
         `预计时间：${provider === 'gpt-image-2' ? '约 45–80 分钟' : '约 35–60 分钟'}\n` +
-        (cloud ? '有效邀请码可不限次数创建、换方案和失败重试。\n角色图片会上传至 QBot 服务器并交给模型服务生成；只上传所选图片、角色名字和形象选项。关闭客户端后任务仍会继续，完成后回来领取。' : '预计消耗：1 张角色方案 + 11 个动作。任务提交后，已发出的 API 请求无法撤回。'),
+        (cloud ? '有效邀请码可不限次数创建、换方案和失败重试。\n角色图片会上传至 QBot 服务器并交给模型服务生成；上传所选图片、角色名字、人设和形象选项。关闭客户端后任务仍会继续，完成后回来领取。' : '预计消耗：1 张角色方案 + 10 个动作。任务提交后，已发出的 API 请求无法撤回。'),
     );
     if (!confirmed) return;
 
@@ -199,6 +200,7 @@ async function startHatch(file: File): Promise<void> {
       form === 'abstract' ? 'abstract' : undefined,
       form === 'abstract' ? undefined : style === 'faithful' ? 'faithful' : 'chibi',
       name,
+      $<HTMLTextAreaElement>('#hatch-draft-persona')?.value.trim(),
     );
 
     localStorage.setItem(`qbot:creation-name:${currentDirId}`, name);
@@ -558,7 +560,7 @@ function renderTimers(): void {
 async function showCertificate(): Promise<void> {
   const source = $<HTMLImageElement>('#hatch-card-source');
   if (source && currentDirId) {
-    source.src = `qbot-asset://${currentDirId}/source.png?v=${Date.now()}`;
+    source.src = `qbot-asset://${currentDirId}/__portrait.png?v=${Date.now()}`;
   }
 
   const container = $('#hatch-card-actions');
@@ -733,8 +735,8 @@ function selectSourceFile(file: File): void {
 
   const preview = $<HTMLImageElement>('#hatch-source-preview');
   if (preview) {
-    preview.src = selectedSourceUrl;
-    preview.hidden = false;
+    preview.removeAttribute('src');
+    preview.hidden = true;
   }
   $('#hatch-drop-placeholder')?.setAttribute('hidden', '');
   const name = $('#hatch-selected-file');
@@ -967,6 +969,11 @@ const TEMPLATE = `
             </div>
 
             <div class="config-group">
+              <label class="config-label" for="hatch-draft-persona">角色人设（选填）</label>
+              <textarea class="input-primary" id="hatch-draft-persona" rows="3" maxlength="4000" placeholder="例如：冷淡寡言，开心时只轻微微笑，不夸张蹦跳。"></textarea>
+              <p>从第一批动作开始生效；以后修改只影响后续生成。</p>
+            </div>
+            <div class="config-group">
               <span class="config-label">角色形态</span>
               <div class="radio-group compact-options">
                 <label class="radio-option">
@@ -1094,7 +1101,7 @@ const TEMPLATE = `
         <h3>你的桌宠准备好了</h3>
 
         <div class="certificate-card">
-          <img id="hatch-card-source" alt="角色原图" class="certificate-source" />
+          <img id="hatch-card-source" alt="角色正面图" class="certificate-source" />
           <div id="hatch-card-actions" class="certificate-actions"></div>
         </div>
 
@@ -1552,7 +1559,7 @@ const TEMPLATE = `
 
 .candidates-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: 24px;
   margin-bottom: 32px;
 }
@@ -1563,6 +1570,7 @@ const TEMPLATE = `
 
 .candidate-card {
   position: relative;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
@@ -1578,32 +1586,20 @@ const TEMPLATE = `
 
 .candidate-thumbnail {
   position: relative;
-  padding-top: 100%;
   background-color: var(--background);
 }
 
 .candidate-thumbnail img {
-  position: absolute;
-  top: 0;
-  left: 0;
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  max-height: 50vh;
+  object-fit: contain;
 }
 
 .candidate-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
   padding: 16px;
-  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.candidate-card:hover .candidate-overlay {
-  opacity: 1;
+  background: var(--card-background);
 }
 
 .btn-select {

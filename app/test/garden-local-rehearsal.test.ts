@@ -17,7 +17,9 @@ describe('local garden rehearsal',()=>{
   expect(canBreed(s.plots[0]!)).toBe(true);expect(canBreed(s.produce[0])).toBe(true);
   const bred=r.act({type:'breed',first:s.plots[0]!.id,second:s.produce[0].id},'pet');expect(bred.ok).toBe(true);
   if(!bred.ok)throw Error(bred.error);expect(bred.reveal?.seed).toBeDefined();
-  expect(r.act({type:'plant',plot:3,seed:bred.reveal!.seed!.id},'pet').ok).toBe(true);
+  expect(r.act({type:'plant',plot:3,seed:bred.reveal!.seed!.id},'pet').ok).toBe(false); // Lv.1 has three plots.
+  for(let i=0;i<3;i++){expect(r.act({type:'mature'},'pet').ok).toBe(true);expect(r.act({type:'harvest',plot:0},'pet').ok).toBe(true);}
+  expect(r.act({type:'plant',plot:0,seed:bred.reveal!.seed!.id},'pet').ok).toBe(true);
   const visit=r.visit('test:guest'),offer=visit.offers[0];
   expect(r.act({type:'buyDaily',owner:visit.owner,offer:offer.id},'pet').ok).toBe(true);
   expect(r.get().coins).toBeLessThan(s.coins);expect(r.visit(visit.owner).plots).toEqual(visit.plots);

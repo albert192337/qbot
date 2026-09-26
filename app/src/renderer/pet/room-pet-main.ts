@@ -30,9 +30,10 @@ speechText.className = 'room-pet-speech-text';
 speech.append(speechText);
 document.body.append(speech);
 
-const player = new Player(stage, () => driver.onVideoEnded());
+let pettingActive=false;
+const player = new Player(stage, () => {if(!pettingActive)driver.onVideoEnded();});
 const driver = new NetworkDriver({
-  play: (action, loop) => {if(!isDesktopQuiet())loop ? player.playLooping(action) : player.play(action);},
+  play: (action, loop) => {if(!isDesktopQuiet()&&!pettingActive)loop ? player.playLooping(action) : player.play(action);},
 });
 
 /** 房友提示互斥：离线 > 传输进度 > 独立说话气泡（8s）> 同步牌面。 */
@@ -214,8 +215,10 @@ function applyVisibility(s:import('../../shared/desktop-visibility').DesktopVisi
 }
 mountDesktopVisibility(applyVisibility);
 
-mountPetting(stage,()=>!!petManifest&&!gone&&!transferText&&!pointerDown&&latestState.mode==='idle',()=>{
+mountPetting(stage,()=>!!petManifest&&!gone&&!transferText&&!pointerDown,()=>{
+  // Presence (working/music/meeting) is not an invitation or consent gate.
+  pettingActive=true;
   const action=petManifest&&choosePairAction(petManifest,'happy');
   if(action)player.playLooping(action.id);
-  return ()=>{if(!isDesktopQuiet()&&!document.hidden&&!gone&&!pointerDown)driver.dragEnd();};
+  return ()=>{pettingActive=false;if(!isDesktopQuiet()&&!document.hidden&&!gone&&!pointerDown)driver.dragEnd();};
 });

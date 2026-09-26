@@ -112,7 +112,7 @@ export function pickAutoAction(
   rng: SchedulerRng,
 ): { action: PlayableId; loops: number } | null {
   // 可自主播放的动作：done 且非 idle/drag（由调用方过滤 status，这里过滤语义）
-  const pool = available.filter((a) => a !== 'idle' && a !== 'drag' && a !== 'perch_sit' && a !== 'perch_lie');
+  const pool = available.filter((a) => a !== 'idle' && a !== 'drag' && a !== 'perch' && a !== 'perch_sit' && a !== 'perch_lie');
   if (pool.length === 0) return null;
   const action = pool[Math.floor(rng.random() * pool.length)];
   const loops =

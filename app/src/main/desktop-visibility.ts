@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, Menu } from 'electron';
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import type { DesktopHitRect, DesktopVisibility, PeekSide } from '../shared/desktop-visibility';
@@ -117,6 +117,22 @@ export function registerDesktopVisibility(): void {
   for (const win of BrowserWindow.getAllWindows()) trackDesktopWindow(win);
   ipcMain.handle('desktop:get', e => desktopSnapshot(BrowserWindow.fromWebContents(e.sender)));
   ipcMain.handle('desktop:toggle', () => { setDesktopHidden(!hidden); return desktopSnapshot(); });
+  ipcMain.on('desktop:menu', async event => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed()) return;
+    try {
+      const display = await import('./rooms/room-pet-display');
+      const rooms = await import('./rooms/rooms');
+      if (win.isDestroyed()) return;
+      const hasRoom = !!rooms.getRoomsCache().room;
+      const roomVisible = display.getRoomDisplayMode() === 'room';
+      Menu.buildFromTemplate([
+        { label: hidden ? '显示全部角色' : '隐藏全部角色', click: () => setDesktopHidden(!hidden) },
+        { label: roomVisible ? '只隐藏房间（保留角色）' : '显示房间背景', enabled: hasRoom,
+          click: () => { void display.setRoomDisplayMode(roomVisible ? 'desktop' : 'room').catch(error => console.error('[desktop:menu] room display switch failed', error)); } },
+      ]).popup({ window: win });
+    } catch (error) { console.error('[desktop:menu]', error); }
+  });
   ipcMain.on('desktop:peerControls', e => { for (const [win,s] of surfaces) if (s.kind==='peer' && win.webContents!==e.sender) win.webContents.send('desktop:peerControlsClose'); });
   ipcMain.handle('desktop:member', (_e,id,value) => { if (typeof id !== 'string' || typeof value !== 'boolean') throw Error('无效请求'); setMemberHidden(id,value); });
   ipcMain.handle('desktop:drop', e => {

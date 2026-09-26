@@ -1,0 +1,55 @@
+{
+  "passed": true,
+  "names": [
+    "未命名",
+    "秦彻1",
+    "宗辉",
+    "小青"
+  ],
+  "options": [
+    {
+      "value": "",
+      "name": "留一个空位"
+    },
+    {
+      "value": "mascot",
+      "name": "小青"
+    },
+    {
+      "value": "8cfc5f76-2d6f-448b-9274-e9d0a51ea61c",
+      "name": "小白狗 · 表情包"
+    },
+    {
+      "value": "957075f5-569c-4e5e-9360-8e2abcd8305a",
+      "name": "小黄狗 · 表情包"
+    },
+    {
+      "value": "9a38bf82-f404-4c8f-ae05-cca1debe37da",
+      "name": "咕咕"
+    },
+    {
+      "value": "market-166d8b7ed0de3e58",
+      "name": "未命名"
+    },
+    {
+      "value": "market-74da29fda81f390d",
+      "name": "秦彻1"
+    },
+    {
+      "value": "market-bec36a4971c98afd",
+      "name": "宗辉"
+    }
+  ],
+  "errors": [],
+  "checks": [
+    "four simultaneous actual character animations",
+    "installed marketplace assets",
+    "action and character switching",
+    "save/reload",
+    "photo export",
+    "small window",
+    "remove actor releases videos",
+    "invalid stored inputs",
+    "no activation or decor writes"
+  ]
+}

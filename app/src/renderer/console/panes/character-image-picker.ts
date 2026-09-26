@@ -2,7 +2,9 @@ import type { ImageSelection } from '../../../shared/character-images';
 import { esc, confirmBox } from './_studio-shared';
 
 export async function pickCharacterImage(root: HTMLElement, dirId: string, purpose: 'cover'|'reference'): Promise<ImageSelection|null> {
-  const choices = await window.qbot.studio.imageChoices(dirId);
+  const available = await window.qbot.studio.imageChoices(dirId);
+  const front = available.find(c => c.selection.kind === 'turnaround-front');
+  const choices = purpose === 'cover' && front ? [front] : available;
   if (!choices.length) throw new Error('没有可用图片或动作');
   return new Promise(resolve => {
     const focus = document.activeElement as HTMLElement|null;

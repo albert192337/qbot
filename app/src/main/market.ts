@@ -4,6 +4,7 @@
  * （persona 已在打包层脱敏）；下载本地复算 hash 校验后原子入库并激活。
  */
 import { nativeImage } from 'electron';
+import { displayImage } from './character-images';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
@@ -92,10 +93,11 @@ export async function uploadSkin(dirId: string): Promise<string> {
   // 管理码入库（下架凭证）
   await setSettings({ marketTokens: { ...settings.marketTokens, [hash]: token } });
 
-  // Only an explicitly selected cover is published as preview; never substitute a generation reference.
+  // Regenerate a safe preview; legacy covers may contain the original reference.
   try {
-    const srcPng = path.join(charDir, 'cover.png');
-    if (existsSync(srcPng)) {
+    const preview = await displayImage(charDir);
+    if (preview) {
+      const srcPng = path.join(charDir, preview);
       const img = nativeImage.createFromPath(srcPng);
       const png = img.isEmpty() ? await readFile(srcPng) : img.resize({ width: PREVIEW_WIDTH }).toPNG();
       await fetchFn(`${MARKET_URL}/skins/${hash}/preview?token=${token}`, {

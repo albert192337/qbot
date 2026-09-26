@@ -77,7 +77,10 @@ async function refresh(force = false): Promise<void> {
   }
   if (!force && boundDirId === ctx.dirId && (generationRequests>0 || hasUnsavedChanges() || root.querySelector('.studio-confirm-mask'))) return;
   boundDirId = ctx.dirId;
-  const actions = collectActions(ctx.m, ctx.prompts);
+  const actions = collectActions(ctx.m, ctx.prompts, true);
+  const statusPriority: Record<string, number> = { failed: 0, pending: 1, done: 2 };
+  actions.sort((a, b) => (statusPriority[a.status] ?? 2) - (statusPriority[b.status] ?? 2));
+  const failedCount = actions.filter((a) => a.status === 'failed').length;
   const jobStatus = await window.qbot.hatch.getStatus(ctx.dirId).catch(()=>null);
 
   let html = '<div class="studio-body">';
@@ -86,6 +89,7 @@ async function refresh(force = false): Promise<void> {
   html += `<div id="action-create-options" class="btn-row" hidden><button class="btn" data-add="preset">选择预设动作</button><button class="btn" data-add="custom">自定义动作</button><button class="btn" id="import-actions">导入 GIF</button></div>`;
   // ── 已拥有的动作 ──
   html += `<p class="studio-hint">默认动作、预设动作、自定义动作和导入 GIF 统一管理。点击视频预览，满意后可在场景联动中使用。</p>`;
+  if (failedCount) html += `<p class="studio-hint" role="status">${failedCount} 个动作生成失败，已排在最上方，请查看卡片中的处理方式。</p>`;
   html += `<div class="action-toolbar"><input id="action-search" aria-label="搜索动作" data-transient type="search" placeholder="搜索动作名称或 ID" /><select id="action-status-filter" aria-label="按状态筛选" data-transient><option value="">全部状态</option><option value="done">可用</option><option value="pending">排队中</option><option value="failed">失败</option></select><select id="action-type-filter" aria-label="按来源筛选" data-transient><option value="">全部来源</option><option value="standard">随角色生成</option><option value="preset">预设动作</option><option value="custom">自定义动作</option><option value="imported">导入 GIF</option></select></div>`;
   html += '<div class="action-library-grid">';
   for (const a of actions) {
@@ -102,21 +106,22 @@ async function refresh(force = false): Promise<void> {
     if (a.isCustom) html += ` <button class="del-action btn danger" data-id="${esc(a.id)}">删除</button>`;
     html += `</div>`;
     if(a.motionDesc)html+=`<p class="studio-hint">${esc(a.motionDesc)}</p>`;
-    if (frameUrl) html += `<video src="${frameUrl}" poster="qbot-asset://${ctx.dirId}/${esc(a.gif ?? ctx.m.sourceImage)}" aria-label="${esc(a.label)}动作预览" muted controls loop playsinline preload="none"></video>`;
+    if (frameUrl) html += `<video src="${frameUrl}" poster="qbot-asset://${ctx.dirId}/__portrait.png" aria-label="${esc(a.label)}动作预览" muted controls loop playsinline preload="none"></video>`;
     html += `<p class="studio-hint">${a.isImported ? '导入 GIF' : a.isCustom ? '自定义动作' : a.isExpression ? '预设动作' : '随角色生成'}</p>`;
     if (a.status === 'done') html += `<button class="preview-action btn ghost" data-id="${esc(a.id)}">${root.closest('#house-book') ? '上台练习' : '在桌面播放'}</button>`;
+    if (a.isExpression && a.status === 'failed') html += `<button class="gen-expr btn" data-id="${esc(a.id)}">重试生成（约 ¥1）</button>`;
     if (!a.isImported && !a.isCustom && !a.isExpression && a.status !== 'pending') html += `<button class="regenerate-action btn" data-id="${esc(a.id)}">${jobStatus?.regenerating && jobStatus.actions[a.id as keyof typeof jobStatus.actions]?.needsFrameApproval ? '继续确认首帧' : a.status === 'failed' ? '重试生成' : '重新生成'}</button>`;
     const annotation=resourceText(ctx.m,a.id);
     if(scenePool(ctx.m,'idle').includes(a.id))html+='<span class="status-chip muted">待机候选</span>';
     html+=`<details class="resource-annotation"><summary>名称与含义</summary><label>名称<input type="text" data-resource-name maxlength="80" value="${esc(annotation.name===a.id?a.label:annotation.name)}"></label><label>含义说明<textarea data-resource-meaning maxlength="500" placeholder="描述这个动作表达什么，适合什么情况">${esc(annotation.meaning)}</textarea></label><label>标签<input type="text" data-resource-tags value="${esc(annotation.tags.join('，'))}"></label><button class="btn ghost" data-save-resource="${esc(a.id)}">保存标注</button></details>`;
-    if (a.isCustom && a.status === 'failed') html += `<p class="studio-hint">删除失败项后，可在下方重新描述并创建。</p>`;
+    if (a.isCustom && a.status === 'failed') html += `<p class="studio-hint">删除失败项后，可通过“添加动作 → 自定义动作”重新描述并创建。</p>`;
     html += `</div>`;
   }
 
   html += '</div><p id="action-no-results" class="pane-placeholder" hidden>没有匹配的动作，请调整筛选条件。</p>';
 
   // ── 可选预设动作 ──
-  const expressions = collectExpressionActions(ctx.m).filter((ex) => ex.status !== 'done');
+  const expressions = collectExpressionActions(ctx.m).filter((ex) => ex.status === 'none');
   html += `<details class="action-add-section" data-add-section="preset"><summary>添加预设动作 <small>从常用情绪和互动中选择</small></summary>`;
   html += `<p class="studio-hint">按需补充情绪和互动动作。它们不会增加首次创建成本，生成后会自动加入上方动作库。</p>`;
   const generatable = expressions.filter((ex) => ex.status === 'none' || ex.status === 'failed');
@@ -124,7 +129,7 @@ async function refresh(force = false): Promise<void> {
     html += `<div class="btn-row"><button id="gen-all-expr" class="btn">生成可选的 ${generatable.length} 个预设动作</button></div>`;
   }
   if (expressions.length === 0) {
-    html += `<p class="studio-hint">全部预设动作已加入动作库。</p>`;
+    html += `<p class="studio-hint">全部预设动作已加入上方动作库，可在那里查看生成状态和重试失败项。</p>`;
   } else {
     html += `<div class="expr-grid">`;
     for (const ex of expressions) {

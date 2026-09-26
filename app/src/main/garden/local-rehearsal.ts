@@ -1,3 +1,5 @@
+import { unlockedPlots } from '../../shared/garden-progression';
+import { characterLevel, currentGrowth } from '../../shared/garden-life';
 import {publicGardenState,publicGardenPlant} from '../../shared/garden-public';
 import {randomUUID} from 'node:crypto';
 import {SPECIES,needsReveal,type GardenState,type GardenCommand,type GardenResult,type Species,type Trait} from '../../shared/garden';
@@ -79,11 +81,11 @@ export class LocalGardenRehearsal {
   }
   visit(owner:string):GardenVisit {
     this.advance();const s=this.ensure(owner);ensureLife(s,this.now(),this.rng);
-    return structuredClone({owner,name:this.members.find(m=>m.id===owner)!.name+' · 模拟',plots:s.plots.map(p=>p?publicGardenPlant(p):null),offers:dailyOffers(owner,s.life!.day),day:s.life!.day,visibility:'public',actorLevel:1,landOpen:true,shopOpen:true,rewardsLeft:Math.max(0,5-(this.rewards.get(String(s.life!.day))??0)),tasks:[...this.tasks.values()].filter(t=>t.owner===owner)});
+    return structuredClone({plotCount:unlockedPlots(s),owner,name:this.members.find(m=>m.id===owner)!.name+' · 模拟',plots:s.plots.map(p=>p?publicGardenPlant(p):null),offers:dailyOffers(owner,s.life!.day),day:s.life!.day,visibility:'public',actorLevel:characterLevel(currentGrowth(s)?.xp??0),landOpen:true,shopOpen:true,rewardsLeft:Math.max(0,5-(this.rewards.get(String(s.life!.day))??0)),tasks:[...this.tasks.values()].filter(t=>t.owner===owner)});
   }
   cooperate(owner:string,plot:number,action:'join'|'leave'|'claim'|'share'|'invite',target?:string,task?:string):GardenVisit {
     this.advance();const s=this.ensure(owner),p=s.plots[plot];
-    if(!Number.isInteger(plot)||plot<0||plot>5)throw Error('无效土地');
+    if(!Number.isInteger(plot)||plot<0||plot>6)throw Error('无效土地');
     let t=task?this.tasks.get(task):p?this.tasks.get(p.id):undefined;
     if(t&&(t.owner!==owner||t.plot!==plot))throw Error('无效培育任务');
     if(!t){if(!p||p.readyAt>this.now()||!needsReveal(p))throw Error('请选择成熟的问号作物');t={id:p.id,plant:p.id,owner,plot,remaining:COOP_RULES.work,updatedAt:this.now(),members:{},done:false,claimed:[]};this.tasks.set(t.id,t);}

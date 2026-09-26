@@ -43,6 +43,8 @@ export class Companions {
     this.saved=existsSync(file)?JSON.parse(readFileSync(file,'utf8')):{bindings:{},invited:{}};
     this.peers=[];this.rooms=[];this.queue=[];this.visits=new Map();this.roomNext=new Map();this.turns=new Map();this.replyAfter=new Map();this.roomRevision=new Map();this.responses=new Map();this.worldNext=now()+2500;
     this.saved.gardenNext??={};
+    this.saved.friendNudges??={};this.saved.friendBlocked??={};this.friendAnswers=new Map();
+    this.roomRequests=new Map();this.trips=new Map();
   }
   save(){writeFileSync(this.file+'.tmp',JSON.stringify(this.saved),{mode:0o600});renameSync(this.file+'.tmp',this.file);}
   start(){
@@ -80,7 +82,7 @@ export class Companions {
         }
         core.advanceV3(s,this.now());
       });
-      const peer={memberId:id,nickname:profile.name,companion:true,profile,actor,packHash:asset.hash,mode:profile.room===1?'working':'idle',action:asset.actions.find(a=>a.id==='idle')?.id??asset.actions[0].id,actions:asset.actions,roomId:THEMES[profile.room].roomId,readyState:1,OPEN:1,hello:true};
+      const peer={memberId:id,nickname:profile.name,companion:true,profile,actor,packHash:asset.hash,mode:profile.room===1?'working':'idle',action:asset.actions.find(a=>a.id==='idle')?.id??asset.actions[0].id,actions:asset.actions,homeRoomId:THEMES[profile.room].roomId,roomId:THEMES[profile.room].roomId,readyState:1,OPEN:1,hello:true};
       // Virtual peers receive only animation frames; no sockets or hidden external messages.
       peer.send=raw=>{const frame=JSON.parse(raw);if(frame.t==='garden:interaction')this.animate?.(peer,frame);};
       this.peers.push(peer);
@@ -95,10 +97,73 @@ export class Companions {
   schedule(delay,run){this.queue.push({at:this.now()+delay,run});}
   joined(user){
     const peer=this.peers.find(p=>p.roomId===user.roomId);if(!peer)return;
-    const visit={roomId:user.roomId,at:this.now(),user,lastSpoke:0,quiet:false};this.visits.set(user,visit);
-    this.schedule(4000+this.random()*6000,()=>{if(this.visits.get(user)===visit&&!visit.lastSpoke&&user.roomId===visit.roomId&&user.readyState===user.OPEN)this.say(peer,peer.profile.welcome);});
+    const visit={roomId:user.roomId,at:this.now(),user,lastSpoke:0,quiet:false,friendAt:this.now()+75000+this.random()*75000};this.visits.set(user,visit);
+    this.schedule(4000+this.random()*6000,()=>{if(this.visits.get(user)===visit&&!visit.lastSpoke&&peer.roomId===visit.roomId&&user.roomId===visit.roomId&&user.readyState===user.OPEN)this.say(peer,peer.profile.welcome);});
   }
   left(user){this.visits.delete(user);this.responses.delete(user);}
+  inviteToRoom(peer,user){
+    if(peer.roomId===user.roomId)throw Error('companion_same_room');
+    if(this.trips.has(peer.memberId)||this.roomRequests.has(peer.memberId))throw Error('companion_busy');
+    this.roomRequests.set(peer.memberId,{peer,user,roomId:user.roomId,at:this.now()+4000+this.random()*4000});
+  }
+  travelTick(move){
+    if(!move)return;
+    for(const [id,trip] of this.trips){
+      const {peer,user,roomId,until}=trip;
+      if(peer.roomId!==roomId||user.roomId!==roomId||user.readyState!==user.OPEN||!this.contacts.areFriends(id,user.memberId)||this.now()>=until){
+        if(move(peer,peer.homeRoomId)){this.trips.delete(id);peer.mode=peer.profile.room===1?'working':'idle';}
+      }
+    }
+    for(const [id,request] of this.roomRequests){
+      if(this.now()<request.at)continue;this.roomRequests.delete(id);
+      const {peer,user,roomId}=request;
+      if(user.roomId!==roomId||user.readyState!==user.OPEN||!this.contacts.areFriends(id,user.memberId))continue;
+      if(move(peer,roomId,user)){
+        this.trips.set(id,{peer,user,roomId,until:this.now()+15*60000});
+        this.say(peer,'我来啦，来你的小屋坐一会儿。');
+      }
+    }
+  }
+  contactChanged(userId,peerId,action){
+    if(!this.peers.some(p=>p.memberId===peerId))return;
+    const key=`${peerId}:${userId}`;
+    if(['cancel','reject','remove'].includes(action)){
+      this.friendAnswers.delete(key);
+      this.saved.friendBlocked[key]=this.now()+7*86400000;this.save();
+    }
+  }
+  friendsTick(){
+    const now=this.now(),active=new Set();let changed=false;
+    // Submitted requests survive leaving/disconnection; never invent an acceptance
+    // after cancellation. Scan persisted incoming relationships again after restart.
+    for(const peer of this.peers)for(const userId of [...(this.contacts.people[peer.memberId]?.incoming??[])]){
+      if(!this.contacts.people[userId]||this.contacts.people[userId].companion)continue;
+      const key=`${peer.memberId}:${userId}`;active.add(key);
+      if(!this.friendAnswers.has(key))this.friendAnswers.set(key,now+8000+this.random()*10000);
+      if(now<this.friendAnswers.get(key))continue;
+      try{this.contacts.change(peer.memberId,userId,'accept');changed=true;this.friendAnswers.delete(key);}
+      catch{this.friendAnswers.set(key,now+60000);}
+    }
+    for(const key of this.friendAnswers.keys())if(!active.has(key))this.friendAnswers.delete(key);
+    for(const [user,visit] of this.visits){
+      const person=this.contacts.people[user.memberId];
+      if(!person||person.companion||visit.quiet||now<visit.friendAt||user.roomId!==visit.roomId||user.readyState!==user.OPEN||(user.mode&&user.mode!=='idle'))continue;
+      if(now<(this.saved.friendNudges[user.memberId]??0))continue;
+      const candidates=this.peers.filter(peer=>{
+        const other=this.contacts.people[peer.memberId];
+        return peer.roomId===user.roomId&&other?.seen[user.memberId]&&!this.contacts.areFriends(user.memberId,peer.memberId)&&!person.incoming.includes(peer.memberId)&&!other.incoming.includes(user.memberId)&&now>=(this.saved.friendBlocked[`${peer.memberId}:${user.memberId}`]??0);
+      });
+      if(!candidates.length)continue;
+      const peer=candidates[Math.floor(this.random()*candidates.length)];
+      // Persist the nudge cap first: failed delivery never floods after restart.
+      this.saved.friendNudges[user.memberId]=now+86400000;
+      for(const [key,until] of Object.entries(this.saved.friendBlocked))if(until<=now)delete this.saved.friendBlocked[key];
+      for(const [id,until] of Object.entries(this.saved.friendNudges))if(until<=now)delete this.saved.friendNudges[id];
+      this.save();
+      try{this.contacts.change(peer.memberId,user.memberId,'request');changed=true;}catch{/* Existing relationship limits still apply. */}
+    }
+    return changed;
+  }
   tend(peer){
     const id=peer.memberId,now=this.now(),rng={id:randomUUID,random:this.random};
     this.gardens.transaction(()=>{
@@ -128,11 +193,13 @@ export class Companions {
     if(entry){entry.text=text;entry.at=this.now()+3500+this.random()*2000;return;}
     this.responses.set(user,{visit,text,peer:peers[(visit.replies??0)%peers.length],at:Math.max(this.now()+3500+this.random()*3000,(this.replyAfter.get(roomId)??0))});
   }
-  tick({humans,worldActive,say,invite,answer,pending}){
+  tick({humans,worldActive,say,invite,answer,pending,notifyContacts=()=>{},moveCompanion}){
     this.say=say;const now=this.now();
+    this.travelTick(moveCompanion);
+    if(this.friendsTick())notifyContacts();
     for(const [user,response] of this.responses){
       if(now<response.at)continue;this.responses.delete(user);
-      const {visit,peer,text}=response;if(this.visits.get(user)!==visit||user.roomId!==visit.roomId||user.readyState!==user.OPEN)continue;
+      const {visit,peer,text}=response;if(this.visits.get(user)!==visit||peer.roomId!==visit.roomId||user.roomId!==visit.roomId||user.readyState!==user.OPEN)continue;
       const room=this.rooms.find(r=>r.roomId===visit.roomId),turn=visit.replies??0;visit.replies=turn+1;
       const choose=items=>items[turn%items.length];
       const reply=visit.quiet?'好，那就安静陪你待会儿。想聊的时候再叫我。':/累|难过|烦|压力/.test(text)?choose(['辛苦啦。想说说哪件事最累，还是先在这里歇一会儿？','听起来今天不太轻松。不用勉强找话题，坐会儿也好。','那先给自己一点喘气的时间吧，我在。']):/谢谢|好多了|开心/.test(text)?choose(['不用客气呀，你能轻松一点就好。','那就把这点好心情留住，陪你坐会儿。']):/刚刚|聊什么/.test(text)?`${room?.kind==='study'?'刚刚在聊看书累了怎么休息':room?.kind==='night'?'刚刚在聊给自己放个小假':'刚刚在聊种花，还有怎么理直气壮地发呆'}。你想加入哪个话题？`:/你好|嗨|大家好/.test(text)?choose(['嗨，欢迎你！想聊就聊，也可以安静坐会儿。','来啦，刚好一起坐。今天想做点什么？']):/花|种|草莓|果/.test(text)?`我这边种了${peer.profile.species.map(s=>core.SPECIES[s].name).join('和')}，可以点我的花园看看。你喜欢种什么？`:/茶|喝水/.test(text)?'那就一起喝口水，休息一下。':/你是谁|真人|机器人|假人/.test(text)?'我是这里的陪伴角色，用准备好的小话题陪大家聊聊，也能一起做双人互动。':choose(['这句我还没太听明白，可以换个说法吗？','我比较会聊种花、喝茶和休息的小事。也想听听你今天怎么样。']);
@@ -157,11 +224,13 @@ export class Companions {
     for(const room of this.rooms){
       if(!humans.some(p=>p.roomId===room.roomId)||[...this.visits.values()].some(v=>v.roomId===room.roomId&&v.quiet)||now<(this.roomNext.get(room.roomId)??0))continue;
       const peers=this.peers.filter(p=>p.roomId===room.roomId),turn=this.turns.get(room.roomId)??0;
+      if(!peers.length)continue;
       const lines=room.lines[turn%room.lines.length];say(peers[0],lines[0]);
       const revision=this.roomRevision.get(room.roomId);
-      if(peers[1])this.schedule(5000+this.random()*5000,()=>{if(this.hasHumans?.(room.roomId)&&this.roomRevision.get(room.roomId)===revision)say(peers[1],lines[1]);});
+      if(peers[1])this.schedule(5000+this.random()*5000,()=>{if(peers[1].roomId===room.roomId&&this.hasHumans?.(room.roomId)&&this.roomRevision.get(room.roomId)===revision)say(peers[1],lines[1]);});
       this.turns.set(room.roomId,turn+1);this.roomNext.set(room.roomId,now+(room.kind==='study'?180000:65000)+this.random()*60000);
     }
-    if(worldActive&&this.peers.length&&now>=this.worldNext){const turn=this.turns.get('world')??0,peer=this.peers[turn%this.peers.length];say(peer,`${['有人想来坐一会儿吗？','给路过的你留一个休息的位置。','今天也慢慢来吧。'][turn%3]} 我在「${THEMES[peer.profile.room].name}」。`,true);this.turns.set('world',turn+1);this.worldNext=now+240000+this.random()*120000;}
+    const homePeers=this.peers.filter(p=>p.roomId===p.homeRoomId);
+    if(worldActive&&homePeers.length&&now>=this.worldNext){const turn=this.turns.get('world')??0,peer=homePeers[turn%homePeers.length];say(peer,`${['有人想来坐一会儿吗？','给路过的你留一个休息的位置。','今天也慢慢来吧。'][turn%3]} 我在「${THEMES[peer.profile.room].name}」。`,true);this.turns.set('world',turn+1);this.worldNext=now+240000+this.random()*120000;}
   }
 }

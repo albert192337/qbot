@@ -9,3 +9,4 @@ export * from '../../shared/garden-v3';
 export * from './v3-rules';
 
 export * from '../../shared/garden-public';
+export * from '../../shared/garden-progression';

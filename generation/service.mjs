@@ -7,7 +7,6 @@ import { atomicJson, digest, openStore } from './store.mjs';
 
 const UUID = /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
-const ACTIONS = ['idle','drag','sleep','tea','talk_happy','talk_annoyed','wave','stretch'];
 const MAX_BODY = 12 * 1024 * 1024;
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const safeError = error => {
@@ -140,9 +139,11 @@ export async function createGenerationService({ dataDir, pipeline, config, invit
         const provider = input.imageProvider ?? 'seedream';
         if (!['seedream','gpt-image-2'].includes(provider) || (provider === 'gpt-image-2' && !config.gptImageApiKey)) throw fail(400, '该生成方式暂不可用');
         if (!['humanoid','abstract'].includes(input.characterForm) || !['chibi','faithful'].includes(input.characterStyle)) throw fail(400, '无效的角色选项');
+        if (input.persona !== undefined && (typeof input.persona !== 'string' || input.persona.length > 4000)) throw fail(400, '人设需为不超过 4000 字的文字');
+        const persona = input.persona?.trim() || undefined;
         const png = Buffer.from(typeof input.image === 'string' ? input.image : '', 'base64');
         if (png.length < 24 || png.length > 8*1024*1024 || !png.subarray(0,8).equals(PNG) || png.readUInt32BE(16) > 4096 || png.readUInt32BE(20) > 4096) throw fail(400, '请上传不超过 4096 像素、8MB 的 PNG 图片');
-        const fingerprint = digest(JSON.stringify([digest(png), provider, input.characterForm, input.characterStyle]));
+        const fingerprint = digest(JSON.stringify([digest(png), provider, input.characterForm, input.characterStyle, ...(persona ? [persona] : [])]));
         await store.transaction(async d => {
           if (d.jobs[id]) {
             if (d.jobs[id].owner !== owner || d.jobs[id].fingerprint !== fingerprint) throw fail(409, '任务 ID 已使用，请重新创建');
@@ -153,7 +154,7 @@ export async function createGenerationService({ dataDir, pipeline, config, invit
           await mkdir(dirFor(id), { recursive: true });
           const source = path.join(dirFor(id), 'upload.png');
           await writeFile(source, png, { mode: 0o600 });
-          await pipeline.Job.create(dirFor(id), { refImagePath: source, imageProvider: provider, characterForm: input.characterForm, characterStyle: input.characterStyle });
+          await pipeline.Job.create(dirFor(id), { refImagePath: source, imageProvider: provider, characterForm: input.characterForm, characterStyle: input.characterStyle, persona });
           d.jobs[id] = { id, owner, name: typeof input.name === 'string' ? input.name.trim().slice(0,24) : undefined, fingerprint, phase: 'queued', attempts: 1, candidateAttempts: 1, createdAt: Date.now() };
         });
         schedule();
@@ -176,6 +177,7 @@ export async function createGenerationService({ dataDir, pipeline, config, invit
       }
       if (req.method === 'POST' && ['pick','resume'].includes(operation)) {
         const input = await body(req);
+        if (input.persona !== undefined && (typeof input.persona !== 'string' || input.persona.length > 4000)) throw fail(400, '人设需为不超过 4000 字的文字');
         await store.transaction(async d => {
           const m = d.jobs[id];
           if (m.phase === 'queued' || m.phase === 'running') return; // Repeated clicks do not spend attempts.
@@ -191,13 +193,21 @@ export async function createGenerationService({ dataDir, pipeline, config, invit
           } else {
             if (m.phase === 'awaiting_pick') return;
             const job = await pipeline.Job.load(dirFor(id));
-            const failed = ACTIONS.filter(a => job.state.actions[a]?.status === 'failed');
+            const failed = Object.keys(job.state.actions).filter(a => job.state.actions[a]?.status === 'failed');
             if (m.phase === 'done' && !failed.length) return;
             if (input.actions !== undefined) {
               if (!Array.isArray(input.actions) || !input.actions.length || input.actions.some(a => !failed.includes(a))) throw fail(400, '仅能选择失败的动作进行修复');
               m.actions = [...new Set(input.actions)];
             } else m.actions = undefined;
             m.attempts++;
+          }
+          if (input.persona !== undefined) {
+            const job = await pipeline.Job.load(dirFor(id));
+            job.state.persona = input.persona.trim();
+            await job.save();
+            const manifestPath = path.join(dirFor(id), 'manifest.json');
+            try { const manifest = JSON.parse(await readFile(manifestPath, 'utf8')); manifest.persona = input.persona.trim(); await atomicJson(manifestPath, manifest); }
+            catch (e) { if (e.code !== 'ENOENT') throw e; }
           }
           m.phase = 'queued'; m.error = undefined;
         });

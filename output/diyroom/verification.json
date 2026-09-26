@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "errors": [],
+  "checks": [
+    "18 independent sprites",
+    "warm/pink presets",
+    "mixed wallpaper/floor/furniture",
+    "real four character playback",
+    "alpha hit-test pointer drag",
+    "keyboard placement",
+    "save/reload",
+    "stow/undo",
+    "clear pixels exactly equal empty architectural shell",
+    "photo download",
+    "small window",
+    "no production writes"
+  ]
+}

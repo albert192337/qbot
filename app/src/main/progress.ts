@@ -198,7 +198,7 @@ export function stopProgressTicker(): void {
   }
 }
 
-/** 开箱：扣 1 箱 + POINTS_PER_BOX 点，随机得一件家具 */
+/** 开箱：扣 1 箱 + 500 点，补给发往当前本地或联机花园。 */
 export async function openBox(): Promise<OpenBoxResult> {
   const { gardenAction } = await import('./garden/service');
   const result = await gardenAction({ type: 'box' });

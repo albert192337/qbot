@@ -254,9 +254,12 @@ export interface GardenApi {
     get(): Promise<GardenState>;
     act(command: GardenCommand): Promise<GardenResult>;
     toggle(): void;
+    collapse(): void;
+    drag(phase: 'start'|'move'|'end', x: number, y: number): void;
     open(page: string): void;
     ignoreMouse(ignore: boolean): void;
     onAnchor(cb: (anchor: {
+        farm?: {left:number;baseline:number};
         performer?: {left:number;right:number;top:number;bottom:number};
         top?: number;
         side?: 'left' | 'right';

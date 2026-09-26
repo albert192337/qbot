@@ -6,12 +6,12 @@ vi.mock('electron', () => ({
   screen:{getDisplayMatching:()=>({workArea:{x:0,y:0,width:1600,height:1000}})},
   BrowserWindow: class {
     bounds:any; listeners=new Map(); visible=false;
-    webContents={send:vi.fn(),on:vi.fn(),isLoading:()=>false};
+    webContents={send:vi.fn(),setAudioMuted:vi.fn(),on:vi.fn(),isLoading:()=>false};
     constructor(options:any){this.bounds={x:0,y:0,...options};mocks.windows.push(this)}
     getBounds(){return this.bounds} setPosition(x:number,y:number){this.bounds={...this.bounds,x,y};this.listeners.get('move')?.()}
     setBounds(bounds:any){this.bounds={...this.bounds,...bounds};this.listeners.get('move')?.()}
-    on(k:string,v:Function){this.listeners.set(k,v)} isDestroyed(){return false} isVisible(){return this.visible}
-    showInactive(){this.visible=true} hide(){this.visible=false}
+    once(k:string,v:Function){this.listeners.set(k,v)} on(k:string,v:Function){this.listeners.set(k,v)} isDestroyed(){return false} isVisible(){return this.visible}
+    show(){this.visible=true} restore(){this.visible=true} showInactive(){this.visible=true} hide(){this.visible=false}
     setAlwaysOnTop(){} setVisibleOnAllWorkspaces(){} setIgnoreMouseEvents(){} loadFile(){} loadURL(){}
   }
 }));
@@ -22,10 +22,10 @@ vi.mock('../src/main/config',()=>({getSettings:async()=>({activeCharacter:'frog'
 vi.mock('../src/main/characters',()=>({getCharacter:async()=>({manifest:{actions:{idle:{status:'done'}},customActions:{writing:{status:'done',durationSec:5},garden_sow:{status:'done',durationSec:5},garden_harvest:{status:'done',durationSec:5}}}})}));
 afterEach(()=>{vi.useRealTimers();vi.resetModules();mocks.windows=[];mocks.handlers.clear();mocks.events.clear();mocks.ok=true;mocks.state=null;mocks.visit=null;mocks.coop=[]});
 describe('garden pet interaction',()=>{
- it('positions all six plots on the available side and clamps negative-origin monitors',()=>{
+ it('positions all seven plots on the available side and clamps negative-origin monitors',()=>{
   const pet={x:600,y:500,width:360,height:360}, strip={x:230,y:280,width:1100}, area={x:0,y:0,width:1600,height:1000};
-  const points=Array.from({length:6},(_,i)=>plotPetPosition(i,pet,strip,area));
-  expect(new Set(points.map(p=>p.x)).size).toBe(6);expect(points.every(p=>p.x>pet.x)).toBe(true);
+  const points=Array.from({length:7},(_,i)=>plotPetPosition(i,pet,strip,area));
+  expect(new Set(points.map(p=>p.x)).size).toBe(7);expect(points.every(p=>p.x>pet.x)).toBe(true);
   expect(plotPetPosition(0,{...pet,x:-1800},{...strip,x:-1920},{...area,x:-1920}).x).toBeGreaterThanOrEqual(-1920);
  });
  it('freezes soil anchor, restores home, ignores failed actions and cancels on drag',async()=>{
@@ -39,8 +39,8 @@ describe('garden pet interaction',()=>{
   await mocks.handlers.get('garden:act')!({}, {type:'plant',plot:0});await vi.advanceTimersByTimeAsync(0);
   expect(pet.getBounds().x).not.toBe(home.x);expect(strip.getBounds()).toEqual(soil);
   expect(strip.webContents.send).toHaveBeenCalledWith('garden:anchor',expect.objectContaining({
-    left:home.x-soil.x, right:home.x+home.width-soil.x,
-    top:Math.min(home.y,pet.getBounds().y)-soil.y,
+    farm:{left:(1600-455)/2,baseline:934},
+    top:pet.getBounds().y-soil.y,
   })); // 土地锚点不动，仅更新弹层必须避开的角色顶部。
   expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance','garden_sow');
   await vi.advanceTimersByTimeAsync(5600);expect(pet.getBounds().x).toBe(home.x);
@@ -48,6 +48,27 @@ describe('garden pet interaction',()=>{
   mocks.ok=true;await mocks.handlers.get('garden:act')!({}, {type:'harvest',plot:4});await vi.advanceTimersByTimeAsync(0);
   pet.setPosition(800,500);mocks.events.get('pet:move')!();await vi.advanceTimersByTimeAsync(6000);expect(pet.getBounds().x).toBe(800);
  });
+});
+
+it('keeps the farm independent of pet docking and remembers a dragged position after collapse',async()=>{
+ const {BrowserWindow}=await import('electron');const {attachGarden,registerGardenIpc}=await import('../src/main/garden/windows');
+ const pet:any=new BrowserWindow({x:600,y:500,width:360,height:360});pet.visible=true;
+ attachGarden(pet);registerGardenIpc();mocks.events.get('garden:toggle')!();
+ const strip=mocks.windows[1],bounds={...strip.getBounds()},sender={sender:strip.webContents};strip.visible=true;
+ pet.setPosition(20,40);
+ expect(strip.getBounds()).toEqual(bounds);
+ expect(strip.webContents.send).toHaveBeenLastCalledWith('garden:anchor',expect.objectContaining({farm:{left:572.5,baseline:934}}));
+ const drag=mocks.events.get('garden:drag')!;
+ drag(sender,'start',700,950);drag(sender,'move',500,750);drag(sender,'end',0,0);
+ expect(strip.webContents.send).toHaveBeenLastCalledWith('garden:anchor',expect.objectContaining({farm:{left:372.5,baseline:734}}));
+ mocks.events.get('garden:collapse')!(sender);expect(strip.visible).toBe(false);expect(pet.visible).toBe(true);
+ mocks.events.get('garden:toggle')!();expect(strip.visible).toBe(true);
+ pet.setPosition(900,100);
+ expect(strip.webContents.send).toHaveBeenLastCalledWith('garden:anchor',expect.objectContaining({farm:{left:372.5,baseline:734}}));
+ drag({sender:pet.webContents},'start',0,0);drag({sender:pet.webContents},'move',999,999);
+ expect(strip.webContents.send).toHaveBeenLastCalledWith('garden:anchor',expect.objectContaining({farm:{left:372.5,baseline:734}}));
+ const target=plotPetPosition(0,pet.getBounds(),bounds,{x:0,y:0,width:1600,height:1000},{left:372.5,baseline:734});
+ expect(target.y).toBe(399);expect(target.x).toBeLessThan(400);
 });
 
 it('cultivation keeps the pet at the crop for three minutes and drag pauses the remaining time',async()=>{

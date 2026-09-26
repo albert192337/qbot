@@ -58,3 +58,16 @@ describe('hosted desktop recovery',()=>{
   const id=await start();malformed=true;const result=await api.syncCloudJob(id);expect(result.error).toContain('资源格式无效');expect(result.running).toBe(false);
  });
 });
+
+it('sends the creation persona and latest saved persona on retries, including clearing',async()=>{
+ await api.cloudAccount(token);const src=path.join(env.dir,'source.png');await writeFile(src,env.png);
+ const id=await api.startCloudHatch(src,undefined,undefined,undefined,'张起灵','冷淡寡言');
+ const calls=()=>vi.mocked(fetch).mock.calls.map(([url,init])=>({url:String(url),body:init?.body?JSON.parse(String(init.body)):null}));
+ expect(calls().find(c=>c.url.endsWith('/jobs')&&c.body)?.body.persona).toBe('冷淡寡言');
+ completed=true;await api.syncCloudJob(id);
+ const file=path.join(env.dir,'characters',id,'manifest.json');
+ await writeFile(file,JSON.stringify({...manifest,persona:'沉稳克制'}));await api.cloudOperation(id,'resume');
+ expect(calls().filter(c=>c.url.endsWith('/resume')).at(-1)?.body.persona).toBe('沉稳克制');
+ await writeFile(file,JSON.stringify(manifest));await api.cloudOperation(id,'resume');
+ expect(calls().filter(c=>c.url.endsWith('/resume')).at(-1)?.body.persona).toBe('');
+});

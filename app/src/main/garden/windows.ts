@@ -12,13 +12,13 @@ import { getSettings } from '../config';
 import { getCharacter } from '../characters';
 import { choosePairAction } from '../../shared/pair-interaction';
 import { plotPetPosition } from './interaction';
-import { gardenSide } from '../../shared/garden-layout';
-import { moveFixedSize } from '../fixed-window';
 let strip: BrowserWindow | null = null, panel: BrowserWindow | null = null, pet: BrowserWindow | null = null;
 let expanded = false;
 onDesktopVisibilityChanged(() => { if (desktopQuiet()) stopPerformance(); });
 let travelPanel: BrowserWindow | null = null;
 let stripSize = {width:1100,height:800};
+let farm = {left:54, baseline:734};
+let farmDrag: {x:number;y:number;left:number;baseline:number} | null = null;
 let speechBounds: { left: number; right: number; top: number; bottom: number } | null = null;
 export function setGardenSpeechBounds(bounds: typeof speechBounds): void {
     speechBounds = bounds; syncSpeechBounds();
@@ -63,7 +63,7 @@ async function perform(plot: number, kind: 'plant' | 'harvest' | 'cultivate', du
     const action = (kind==='cultivate'?research:[kind === 'plant' ? 'garden_sow' : 'garden_harvest',kind==='plant'?'wave':'talk_happy','idle']).filter((id):id is string=>!!id).find(id => actions[id] && (!actions[id].status || actions[id].status === 'done'));
     if (!action) return false;
     const bounds = pet.getBounds(); home = {x:bounds.x,y:bounds.y};
-    const target = plotPetPosition(plot, bounds, strip.getBounds(), screen.getDisplayMatching(bounds).workArea);
+    const target = plotPetPosition(plot, bounds, strip.getBounds(), screen.getDisplayMatching(strip.getBounds()).workArea, farm);
     pet.webContents.send('garden:performance', action);
     pet.setPosition(target.x, target.y);
     if(kind==='cultivate'){
@@ -82,19 +82,11 @@ function load(win: BrowserWindow, page: string): void {
 function anchor(): void {
     if (!strip || strip.isDestroyed() || !pet || pet.isDestroyed())
         return;
-    const p = pet.getBounds(), wa = screen.getDisplayMatching(p).workArea, b = strip.getBounds();
-    if (home) {
-        syncSpeechBounds();
-        strip.webContents.send('garden:anchor', { performer:{left:p.x-b.x,right:p.x+p.width-b.x,top:p.y-b.y,bottom:p.y+p.height-b.y}, left: home.x - b.x, right: home.x + p.width - b.x,
-            side: gardenSide({x:home.x,width:p.width},wa), top: Math.min(home.y, p.y) - b.y, bottom: Math.min(b.height - 66, home.y + p.height - b.y - 25) });
-        return;
-    }
-    const side = gardenSide(p, wa);
-    const x = Math.max(wa.x, Math.min(side === 'left' ? p.x + p.width - b.width : p.x, wa.x + wa.width - b.width));
-    const y = Math.max(wa.y, Math.min(p.y + p.height - b.height, wa.y + wa.height - b.height));
-    moveFixedSize(strip, x, y, stripSize);
+    const p = pet.getBounds(), b = strip.getBounds();
     syncSpeechBounds();
-    strip.webContents.send('garden:anchor', { side, left: p.x - x, right: p.x + p.width - x, top: p.y - y, bottom: Math.min(b.height - 66, p.y + p.height - y - 25) });
+    strip.webContents.send('garden:anchor', { farm,
+        performer: home ? {left:p.x-b.x,right:p.x+p.width-b.x,top:p.y-b.y,bottom:p.y+p.height-b.y} : undefined,
+        left:p.x-b.x,right:p.x+p.width-b.x,top:p.y-b.y,bottom:p.y+p.height-b.y-25 });
 }
 export function attachGarden(p: BrowserWindow): void {
     pet = p;
@@ -119,8 +111,9 @@ function toggle(): void {
     }
     const wa = screen.getDisplayMatching(pet.getBounds()).workArea;
     if (!strip || strip.isDestroyed()) {
-        stripSize = {width:Math.min(1100,wa.width),height:wa.height};
-        strip = new BrowserWindow({ ...stripSize, frame: false, transparent: true, hasShadow: false, resizable: false, skipTaskbar: true, show: false,
+        stripSize = {width:wa.width,height:wa.height};
+        farm = {left:Math.max(8,(wa.width-455)/2),baseline:wa.height-66};
+        strip = new BrowserWindow({ ...stripSize, x:wa.x,y:wa.y, frame: false, transparent: true, hasShadow: false, resizable: false, skipTaskbar: true, show: false,
             webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
         strip.setAlwaysOnTop(true, 'floating');
         trackDesktopWindow(strip,'decoration'); allowDesktopWindow(strip);
@@ -136,13 +129,13 @@ function toggle(): void {
         anchor();
         strip.showInactive();
     }
-    // 展开方向由左右剩余空间决定，不再强制把桌宠挪到屏幕中间。
+    // 土地使用独立位置；桌宠移动只更新提示避让区域。
     anchor();
 }
 let weatherPanel: BrowserWindow | null=null;
 export function openGardenPanel(page: string): void {
 
-    const allowed = /^(weather|travel|moments|bag|shop|book|plots|sow|daily|sprays|feeding|friends|notebook|visit:(?:test:[a-zA-Z0-9_.-]{1,160}|[0-9A-Z]{12})(?::[0-5]:[a-zA-Z0-9_-]{1,160})?|plot:[0-5])$/.test(page) ? page : 'bag';
+    const allowed = /^(weather|travel|moments|bag|shop|book|plots|sow|daily|sprays|feeding|friends|notebook|visit:(?:test:[a-zA-Z0-9_.-]{1,160}|[0-9A-Z]{12})(?::[0-6]:[a-zA-Z0-9_-]{1,160})?|plot:[0-6])$/.test(page) ? page : 'bag';
     if(allowed==='weather'){
         allowDesktopWindow(weatherPanel);
         if(weatherPanel&&!weatherPanel.isDestroyed()){weatherPanel.show();weatherPanel.focus();return;}
@@ -237,6 +230,20 @@ export function registerGardenIpc(): void {
     ipcMain.on('pet:move', () => { if (home) stopPerformance(false); });
     ipcMain.on('garden:cancelPerformance', (_ev, restore) => stopPerformance(restore !== false));
     ipcMain.on('garden:toggle', toggle);
+    ipcMain.on('garden:collapse', ev => {
+        if(ev.sender!==strip?.webContents)return;
+        farmDrag=null;expanded=false;stopPerformance();strip?.hide();
+    });
+    ipcMain.on('garden:drag', (ev, phase, x, y) => {
+        if(!strip||ev.sender!==strip.webContents)return;
+        if(phase==='end'){farmDrag=null;return;}
+        if(!Number.isFinite(x)||!Number.isFinite(y))return;
+        if(phase==='start'){stopPerformance();farmDrag={x,y,...farm};return;}
+        if(phase!=='move'||!farmDrag)return;
+        farm={left:Math.max(8,Math.min(stripSize.width-463,farmDrag.left+x-farmDrag.x)),
+            baseline:Math.max(180,Math.min(stripSize.height-66,farmDrag.baseline+y-farmDrag.y))};
+        anchor();
+    });
     ipcMain.on('garden:open', (_ev, page) => openGardenPanel(typeof page === 'string' ? page : 'bag'));
     ipcMain.on('garden:closeTravel', ev => {if(travelPanel && ev.sender === travelPanel.webContents) travelPanel.close();});
     ipcMain.on('garden:ignore', (ev, ignore) => { if (strip && ev.sender === strip.webContents)

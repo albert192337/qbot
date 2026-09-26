@@ -237,6 +237,8 @@ export function errorText(code: string): string {
     case 'contacts_limit': return '好友或待处理申请已达上限，请先整理列表';
     case 'invite_unavailable': return '暂时无法邀请，请检查房间和好友关系';
     case 'contact_offline': return '朋友现在不在线，邀请未发送';
+    case 'companion_same_room': return '这位朋友已经在房间里啦';
+    case 'companion_busy': return '朋友正在互动或做客，稍后再邀请吧';
     case 'invite_expired': return '邀请已失效，请朋友重新邀请';
     case 'room_not_found': return '房间不存在（可能已被回收）';
     case 'room_full': return '房间满员了';

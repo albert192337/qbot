@@ -1,0 +1,33 @@
+{
+  "objects": 1,
+  "vertices": 3208,
+  "triangles": 4876,
+  "dimensions": [
+    0.77703857421875,
+    0.77734375,
+    0.980621337890625
+  ],
+  "images": [
+    {
+      "name": "strawberry+3d+model_basecolor.jpg",
+      "size": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "name": "strawberry+3d+model_normal.png",
+      "size": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "name": "strawberry+3d+model_rm.jpg",
+      "size": [
+        2048,
+        2048
+      ]
+    }
+  ]
+}

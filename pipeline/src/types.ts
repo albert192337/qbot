@@ -4,7 +4,7 @@
  * 铁律：本模块（整个 pipeline/）不得 import 任何 Electron API。
  */
 
-/** 新角色默认生成的 11 个动作 ID。 */
+/** 全部标准动作 ID，包含旧版窗沿动作以兼容存量资源。 */
 export const ACTION_IDS = [
   'idle',
   'drag',
@@ -14,10 +14,14 @@ export const ACTION_IDS = [
   'talk_annoyed',
   'wave',
   'stretch',
+  'perch',
   'perch_sit',
   'perch_lie',
   'writing',
 ] as const;
+
+/** 新角色首批只生成一个窗沿停靠动作。 */
+export const DEFAULT_ACTION_IDS = ACTION_IDS.filter(id => id !== 'perch_sit' && id !== 'perch_lie');
 
 export type ActionId = (typeof ACTION_IDS)[number];
 
@@ -257,6 +261,8 @@ export interface ActionState {
 
 /** .job/state.json 整体结构 */
 export interface JobState {
+  /** Initial persona; the saved manifest takes precedence once available. */
+  persona?: string;
   generationMode?: 'original';
   /** Existing-character regeneration: resume only these explicitly selected actions. */
   regenerateActions?: ActionId[];

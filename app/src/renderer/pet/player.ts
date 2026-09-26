@@ -6,7 +6,7 @@ import { scenePool } from '../../shared/action-resources';
  */
 import type { Manifest, ManifestAction, PlayableId } from '@qbot/pipeline';
 
-const LOOPING: ReadonlySet<string> = new Set(['idle', 'drag', 'perch_sit', 'perch_lie']);
+const LOOPING: ReadonlySet<string> = new Set(['idle', 'drag', 'perch', 'perch_sit', 'perch_lie']);
 
 export class Player {
   private suspended = false;
@@ -88,13 +88,19 @@ export class Player {
      * 每次 load 带一个新 nonce 强制重取。本地协议读盘开销可忽略。
      */
     const nonce = Date.now();
-    // No functioning video (including initial load): keep the character's source image visible.
-    this.fallback = document.createElement('img');
-    this.fallback.src = `qbot-asset://${dirId}/${manifest.sourceImage}?v=${nonce}`;
-    this.fallback.alt = manifest.name;
-    this.fallback.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;z-index:1';
-    this.fallback.style.visibility = 'visible';
-    this.container.appendChild(this.fallback);
+    // Only reveal successfully loaded display art; missing room-pack images must
+    // never expose Chromium's broken-image icon or replacement text.
+    const fallback = document.createElement('img');
+    this.fallback = fallback;
+    fallback.alt = '';
+    fallback.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;z-index:1';
+    fallback.style.visibility = 'hidden';
+    fallback.addEventListener('load', () => {
+      if (this.fallback === fallback) this.updateFallbackVisibility();
+    });
+    fallback.addEventListener('error', () => { fallback.style.visibility = 'hidden'; });
+    fallback.src = `qbot-asset://${dirId}/__portrait.png?v=${nonce}`;
+    this.container.appendChild(fallback);
     /**
      * 合并顺序（sticker-import spec §4.3）：默认动作 → 导入贴纸 → 预设动作
      * → 自定义动作。后写的覆盖同名 key，所以导入贴纸能盖掉同名标准动作，
@@ -195,7 +201,7 @@ export class Player {
       if (this.current === id) {
         next.style.visibility = 'hidden';
         this.current = null;
-        if (this.fallback) this.fallback.style.visibility = 'visible';
+        this.updateFallbackVisibility();
       }
       if (retries++ === 0) {
         start(true);
@@ -266,6 +272,12 @@ export class Player {
       }
     };
     start(false);
+  }
+
+  private updateFallbackVisibility(): void {
+    if (!this.fallback) return;
+    this.fallback.style.visibility = !this.current && this.fallback.complete && this.fallback.naturalWidth > 0
+      ? 'visible' : 'hidden';
   }
 
   /** 触发一次烟雾过渡动画 */

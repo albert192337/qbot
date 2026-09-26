@@ -76,7 +76,7 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
       }
       let localPending = false;
       try { const state=JSON.parse(await readFile(path.join(charDir,'.job/state.json'),'utf8')); localPending=!existsSync(path.join(charDir,'.cloud-job.json')) && typeof state.stage==='string' && state.stage!=='done'; } catch {}
-      out.push({ dirId: entry.name, coverImage: existsSync(path.join(charDir,'cover.png')) ? 'cover.png' : undefined, manifest, hasUnfinishedJob: cloudPending || localPending, taskDismissed });
+      out.push({ dirId: entry.name, coverImage: '__portrait.png', manifest, hasUnfinishedJob: cloudPending || localPending, taskDismissed });
     } catch {
       /* 损坏的包跳过 */
     }

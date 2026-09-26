@@ -94,10 +94,12 @@ function watch(box: HTMLElement): void {
 }
 
 /** Reuse the actual sprite alpha for every surface, including PNG, SVG and twins. */
-export function attachMutationEffects(box: HTMLElement, src: string, traits: Trait[]): void {
-    if (!traits.length) return;
+export function attachMutationEffects(box: HTMLElement, src: string, traits: Trait[], goldQuality = false): void {
+    if (!traits.length && !goldQuality) return;
     box.classList.add('mutation-art');
     box.style.setProperty('--plant-mask', `url(${JSON.stringify(src)})`);
+    // Reserve part of the shared eight-particle budget for the actual fruit quality.
+    if (goldQuality) particles(box, 'gold-quality', 5);
     for (let copy = 0; copy < (traits.includes('twin') ? 2 : 1); copy++) {
         const surface = layer(`mutation-surface${copy ? ' twin-copy' : ''}`);
         for (const t of ['purple', 'mint', 'coral', 'rainbow', 'golden', 'punk', 'frost', 'thunder'] as const) {

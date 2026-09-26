@@ -11,7 +11,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { Job } from '../src/job.js';
 import { runPipeline } from '../src/stages.js';
-import { ACTION_IDS, type Manifest } from '../src/types.js';
+import { DEFAULT_ACTION_IDS as ACTION_IDS, type Manifest } from '../src/types.js';
 import { createFakeArkClient } from './fake-ark.js';
 import { ensureFixtures, getFfmpegPath, type Fixtures } from './fixtures.js';
 

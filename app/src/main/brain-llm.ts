@@ -267,7 +267,7 @@ export async function buildInput(memoryMode?: 'chat' | 'auto', query = ''): Prom
       if (meta?.manifest) {
         personaName = meta.manifest.name || personaName;
         personaTraits = meta.manifest.persona || undefined;
-        actionDescriptions = brainActions(meta.manifest).filter(a=>a.id!=='perch_sit'&&a.id!=='perch_lie');
+        actionDescriptions = brainActions(meta.manifest).filter(a=>a.id!=='perch'&&a.id!=='perch_sit'&&a.id!=='perch_lie');
         const pool=scenePool(meta.manifest,'idle');
         idleCandidates=actionDescriptions.filter(a=>pool.includes(a.id));
       }

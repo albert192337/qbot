@@ -9,6 +9,8 @@ export const ACTIONS = [
   ['talk_annoyed', '闹小脾气'],
   ['wave', '打招呼'],
   ['stretch', '伸懒腰'],
+  ['perch', '窗沿停靠'],
+  ['writing', '写手账'],
 ] as const;
 export const ACTION_STATUS: Record<string, string> = {
   pending: '等待练习',
@@ -33,7 +35,7 @@ export function incubation(status: HatchStatus | null): {
   failed: number;
   total: number;
 } {
-  const values = ACTIONS.map(([id]) => status?.actions[id]?.status);
+  const values = status && Object.keys(status.actions).length ? Object.values(status.actions).map(a => a.status) : ACTIONS.map(() => undefined);
   const done = values.filter((s) => s === 'done').length;
   const failed = values.filter((s) => s === 'failed').length;
   const phase: IncubationPhase = !status
@@ -51,7 +53,7 @@ export function incubation(status: HatchStatus | null): {
             : status.stage === 'turnaround'
               ? 'brewing'
               : 'learning';
-  return { phase, done, failed, total: ACTIONS.length };
+  return { phase, done, failed, total: values.length };
 }
 export const PHASE_LABEL: Record<IncubationPhase, string> = {
   empty: '等待一位新朋友',

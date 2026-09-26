@@ -85,6 +85,7 @@ const form = new CreationForm(
         draft.form,
         draft.style,
         draft.name,
+        draft.persona,
       );
       storage.set(`qbot:creation-name:${id}`, draft.name);
       storage.set('qbot:nursery-task', id);
@@ -328,6 +329,7 @@ function renderState(state: NurseryState): void {
     const list = el('ul', undefined, 'action-list');
     for (const [id, label] of ACTIONS) {
       const action = st.actions[id];
+      if (!action) continue;
       const li = el('li', undefined, action?.status ?? 'pending');
       li.append(
         el('b', label),
@@ -572,9 +574,9 @@ function companion(
   description: string,
 ): HTMLButtonElement {
   const control = button('', action, 'companion');
-  if (meta.manifest?.sourceImage) {
+  if (meta.manifest) {
     const img = image(
-      `qbot-asset://${meta.dirId}/${meta.manifest.sourceImage}`,
+      `qbot-asset://${meta.dirId}/__portrait.png`,
       '',
       '',
     );

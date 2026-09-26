@@ -14,6 +14,7 @@ const pendingFile=()=>path.join(app.getPath('userData'),'garden-network-pending.
 async function readPending():Promise<Pending|undefined>{try{return JSON.parse(await readFile(pendingFile(),'utf8'));}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}}
 async function clearPending():Promise<void>{try{await unlink(pendingFile());}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}}
 export async function networkGarden():Promise<GardenState>{
+  await (await import('./network-box')).onlineBox(false);
   const s=await getSettings();let r=await gardenRequest({action:'get',actor:s.activeCharacter});if(!r.ok)throw Error(String(r.error));
   // A response can be lost after the server consumed the item. Reconcile by receipt, even when
   // the original fruit/button no longer exists; never require the player to recreate the command.
@@ -41,7 +42,7 @@ export async function networkAction(command:GardenCommand):Promise<GardenResult>
 export async function visitGarden(owner:string,preview=false,task?:string):Promise<GardenVisit>{if(getRehearsal())return getRehearsal()!.visit(owner);if(!/^[0-9A-Z]{12}$/.test(owner))throw Error('玩家不存在');const r=await gardenRequest({action:preview?'preview':'visit',owner,task});if(!r.ok)throw Error(String(r.error));return r.visit as GardenVisit;}
 export async function cooperateGarden(owner:string,plot:number,action:'join'|'leave'|'claim'|'share'|'invite',target?:string,task?:string):Promise<GardenVisit>{
   if(getRehearsal()){const v=getRehearsal()!.cooperate(owner,plot,action,target,task);if(action!=='join')notify();return v;}
-  if(!/^[0-9A-Z]{12}$/.test(owner)||!Number.isInteger(plot)||plot<0||plot>5||!['join','leave','claim','share','invite'].includes(action))throw Error('无效培育请求');
+  if(!/^[0-9A-Z]{12}$/.test(owner)||!Number.isInteger(plot)||plot<0||plot>6||!['join','leave','claim','share','invite'].includes(action))throw Error('无效培育请求');
   if(action==='invite'&&(!target||!/^[0-9A-Z]{12}$/.test(target)))throw Error('请选择好友');
   const r=await gardenRequest({action:'coop',owner,plot,command:action,target,task});if(!r.ok)throw Error(String(r.error));if(action!=='join')notify();return r.visit as GardenVisit;
 }

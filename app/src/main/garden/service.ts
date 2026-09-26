@@ -119,7 +119,14 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
         try {
             const settings=await getSettings();
             if(getRehearsal()){const rehearsal=getRehearsal()!;rehearsal.initializeOwn((await load()).state);const result=rehearsal.act(command,settings.activeCharacter??undefined);for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');return result;}
-            if(settings.gardenOnline)return (await import('./network')).networkAction(command);
+            if(settings.gardenOnline){
+                if(command?.type==='box'){
+                    const result=(await (await import('./network-box')).onlineBox())!;
+                    for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');
+                    return result;
+                }
+                return (await import('./network')).networkAction(command);
+            }
             if (!command || typeof command !== 'object')
                 throw Error('无效花园操作');
             const participant = (command.type === 'harvest' || command.type === 'harvestMany') ? (await getSettings()).activeCharacter ?? 'default' : undefined;

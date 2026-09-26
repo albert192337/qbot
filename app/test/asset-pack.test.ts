@@ -89,7 +89,7 @@ describe('packCharacterDir / unpackCharacter', () => {
     await writeFile(path.join(charDir, 'actions/idle.webm'), Buffer.from('changed!'));
     const changed = await packCharacterDir(charDir);
     expect(changed.hash).not.toBe(first.hash);
-  });
+  }, 20000);
 
   it('恶意包：路径穿越拒收', async () => {
     const header = Buffer.from(

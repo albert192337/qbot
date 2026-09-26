@@ -13,6 +13,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { displayImage } from './character-images';
 
 /** 单块原始字节数（base64 后 ≈87KB，rooms 服务 128KB 帧上限内余量充足） */
 export const CHUNK_SIZE = 64 * 1024;
@@ -73,6 +74,12 @@ export async function packCharacterDir(charDir: string): Promise<PackedCharacter
       }
     }
   }
+  const portrait = await displayImage(charDir);
+  const portraitData = portrait ? await readFile(path.join(charDir, portrait)) : undefined;
+  manifest.sourceImage = portraitData ? 'source.png' : '';
+  manifest.turnaround = '';
+  delete manifest.sourceImagePurpose;
+  if (portraitData) manifest.sourceImagePurpose = 'portrait';
   const manifestBuf = Buffer.from(JSON.stringify(manifest), 'utf8');
 
   const entries: PackEntry[] = [{ path: 'manifest.json', size: manifestBuf.length }];
@@ -83,11 +90,10 @@ export async function packCharacterDir(charDir: string): Promise<PackedCharacter
     entries.push({ path: rel, size: buf.length });
     datas.push(buf);
   }
-  if (raw.stickerLibrary) {
-    try {
-      const source = await readFile(path.join(charDir,'source.png'));
-      entries.push({path:'source.png',size:source.length}); datas.push(source);
-    } catch { /* Older downloaded packs may have no reference image. */ }
+  // Generation references remain local, including sticker-library source images.
+  if (portraitData) {
+    entries.push({ path: 'source.png', size: portraitData.length });
+    datas.push(portraitData);
   }
 
   const header = Buffer.from(JSON.stringify({ files: entries }), 'utf8');

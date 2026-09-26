@@ -1,7 +1,7 @@
 export function gardenSide(pet: { x: number; width: number }, area: { x: number; width: number }): 'left' | 'right' {
   return pet.x - area.x >= area.x + area.width - pet.x - pet.width ? 'left' : 'right';
 }
-/** 六块地排在同一侧，最外侧单独留工具列，不与植物共用空间。 */
+/** 土地排在同一侧，最外侧单独留工具列，不与植物共用空间。 */
 export function gardenLane(left: number, right: number, width: number, side: 'left' | 'right') {
   const laneWidth = 455;
   const desired = side === 'left' ? left - 20 - laneWidth : right + 20;

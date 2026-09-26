@@ -1,0 +1,14 @@
+# 果实挂饰参考图
+
+2026-09-26。使用内置 image_gen；普通草莓图仅作为风格参考。分别制作茶壶和蝴蝶结的独立实体参考，不含光效。尚未生成 3D 模型。
+
+- ivory-gold-teapot.png：奶白瓷、浅青绿面板、金色边饰。
+- pink-satin-bow.png：柔粉丝缎、浅金包边。
+
+## 茶壶提示词
+
+Use case: stylized-concept. Create ONE original refined fantasy collectible miniature TEAPOT, isolated asset reference for image-to-3D generation. Tall graceful pear-shaped creamy ivory porcelain body with subtle pale celadon panels, restrained champagne-gold raised borders tracing 4 broad petal-shaped body panels, domed fitted lid and a simple rounded finial. One elegant curved spout on the left with visible opening, one sturdy open looping handle on the right, small integrated circular foot. All components visibly connected, clear silhouette and handle opening, practical solid thickness rather than fragile filigree. Elegant fairy-garden treasure, sophisticated rather than juvenile; no face, flowers, jewels, hearts or fruit shapes. Supplied strawberry image is ONLY a style/color harmony reference: soft hand-painted pastel finish, warm cream highlights, gently simplified shapes. DO NOT include the strawberry or leaves. Show near-front three-quarter view with very slight view from above, complete object occupying 80 percent of square canvas. Refined hand-painted 3D concept illustration with readable volume and restrained porcelain/gold material highlights, no harsh baked shadows, no photorealism. Actual transparent alpha background. No ground, stand, floating ring, particles, glow halo, music notes, scenery, labels, multiple views or text. Teapot itself only; meant to float later in the game.
+
+## 蝴蝶结提示词
+
+Use case: stylized-concept. Create ONE original elegant blush-pink SATIN RIBBON BOW as an isolated physical accessory reference for image-to-3D generation. Two full softly sculpted ribbon loops, a neatly wrapped central knot, two gracefully curved short hanging ribbon tails with clean angled ends. Broad ribbon surfaces, believable folds and visible edge thickness, all parts connected at the knot, clear separation of the loops and tails. Refined pearl-satin sheen with soft cream highlights and subtle rose-lilac shaded folds, thin restrained pale champagne edging. Sophisticated fantasy collectible ornament, not childish, not plastic balloon, no additional heart, gem, flower or charm. Supplied strawberry image is ONLY a style/color harmony reference: pastel hand-painted finish, warm painted highlights and softly simplified forms. Do NOT include fruit, seeds or leaves. Near-front view with a slight three-quarter turn to reveal physical thickness, complete bow occupying 80 percent of square canvas. Soft hand-painted 3D concept illustration, beautifully readable silhouette, moderate material sheen with no blown highlights. Actual transparent alpha background. Bow only, no string, ground, backdrop, support, glow, sparkles, particles, text, labels, duplicate views or decorative surround.

@@ -709,8 +709,9 @@ window.addEventListener('blur', cancelPointer);
 
 // ── 右键菜单 ───────────────────────────
 const ACTION_LABELS: Record<string, string | undefined> = {
-  perch_sit: '坐窗沿',
-  perch_lie: '趴窗沿',
+  perch: '窗沿停靠',
+  perch_sit: '坐窗沿（旧版）',
+  perch_lie: '趴窗沿（旧版）',
   writing: '写手账',
   sleep: '睡觉',
   tea: '喝茶',
@@ -734,7 +735,13 @@ window.qbot.pet.onMenuCommand((cmd) => {
   if (cmd.type === 'pairEnd') { pairRequest++; pairInteraction.finish(); return; }
   if (cmd.type === 'speak' || cmd.type === 'play') visitOrchestrator.cancelVisit();
   if (cmd.type === 'speak') speaker.forceSpeak();
-  else if (cmd.type === 'play') dispatch({ type: 'PLAY_ACTION', action: cmd.action as PlayableId });
+  else if (cmd.type === 'play') {
+    // Explicit playback must release the previous behavior's lease and timeout.
+    // Otherwise dispatch silently drops this command until that behavior finishes.
+    cancelHold();
+    if (perched) { window.qbot.pet.detachPerch(); applyPerch(null); }
+    dispatch({ type: 'PLAY_ACTION', action: cmd.action as PlayableId });
+  }
   else if (cmd.type === 'signPrompt') showSignPrompt();
   else if (cmd.type === 'signClear') applyUserSign(null);
   else if (cmd.type === 'signDismiss') {

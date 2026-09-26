@@ -37,6 +37,6 @@ export const STICKER_SCENES = [
   ['idle', '待机'], ['drag', '拖拽'], ['sleep', '睡觉'], ['tea', '放松'],
   ['talk_happy', '开心'], ['talk_annoyed', '不高兴'], ['wave', '打招呼'],
   ['garden_sow', '播种'], ['garden_harvest', '收获'],
-  ['perch_sit', '坐窗沿'], ['perch_lie', '趴窗沿'],
+  ['perch', '窗沿停靠'],
   ['writing', '写手账'],
 ] as const;

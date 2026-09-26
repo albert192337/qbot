@@ -62,3 +62,13 @@ describe('task inventory', () => {
     expect(taskCharacters([pet])).toEqual([pet]);
   });
 });
+
+it('offers one merged perch repair entry for older characters',()=>{
+ const manifest=character('old').manifest;
+ manifest.actions.perch_sit={...done,status:'failed'};
+ manifest.actions.perch_lie={...done,status:'failed'};
+ const prompts={actions:{perch:{poseDesc:'pose',motionDesc:'motion'}}} as Parameters<typeof collectActions>[1];
+ const entries=collectActions(manifest,prompts).filter(a=>a.id.startsWith('perch'));
+ expect(entries).toHaveLength(1);expect(entries[0]).toMatchObject({id:'perch',label:'窗沿停靠'});
+ expect(manifest.actions.perch).toBeUndefined();
+});

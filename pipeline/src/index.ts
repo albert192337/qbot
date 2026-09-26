@@ -61,4 +61,5 @@ export { turnaroundPrompt, framePrompt, videoPrompt, actionSpec, ACTIONS, ABSTRA
 export { EXPRESSION_ACTION_IDS } from './types.js';
 export type { ExpressionActionId } from './types.js';
 
+export { personaPrompt } from './persona-prompt.js';
 export { originalActionSpec, originalFramePrompt, originalVideoPrompt } from './original-prompts.js';

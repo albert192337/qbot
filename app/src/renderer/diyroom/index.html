@@ -1,0 +1,11 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>我的小屋 · 自由布置</title></head><body>
+<header><div><small>QBOT · MAKE IT YOURS</small><h1>今天，小屋是什么模样？</h1></div><nav><a href="../tearoom/index.html">上一版茶室</a><button id="photo">保存照片</button><button id="edit" aria-expanded="true">收起布置</button></nav></header>
+<main><div class="scene"><canvas id="scene" tabindex="0" aria-label="可拖动家具的小屋；选中家具后可用方向键移动，Delete 收起"></canvas><p id="loading" role="status">正在把新家具搬进来…</p></div>
+<aside id="decor" aria-label="家具与装修"><div class="aside-head"><span>自由布置</span><small>拖动家具 · 混搭你喜欢的颜色</small></div>
+<div class="presets"><button data-preset="warm">暖木茶室</button><button data-preset="pink">粉色公主房</button></div><p id="presetNote">整套试摆会替换当前布置，可撤销。</p>
+<div class="surfaces"><label>墙纸<select id="wall"><option value="warm">奶油白</option><option value="pink">梦幻粉</option></select></label><label>地板<select id="floor"><option value="warm">暖橡木</option><option value="pink">浅奶油</option></select></label></div>
+<div class="catalog-tabs"><button data-family="pink" aria-pressed="true">粉色家具</button><button data-family="warm" aria-pressed="false">暖木家具</button></div><div id="catalog"></div>
+<div id="selection"><strong id="selectedName"></strong><label>家具大小<input id="furnitureSize" type="range" min="65" max="140" value="100"></label><div><button id="stow">收起</button><button id="flip">镜像</button><button id="undo" disabled>撤销</button><button id="exportPiece">导出单件</button></div></div>
+<div class="bottom-actions"><button id="clear">清空家具</button><button id="save">保存布置</button></div></aside></main>
+<section id="controls" aria-label="安排角色"><div id="spots" role="group" aria-label="选择位置"></div><div class="fields"><label>这里的朋友<select id="character"></select></label><label>已有动作<select id="action"></select></label><label>角色大小 <output id="sizeValue"></output><input id="size" type="range" min="65" max="145" value="100"></label><label>落脚微调<input id="offset" type="range" min="-45" max="45" value="0"></label></div></section>
+<footer><span id="note" role="status">每件家具都可以单独拖动、收起或替换。</span><span id="summary"></span></footer><div id="sources" aria-hidden="true"></div><script type="module" src="./main.ts"></script></body></html>

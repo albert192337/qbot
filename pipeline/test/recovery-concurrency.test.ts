@@ -28,7 +28,10 @@ describe('generation retry and concurrency',()=>{
   const ark={generateImage:vi.fn(),submitVideoTask:vi.fn(),getVideoTask:vi.fn(async()=>{active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,5));active--;return {status:'succeeded',videoUrl:'https://example.test/video'};}),downloadVideo:async(_u:string,d:string)=>{await writeFile(d,'mp4');}} as unknown as ArkClient;
   await runActions(job,ark,'/mock',async()=>{},2);
   expect(peak).toBe(2);expect(ark.generateImage).not.toHaveBeenCalled();expect(ark.submitVideoTask).not.toHaveBeenCalled();
-  expect(ACTION_IDS.every(id=>job.state.actions[id].status==='done')).toBe(true);
+  expect(job.state.baseActionIds!.every(id=>job.state.actions[id].status==='done')).toBe(true);
+  expect(job.state.actions.perch.status).toBe('done');
+  expect(job.state.actions.perch_sit.status).toBe('failed');
+  expect(job.state.actions.perch_lie.status).toBe('failed');
  });
  it('clears a terminally failed task ID and explicitly retries it with the existing good frame',async()=>{
   const job=await setup();for(const id of ACTION_IDS.slice(1))job.state.actions[id].status='done';
@@ -102,4 +105,21 @@ it('legacy sticker labels never override idle motion, but explicitly saved promp
  await runActions(job,ark,'/mock',async()=>{},1,['idle']);
  expect(ark.submitVideoTask).toHaveBeenLastCalledWith(expect.objectContaining({prompt:expect.stringContaining('只眨眼')}));
  expect(ark.submitVideoTask).toHaveBeenLastCalledWith(expect.objectContaining({prompt:expect.not.stringContaining('扭呀扭')}));
+});
+
+it.each([undefined, 'original'] as const)('creation and later actions use current persona (%s)', async (mode) => {
+ const job=await setup(); job.state.generationMode=mode;job.state.persona='冷淡寡言';await job.save();
+ expect((await Job.load(dir)).state.persona).toBe('冷淡寡言');
+ const ark={generateImage:vi.fn(async()=>Buffer.from('frame')),submitVideoTask:vi.fn(async()=>'new'),getVideoTask:vi.fn(async()=>({status:'succeeded',videoUrl:'https://example.test/video'})),downloadVideo:async(_u:string,d:string)=>{await writeFile(d,'mp4');}} as unknown as ArkClient;
+ const run=async()=>{job.state.actions.talk_happy={status:'pending',attempts:{frame:0,video:0}}; await runActions(job,ark,'/mock',async()=>{},1,['talk_happy']);};
+ await run();
+ for(const fn of [ark.generateImage,ark.submitVideoTask])expect(fn).toHaveBeenLastCalledWith(expect.objectContaining({prompt:expect.stringContaining('冷淡寡言')}));
+ for(const id of ACTION_IDS)job.state.actions[id].status='done';
+ expect((await runPackage(job)).persona).toBe('冷淡寡言');
+ await writeFile(path.join(dir,'manifest.json'),JSON.stringify({persona:'温柔慢热',actions:{}}));await run();
+ for(const fn of [ark.generateImage,ark.submitVideoTask])expect(fn).toHaveBeenLastCalledWith(expect.objectContaining({prompt:expect.stringContaining('温柔慢热')}));
+ await writeFile(path.join(dir,'manifest.json'),JSON.stringify({actions:{}}));await run();
+ for(const fn of [ark.generateImage,ark.submitVideoTask])expect(fn).toHaveBeenLastCalledWith(expect.objectContaining({prompt:expect.not.stringContaining('角色人设：')}));
+ for(const id of ACTION_IDS)job.state.actions[id].status='done';
+ expect((await runPackage(job)).persona).toBeUndefined();
 });

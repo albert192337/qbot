@@ -3,6 +3,7 @@ import { recoverCloudJobs } from './cloud-generation';
 import { initUserMemory, flushUserMemory } from './user-memory';
 /** 主进程入口：协议注册（必须在 ready 前）→ 预置角色 → 窗口/托盘/IPC */
 import { app, net, protocol, screen, dialog } from 'electron';
+import { displayImage } from './character-images';
 import { applyPendingProgressReset } from './reset-progress-storage';
 import { existsSync } from 'node:fs';
 import { open, readFile, stat } from 'node:fs/promises';
@@ -76,11 +77,17 @@ app.whenReady().then(async () => {
   protocol.handle('qbot-asset', async (req) => {
     const url = new URL(req.url);
     const base = charactersDir();
-    const full = path.normalize(
+    let full = path.normalize(
       path.join(base, url.hostname, decodeURIComponent(url.pathname)),
     );
     if (!full.startsWith(base + path.sep)) {
       return new Response('forbidden', { status: 403 });
+    }
+    if (path.basename(full) === '__portrait.png') {
+      const dir = path.dirname(full);
+      const image = await displayImage(dir).catch(() => undefined);
+      if (!image) return new Response('not found', { status: 404 });
+      full = path.join(dir, image);
     }
     let info;
     try {

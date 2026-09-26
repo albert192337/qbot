@@ -1,5 +1,5 @@
 /** Real production windows/IPC/renderers, isolated data and no external service calls. */
-import {app,BrowserWindow,protocol,session,screen} from 'electron';
+import {app,BrowserWindow,protocol,session,screen,Menu} from 'electron';
 import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -18,11 +18,13 @@ async function until(fn:()=>Promise<unknown>|unknown,label:string){for(let i=0;i
 app.whenReady().then(async()=>{try{
  await mkdir(output,{recursive:true});const chars=path.join(app.getPath('userData'),'characters');await mkdir(chars,{recursive:true});
  for(const id of ['host','guest','second'])await cp(path.join(root,'app/resources/presets/mascot'),path.join(chars,id),{recursive:true});
- await writeFile(path.join(app.getPath('userData'),'config.json'),JSON.stringify({activeCharacter:'host',nickname:'可见性测试',roomsChatConsent:true,voiceEnabled:false,freeMode:false,arkApiKey:'QA-NOT-A-KEY',gptImageApiKey:'QA-NOT-A-KEY'}));
+ await writeFile(path.join(app.getPath('userData'),'config.json'),JSON.stringify({activeCharacter:'host',nickname:'可见性测试',roomsChatConsent:true,voiceEnabled:false,freeMode:false,roomsDisplayMode:'desktop',arkApiKey:'QA-NOT-A-KEY',gptImageApiKey:'QA-NOT-A-KEY'}));
  session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_r,cb)=>cb({cancel:true}));
  protocol.handle('qbot-asset',async req=>{const u=new URL(req.url),file=path.resolve(chars,u.hostname,decodeURIComponent(u.pathname).slice(1));if(!file.startsWith(chars+path.sep))return new Response(null,{status:403});try{return new Response(await readFile(file),{headers:{'Content-Type':file.endsWith('.webm')?'video/webm':'image/png'}});}catch{return new Response(null,{status:404});}});
  registerIpc();Rooms.setLoungePush(Windows.pushToLounge);wireRoomPetDisplay();
  const pet=Windows.createPetWindow();Windows.setPetScale(1);Windows.broadcastCharacterActivated((await getCharacter('host'))!);
+ let capturedMenu:Menu|undefined;Menu.prototype.popup=function(){capturedMenu=this;};
+ async function chooseVisibility(label:string){capturedMenu=undefined;await js(pet,"document.querySelector('.hud-hide').click()");await until(()=>!!capturedMenu,'visibility menu');const item=capturedMenu!.items.find(i=>i.label===label);assert.ok(item, label);(item.click as ()=>void)();}
  await until(()=>js(pet,'!!document.querySelector(".hud-hide")&&!document.body.classList.contains("desktop-loading")'),'host toolbar');
  const area=screen.getDisplayMatching(pet.getBounds()).workArea;Windows.movePetWindow(area.x+80,area.y+180);
  await until(()=>BrowserWindow.getAllWindows().some(w=>w.webContents.getURL().includes('/pet-hint/')&&w.isVisible()),'exterior wish');
@@ -61,7 +63,7 @@ app.whenReady().then(async()=>{try{
  Windows.displayDesktopSign('测试留言');const bubble=Windows.showBubbleWindow();
  await js(pet,`document.querySelector('.hud-garden').click()`);await wait(900);
  Visibility.setMemberHidden('test:guest',true);
- await js(pet,`document.querySelector('.hud-hide').click()`);
+ await chooseVisibility(Visibility.desktopHidden()?'显示全部角色':'隐藏全部角色');
  await until(()=>Visibility.desktopHidden()&&js(pet,'document.body.classList.contains("desktop-hidden")'),'global hide');
  assert.equal(pet.isVisible(),true);assert.equal(social.isVisible(),false);assert.equal(rejoined.isVisible(),false);assert.equal(bubble.isVisible(),false);
  assert.equal(await js(pet,'getComputedStyle(document.getElementById("stage")).display'),'none');
@@ -74,7 +76,7 @@ app.whenReady().then(async()=>{try{
  await js(pet,`document.querySelector('.hud-weather').click()`);await until(()=>BrowserWindow.getAllWindows().some(w=>w.webContents.getURL().includes('view=weather')&&w.isVisible()),'manual panel while hidden');
  // Reapplying hide also dismisses explicitly opened panels.
  Visibility.setDesktopHidden(true);assert.equal(BrowserWindow.getAllWindows().filter(w=>w!==pet&&w.isVisible()).length,0);
- await js(pet,`document.querySelector('.hud-hide').click()`);await until(()=>!Visibility.desktopHidden(),'restore all');
+ await chooseVisibility(Visibility.desktopHidden()?'显示全部角色':'隐藏全部角色');await until(()=>!Visibility.desktopHidden(),'restore all');
  assert.equal(rejoined.isVisible(),true);assert.equal(await js(rejoined,'getComputedStyle(document.getElementById("stage")).display'),'none');Visibility.setMemberHidden('test:guest',false);assert.equal(rejoined.isVisible(),true);assert.equal(social.isVisible(),false);late.show();assert.equal(late.isVisible(),false);assert.equal(bubble.isVisible(),false);
  const a=screen.getDisplayMatching(pet.getBounds()).workArea;
  Windows.movePetWindow(a.x,a.y+100);const before=pet.getSize();

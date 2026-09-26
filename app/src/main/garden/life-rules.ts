@@ -104,6 +104,7 @@ export function lifeTransition(s:GardenState,cmd:GardenCommand,now:number,rng:Ra
       return {handled:true,changed,reveal:{title:'喷雾生效！',message:candidate.trait?TRAITS[candidate.trait].name:DYE_COLORS[candidate.dye!].name}};
     }
     case 'feed':{
+      if(cmd.actor!==undefined&&cmd.actor!==actor)throw Error('角色已切换，请重新投喂');
       const c=actor&&l.characters[actor];if(!c)throw Error('请先选择自己的角色');
       const w=c.wishes.find(w=>w.id===cmd.wish),i=s.produce.findIndex(p=>p.id===cmd.produce);
       if(!w||i<0||!wishMatches(w,s.produce[i]))throw Error('需要正确的水果和全部指定词条，且果实未收藏锁定');

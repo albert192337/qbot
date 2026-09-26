@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "checks": [
+    "four real character animations",
+    "600px native window and no horizontal overflow",
+    "always-on-top toggle",
+    "character drag/scale",
+    "save/reload",
+    "zero production writes"
+  ],
+  "errors": []
+}

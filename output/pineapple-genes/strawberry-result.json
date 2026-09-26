@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "regions": [
+    {
+      "leaf": false,
+      "base": false,
+      "triangles": 3606
+    },
+    {
+      "leaf": true,
+      "base": false,
+      "triangles": 1270
+    },
+    {
+      "leaf": false,
+      "base": true,
+      "triangles": 4888
+    }
+  ],
+  "errors": []
+}

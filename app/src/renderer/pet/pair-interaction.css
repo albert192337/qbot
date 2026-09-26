@@ -24,7 +24,8 @@ body.pair-swapped #pair-interaction { --from:67%; --to:33%; }
 body.pair-swapped #pair-interaction[data-recipient=true] .pair-effects { --from:33%; --to:67%; }
 .pair-heart { position:absolute; opacity:0; left:var(--from); top:43%; color:#ef6c96; font-size:34px; filter:drop-shadow(0 2px 2px #fff); animation:pair-send-heart 2.3s ease-in-out both; }
 @keyframes pair-send-heart { 0% { opacity:0; transform:translate(-50%,0) scale(.4); } 15% { opacity:1; } 55% { top:23%; } 90% { opacity:1; } 100% { left:var(--to); top:43%; opacity:0; transform:translate(-50%,0) scale(1.15); } }
-.pair-tea { position:absolute; left:50%; top:64%; transform:translateX(-50%); padding:5px 14px; border-radius:50%; background:#e5c5a0; box-shadow:0 5px 0 #a98469; font-size:30px; white-space:nowrap; }
+/* Temporary side-view table: keep its feet near the actors' baseline and preserve art proportions. */
+.pair-tea { position:absolute; left:50%; bottom:10%; width:38%; height:34%; transform:translateX(-50%); object-fit:contain; user-select:none; }
 .pair-talk { position:absolute; left:var(--from); top:22%; transform:translateX(-50%); background:#fff9ef; border:2px solid #cfb19a; border-radius:15px; padding:3px 12px; color:#9c7863; }
 .pair-shared-prop {position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:38px;padding:12px;background:#fff9efde;border:2px solid #dbc9a6;border-radius:25px;white-space:nowrap;}
 .pair-effects[data-effect='guest-talk'] .pair-talk { left:var(--to); }

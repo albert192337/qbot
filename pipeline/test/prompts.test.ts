@@ -303,3 +303,12 @@ describe('prompt 全文覆盖', () => {
     expect(Number(m![1])).toBeGreaterThanOrEqual(5);
   });
 });
+
+it('merged perch selects a character-appropriate stable pose with no drawn support',()=>{
+  for(const spec of [ACTIONS.perch,ABSTRACT_ACTIONS.perch,FAITHFUL_ACTIONS.perch]) {
+    expect(spec.poseDesc).toContain('人设');
+    expect(spec.poseDesc).toContain('承托线');
+    expect(spec.poseDesc).toContain('不画窗口');
+    expect(spec.motionDesc).toContain('不切换姿态');
+  }
+});
