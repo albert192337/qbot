@@ -26,6 +26,7 @@ export class PairInteraction {
   private earliestEnd = 0;
   private ending = false;
   private transitionVersion = 0;
+  private captionResize: ResizeObserver | null = null;
   constructor(private callbacks: PairCallbacks) {}
   isActive(): boolean { return this.root !== null; }
   start(host: CharacterMeta, guest: CharacterMeta, kind: PairKind, live=false, recipient=false, partner?:string, lines?:string[]): void {
@@ -38,6 +39,8 @@ export class PairInteraction {
     for (const who of ['host', 'guest'] as const) {
       captions[who].className = 'pair-caption'; captions[who].dataset.speaker = who;
       captions[who].setAttribute('role', 'status');
+      const text = document.createElement('div'); text.className = 'pair-caption-text';
+      captions[who].append(text);
     }
     const effects = document.createElement('div'); effects.className = 'pair-effects'; effects.setAttribute('aria-hidden', 'true');
     const toolbar = document.createElement('div'); toolbar.className = 'pair-toolbar';
@@ -53,8 +56,20 @@ export class PairInteraction {
     button('换边', () => { this.swapped = !this.swapped; this.applyFacing(); });
     button('结束', () => this.finish());
     this.root.append(captions.host, captions.guest, effects);if(!live)this.root.append(toolbar);document.body.append(this.root);
+    // Keep larger solo-style text inside the window, including at small pet sizes.
+    const positionCaptions = () => {
+      if (!this.root) return;
+      const height = this.root.clientHeight;
+      for (const caption of Object.values(captions)) {
+        if (!caption.hidden) caption.style.bottom = `${Math.min(height * .78, height - caption.offsetHeight - 4)}px`;
+      }
+    };
+    this.captionResize = new ResizeObserver(positionCaptions);
+    this.captionResize.observe(this.root);
+    Object.values(captions).forEach(caption => this.captionResize!.observe(caption));
     document.body.classList.add('pair-mode');
     const scene=this.root;
+    const relationshipSession = crypto.randomUUID();
     const ready=this.callbacks.start(guest,partner);
     const beats = pairBeats(kind).map((beat,i)=>({...beat,caption:lines?.[i]??beat.caption})).map(beat=>recipient?{...beat,host:beat.guest,guest:beat.host,speaker:beat.speaker==='host'?'guest' as const:'host' as const,effect:beat.effect==='host-talk'?'guest-talk' as const:beat.effect==='guest-talk'?'host-talk' as const:beat.effect}:beat);
     const advance = (index: number) => {
@@ -72,9 +87,10 @@ export class PairInteraction {
       this.applyFacing();
       for (const who of ['host', 'guest'] as const) {
         captions[who].hidden = (live && !lines?.length) || who !== beat.speaker;
-        captions[who].textContent = who === beat.speaker ? beat.caption : '';
+        captions[who].firstElementChild!.textContent = who === beat.speaker ? beat.caption : '';
         captions[who].title = who === 'host' ? host.manifest.name : guest.manifest.name;
       }
+      positionCaptions();
       effects.replaceChildren(); effects.dataset.effect = beat.effect;
       if(['flower','photo','celebrate'].includes(beat.effect)){const prop=document.createElement('span');prop.className='pair-shared-prop';prop.textContent=beat.effect==='flower'?'🌷':beat.effect==='photo'?'📷 ✨':'🎉 ✨ 🎊';effects.append(prop);}
       if (beat.effect === 'heart') {
@@ -92,6 +108,8 @@ export class PairInteraction {
         bubble.textContent = beat.effect === 'wave' ? '✦' : '•••'; effects.append(bubble);
       }
       this.callbacks.play(hostAction.id, guestAction.id);
+      if (index === 0 && !live) void window.qbot.relationships?.recordLocal(host.dirId,guest.dirId,kind,relationshipSession)
+        .catch(error => console.error('关系手账保存失败', error));
       // Actual ended events advance normal clips; this only recovers broken media.
       this.timer = setTimeout(() => advance(index + 1), Math.max(4500, hostAction.durationMs, guestAction.durationMs) + 15000);
     };
@@ -165,6 +183,7 @@ export class PairInteraction {
     void this.clearScene();
   }
   private clearScene(): void | Promise<void> {
+    this.captionResize?.disconnect(); this.captionResize = null;
     if (!this.root) return;
     this.root.remove(); this.root = null; this.current = null; this.advance = null; this.completed.clear();
     document.body.classList.remove('pair-mode', 'pair-swapped');

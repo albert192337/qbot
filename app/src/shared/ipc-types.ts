@@ -247,6 +247,7 @@ export type PerceptionInteractKind = 'click' | 'drag_start' | 'drag_end' | 'sign
 
 /** 原生右键菜单点选后回渲染端执行的命令 */
 export type PetMenuCommand =
+  | { type: 'workMode' }
   | { type:'networkPhoto'; guest:CharacterMeta }
   | { type:'networkPair'; partner?:string; kind:import('./pair-interaction').PairKind; recipient:boolean; guest:CharacterMeta; lines?:string[] }
   | { type: 'pair'; kind: import('./pair-interaction').PairKind; guestId: string }
@@ -523,7 +524,7 @@ export interface QBotApi {
      * 右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
      * 动作列表由渲染端传入，说话/播动作的执行经 onMenuCommand 回渲染端。
      */
-    popupMenu(actions: PetMenuActionEntry[]): void;
+    popupMenu(actions: PetMenuActionEntry[], working?: boolean): void;
     /** 控制台预览动作：让当前桌宠立即播放一次指定动作 */
     previewAction(action: string): void;
     onMenuCommand(cb: (cmd: PetMenuCommand) => void): () => void;
@@ -592,6 +593,7 @@ export interface QBotApi {
   };
   /** 公共房间（spec 2026-08-21）：联机唯一链路（原 1v1 已退役） */
   social: SocialApi;
+  relationships: import('./relationships').RelationshipsApi;
   rooms: {
     open(): void;
     getDisplayMode(): Promise<RoomsDisplayMode>;
@@ -683,6 +685,7 @@ export interface QBotApi {
     sendChat(text: string): Promise<{ ok: boolean; error?: string }>;
     onThinking(cb: (thinking: boolean) => void): () => void;
     say(text: string, durationMs: number): void;
+    getWorkIdleMs(): Promise<number>;
     getIdleSeconds(): Promise<number>;
     /** 气泡全部消散 → 主进程隐藏气泡窗 */
     reportEmpty(): void;

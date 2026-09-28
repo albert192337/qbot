@@ -14,6 +14,7 @@ import { choosePairAction } from '../../shared/pair-interaction';
 import { plotPetPosition } from './interaction';
 let strip: BrowserWindow | null = null, panel: BrowserWindow | null = null, pet: BrowserWindow | null = null;
 let expanded = false;
+export const isGardenStrip=(id:number)=>!!strip&&!strip.isDestroyed()&&strip.webContents.id===id;
 onDesktopVisibilityChanged(() => { if (desktopQuiet()) stopPerformance(); });
 let travelPanel: BrowserWindow | null = null;
 let stripSize = {width:1100,height:800};
@@ -51,6 +52,7 @@ function stopPerformance(restore = true): void {
 }
 async function perform(plot: number, kind: 'plant' | 'harvest' | 'cultivate', duration?:number, owner?:string,scene?:GardenVisit): Promise<boolean> {
     if (desktopQuiet()) return false;
+    if(cultivatingPlot!==null&&kind!=='cultivate')return true;
     stopPerformance();
     if(kind==='cultivate'&&!expanded)toggle();
     const version = performanceVersion;
@@ -59,7 +61,7 @@ async function perform(plot: number, kind: 'plant' | 'harvest' | 'cultivate', du
     const meta = settings.activeCharacter ? await getCharacter(settings.activeCharacter) : null;
     if (desktopQuiet() || version !== performanceVersion || !meta?.manifest || !expanded || !strip?.isVisible() || !pet?.isVisible()) return false;
     const actions: Record<string, {status?:string;durationSec?:number}> = {...meta.manifest.actions, ...meta.manifest.importedActions, ...meta.manifest.expressionActions, ...meta.manifest.customActions};
-    const research=[meta.manifest.agentActions?.thinking,...scenePool(meta.manifest,'focus'),...Object.keys(actions).filter(id=>/研究|观察|思考|看书|记录|research|inspect|think|study/i.test(JSON.stringify(resourceText(meta.manifest,id)))),'writing','idle','garden_sow'];
+    const research=[meta.manifest.agentActions?.thinking,...Object.keys(actions).filter(id=>/研究|观察|思考|种地|播种|浇水|research|inspect|think|study/i.test(JSON.stringify(resourceText(meta.manifest,id)))),'garden_sow',...scenePool(meta.manifest,'focus'),'writing','idle'];
     const action = (kind==='cultivate'?research:[kind === 'plant' ? 'garden_sow' : 'garden_harvest',kind==='plant'?'wave':'talk_happy','idle']).filter((id):id is string=>!!id).find(id => actions[id] && (!actions[id].status || actions[id].status === 'done'));
     if (!action) return false;
     const bounds = pet.getBounds(); home = {x:bounds.x,y:bounds.y};
@@ -218,16 +220,17 @@ export function registerGardenIpc(): void {
             void perform(command.plot, command.type).catch(() => stopPerformance());
         if(result.ok&&command.type==='feed'){
             const actor=result.state.activeActor;
-            if(actor)void getCharacter(actor).then(character=>{
-                if(!character||!pet||pet.isDestroyed())return;
+            if(actor)void Promise.all([getCharacter(actor),getGarden()]).then(([character,current])=>{
+                if(!character||!pet||pet.isDestroyed()||current.activeActor!==actor)return;
                 const action=choosePairAction(character.manifest,'happy');
                 if(action)pet.webContents.send('pet:menuCommand',{type:'play',action:action.id});
-                pet.webContents.send('garden:interaction',{kind:'feed',caption:result.reveal?.message??'吃到了，谢谢你！',effect:({strawberry:'🍓',tomato:'🍅',blueberry:'🫐',pineapple:'🍍',apple:'🍎'} as Record<string,string>)[result.state.life?.characters[actor]?.wishes.find(w=>w.id===command.wish)?.species??'']??'🍓'});
+                const growth=result.state.life?.characters[actor],gain=growth?.wishes.find(w=>w.id===command.wish)?.xp??0;
+                pet.webContents.send('garden:interaction',{kind:'feed',caption:result.reveal?.message??'吃到了，谢谢你！',effect:'',experience:growth&&gain>0?{actor,from:Math.max(0,growth.xp-gain),to:growth.xp}:undefined});
             }).catch(()=>{});
         }
         return result;
     });
-    ipcMain.on('pet:move', () => { if (home) stopPerformance(false); });
+    ipcMain.on('pet:move', () => { if (home&&cultivatingPlot===null) stopPerformance(false); });
     ipcMain.on('garden:cancelPerformance', (_ev, restore) => stopPerformance(restore !== false));
     ipcMain.on('garden:toggle', toggle);
     ipcMain.on('garden:collapse', ev => {

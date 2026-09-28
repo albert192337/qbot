@@ -32,7 +32,9 @@ app.whenReady().then(async()=>{try{
   if(!p.startsWith(base+path.sep))return new Response(null,{status:403});
   return new Response(await fs.readFile(p),{headers:{'Content-Type':p.endsWith('.webm')?'video/webm':'image/png'}});
  });
+ const relationshipRecords=[];
  const handlers={
+ 'relationships:recordLocal':(_event,hostId,guestId,kind,session)=>relationshipRecords.push({hostId,guestId,kind,session}),
  'overlays:get':()=>({revision:0,winner:null}),
  'social:contacts':()=>({available:false,invitations:[],people:[]}),
  'rooms:getStatus':()=>({phase:'offline'}),'garden:weather':()=>({now:Date.now(),current:null,next:null,today:[],forecast:[]}),
@@ -60,6 +62,18 @@ app.whenReady().then(async()=>{try{
  const end=async()=>{win.webContents.send('pet:menuCommand',{type:'pairEnd'});await until(()=>evaluate(`!document.querySelector('#pair-interaction')&&!document.body.classList.contains('pair-returning')&&!document.body.classList.contains('pair-arriving')`),'pair did not stop');};
  await win.loadFile(path.join(root,'app/out/renderer/pet/index.html'));
  await until(()=>evaluate(`document.querySelector('#stage video')?.currentTime>0`),'host playback');
+ if(process.env.QBOT_QA_RELATIONSHIPS_ONLY==='1'){
+  await start('tea');await until(()=>relationshipRecords.length===1,'first local award');
+  assert.deepEqual([relationshipRecords[0].hostId,relationshipRecords[0].guestId,relationshipRecords[0].kind],['host','guest','tea']);
+  await end();await start('tea');await until(()=>relationshipRecords.length===2,'second local award');
+  assert.notEqual(relationshipRecords[0].session,relationshipRecords[1].session);await end();
+  delayList=500;win.webContents.send('pet:menuCommand',{type:'pair',kind:'heart',guestId:'guest'});await wait(100);win.webContents.send('pet:menuCommand',{type:'pairEnd'});await wait(700);
+  assert.equal(relationshipRecords.length,2,'cancel before starting grants nothing');delayList=0;
+  win.webContents.send('pet:menuCommand',{type:'networkPair',partner:'friend',kind:'tea',recipient:false,guest});
+  await until(()=>evaluate(`document.querySelector('#pair-interaction')?.dataset.beat==='0'`),'network started');
+  assert.equal(relationshipRecords.length,2,'network director must not award a local interaction');await end();
+  console.log('PASS: local pair award, unique sessions, early cancellation, network/local separation');app.exit(0);return;
+ }
  await fs.mkdir(path.join(root,'output/garden-v3'),{recursive:true});
  win.webContents.send('pet:menuCommand',{type:'networkPhoto',guest:{...guest,hasUnfinishedJob:false}});await until(()=>evaluate(`document.querySelector('#pair-interaction')?.dataset.kind==='photo'`),'consented photo did not start');await until(()=>evaluate(`Array.from(document.querySelectorAll('#visitor-stage video')).some(v=>v.currentTime>0)`),'photo partner playback');assert.equal(await evaluate(`!!document.querySelector('.pair-toolbar')`),false);assert.ok(await evaluate(`parseFloat(getComputedStyle(document.querySelector('.pair-effects'),'::after').borderTopWidth)>8`),'photo frame visible at Windows scaling');await wait(250);await fs.writeFile(path.join(root,'output/garden-v3/photo-pair.png'),(await win.webContents.capturePage()).toPNG());await end();
  // Network entry uses the production two-player director for every kind and role.

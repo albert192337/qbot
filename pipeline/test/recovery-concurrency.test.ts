@@ -6,10 +6,11 @@ import { Job } from '../src/job';
 import { ACTION_IDS } from '../src/types';
 import type { ArkClient } from '../src/ark';
 import { runActions, runPackage } from '../src/stages';
+import { toWebm } from '../src/chroma';
 vi.mock('../src/chroma.js', () => ({
   computeAlphaStats: async()=>null, normalizeFilter:()=>'', probeSize:async()=>({width:640,height:640}),
   resolveFfmpegPath:async()=>'/mock',sampleBackgroundColors:async()=>[],sampleKeyColor:async()=>'00ff00',
-  toGif:async()=>{},toWebm:async()=>{},ALPHA_ERODE_PX:0,RIM_DESPILL_MIX:1,
+  toGif:async()=>{},toWebm:vi.fn(async()=>{}),ALPHA_ERODE_PX:0,RIM_DESPILL_MIX:1,
 }));
 vi.mock('../src/qc.js',()=>({checkGreenFrame:async()=>({pass:true}),checkVideoDrift:async()=>({fail:false}),selectDualKeys:()=>['00ff00']}));
 vi.mock('../src/reference-color.js',()=>({referenceColorFilter:async()=>undefined}));
@@ -23,9 +24,26 @@ async function setup(){
  return job;
 }
 describe('generation retry and concurrency',()=>{
+ it('transparency QC failure keeps the paid video and retries only keying',async()=>{
+  const job=await setup();
+  await writeFile(job.jobPath('perch.mp4'),'saved video');
+  job.state.actions.perch.videoPath='perch.mp4';
+  const ark={generateImage:vi.fn(),submitVideoTask:vi.fn(),getVideoTask:vi.fn(),downloadVideo:vi.fn()} as unknown as ArkClient;
+  vi.mocked(toWebm).mockRejectedValueOnce(new Error('Transparency QC: green background remains; rekey the saved video'));
+  await runActions(job,ark,'/mock',async()=>{},1,['perch']);
+  expect(job.state.actions.perch.status).toBe('failed');
+  expect(job.state.actions.perch.error).toContain('Transparency QC');
+  expect(job.state.actions.perch.videoPath).toBe('perch.mp4');
+  expect(job.state.actions.perch.videoTaskId).toBe('paid-perch');
+  await runActions(job,ark,'/mock',async()=>{},1,['perch']);
+  expect(job.state.actions.perch.status).toBe('done');
+  expect(ark.submitVideoTask).not.toHaveBeenCalled();expect(ark.getVideoTask).not.toHaveBeenCalled();
+  expect(ark.generateImage).not.toHaveBeenCalled();expect(ark.downloadVideo).not.toHaveBeenCalled();
+ });
  it('caps in-flight actions and resumes paid video IDs after a temporary failure',async()=>{
   const job=await setup();let active=0;let peak=0;
-  const ark={generateImage:vi.fn(),submitVideoTask:vi.fn(),getVideoTask:vi.fn(async()=>{active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,5));active--;return {status:'succeeded',videoUrl:'https://example.test/video'};}),downloadVideo:async(_u:string,d:string)=>{await writeFile(d,'mp4');}} as unknown as ArkClient;
+  let release!:()=>void;const firstPair=new Promise<void>(resolve=>{release=resolve;});
+  const ark={generateImage:vi.fn(),submitVideoTask:vi.fn(),getVideoTask:vi.fn(async()=>{active++;peak=Math.max(peak,active);if(active===2)release();await firstPair;await new Promise(r=>setTimeout(r,5));active--;return {status:'succeeded',videoUrl:'https://example.test/video'};}),downloadVideo:async(_u:string,d:string)=>{await writeFile(d,'mp4');}} as unknown as ArkClient;
   await runActions(job,ark,'/mock',async()=>{},2);
   expect(peak).toBe(2);expect(ark.generateImage).not.toHaveBeenCalled();expect(ark.submitVideoTask).not.toHaveBeenCalled();
   expect(job.state.baseActionIds!.every(id=>job.state.actions[id].status==='done')).toBe(true);

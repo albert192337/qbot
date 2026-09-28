@@ -1,0 +1,825 @@
+{
+  "pid": 39572,
+  "passed": true,
+  "initial": {
+    "mode": "idle",
+    "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+  },
+  "samples": [
+    {
+      "idle": 157,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 157,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 158,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 158,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 158,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 158,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 158,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 159,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 159,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 159,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 159,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 160,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 160,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 160,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 160,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 160,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 161,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 161,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 161,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 161,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 161,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 162,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 162,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 162,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 162,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 163,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 163,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 163,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 163,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 163,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 164,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 164,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 164,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 164,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 164,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 165,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 165,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 165,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 165,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 165,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 166,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 166,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 166,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 166,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 167,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 167,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 167,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 167,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 167,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 168,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 168,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 168,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 168,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 168,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 169,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 169,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 169,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 169,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 170,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 170,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 170,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 170,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 170,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 171,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 171,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 171,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 171,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 171,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 172,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 172,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 172,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 172,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 173,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 173,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 173,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 173,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 173,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 174,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 174,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 174,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 174,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 174,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 175,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 175,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 175,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 175,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 176,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 176,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 176,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 176,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 176,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 177,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 177,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 177,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 177,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 177,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 178,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 178,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 178,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 178,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 179,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 179,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 179,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 179,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 179,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 180,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 180,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 180,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 180,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 180,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 181,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 181,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 181,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 181,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 182,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 182,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 182,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 182,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 182,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 183,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 183,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 183,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 183,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 183,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 184,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 184,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 184,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 184,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 185,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 185,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 185,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 185,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 185,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 186,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 186,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 186,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 186,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 186,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 187,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 187,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 187,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 187,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 188,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 188,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 188,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 188,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 188,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 189,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 189,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 189,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 189,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 189,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 0,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 0,
+      "mode": "typing",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_typing.webm?v=1790492944315"
+    },
+    {
+      "idle": 0,
+      "mode": "typing",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_typing.webm?v=1790492944315"
+    },
+    {
+      "idle": 0,
+      "mode": "typing",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_typing.webm?v=1790492944315"
+    },
+    {
+      "idle": 0,
+      "mode": "typing",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_typing.webm?v=1790492944315"
+    },
+    {
+      "idle": 1,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 1,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 1,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 1,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 1,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    },
+    {
+      "idle": 2,
+      "mode": "idle",
+      "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_idle.webm?v=1790492944315"
+    }
+  ]
+}

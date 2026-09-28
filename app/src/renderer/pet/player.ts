@@ -10,11 +10,14 @@ import type { Manifest, ManifestAction, PlayableId } from '@qbot/pipeline';
 const LOOPING: ReadonlySet<string> = new Set(['idle', 'drag', 'perch', 'perch_sit', 'perch_lie']);
 
 export class Player {
+  private workVideo: HTMLVideoElement | null = null;
+  private workTyping = false;
   private spine: SpinePlayer | null = null;
   private suspended = false;
   /** Keep assets, but cancel decoder retries and one-shot completions while concealed. */
   setSuspended(value: boolean): void {
     this.suspended=value;
+    if(value)this.endWork();
     this.spine?.setSuspended(value);
     if(!value)return;
     this.generation++;
@@ -41,6 +44,7 @@ export class Player {
 
   /** Stop detached visitors / release decoders before replacing a character. */
   dispose(): void {
+    this.endWork();
     this.spine?.dispose();this.spine=null;
     this.generation++;
     this.cancelAttempt?.();
@@ -156,8 +160,41 @@ export class Player {
     this.playImpl(action, false, true, false);
   }
 
-  private playImpl(action: PlayableId, forceLoop: boolean, forceOnce = false, usePool = true): void {
+  /** One decoder and one timeline: stop on the actual hand pose, resume without seeking. */
+  playWork(typing: boolean): void {
+    if (this.suspended) return;
+    this.workTyping = typing;
+    if (this.workVideo) {
+      const video = this.workVideo;
+      if (this.current !== 'computer_typing') return;
+      video.classList.remove('work-breathing');
+      if (!typing) {
+        video.pause();
+        video.classList.add('work-breathing');
+      } else {
+        void video.play().catch((error: unknown) => {
+          // A quick stop may cancel the pending play promise; that is intentional.
+          if (this.workVideo === video && this.workTyping && (error as { name?: string })?.name !== 'AbortError') {
+            this.endWork(); this.play('idle');
+          }
+        });
+      }
+      return;
+    }
+    this.playImpl('computer_typing', true, false, false, typing);
+    // playImpl reveals the prepared frame asynchronously and applies the latest input state.
+    this.workVideo = this.videos.get('computer_typing') ?? null;
+    this.workTyping = typing;
+  }
+
+  private endWork(): void {
+    this.workVideo?.classList.remove('work-breathing');
+    this.workVideo = null;
+  }
+
+  private playImpl(action: PlayableId, forceLoop: boolean, forceOnce = false, usePool = true, workTyping?: boolean): void {
     if(this.suspended)return;
+    this.endWork();
     if(this.spine){this.spine.play(action,!forceOnce&&(forceLoop||LOOPING.has(action)));return;}
     if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
     this.recoveryTimer = null;
@@ -187,12 +224,14 @@ export class Player {
       return;
     }
     const next = this.videos.get(id)!;
+    if (workTyping !== undefined) { this.workVideo = next; this.workTyping = workTyping; }
     const active = () => generation === this.generation;
     let retries = 0;
     let lastTime = -1;
     let watchdog: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
     let completed = false;
+    let pendingFrame: (() => void) | null = null;
     const clearWatchdog = () => {
       if (watchdog !== null) clearTimeout(watchdog);
       watchdog = null;
@@ -201,6 +240,7 @@ export class Player {
       clearWatchdog();
       watchdog = setTimeout(() => {
         if (!next.isConnected) { this.dispose(); return; }
+        if (this.workVideo === next && !this.workTyping) { armWatchdog(); return; }
         fail('no playback progress for 12s');
       }, 12_000);
     };
@@ -223,12 +263,18 @@ export class Player {
     const reveal = () => {
       if (!active()) return;
       this.recoveryAttempts = 0;
-      if (this.current && this.current !== id) this.triggerPoof();
+      const workPair = new Set(['computer_idle', 'computer_typing']);
+      if (this.current && this.current !== id && !(workPair.has(this.current) && workPair.has(id))) this.triggerPoof();
       for (const video of this.videos.values()) {
         video.style.visibility = video === next ? 'visible' : 'hidden';
         if (video !== next) video.pause();
       }
       this.current = id;
+      if (this.workVideo === next && !this.workTyping) {
+        next.pause();
+        next.classList.add('work-breathing');
+        clearWatchdog();
+      }
       if (this.fallback) this.fallback.style.visibility = 'hidden';
     };
     const onProgress = () => {
@@ -266,6 +312,20 @@ export class Player {
         next.loop = !forceOnce && (forceLoop || LOOPING.has(action));
         if (reload || next.error) next.load();
         if (next.readyState > 0) next.currentTime = 0;
+        if (this.workVideo === next && !this.workTyping) {
+          // Decode a still frame without ever starting playback on mode entry.
+          if (next.readyState >= 2) reveal();
+          else {
+            pendingFrame = () => { pendingFrame = null; if (active() && token === attempt) {
+              reveal();
+              if (this.workTyping) this.playWork(true);
+            } };
+            next.addEventListener('loadeddata', pendingFrame, { once: true });
+            next.preload = 'auto';
+            next.load();
+          }
+          return;
+        }
         void next.play().then(() => {
           if (!active() || token !== attempt) return;
           reveal();

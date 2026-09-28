@@ -23,7 +23,7 @@ async function refresh(force = false): Promise<void> {
     <label for="profile-persona">角色人设</label><textarea id="profile-persona" rows="5" placeholder="例如：温柔、慢热，喜欢喝茶和陪伴。">${esc(ctx.m.persona ?? '')}</textarea>
     <p class="studio-hint">角色昵称和人设会随装扮市场发布及联机角色包分享，用于角色之间的对话。人设也影响之后生成动作的表情、姿态和幅度。保存不会自动重新生成已有动画；要调整旧动作，请在动作库选择重新生成。</p>
     <div class="btn-row"><button class="btn primary" type="submit">保存资料</button><span class="studio-hint" id="profile-feedback" role="status"></span></div></form></div>
-    <div class="workspace-next"><div><h3>接下来，为它增加表达</h3><p>预览已有动作，添加新动作，或设置开会和工作时的表现。</p></div><div class="btn-row"><button class="btn" data-go="persona">管理动作</button><button class="btn ghost" data-go="scene-actions">设置场景联动</button></div></div>
+    <div class="workspace-next"><div><h3>接下来，为它增加表达</h3><p>预览已有动作，添加新动作，或看看它与朋友的关系。</p></div><div class="btn-row"><button class="btn" data-go="relationships">关系手账</button><button class="btn" data-go="persona">管理动作</button><button class="btn ghost" data-go="scene-actions">设置场景联动</button></div></div>
   </div>`;
   host.querySelector<HTMLButtonElement>('[data-cover]')!.onclick=()=>void guard(host,host.querySelector('[data-cover]')!,'保存中…',async()=>{
     const selection=await pickCharacterImage(host,ctx.dirId,'cover');if(!selection)return;

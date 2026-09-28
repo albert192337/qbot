@@ -1,5 +1,6 @@
 import './style.css';
 import { Player } from '../pet/player';
+import { RoomMotion } from './motion';
 import { NetworkDriver } from '../pet/network-driver';
 import type { LinkPeerCharacter, LinkPeerState, RoomSizePreset } from '../../shared/ipc-types';
 const $=<T extends HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -9,6 +10,7 @@ type Bounds={x:number;y:number;w:number;h:number};
 type Actor={member:Member;source:HTMLDivElement;player:Player;driver:NetworkDriver;key:string;bounds:Bounds|null;media:CanvasImageSource|null;sampled:number};
 const actors=new Map<string,Actor>(),sample=document.createElement('canvas');sample.width=128;sample.height=128;
 const sc=sample.getContext('2d',{willReadFrequently:true})!;
+const motion=new RoomMotion(),reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 const themes={halloween:new URL('../roomlab/art/halloween-reference.png',import.meta.url).href,space:new URL('./art/space-v2.png',import.meta.url).href,observatory:new URL('./art/observatory-v2.png',import.meta.url).href,greenhouse:new URL('./art/greenhouse-v2.png',import.meta.url).href};
 let background=new Image(),theme:keyof typeof themes='halloween',imageVersion=0,frame=0,last=0,hiddenMembers:string[]=[],hidden=false,disposed=false;
 let mine:Member|null=null,peers:Member[]=[],refreshing=false,refreshAgain=false;
@@ -30,17 +32,20 @@ async function refresh(){if(refreshing){refreshAgain=true;return;}refreshing=tru
 async function loadMine(){const meta=await window.qbot.characters.getActive();mine=meta?{id:'self',nickname:meta.manifest.name||'我',character:{dirId:meta.dirId,manifest:meta.manifest},mode:'idle'}:null;reconcile();}
 function readBounds(media:HTMLVideoElement|HTMLImageElement|HTMLCanvasElement):Bounds|null{sc.clearRect(0,0,128,128);sc.drawImage(media,0,0,128,128);const data=sc.getImageData(0,0,128,128).data;let l=128,t=128,r=-1,b=-1;for(let y=0;y<128;y++)for(let x=0;x<128;x++)if(data[(y*128+x)*4+3]>35){l=Math.min(l,x);r=Math.max(r,x);t=Math.min(t,y);b=Math.max(b,y);}return r<0?null:{x:Math.max(0,l-1)/128,y:Math.max(0,t-1)/128,w:(Math.min(127,r+1)-Math.max(0,l-1)+1)/128,h:(Math.min(127,b+1)-Math.max(0,t-1)+1)/128};}
 function paint(now:number){
+ motion.step(now,window.screenX,window.screenY,window.innerWidth,reducedMotion.matches);
  if(background.complete&&background.naturalWidth){if(theme==='halloween')ctx.drawImage(background,0,65,1000,295,0,0,1000,295);else{const h=background.naturalWidth*.295;ctx.drawImage(background,0,(background.naturalHeight-h)/2,background.naturalWidth,h,0,0,1000,295);}}
  const list=[...actors.values()],gap=880/Math.max(1,list.length),height=Math.min(155,gap*1.25);
  list.forEach((a,i)=>{const x=60+gap*(i+.5),y=280;const media=a.source.querySelector<HTMLCanvasElement>('canvas.spine-player[data-ready=true]')||[...a.source.querySelectorAll('video')].find(v=>v.style.visibility==='visible'&&v.readyState>=2)||[...a.source.querySelectorAll('img')].find(v=>v.complete&&v.naturalWidth&&v.style.visibility!=='hidden');
   if(!media){ctx.fillStyle='#dfd5c2';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText(a.member.nickname+' · 等待形象',x,y,Math.max(40,gap-5));return;}
   if(a.media!==media){a.media=media;a.bounds=null;}if(!a.bounds||now-a.sampled>500){try{const b=readBounds(media);if(b){if(!a.bounds)a.bounds=b;else{const old=a.bounds,l=Math.min(old.x,b.x),t=Math.min(old.y,b.y);a.bounds={x:l,y:t,w:Math.max(old.x+old.w,b.x+b.w)-l,h:Math.max(old.y+old.h,b.y+b.h)-t};}}}catch{a.bounds={x:0,y:0,w:1,h:1};}a.sampled=now;}
   const b=a.bounds;if(!b)return;const iw=media instanceof HTMLVideoElement?media.videoWidth:media instanceof HTMLCanvasElement?media.width:media.naturalWidth,ih=media instanceof HTMLVideoElement?media.videoHeight:media instanceof HTMLCanvasElement?media.height:media.naturalHeight;
-  const h=Math.min(height,(gap-10)*b.h*ih/(b.w*iw)),w=h*b.w*iw/(b.h*ih);ctx.save();ctx.translate(x,y-2);ctx.scale(Math.min(w*.36,28),3);const g=ctx.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,'#0009');g.addColorStop(1,'#0000');ctx.fillStyle=g;ctx.fillRect(-1,-1,2,2);ctx.restore();ctx.drawImage(media,b.x*iw,b.y*ih,b.w*iw,b.h*ih,x-w/2,y-h,w,h);
+  const h=Math.min(height,(gap-10)*b.h*ih/(b.w*iw)),w=h*b.w*iw/(b.h*ih),pose=motion.pose(now,i);
+  ctx.save();ctx.translate(x,y-2);ctx.scale(Math.min(w*.36,28)*pose.shadow,3);ctx.globalAlpha=pose.shadow;const g=ctx.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,'#0009');g.addColorStop(1,'#0000');ctx.fillStyle=g;ctx.fillRect(-1,-1,2,2);ctx.restore();
+  ctx.save();ctx.translate(x+pose.x*Math.min(1,gap/160),y-h/2+pose.y);ctx.rotate(pose.angle);ctx.drawImage(media,b.x*iw,b.y*ih,b.w*iw,b.h*ih,-w/2,-h/2,w,h);ctx.restore();
  });
 }
 function tick(now:number){if(disposed)return;if(!hidden&&!document.hidden&&now-last>1000/24){paint(now);last=now;}frame=requestAnimationFrame(tick);}
-function visibility(){for(const a of actors.values()){a.player.setSuspended(hidden||document.hidden);if(!hidden&&!document.hidden&&a.member.character)a.driver.dragEnd();}}
+function visibility(){motion.reset();for(const a of actors.values()){a.player.setSuspended(hidden||document.hidden);if(!hidden&&!document.hidden&&a.member.character)a.driver.dragEnd();}}
 const cleanups=[window.qbot.rooms.onSceneChanged(()=>void refresh()),window.qbot.characters.onActivated(()=>void loadMine()),window.qbot.desktop.onChanged(s=>{hidden=s.hidden;hiddenMembers=s.hiddenMembers;reconcile();visibility();})];
 cleanups.push(window.qbot.agent.onStatus(status=>{if(mine){mine.mode=status.activity;reconcile();}}));
 document.addEventListener('visibilitychange',visibility);

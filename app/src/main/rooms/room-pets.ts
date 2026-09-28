@@ -18,6 +18,7 @@ import { mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promi
 import path from 'node:path';
 import { ChunkAssembler, chunkToBase64, packCharacterDir, unpackCharacter } from '../asset-pack';
 import { charactersDir } from '../characters';
+import { relationships, peerPerson } from '../relationships';
 import { getSettings } from '../config';
 import type { LinkPeerCharacter, RoomMember, RoomSnapshot } from '../../shared/ipc-types';
 import { PACK_HASH_RE, selectPruneTargets } from './rooms-rules';
@@ -41,6 +42,7 @@ type OutFrame = { t: string } & Record<string, unknown>;
 /** rooms.ts 注入的出帧口（room-pets 不持连接，避免与 rooms.ts 循环依赖） */
 let contactRealm = '';
 export function setContactRealm(realm: string): void { contactRealm = realm; }
+export function getContactRealm(): string { return contactRealm; }
 let sendFrame: ((frame: OutFrame) => void) | null = null;
 
 export function setRoomsSend(fn: (frame: OutFrame) => void): void {
@@ -205,6 +207,8 @@ function emitCharacter(hash: string, character: LinkPeerCharacter): void {
   for (const [memberId, m] of memberStates) {
     if (m.hash === hash && !m.character) {
       m.character = character;
+      void relationships.remember([peerPerson(character,memberId,contactRealm,m.nickname)])
+        .catch(error => console.error('[relationships] remember failed',error));
       void writeFile(path.join(peerCacheDir(hash), '.social-origin.json'), JSON.stringify({memberId, nickname:m.nickname, realm:contactRealm}), 'utf8').catch(() => {});
       emit({ kind: 'character', memberId, nickname: m.nickname, character });
     }

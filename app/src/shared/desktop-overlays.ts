@@ -1,5 +1,5 @@
 /** One occupant per desktop head area. Keep docs/desktop-ui-priority.md in sync. */
-export const HEAD_PRIORITY={interaction:60,wish:50,speech:30,quest:10} as const;
+export const HEAD_PRIORITY={interaction:60,cultivation:55,wish:50,speech:30,quest:10} as const;
 export type HeadOverlay=keyof typeof HEAD_PRIORITY;
 export type HeadSnapshot={revision:number;winner:HeadOverlay|null};
 export const headWinner=(active:readonly HeadOverlay[]):HeadOverlay|null=>

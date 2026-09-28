@@ -1,0 +1,7 @@
+{
+  "stopLatencyMs": 62,
+  "beforeStop": 1.343228,
+  "frozen": 1.361265,
+  "resumed": 1.391722,
+  "pausedFrameStable": true
+}

@@ -913,13 +913,11 @@ body.strip[data-head-overlay=interaction] .quest-pill,body.strip[data-head-overl
 
 .result-action-area{display:flex;flex-direction:column;gap:5px;width:100%}.result-actions{display:flex;gap:8px;width:100%}.result-actions>button{flex:1;min-width:0;padding:7px 10px}.result-action-area>small{line-height:1.5}
 
-.strip .garden-controls.cultivation-hint {width:224px;box-sizing:border-box;display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:9px 12px;border-radius:15px;flex-wrap:nowrap;}
-.cultivation-hint-title {font-size:12px;line-height:18px;white-space:nowrap;}
-.strip .cultivation-hint .cultivation-pause {font-size:11px;line-height:18px;padding:0;border:0;background:transparent;box-shadow:none;color:#82745a;min-width:0;}
-.strip .cultivation-hint .cultivation-pause:hover {color:#453a2b;text-decoration:underline;}
-.cultivation-hint-progress {grid-column:1 / -1;appearance:none;width:100%;height:5px;margin:0;border:0;border-radius:4px;overflow:hidden;background:#e5dfcd;}
-.cultivation-hint-progress::-webkit-progress-bar {background:#e5dfcd;border-radius:4px;}
-.cultivation-hint-progress::-webkit-progress-value {background:#86aa72;border-radius:4px;transition:width .8s linear;}
+.strip .cultivation-hint {position:absolute;width:180px;height:18px;pointer-events:none;}
+.strip:has(.cultivation-hint) .quest-pill {display:none;pointer-events:none;}
+.cultivation-hint-progress {display:block;box-sizing:border-box;appearance:none;width:100%;height:100%;margin:0;border:3px solid #c7c3d2;border-radius:12px;overflow:hidden;background:#96919f;pointer-events:none;}
+.cultivation-hint-progress::-webkit-progress-bar {background:#96919f;border-radius:9px;}
+.cultivation-hint-progress::-webkit-progress-value {background:#ffeb70;border-radius:9px;transition:width .8s linear;}
 @media(prefers-reduced-motion:reduce){.cultivation-hint-progress::-webkit-progress-value{transition:none}}
 
 .strip .strip-drag,.strip .strip-collapse { pointer-events:auto;border:0;background:transparent;padding:3px 6px;min-width:24px; }

@@ -22,6 +22,14 @@
         height: 100%;
         cursor: grab;
       }
+      #stage video.work-breathing {
+        transform-origin: 50% 86%;
+        animation: work-breathe 2.8s ease-in-out infinite;
+      }
+      @keyframes work-breathe {
+        0%, 100% { scale: 1 1; }
+        50% { scale: 1 1.004; }
+      }
       #stage:active {
         cursor: grabbing;
       }

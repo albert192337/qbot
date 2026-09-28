@@ -1,11 +1,16 @@
 const mode=process.argv[2]??'inspect';
 const expressions={
+ relaunch:'(()=>{e.app.relaunch();setTimeout(()=>e.app.quit(),150);return "Save and relaunch requested"})()',
+ reloadGarden:'(()=>{const ws=e.BrowserWindow.getAllWindows().filter(w=>w.webContents.getURL().includes("/garden/index.html"));for(const w of ws)w.webContents.reload();return JSON.stringify({pid:process.pid,reloaded:ws.map(w=>w.id)})})()',
+ verifyBar:'(async()=>{const ws=e.BrowserWindow.getAllWindows().filter(w=>w.webContents.getURL().includes("/garden/index.html"));const result=[];for(const w of ws)result.push({id:w.id,state:await w.webContents.executeJavaScript("({ready:document.readyState,barStyle:[...document.styleSheets].flatMap(s=>[...s.cssRules]).some(r=>r.selectorText===\".strip .cultivation-hint\"&&r.style.width===\"200px\"&&r.style.height===\"18px\"),scripts:[...document.scripts].map(s=>s.src)})")});return JSON.stringify(result)})()',
+ closeInspector:'(()=>{setTimeout(()=>process.getBuiltinModule("inspector").close(),500);return "Temporary inspector closing"})()',
  inspect:'JSON.stringify({pid:process.pid,path:e.app.getAppPath(),windows:e.BrowserWindow.getAllWindows().map(w=>({id:w.id,url:w.webContents.getURL()}))})',
  quit:'(()=>{setTimeout(()=>e.app.quit(),150);return "Normal quit requested"})()',
  open:'(()=>{e.ipcMain.emit("garden:open",{},"friends");return "Friends garden opened"})()',
  verify:'(async()=>{const w=e.BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes("/garden/index.html")&&!w.webContents.getURL().includes("view=strip"));if(!w)throw Error("Garden window missing");return JSON.stringify(await w.webContents.executeJavaScript('+JSON.stringify('(async()=>{const s=await window.qbot.garden.get();return {online:s.online,newBreedingApi:Array.isArray(s.friendBreeding),page:document.body.textContent.includes("朋友的花园与小店"),friendCards:[...document.querySelectorAll("button")].filter(b=>b.textContent.includes("看土地")).length}})()')+'))})()'
 };
 const gardenJs={
+ verifyBar:'(()=>({ready:document.readyState,barStyle:[...document.styleSheets].flatMap(s=>[...s.cssRules]).some(r=>r.selectorText===".strip .cultivation-hint"&&r.style.width==="200px"&&r.style.height==="18px"),scripts:[...document.scripts].map(s=>s.src)}))()',
  visitFirst:'(()=>{const b=[...document.querySelectorAll("button")].find(b=>b.textContent.includes("看土地"));if(!b)throw Error("No friend card");b.click();return "Opened first friend"})()',
  refreshTest:'(()=>{const b=document.querySelector(".garden-test-refresh");if(!b)throw Error("Test refresh button missing");b.click();return "Clicked test refresh"})()',
  testState:'(()=>{const text=document.body.textContent;return {testButton:!!document.querySelector(".garden-test-refresh"),refreshed:text.includes("测试作物已刷新"),breed:[...document.querySelectorAll("button")].filter(b=>b.textContent==="申请繁育").length,cultivate:[...document.querySelectorAll("button")].filter(b=>b.textContent==="帮忙培育").length}})()',

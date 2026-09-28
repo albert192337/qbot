@@ -5,6 +5,7 @@ import { getEditingCharacter, getSelectedCharacterId, selectCharacter, taskChara
 import { icon, type ConsoleIcon } from './icons';
 
 export type PaneId =
+  | 'relationships'
   | 'sticker-create' | 'lounge' | 'rewards' | 'furnish' | 'memory'
   | 'profile'
   | 'tasks'
@@ -51,6 +52,7 @@ const GROUPS: { label: string; defs: Omit<PaneDef, 'group'>[] }[] = [
     label: '角色',
     defs: [
       { id: 'characters', label: '角色库', icon: 'characters', load: () => import('./panes/characters') },
+      { id: 'relationships', label: '关系手账', icon: 'characters', load: () => import('./panes/relationships') },
       { id: 'sticker-create', label: '导入表情包', icon: 'stickers', load: () => import('./panes/sticker-create') },
       { id: 'hatch', label: '创建角色', icon: 'create', load: () => import('./panes/hatch') },
       { id: 'profile', label: '角色资料', icon: 'persona', load: () => import('./panes/profile'), hiddenFromSidebar: true, navParent: 'characters' },

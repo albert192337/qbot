@@ -19,3 +19,4 @@ body.pair-mode #food-wish,body.garden-performing #food-wish {display:none;}
 body[data-head-overlay=wish] #bubble,body[data-head-overlay=interaction] #bubble{visibility:hidden;pointer-events:none;}
 
 body.pair-mode #network-interaction[data-kind=photo]{display:none}
+body[data-head-overlay=cultivation] #food-wish,body[data-head-overlay=cultivation] #bubble{visibility:hidden;pointer-events:none}

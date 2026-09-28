@@ -1,4 +1,16 @@
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font:14px/1.5 'Microsoft YaHei',sans-serif;user-select:none}
+#hint.has-experience{width:100%;max-width:none;height:76px;max-height:none;background:transparent;border:0;box-shadow:none;padding:0;pointer-events:none}
+.has-experience>#open,.has-experience>#dismiss,.has-experience>#invitation-actions{display:none!important}
+#experience{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:0 4px 2px;box-sizing:border-box}
+.experience-levelup{text-align:center;font:bold 24px/30px 'Arial',sans-serif;color:#fff4ba;-webkit-text-stroke:1px #eea052;text-shadow:0 2px 0 #eea052;letter-spacing:.4px;margin-bottom:2px}
+.experience-row{height:38px;display:flex;align-items:center;position:relative}
+.experience-level{position:relative;z-index:1;flex:none;width:42px;height:42px;display:grid;place-items:center;font:bold 19px/1 'Arial',sans-serif;color:#705b48;background:#ed9950;clip-path:polygon(50% 0,65% 25%,96% 22%,86% 53%,100% 78%,68% 82%,50% 100%,34% 81%,3% 78%,15% 50%,5% 22%,35% 25%)}
+.experience-level:before{content:'';position:absolute;inset:3px;z-index:-1;background:#ffeb70;clip-path:polygon(50% 0,65% 25%,96% 22%,86% 53%,100% 78%,68% 82%,50% 100%,34% 81%,3% 78%,15% 50%,5% 22%,35% 25%)}
+.experience-track{position:relative;height:24px;flex:1;margin-left:-9px;border:3px solid #c7c3d2;border-radius:18px;background:#96919f;overflow:hidden}
+.experience-fill{height:100%;background:#ffeb70;border-radius:14px}
+.experience-gain{position:absolute;inset:0;display:grid;place-items:center;font-size:13px;font-weight:700;color:#584936;text-shadow:0 1px 1px #fff9d9}
+@media(max-width:180px){.experience-levelup{font-size:18px;letter-spacing:0}.experience-level{width:32px;height:34px;font-size:16px}.experience-gain{font-size:11px}.experience-track{min-width:0;height:21px}#experience{padding-left:1px;padding-right:1px}}
+@media(max-width:110px){.experience-levelup{font-size:13px}.experience-level{width:26px;height:30px;font-size:13px}.experience-gain{font-size:10px}}
 #invitation-actions{display:flex;gap:12px;justify-content:center;margin-top:5px}#invitation-actions button{cursor:pointer;border-radius:8px;padding:3px 8px;background:#e5efdf;font-size:12px}.invitation #text{-webkit-line-clamp:2}.invitation #icon{font-size:20px}
 body{display:flex;align-items:center;justify-content:center}
 #hint{position:relative;max-width:228px;max-height:100px;background:#fff9ef;border:2px solid #594235;border-radius:16px 13px 15px 12px;box-shadow:0 2px 0 #3f2a1e33;box-sizing:border-box;padding:7px 12px;color:#594235}

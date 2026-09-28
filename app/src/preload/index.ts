@@ -4,6 +4,11 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
+  relationships: {
+    get: () => ipcRenderer.invoke('relationships:get'),
+    save: (from,to,settings) => ipcRenderer.invoke('relationships:save',from,to,settings),
+    recordLocal: (host,guest,kind,session) => ipcRenderer.invoke('relationships:recordLocal',host,guest,kind,session),
+  },
   desktop: {
     openMenu: () => ipcRenderer.send('desktop:menu'),
     get: () => ipcRenderer.invoke('desktop:get'),
@@ -116,7 +121,7 @@ const api: QBotApi = {
     // 高频拖拽走 send（不等待回包）
     move: (x, y) => ipcRenderer.send('pet:move', x, y),
     setVisitMode: (enter,partner) => ipcRenderer.invoke('pet:setVisitMode', enter,partner),
-    popupMenu: (actions) => ipcRenderer.send('pet:popupMenu', actions),
+    popupMenu: (actions, working) => ipcRenderer.send('pet:popupMenu', actions, working),
     previewAction: (action) => ipcRenderer.send('pet:previewAction', action),
     onMenuCommand: (cb) => {
       const listener = (_ev: unknown, cmd: PetMenuCommand) => cb(cmd);
@@ -385,6 +390,7 @@ const api: QBotApi = {
       return () => ipcRenderer.removeListener('bubble:thinking', listener);
     },
     say: (text, durationMs) => ipcRenderer.send('bubble:say', { text, durationMs }),
+    getWorkIdleMs: () => ipcRenderer.invoke('pet:workIdleMs'),
     getIdleSeconds: () => ipcRenderer.invoke('bubble:idleSeconds'),
     reportEmpty: () => ipcRenderer.send('bubble:empty'),
     onClear: (cb) => {

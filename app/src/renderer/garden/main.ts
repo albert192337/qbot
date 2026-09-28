@@ -21,6 +21,8 @@ import { supportsGarden3D } from '../../shared/garden-render';
 import { SPECIES, TRAITS, FERTILIZERS, TIER_NAMES, LEVEL_XP, CULTIVATION_MS, fruitQuality, traitSlot, SLOT_NAMES, canBreed, needsReveal, cultivationRemaining, mutationMultiplier, gardenQuest, tier, level, growth, growthLabel, type Species, type Trait, type Plant, type Produce, type GardenState, type GardenCommand, type GardenReveal, type Seed } from '../../shared/garden';
 import { traitSource, wishMatches, wishLabel } from '../../shared/garden-life';
 import {cultivationFraction,cultivationHintPosition} from '../../shared/cultivation-hint';
+import {headProgressWidth} from '../../shared/head-progress-size';
+import {headAllows,type HeadOverlay} from '../../shared/desktop-overlays';
 import {renderAppraisal,renderProvenance,renderV3Breeding,renderNotebook,renderV3Weather} from './v3';
 import {V3_XP,AFFINITIES,speciesLevel,fertilizerDescription,scoreOf} from '../../shared/garden-v3';
 import './v3.css';
@@ -217,11 +219,10 @@ async function act(command: GardenCommand, onSuccess?:()=>void): Promise<void> {
             notice('已出售，花园币已到账');
         if (command.type === 'buy' || command.type === 'buyMany')
             notice('已放进背包');
-        if (command.type === 'feed') notice('投喂成功，角色经验已增加');
         if (command.type === 'travelNext') notice('到达新的目的地');
         if (command.type === 'fertilize')
             notice('施肥成功');
-        if (r.reveal) {
+        if (r.reveal && command.type !== 'feed') {
             if (strip && (r.reveal.seed || r.reveal.produce)) { quickResult = r.reveal; if (quickPlot === null) quickPlot = 0; }
             else reveal(r.reveal);
         }
@@ -296,12 +297,14 @@ function renderStrip(): void {
     });
     const activePlot=state!.plots.findIndex(p=>p&&needsReveal(p)&&p.cultivation?.startedAt!==undefined);
     if(state!.cultivationVisit||activePlot>=0){
-        const visit=state!.cultivationVisit,controls=el('div',undefined,'garden-controls cultivation-hint');
-        const progress=el('progress');progress.max=1;progress.className='cultivation-hint-progress';progress.setAttribute('aria-label','培育进度');
+        const visit=state!.cultivationVisit,plant=state!.plots[visit?.plot??activePlot];
+        const existing=root.querySelector<HTMLElement>('.cultivation-hint');
+        const controls=existing&&existing.dataset.plant===plant?.id?existing:el('div',undefined,'cultivation-hint');
+        controls.dataset.plant=plant?.id??'';
+        const progress=controls.querySelector('progress')??el('progress');progress.max=1;progress.className='cultivation-hint-progress';progress.setAttribute('aria-label','培育进度');
+        if(!progress.hasAttribute('value'))progress.value=0;
         controls.dataset.cultivationPlot=String(visit?.plot??activePlot);
-        const pause=button('暂停',()=>{if(visit)void api.cooperate(visit.owner,visit.plot,'leave').then(()=>refresh(true)).catch(e=>notice(String(e)));else void act({type:'pauseCultivation',plot:activePlot});},'cultivation-pause');
-        pause.setAttribute('aria-label','暂停培育');
-        controls.append(el('span','正在培育神秘果实','cultivation-hint-title'),pause,progress);
+        if(progress.parentElement!==controls)controls.append(progress);
         cultivationHint=controls;
     }
     const tools = el('nav', undefined, 'garden-tools');
@@ -320,7 +323,9 @@ function renderStrip(): void {
     const collapse = button('×', () => api.collapse(), 'strip-collapse');
     collapse.title = '收起农场'; collapse.setAttribute('aria-label', '收起农场');
     controls.append(handle, tools, harvest, sow, collapse);
-    root.replaceChildren(...sides, controls, quest, ...(cultivationHint?[cultivationHint]:[]));
+    for(const child of [...root.children])if(child!==cultivationHint)child.remove();
+    root.append(...sides,controls,quest);
+    if(cultivationHint&&!cultivationHint.isConnected)root.append(cultivationHint);
     tick(false);
     renderQuickMenu();
     requestAnimationFrame(syncStripMouse);
@@ -771,7 +776,8 @@ function tick(allowRender = true): void {
     const cultivation=root.querySelector<HTMLElement>('.cultivation-hint');
     if(cultivation){const p=state.plots[Number(cultivation.dataset.cultivationPlot)],bar=cultivation.querySelector('progress')!;
         const task=state.cooperations?.find(t=>t.plant===p?.id);
-        bar.value=task?cultivationFraction(task,now):p?Math.max(0,Math.min(1,1-cultivationRemaining(p,now)/CULTIVATION_MS)):0;
+        const fraction=task?cultivationFraction(task,now):p?Math.max(0,Math.min(1,1-cultivationRemaining(p,now)/(p.growthVersion===3?180000:CULTIVATION_MS))):0;
+        bar.value=Math.max(bar.value,fraction);
         bar.setAttribute('aria-valuetext',`${Math.round(bar.value*100)}%`);
     }
     const clock = document.querySelector('#refresh-clock');
@@ -824,7 +830,7 @@ function syncStripMouse(): void {
     const next = dragPointer===null && !document.querySelector('dialog[open]') && !target?.closest('button,.quick-menu');
     if (next !== ignored) { ignored = next; api.ignoreMouse(next); }
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(true); else if (strip) closeQuick(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(true); else if (strip) {closeQuick();window.qbot.overlays.report('cultivation',false);} });
 setInterval(() => { if (!document.hidden) {
     if(page==='weather'&&state?.v3){if(v3WeatherHour!==Math.floor(Date.now()/3600000))void refresh(true);return;}
     if(page==='weather'){if(weatherStatus){updateWeatherCountdown(root,weatherStatus,weatherStatus.now+Date.now()-weatherReceivedAt);}if(Date.now()-weatherReceivedAt>=5000)void refreshWeather();return;}
@@ -837,9 +843,14 @@ void refresh(true);
 function positionQuest(): void {
     const quest=root.querySelector<HTMLElement>('.quest-pill'), controls=root.querySelector<HTMLElement>('.garden-controls');
     const hint=root.querySelector<HTMLElement>('.cultivation-hint');
+    if(strip)window.qbot.overlays.report('cultivation',!!hint&&!document.hidden);
     if(hint){
+        const actor=performerBounds??petBounds;
+        hint.style.width=`${headProgressWidth(actor.right-actor.left)}px`;
         const p=cultivationHintPosition(performerBounds??petBounds,hint.offsetWidth,hint.offsetHeight,innerWidth,innerHeight);
-        hint.style.visibility=p?'visible':'hidden';if(p){hint.style.left=`${p.x}px`;hint.style.top=`${p.y}px`;}
+        const allowed=headAllows((document.body.dataset.headOverlay||null) as HeadOverlay|null,'cultivation');
+        const overlaps=p&&speechBounds&&p.x<speechBounds.right&&p.x+hint.offsetWidth>speechBounds.left&&p.y<speechBounds.bottom&&p.y+hint.offsetHeight>speechBounds.top;
+        hint.style.visibility=p&&allowed&&!overlaps?'visible':'hidden';if(p){hint.style.left=`${p.x}px`;hint.style.top=`${p.y}px`;}
     }
     if (!quest || !controls) return;
     const left=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--garden-left'))||12;

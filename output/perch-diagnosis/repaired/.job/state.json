@@ -1,0 +1,185 @@
+{
+  "jobId": "b451d144-ca06-4052-a3fc-46165d088e77",
+  "pipelineVersion": "1",
+  "tier": "S",
+  "createdAt": "2026-09-26T06:13:32.417Z",
+  "stage": "turnaround",
+  "refImage": "source.png",
+  "imageProvider": "seedream",
+  "characterForm": "humanoid",
+  "characterStyle": "faithful",
+  "turnaround": {
+    "candidates": [],
+    "picked": null
+  },
+  "actions": {
+    "idle": {
+      "status": "done",
+      "attempts": {
+        "frame": 1,
+        "video": 1
+      },
+      "framePath": "idle_frame.png",
+      "frameQcPass": true,
+      "videoTaskId": "cgt-20260926142112-dc5gf",
+      "videoPath": "idle.mp4",
+      "keyColors": [
+        "0ab314",
+        "1b9f28"
+      ]
+    },
+    "drag": {
+      "status": "done",
+      "attempts": {
+        "frame": 1,
+        "video": 1
+      },
+      "framePath": "drag_frame.png",
+      "frameQcPass": true,
+      "videoTaskId": "cgt-20260926142116-2m9lx",
+      "videoPath": "drag.mp4",
+      "keyColors": [
+        "09a81b",
+        "169c2a"
+      ]
+    },
+    "sleep": {
+      "status": "done",
+      "attempts": {
+        "frame": 1,
+        "video": 1
+      },
+      "framePath": "sleep_frame.png",
+      "frameQcPass": true,
+      "videoTaskId": "cgt-20260926142254-prj8n",
+      "videoPath": "sleep.mp4",
+      "keyColors": [
+        "1cad36",
+        "1c9d3a"
+      ]
+    },
+    "tea": {
+      "status": "done",
+      "attempts": {
+        "frame": 1,
+        "video": 1
+      },
+      "framePath": "tea_frame.png",
+      "frameQcPass": true,
+      "videoTaskId": "cgt-20260926142302-zjtdc",
+      "videoPath": "tea.mp4",
+      "keyColors": [
+        "10ac44",
+        "1e9f4a"
+      ]
+    },
+    "talk_happy": {
+      "status": "done",
+      "attempts": {
+        "frame": 1,
+        "video": 1
+      },
+      "framePath": "talk_happy_frame.png",
+      "frameQcPass": true,
+      "videoTaskId": "cgt-20260926142440-wwf42",
+      "videoPath": "talk_happy.mp4",
+      "keyColors": [
+        "0db73c",
+        "1cad40"
+      ]
+    },
+    "talk_annoyed": {
+      "status": "done",
+      "attempts": {
+        "frame": 1,
+        "video": 1
+      },
+      "framePath": "talk_annoyed_frame.png",
+      "frameQcPass": true,
+      "videoTaskId": "cgt-20260926142442-zm6mp",
+      "videoPath": "talk_annoyed.mp4",
+      "keyColors": [
+        "0da520",
+        "189b2a"
+      ]
+    },
+    "wave": {
+      "status": "done",
+      "attempts": {
+        "frame": 1,
+        "video": 1
+      },
+      "framePath": "wave_frame.png",
+      "frameQcPass": true,
+      "videoTaskId": "cgt-20260926142610-qhzdh",
+      "videoPath": "wave.mp4",
+      "keyColors": [
+        "05ae24",
+        "179a2f"
+      ]
+    },
+    "stretch": {
+      "status": "done",
+      "attempts": {
+        "frame": 1,
+        "video": 1
+      },
+      "framePath": "stretch_frame.png",
+      "frameQcPass": true,
+      "videoTaskId": "cgt-20260926142638-69wll",
+      "videoPath": "stretch.mp4",
+      "keyColors": [
+        "0ab828",
+        "1aa42f"
+      ]
+    },
+    "perch": {
+      "status": "done",
+      "attempts": {
+        "frame": 1,
+        "video": 1
+      },
+      "framePath": "perch_frame.png",
+      "frameQcPass": true,
+      "videoTaskId": "cgt-20260926211903-26s7w",
+      "videoPath": "perch.mp4",
+      "keyColors": [
+        "15b235",
+        "328b42"
+      ]
+    },
+    "perch_sit": {
+      "status": "pending",
+      "attempts": {
+        "frame": 0,
+        "video": 0
+      }
+    },
+    "perch_lie": {
+      "status": "pending",
+      "attempts": {
+        "frame": 0,
+        "video": 0
+      }
+    },
+    "writing": {
+      "status": "pending",
+      "attempts": {
+        "frame": 0,
+        "video": 0
+      }
+    }
+  },
+  "baseActionIds": [
+    "idle",
+    "drag",
+    "sleep",
+    "tea",
+    "talk_happy",
+    "talk_annoyed",
+    "wave",
+    "stretch",
+    "perch"
+  ],
+  "persona": "《盗墓笔记》里的张起灵，又称“小哥”、“闷油瓶”，性子冷淡。话少。"
+}

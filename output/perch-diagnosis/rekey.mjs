@@ -1,0 +1,11 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {Job,keyActionVideo} from '../../pipeline/dist/index.js';
+const dir=path.resolve('output/perch-diagnosis/repaired');
+await fs.mkdir(path.join(dir,'.job'),{recursive:true});await fs.mkdir(path.join(dir,'actions'),{recursive:true});
+const old=path.join(process.env.APPDATA,'@qbot/app/characters/53ed5068-dd60-4e2a-82c7-fb94250369d1');
+await fs.copyFile(path.join(old,'.job/state.json'),path.join(dir,'.job/state.json'));
+await fs.copyFile('output/perch-diagnosis/perch.mp4',path.join(dir,'.job/perch.mp4'));
+const job=await Job.load(dir);
+await keyActionVideo(job,'perch',process.env.FFMPEG_BIN || path.resolve('pipeline/node_modules/ffmpeg-static/ffmpeg.exe'));
+console.log('Rekeyed original perch into isolated output');

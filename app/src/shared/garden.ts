@@ -240,7 +240,7 @@ export type GardenResult = {
 export interface GardenApi {
     interact(target:string,kind:import('./pair-interaction').PairKind):Promise<void>;
     answerInteraction(id:string,accept:boolean,response?:'happy'|'heart'|'wave'):Promise<void>;
-    onInteraction(cb:(event:{kind:string;caption:string;effect:string})=>void):()=>void;
+    onInteraction(cb:(event:{kind:string;caption:string;effect:string;experience?:import('./experience-progress').ExperienceGain})=>void):()=>void;
     online(enable: boolean): Promise<void>;
     visit(owner: string,preview?:boolean,task?:string): Promise<import('./garden-life').GardenVisit>;
     cooperate(owner: string, plot: number, action: 'join'|'leave'|'claim'|'share'|'invite', target?:string, task?:string): Promise<import('./garden-life').GardenVisit>;

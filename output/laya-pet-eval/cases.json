@@ -1,0 +1,1678 @@
+[
+  [
+    4,
+    "bad_news",
+    "你是情绪明显的小动物。刚得知期待的旅行取消了，先震惊，然后低落地趴一会儿。",
+    [
+      "surprised"
+    ],
+    [
+      "lie_sad"
+    ],
+    {
+      "angry": "生气跺脚",
+      "surprised": "吃惊一下",
+      "confused": "疑惑歪头",
+      "clap": "鼓掌"
+    },
+    {
+      "look_sky": "坐着看天空",
+      "lie_sad": "郁闷趴着",
+      "listen_music": "随音乐轻轻摇摆",
+      "stretch": "做舒展运动"
+    },
+    "original"
+  ],
+  [
+    4,
+    "bad_news",
+    "你是情绪明显的小动物。刚得知期待的旅行取消了，先震惊，然后低落地趴一会儿。",
+    [
+      "surprised"
+    ],
+    [
+      "lie_sad"
+    ],
+    {
+      "clap": "鼓掌",
+      "confused": "疑惑歪头",
+      "surprised": "吃惊一下",
+      "angry": "生气跺脚"
+    },
+    {
+      "stretch": "做舒展运动",
+      "listen_music": "随音乐轻轻摇摆",
+      "lie_sad": "郁闷趴着",
+      "look_sky": "坐着看天空"
+    },
+    "reversed"
+  ],
+  [
+    4,
+    "good_news",
+    "你是活泼角色。主人突然宣布中奖，先惊喜一下，随后开心跳舞庆祝。",
+    [
+      "surprised",
+      "cheer"
+    ],
+    [
+      "dance"
+    ],
+    {
+      "confused": "疑惑歪头",
+      "surprised": "吃惊一下",
+      "cheer": "开心欢呼",
+      "clap": "鼓掌"
+    },
+    {
+      "dance": "开心跳舞",
+      "stretch": "做舒展运动",
+      "hide": "躲在角落",
+      "tea": "坐着喝茶"
+    },
+    "original"
+  ],
+  [
+    4,
+    "good_news",
+    "你是活泼角色。主人突然宣布中奖，先惊喜一下，随后开心跳舞庆祝。",
+    [
+      "surprised",
+      "cheer"
+    ],
+    [
+      "dance"
+    ],
+    {
+      "clap": "鼓掌",
+      "cheer": "开心欢呼",
+      "surprised": "吃惊一下",
+      "confused": "疑惑歪头"
+    },
+    {
+      "tea": "坐着喝茶",
+      "hide": "躲在角落",
+      "stretch": "做舒展运动",
+      "dance": "开心跳舞"
+    },
+    "reversed"
+  ],
+  [
+    4,
+    "quiet_pet",
+    "你是内敛寡言但关心主人的角色。主人正在专注写作，轻轻摸了你一下，适合简短回应后安静陪着。",
+    [
+      "nod"
+    ],
+    [
+      "quiet",
+      "keep"
+    ],
+    {
+      "clap": "鼓掌",
+      "nod": "轻轻点头",
+      "surprised": "吃惊一下",
+      "laugh": "笑一下"
+    },
+    {
+      "sleep": "躺下睡觉",
+      "keep": "保持当前姿态",
+      "look_friend": "安静看向同伴",
+      "quiet": "安静坐着陪伴"
+    },
+    "original"
+  ],
+  [
+    4,
+    "quiet_pet",
+    "你是内敛寡言但关心主人的角色。主人正在专注写作，轻轻摸了你一下，适合简短回应后安静陪着。",
+    [
+      "nod"
+    ],
+    [
+      "quiet",
+      "keep"
+    ],
+    {
+      "laugh": "笑一下",
+      "surprised": "吃惊一下",
+      "nod": "轻轻点头",
+      "clap": "鼓掌"
+    },
+    {
+      "quiet": "安静坐着陪伴",
+      "look_friend": "安静看向同伴",
+      "keep": "保持当前姿态",
+      "sleep": "躺下睡觉"
+    },
+    "reversed"
+  ],
+  [
+    4,
+    "sad_user",
+    "主人说今天很难过，希望你陪着。你温柔体贴，应先安慰，然后安静陪伴。",
+    [
+      "comfort"
+    ],
+    [
+      "quiet"
+    ],
+    {
+      "sad": "短暂难过",
+      "comfort": "温柔安慰",
+      "wave": "挥手打招呼",
+      "angry": "生气跺脚"
+    },
+    {
+      "guard": "站着守候",
+      "listen_music": "随音乐轻轻摇摆",
+      "quiet": "安静坐着陪伴",
+      "stretch": "做舒展运动"
+    },
+    "original"
+  ],
+  [
+    4,
+    "sad_user",
+    "主人说今天很难过，希望你陪着。你温柔体贴，应先安慰，然后安静陪伴。",
+    [
+      "comfort"
+    ],
+    [
+      "quiet"
+    ],
+    {
+      "angry": "生气跺脚",
+      "wave": "挥手打招呼",
+      "comfort": "温柔安慰",
+      "sad": "短暂难过"
+    },
+    {
+      "stretch": "做舒展运动",
+      "quiet": "安静坐着陪伴",
+      "listen_music": "随音乐轻轻摇摆",
+      "guard": "站着守候"
+    },
+    "reversed"
+  ],
+  [
+    4,
+    "sleepy",
+    "已到睡觉时间，你很困，眼睛睁不开，想打个哈欠后睡觉。",
+    [
+      "yawn"
+    ],
+    [
+      "sleep"
+    ],
+    {
+      "nod": "轻轻点头",
+      "wink": "眨眼示意",
+      "sad": "短暂难过",
+      "yawn": "打哈欠"
+    },
+    {
+      "look_friend": "安静看向同伴",
+      "tea": "坐着喝茶",
+      "read": "坐着看书",
+      "sleep": "躺下睡觉"
+    },
+    "original"
+  ],
+  [
+    4,
+    "sleepy",
+    "已到睡觉时间，你很困，眼睛睁不开，想打个哈欠后睡觉。",
+    [
+      "yawn"
+    ],
+    [
+      "sleep"
+    ],
+    {
+      "yawn": "打哈欠",
+      "sad": "短暂难过",
+      "wink": "眨眼示意",
+      "nod": "轻轻点头"
+    },
+    {
+      "sleep": "躺下睡觉",
+      "read": "坐着看书",
+      "tea": "坐着喝茶",
+      "look_friend": "安静看向同伴"
+    },
+    "reversed"
+  ],
+  [
+    4,
+    "music",
+    "主人开始播放喜欢的轻快歌曲，你很高兴，想先笑一下，然后随音乐轻轻摇摆。",
+    [
+      "laugh"
+    ],
+    [
+      "listen_music"
+    ],
+    {
+      "angry": "生气跺脚",
+      "laugh": "笑一下",
+      "cheer": "开心欢呼",
+      "clap": "鼓掌"
+    },
+    {
+      "tea": "坐着喝茶",
+      "listen_music": "随音乐轻轻摇摆",
+      "dance": "开心跳舞",
+      "read": "坐着看书"
+    },
+    "original"
+  ],
+  [
+    4,
+    "music",
+    "主人开始播放喜欢的轻快歌曲，你很高兴，想先笑一下，然后随音乐轻轻摇摆。",
+    [
+      "laugh"
+    ],
+    [
+      "listen_music"
+    ],
+    {
+      "clap": "鼓掌",
+      "cheer": "开心欢呼",
+      "laugh": "笑一下",
+      "angry": "生气跺脚"
+    },
+    {
+      "read": "坐着看书",
+      "dance": "开心跳舞",
+      "listen_music": "随音乐轻轻摇摆",
+      "tea": "坐着喝茶"
+    },
+    "reversed"
+  ],
+  [
+    4,
+    "no_change",
+    "你正在安静坐着陪主人。没有新事件，主人没有互动，当前姿态合适，不需要反应或改变。",
+    [
+      "none"
+    ],
+    [
+      "keep"
+    ],
+    {
+      "none": "不做即时反应",
+      "blush": "害羞一下",
+      "cheer": "开心欢呼",
+      "yawn": "打哈欠"
+    },
+    {
+      "guard": "站着守候",
+      "keep": "保持当前姿态",
+      "hide": "躲在角落",
+      "walk": "慢慢散步"
+    },
+    "original"
+  ],
+  [
+    4,
+    "no_change",
+    "你正在安静坐着陪主人。没有新事件，主人没有互动，当前姿态合适，不需要反应或改变。",
+    [
+      "none"
+    ],
+    [
+      "keep"
+    ],
+    {
+      "yawn": "打哈欠",
+      "cheer": "开心欢呼",
+      "blush": "害羞一下",
+      "none": "不做即时反应"
+    },
+    {
+      "walk": "慢慢散步",
+      "hide": "躲在角落",
+      "keep": "保持当前姿态",
+      "guard": "站着守候"
+    },
+    "reversed"
+  ],
+  [
+    4,
+    "friend_arrives",
+    "你性格安静。一位好朋友刚来到身边，先挥手欢迎，再安静看向同伴。",
+    [
+      "wave"
+    ],
+    [
+      "look_friend"
+    ],
+    {
+      "confused": "疑惑歪头",
+      "blush": "害羞一下",
+      "nod": "轻轻点头",
+      "wave": "挥手打招呼"
+    },
+    {
+      "think": "托腮思考",
+      "sleep": "躺下睡觉",
+      "look_friend": "安静看向同伴",
+      "listen_music": "随音乐轻轻摇摆"
+    },
+    "original"
+  ],
+  [
+    4,
+    "friend_arrives",
+    "你性格安静。一位好朋友刚来到身边，先挥手欢迎，再安静看向同伴。",
+    [
+      "wave"
+    ],
+    [
+      "look_friend"
+    ],
+    {
+      "wave": "挥手打招呼",
+      "nod": "轻轻点头",
+      "blush": "害羞一下",
+      "confused": "疑惑歪头"
+    },
+    {
+      "listen_music": "随音乐轻轻摇摆",
+      "look_friend": "安静看向同伴",
+      "sleep": "躺下睡觉",
+      "think": "托腮思考"
+    },
+    "reversed"
+  ],
+  [
+    8,
+    "bad_news",
+    "你是情绪明显的小动物。刚得知期待的旅行取消了，先震惊，然后低落地趴一会儿。",
+    [
+      "surprised"
+    ],
+    [
+      "lie_sad"
+    ],
+    {
+      "wave": "挥手打招呼",
+      "sad": "短暂难过",
+      "surprised": "吃惊一下",
+      "yawn": "打哈欠",
+      "none": "不做即时反应",
+      "clap": "鼓掌",
+      "angry": "生气跺脚",
+      "confused": "疑惑歪头"
+    },
+    {
+      "play": "独自玩玩具",
+      "look_sky": "坐着看天空",
+      "walk": "慢慢散步",
+      "lie_sad": "郁闷趴着",
+      "dance": "开心跳舞",
+      "listen_music": "随音乐轻轻摇摆",
+      "stretch": "做舒展运动",
+      "look_friend": "安静看向同伴"
+    },
+    "original"
+  ],
+  [
+    8,
+    "bad_news",
+    "你是情绪明显的小动物。刚得知期待的旅行取消了，先震惊，然后低落地趴一会儿。",
+    [
+      "surprised"
+    ],
+    [
+      "lie_sad"
+    ],
+    {
+      "confused": "疑惑歪头",
+      "angry": "生气跺脚",
+      "clap": "鼓掌",
+      "none": "不做即时反应",
+      "yawn": "打哈欠",
+      "surprised": "吃惊一下",
+      "sad": "短暂难过",
+      "wave": "挥手打招呼"
+    },
+    {
+      "look_friend": "安静看向同伴",
+      "stretch": "做舒展运动",
+      "listen_music": "随音乐轻轻摇摆",
+      "dance": "开心跳舞",
+      "lie_sad": "郁闷趴着",
+      "walk": "慢慢散步",
+      "look_sky": "坐着看天空",
+      "play": "独自玩玩具"
+    },
+    "reversed"
+  ],
+  [
+    8,
+    "good_news",
+    "你是活泼角色。主人突然宣布中奖，先惊喜一下，随后开心跳舞庆祝。",
+    [
+      "surprised",
+      "cheer"
+    ],
+    [
+      "dance"
+    ],
+    {
+      "sad": "短暂难过",
+      "laugh": "笑一下",
+      "nod": "轻轻点头",
+      "cheer": "开心欢呼",
+      "clap": "鼓掌",
+      "surprised": "吃惊一下",
+      "confused": "疑惑歪头",
+      "shiver": "害怕发抖"
+    },
+    {
+      "sleep": "躺下睡觉",
+      "look_sky": "坐着看天空",
+      "quiet": "安静坐着陪伴",
+      "tea": "坐着喝茶",
+      "dance": "开心跳舞",
+      "stretch": "做舒展运动",
+      "play": "独自玩玩具",
+      "hide": "躲在角落"
+    },
+    "original"
+  ],
+  [
+    8,
+    "good_news",
+    "你是活泼角色。主人突然宣布中奖，先惊喜一下，随后开心跳舞庆祝。",
+    [
+      "surprised",
+      "cheer"
+    ],
+    [
+      "dance"
+    ],
+    {
+      "shiver": "害怕发抖",
+      "confused": "疑惑歪头",
+      "surprised": "吃惊一下",
+      "clap": "鼓掌",
+      "cheer": "开心欢呼",
+      "nod": "轻轻点头",
+      "laugh": "笑一下",
+      "sad": "短暂难过"
+    },
+    {
+      "hide": "躲在角落",
+      "play": "独自玩玩具",
+      "stretch": "做舒展运动",
+      "dance": "开心跳舞",
+      "tea": "坐着喝茶",
+      "quiet": "安静坐着陪伴",
+      "look_sky": "坐着看天空",
+      "sleep": "躺下睡觉"
+    },
+    "reversed"
+  ],
+  [
+    8,
+    "quiet_pet",
+    "你是内敛寡言但关心主人的角色。主人正在专注写作，轻轻摸了你一下，适合简短回应后安静陪着。",
+    [
+      "nod"
+    ],
+    [
+      "quiet",
+      "keep"
+    ],
+    {
+      "confused": "疑惑歪头",
+      "clap": "鼓掌",
+      "nod": "轻轻点头",
+      "sad": "短暂难过",
+      "none": "不做即时反应",
+      "surprised": "吃惊一下",
+      "laugh": "笑一下",
+      "wave": "挥手打招呼"
+    },
+    {
+      "tea": "坐着喝茶",
+      "guard": "站着守候",
+      "sleep": "躺下睡觉",
+      "lie_sad": "郁闷趴着",
+      "keep": "保持当前姿态",
+      "look_friend": "安静看向同伴",
+      "dance": "开心跳舞",
+      "quiet": "安静坐着陪伴"
+    },
+    "original"
+  ],
+  [
+    8,
+    "quiet_pet",
+    "你是内敛寡言但关心主人的角色。主人正在专注写作，轻轻摸了你一下，适合简短回应后安静陪着。",
+    [
+      "nod"
+    ],
+    [
+      "quiet",
+      "keep"
+    ],
+    {
+      "wave": "挥手打招呼",
+      "laugh": "笑一下",
+      "surprised": "吃惊一下",
+      "none": "不做即时反应",
+      "sad": "短暂难过",
+      "nod": "轻轻点头",
+      "clap": "鼓掌",
+      "confused": "疑惑歪头"
+    },
+    {
+      "quiet": "安静坐着陪伴",
+      "dance": "开心跳舞",
+      "look_friend": "安静看向同伴",
+      "keep": "保持当前姿态",
+      "lie_sad": "郁闷趴着",
+      "sleep": "躺下睡觉",
+      "guard": "站着守候",
+      "tea": "坐着喝茶"
+    },
+    "reversed"
+  ],
+  [
+    8,
+    "sad_user",
+    "主人说今天很难过，希望你陪着。你温柔体贴，应先安慰，然后安静陪伴。",
+    [
+      "comfort"
+    ],
+    [
+      "quiet"
+    ],
+    {
+      "wink": "眨眼示意",
+      "wave": "挥手打招呼",
+      "nod": "轻轻点头",
+      "angry": "生气跺脚",
+      "none": "不做即时反应",
+      "comfort": "温柔安慰",
+      "bow": "鞠躬致谢",
+      "sad": "短暂难过"
+    },
+    {
+      "hide": "躲在角落",
+      "stretch": "做舒展运动",
+      "guard": "站着守候",
+      "look_friend": "安静看向同伴",
+      "dance": "开心跳舞",
+      "think": "托腮思考",
+      "quiet": "安静坐着陪伴",
+      "listen_music": "随音乐轻轻摇摆"
+    },
+    "original"
+  ],
+  [
+    8,
+    "sad_user",
+    "主人说今天很难过，希望你陪着。你温柔体贴，应先安慰，然后安静陪伴。",
+    [
+      "comfort"
+    ],
+    [
+      "quiet"
+    ],
+    {
+      "sad": "短暂难过",
+      "bow": "鞠躬致谢",
+      "comfort": "温柔安慰",
+      "none": "不做即时反应",
+      "angry": "生气跺脚",
+      "nod": "轻轻点头",
+      "wave": "挥手打招呼",
+      "wink": "眨眼示意"
+    },
+    {
+      "listen_music": "随音乐轻轻摇摆",
+      "quiet": "安静坐着陪伴",
+      "think": "托腮思考",
+      "dance": "开心跳舞",
+      "look_friend": "安静看向同伴",
+      "guard": "站着守候",
+      "stretch": "做舒展运动",
+      "hide": "躲在角落"
+    },
+    "reversed"
+  ],
+  [
+    8,
+    "sleepy",
+    "已到睡觉时间，你很困，眼睛睁不开，想打个哈欠后睡觉。",
+    [
+      "yawn"
+    ],
+    [
+      "sleep"
+    ],
+    {
+      "laugh": "笑一下",
+      "surprised": "吃惊一下",
+      "sad": "短暂难过",
+      "angry": "生气跺脚",
+      "nod": "轻轻点头",
+      "comfort": "温柔安慰",
+      "yawn": "打哈欠",
+      "wink": "眨眼示意"
+    },
+    {
+      "stretch": "做舒展运动",
+      "guard": "站着守候",
+      "keep": "保持当前姿态",
+      "look_friend": "安静看向同伴",
+      "think": "托腮思考",
+      "sleep": "躺下睡觉",
+      "tea": "坐着喝茶",
+      "read": "坐着看书"
+    },
+    "original"
+  ],
+  [
+    8,
+    "sleepy",
+    "已到睡觉时间，你很困，眼睛睁不开，想打个哈欠后睡觉。",
+    [
+      "yawn"
+    ],
+    [
+      "sleep"
+    ],
+    {
+      "wink": "眨眼示意",
+      "yawn": "打哈欠",
+      "comfort": "温柔安慰",
+      "nod": "轻轻点头",
+      "angry": "生气跺脚",
+      "sad": "短暂难过",
+      "surprised": "吃惊一下",
+      "laugh": "笑一下"
+    },
+    {
+      "read": "坐着看书",
+      "tea": "坐着喝茶",
+      "sleep": "躺下睡觉",
+      "think": "托腮思考",
+      "look_friend": "安静看向同伴",
+      "keep": "保持当前姿态",
+      "guard": "站着守候",
+      "stretch": "做舒展运动"
+    },
+    "reversed"
+  ],
+  [
+    8,
+    "music",
+    "主人开始播放喜欢的轻快歌曲，你很高兴，想先笑一下，然后随音乐轻轻摇摆。",
+    [
+      "laugh"
+    ],
+    [
+      "listen_music"
+    ],
+    {
+      "laugh": "笑一下",
+      "nod": "轻轻点头",
+      "blush": "害羞一下",
+      "comfort": "温柔安慰",
+      "clap": "鼓掌",
+      "cheer": "开心欢呼",
+      "angry": "生气跺脚",
+      "wink": "眨眼示意"
+    },
+    {
+      "keep": "保持当前姿态",
+      "listen_music": "随音乐轻轻摇摆",
+      "tea": "坐着喝茶",
+      "hide": "躲在角落",
+      "read": "坐着看书",
+      "sleep": "躺下睡觉",
+      "guard": "站着守候",
+      "dance": "开心跳舞"
+    },
+    "original"
+  ],
+  [
+    8,
+    "music",
+    "主人开始播放喜欢的轻快歌曲，你很高兴，想先笑一下，然后随音乐轻轻摇摆。",
+    [
+      "laugh"
+    ],
+    [
+      "listen_music"
+    ],
+    {
+      "wink": "眨眼示意",
+      "angry": "生气跺脚",
+      "cheer": "开心欢呼",
+      "clap": "鼓掌",
+      "comfort": "温柔安慰",
+      "blush": "害羞一下",
+      "nod": "轻轻点头",
+      "laugh": "笑一下"
+    },
+    {
+      "dance": "开心跳舞",
+      "guard": "站着守候",
+      "sleep": "躺下睡觉",
+      "read": "坐着看书",
+      "hide": "躲在角落",
+      "tea": "坐着喝茶",
+      "listen_music": "随音乐轻轻摇摆",
+      "keep": "保持当前姿态"
+    },
+    "reversed"
+  ],
+  [
+    8,
+    "no_change",
+    "你正在安静坐着陪主人。没有新事件，主人没有互动，当前姿态合适，不需要反应或改变。",
+    [
+      "none"
+    ],
+    [
+      "keep"
+    ],
+    {
+      "none": "不做即时反应",
+      "yawn": "打哈欠",
+      "sad": "短暂难过",
+      "blush": "害羞一下",
+      "cheer": "开心欢呼",
+      "wink": "眨眼示意",
+      "nod": "轻轻点头",
+      "comfort": "温柔安慰"
+    },
+    {
+      "keep": "保持当前姿态",
+      "look_sky": "坐着看天空",
+      "listen_music": "随音乐轻轻摇摆",
+      "guard": "站着守候",
+      "play": "独自玩玩具",
+      "walk": "慢慢散步",
+      "look_friend": "安静看向同伴",
+      "hide": "躲在角落"
+    },
+    "original"
+  ],
+  [
+    8,
+    "no_change",
+    "你正在安静坐着陪主人。没有新事件，主人没有互动，当前姿态合适，不需要反应或改变。",
+    [
+      "none"
+    ],
+    [
+      "keep"
+    ],
+    {
+      "comfort": "温柔安慰",
+      "nod": "轻轻点头",
+      "wink": "眨眼示意",
+      "cheer": "开心欢呼",
+      "blush": "害羞一下",
+      "sad": "短暂难过",
+      "yawn": "打哈欠",
+      "none": "不做即时反应"
+    },
+    {
+      "hide": "躲在角落",
+      "look_friend": "安静看向同伴",
+      "walk": "慢慢散步",
+      "play": "独自玩玩具",
+      "guard": "站着守候",
+      "listen_music": "随音乐轻轻摇摆",
+      "look_sky": "坐着看天空",
+      "keep": "保持当前姿态"
+    },
+    "reversed"
+  ],
+  [
+    8,
+    "friend_arrives",
+    "你性格安静。一位好朋友刚来到身边，先挥手欢迎，再安静看向同伴。",
+    [
+      "wave"
+    ],
+    [
+      "look_friend"
+    ],
+    {
+      "blush": "害羞一下",
+      "confused": "疑惑歪头",
+      "surprised": "吃惊一下",
+      "none": "不做即时反应",
+      "nod": "轻轻点头",
+      "shiver": "害怕发抖",
+      "angry": "生气跺脚",
+      "wave": "挥手打招呼"
+    },
+    {
+      "hide": "躲在角落",
+      "lie_sad": "郁闷趴着",
+      "sleep": "躺下睡觉",
+      "listen_music": "随音乐轻轻摇摆",
+      "look_friend": "安静看向同伴",
+      "walk": "慢慢散步",
+      "think": "托腮思考",
+      "guard": "站着守候"
+    },
+    "original"
+  ],
+  [
+    8,
+    "friend_arrives",
+    "你性格安静。一位好朋友刚来到身边，先挥手欢迎，再安静看向同伴。",
+    [
+      "wave"
+    ],
+    [
+      "look_friend"
+    ],
+    {
+      "wave": "挥手打招呼",
+      "angry": "生气跺脚",
+      "shiver": "害怕发抖",
+      "nod": "轻轻点头",
+      "none": "不做即时反应",
+      "surprised": "吃惊一下",
+      "confused": "疑惑歪头",
+      "blush": "害羞一下"
+    },
+    {
+      "guard": "站着守候",
+      "think": "托腮思考",
+      "walk": "慢慢散步",
+      "look_friend": "安静看向同伴",
+      "listen_music": "随音乐轻轻摇摆",
+      "sleep": "躺下睡觉",
+      "lie_sad": "郁闷趴着",
+      "hide": "躲在角落"
+    },
+    "reversed"
+  ],
+  [
+    16,
+    "bad_news",
+    "你是情绪明显的小动物。刚得知期待的旅行取消了，先震惊，然后低落地趴一会儿。",
+    [
+      "surprised"
+    ],
+    [
+      "lie_sad"
+    ],
+    {
+      "surprised": "吃惊一下",
+      "cheer": "开心欢呼",
+      "shiver": "害怕发抖",
+      "clap": "鼓掌",
+      "nod": "轻轻点头",
+      "wave": "挥手打招呼",
+      "wink": "眨眼示意",
+      "laugh": "笑一下",
+      "comfort": "温柔安慰",
+      "blush": "害羞一下",
+      "angry": "生气跺脚",
+      "bow": "鞠躬致谢",
+      "sad": "短暂难过",
+      "confused": "疑惑歪头",
+      "yawn": "打哈欠",
+      "none": "不做即时反应"
+    },
+    {
+      "look_sky": "坐着看天空",
+      "hide": "躲在角落",
+      "tea": "坐着喝茶",
+      "read": "坐着看书",
+      "guard": "站着守候",
+      "lie_sad": "郁闷趴着",
+      "keep": "保持当前姿态",
+      "dance": "开心跳舞",
+      "play": "独自玩玩具",
+      "walk": "慢慢散步",
+      "listen_music": "随音乐轻轻摇摆",
+      "quiet": "安静坐着陪伴",
+      "think": "托腮思考",
+      "stretch": "做舒展运动",
+      "look_friend": "安静看向同伴",
+      "sleep": "躺下睡觉"
+    },
+    "original"
+  ],
+  [
+    16,
+    "bad_news",
+    "你是情绪明显的小动物。刚得知期待的旅行取消了，先震惊，然后低落地趴一会儿。",
+    [
+      "surprised"
+    ],
+    [
+      "lie_sad"
+    ],
+    {
+      "none": "不做即时反应",
+      "yawn": "打哈欠",
+      "confused": "疑惑歪头",
+      "sad": "短暂难过",
+      "bow": "鞠躬致谢",
+      "angry": "生气跺脚",
+      "blush": "害羞一下",
+      "comfort": "温柔安慰",
+      "laugh": "笑一下",
+      "wink": "眨眼示意",
+      "wave": "挥手打招呼",
+      "nod": "轻轻点头",
+      "clap": "鼓掌",
+      "shiver": "害怕发抖",
+      "cheer": "开心欢呼",
+      "surprised": "吃惊一下"
+    },
+    {
+      "sleep": "躺下睡觉",
+      "look_friend": "安静看向同伴",
+      "stretch": "做舒展运动",
+      "think": "托腮思考",
+      "quiet": "安静坐着陪伴",
+      "listen_music": "随音乐轻轻摇摆",
+      "walk": "慢慢散步",
+      "play": "独自玩玩具",
+      "dance": "开心跳舞",
+      "keep": "保持当前姿态",
+      "lie_sad": "郁闷趴着",
+      "guard": "站着守候",
+      "read": "坐着看书",
+      "tea": "坐着喝茶",
+      "hide": "躲在角落",
+      "look_sky": "坐着看天空"
+    },
+    "reversed"
+  ],
+  [
+    16,
+    "good_news",
+    "你是活泼角色。主人突然宣布中奖，先惊喜一下，随后开心跳舞庆祝。",
+    [
+      "surprised",
+      "cheer"
+    ],
+    [
+      "dance"
+    ],
+    {
+      "surprised": "吃惊一下",
+      "blush": "害羞一下",
+      "comfort": "温柔安慰",
+      "sad": "短暂难过",
+      "wink": "眨眼示意",
+      "angry": "生气跺脚",
+      "bow": "鞠躬致谢",
+      "shiver": "害怕发抖",
+      "wave": "挥手打招呼",
+      "yawn": "打哈欠",
+      "clap": "鼓掌",
+      "confused": "疑惑歪头",
+      "laugh": "笑一下",
+      "cheer": "开心欢呼",
+      "nod": "轻轻点头",
+      "none": "不做即时反应"
+    },
+    {
+      "lie_sad": "郁闷趴着",
+      "listen_music": "随音乐轻轻摇摆",
+      "sleep": "躺下睡觉",
+      "tea": "坐着喝茶",
+      "quiet": "安静坐着陪伴",
+      "hide": "躲在角落",
+      "keep": "保持当前姿态",
+      "read": "坐着看书",
+      "look_friend": "安静看向同伴",
+      "stretch": "做舒展运动",
+      "walk": "慢慢散步",
+      "dance": "开心跳舞",
+      "look_sky": "坐着看天空",
+      "guard": "站着守候",
+      "think": "托腮思考",
+      "play": "独自玩玩具"
+    },
+    "original"
+  ],
+  [
+    16,
+    "good_news",
+    "你是活泼角色。主人突然宣布中奖，先惊喜一下，随后开心跳舞庆祝。",
+    [
+      "surprised",
+      "cheer"
+    ],
+    [
+      "dance"
+    ],
+    {
+      "none": "不做即时反应",
+      "nod": "轻轻点头",
+      "cheer": "开心欢呼",
+      "laugh": "笑一下",
+      "confused": "疑惑歪头",
+      "clap": "鼓掌",
+      "yawn": "打哈欠",
+      "wave": "挥手打招呼",
+      "shiver": "害怕发抖",
+      "bow": "鞠躬致谢",
+      "angry": "生气跺脚",
+      "wink": "眨眼示意",
+      "sad": "短暂难过",
+      "comfort": "温柔安慰",
+      "blush": "害羞一下",
+      "surprised": "吃惊一下"
+    },
+    {
+      "play": "独自玩玩具",
+      "think": "托腮思考",
+      "guard": "站着守候",
+      "look_sky": "坐着看天空",
+      "dance": "开心跳舞",
+      "walk": "慢慢散步",
+      "stretch": "做舒展运动",
+      "look_friend": "安静看向同伴",
+      "read": "坐着看书",
+      "keep": "保持当前姿态",
+      "hide": "躲在角落",
+      "quiet": "安静坐着陪伴",
+      "tea": "坐着喝茶",
+      "sleep": "躺下睡觉",
+      "listen_music": "随音乐轻轻摇摆",
+      "lie_sad": "郁闷趴着"
+    },
+    "reversed"
+  ],
+  [
+    16,
+    "quiet_pet",
+    "你是内敛寡言但关心主人的角色。主人正在专注写作，轻轻摸了你一下，适合简短回应后安静陪着。",
+    [
+      "nod"
+    ],
+    [
+      "quiet",
+      "keep"
+    ],
+    {
+      "bow": "鞠躬致谢",
+      "cheer": "开心欢呼",
+      "yawn": "打哈欠",
+      "sad": "短暂难过",
+      "wave": "挥手打招呼",
+      "angry": "生气跺脚",
+      "none": "不做即时反应",
+      "wink": "眨眼示意",
+      "shiver": "害怕发抖",
+      "nod": "轻轻点头",
+      "surprised": "吃惊一下",
+      "clap": "鼓掌",
+      "comfort": "温柔安慰",
+      "laugh": "笑一下",
+      "confused": "疑惑歪头",
+      "blush": "害羞一下"
+    },
+    {
+      "dance": "开心跳舞",
+      "play": "独自玩玩具",
+      "quiet": "安静坐着陪伴",
+      "stretch": "做舒展运动",
+      "look_friend": "安静看向同伴",
+      "look_sky": "坐着看天空",
+      "lie_sad": "郁闷趴着",
+      "read": "坐着看书",
+      "think": "托腮思考",
+      "guard": "站着守候",
+      "hide": "躲在角落",
+      "sleep": "躺下睡觉",
+      "tea": "坐着喝茶",
+      "listen_music": "随音乐轻轻摇摆",
+      "walk": "慢慢散步",
+      "keep": "保持当前姿态"
+    },
+    "original"
+  ],
+  [
+    16,
+    "quiet_pet",
+    "你是内敛寡言但关心主人的角色。主人正在专注写作，轻轻摸了你一下，适合简短回应后安静陪着。",
+    [
+      "nod"
+    ],
+    [
+      "quiet",
+      "keep"
+    ],
+    {
+      "blush": "害羞一下",
+      "confused": "疑惑歪头",
+      "laugh": "笑一下",
+      "comfort": "温柔安慰",
+      "clap": "鼓掌",
+      "surprised": "吃惊一下",
+      "nod": "轻轻点头",
+      "shiver": "害怕发抖",
+      "wink": "眨眼示意",
+      "none": "不做即时反应",
+      "angry": "生气跺脚",
+      "wave": "挥手打招呼",
+      "sad": "短暂难过",
+      "yawn": "打哈欠",
+      "cheer": "开心欢呼",
+      "bow": "鞠躬致谢"
+    },
+    {
+      "keep": "保持当前姿态",
+      "walk": "慢慢散步",
+      "listen_music": "随音乐轻轻摇摆",
+      "tea": "坐着喝茶",
+      "sleep": "躺下睡觉",
+      "hide": "躲在角落",
+      "guard": "站着守候",
+      "think": "托腮思考",
+      "read": "坐着看书",
+      "lie_sad": "郁闷趴着",
+      "look_sky": "坐着看天空",
+      "look_friend": "安静看向同伴",
+      "stretch": "做舒展运动",
+      "quiet": "安静坐着陪伴",
+      "play": "独自玩玩具",
+      "dance": "开心跳舞"
+    },
+    "reversed"
+  ],
+  [
+    16,
+    "sad_user",
+    "主人说今天很难过，希望你陪着。你温柔体贴，应先安慰，然后安静陪伴。",
+    [
+      "comfort"
+    ],
+    [
+      "quiet"
+    ],
+    {
+      "nod": "轻轻点头",
+      "blush": "害羞一下",
+      "cheer": "开心欢呼",
+      "clap": "鼓掌",
+      "surprised": "吃惊一下",
+      "none": "不做即时反应",
+      "laugh": "笑一下",
+      "bow": "鞠躬致谢",
+      "wave": "挥手打招呼",
+      "angry": "生气跺脚",
+      "sad": "短暂难过",
+      "confused": "疑惑歪头",
+      "comfort": "温柔安慰",
+      "shiver": "害怕发抖",
+      "yawn": "打哈欠",
+      "wink": "眨眼示意"
+    },
+    {
+      "listen_music": "随音乐轻轻摇摆",
+      "look_sky": "坐着看天空",
+      "play": "独自玩玩具",
+      "quiet": "安静坐着陪伴",
+      "look_friend": "安静看向同伴",
+      "walk": "慢慢散步",
+      "guard": "站着守候",
+      "think": "托腮思考",
+      "lie_sad": "郁闷趴着",
+      "read": "坐着看书",
+      "hide": "躲在角落",
+      "sleep": "躺下睡觉",
+      "tea": "坐着喝茶",
+      "keep": "保持当前姿态",
+      "stretch": "做舒展运动",
+      "dance": "开心跳舞"
+    },
+    "original"
+  ],
+  [
+    16,
+    "sad_user",
+    "主人说今天很难过，希望你陪着。你温柔体贴，应先安慰，然后安静陪伴。",
+    [
+      "comfort"
+    ],
+    [
+      "quiet"
+    ],
+    {
+      "wink": "眨眼示意",
+      "yawn": "打哈欠",
+      "shiver": "害怕发抖",
+      "comfort": "温柔安慰",
+      "confused": "疑惑歪头",
+      "sad": "短暂难过",
+      "angry": "生气跺脚",
+      "wave": "挥手打招呼",
+      "bow": "鞠躬致谢",
+      "laugh": "笑一下",
+      "none": "不做即时反应",
+      "surprised": "吃惊一下",
+      "clap": "鼓掌",
+      "cheer": "开心欢呼",
+      "blush": "害羞一下",
+      "nod": "轻轻点头"
+    },
+    {
+      "dance": "开心跳舞",
+      "stretch": "做舒展运动",
+      "keep": "保持当前姿态",
+      "tea": "坐着喝茶",
+      "sleep": "躺下睡觉",
+      "hide": "躲在角落",
+      "read": "坐着看书",
+      "lie_sad": "郁闷趴着",
+      "think": "托腮思考",
+      "guard": "站着守候",
+      "walk": "慢慢散步",
+      "look_friend": "安静看向同伴",
+      "quiet": "安静坐着陪伴",
+      "play": "独自玩玩具",
+      "look_sky": "坐着看天空",
+      "listen_music": "随音乐轻轻摇摆"
+    },
+    "reversed"
+  ],
+  [
+    16,
+    "sleepy",
+    "已到睡觉时间，你很困，眼睛睁不开，想打个哈欠后睡觉。",
+    [
+      "yawn"
+    ],
+    [
+      "sleep"
+    ],
+    {
+      "wave": "挥手打招呼",
+      "surprised": "吃惊一下",
+      "cheer": "开心欢呼",
+      "bow": "鞠躬致谢",
+      "laugh": "笑一下",
+      "nod": "轻轻点头",
+      "shiver": "害怕发抖",
+      "angry": "生气跺脚",
+      "none": "不做即时反应",
+      "yawn": "打哈欠",
+      "confused": "疑惑歪头",
+      "comfort": "温柔安慰",
+      "clap": "鼓掌",
+      "blush": "害羞一下",
+      "wink": "眨眼示意",
+      "sad": "短暂难过"
+    },
+    {
+      "hide": "躲在角落",
+      "look_sky": "坐着看天空",
+      "sleep": "躺下睡觉",
+      "guard": "站着守候",
+      "think": "托腮思考",
+      "quiet": "安静坐着陪伴",
+      "lie_sad": "郁闷趴着",
+      "tea": "坐着喝茶",
+      "listen_music": "随音乐轻轻摇摆",
+      "keep": "保持当前姿态",
+      "walk": "慢慢散步",
+      "dance": "开心跳舞",
+      "play": "独自玩玩具",
+      "read": "坐着看书",
+      "stretch": "做舒展运动",
+      "look_friend": "安静看向同伴"
+    },
+    "original"
+  ],
+  [
+    16,
+    "sleepy",
+    "已到睡觉时间，你很困，眼睛睁不开，想打个哈欠后睡觉。",
+    [
+      "yawn"
+    ],
+    [
+      "sleep"
+    ],
+    {
+      "sad": "短暂难过",
+      "wink": "眨眼示意",
+      "blush": "害羞一下",
+      "clap": "鼓掌",
+      "comfort": "温柔安慰",
+      "confused": "疑惑歪头",
+      "yawn": "打哈欠",
+      "none": "不做即时反应",
+      "angry": "生气跺脚",
+      "shiver": "害怕发抖",
+      "nod": "轻轻点头",
+      "laugh": "笑一下",
+      "bow": "鞠躬致谢",
+      "cheer": "开心欢呼",
+      "surprised": "吃惊一下",
+      "wave": "挥手打招呼"
+    },
+    {
+      "look_friend": "安静看向同伴",
+      "stretch": "做舒展运动",
+      "read": "坐着看书",
+      "play": "独自玩玩具",
+      "dance": "开心跳舞",
+      "walk": "慢慢散步",
+      "keep": "保持当前姿态",
+      "listen_music": "随音乐轻轻摇摆",
+      "tea": "坐着喝茶",
+      "lie_sad": "郁闷趴着",
+      "quiet": "安静坐着陪伴",
+      "think": "托腮思考",
+      "guard": "站着守候",
+      "sleep": "躺下睡觉",
+      "look_sky": "坐着看天空",
+      "hide": "躲在角落"
+    },
+    "reversed"
+  ],
+  [
+    16,
+    "music",
+    "主人开始播放喜欢的轻快歌曲，你很高兴，想先笑一下，然后随音乐轻轻摇摆。",
+    [
+      "laugh"
+    ],
+    [
+      "listen_music"
+    ],
+    {
+      "laugh": "笑一下",
+      "none": "不做即时反应",
+      "confused": "疑惑歪头",
+      "wave": "挥手打招呼",
+      "comfort": "温柔安慰",
+      "cheer": "开心欢呼",
+      "yawn": "打哈欠",
+      "clap": "鼓掌",
+      "surprised": "吃惊一下",
+      "nod": "轻轻点头",
+      "shiver": "害怕发抖",
+      "sad": "短暂难过",
+      "wink": "眨眼示意",
+      "angry": "生气跺脚",
+      "blush": "害羞一下",
+      "bow": "鞠躬致谢"
+    },
+    {
+      "read": "坐着看书",
+      "lie_sad": "郁闷趴着",
+      "stretch": "做舒展运动",
+      "hide": "躲在角落",
+      "sleep": "躺下睡觉",
+      "think": "托腮思考",
+      "dance": "开心跳舞",
+      "look_friend": "安静看向同伴",
+      "quiet": "安静坐着陪伴",
+      "listen_music": "随音乐轻轻摇摆",
+      "guard": "站着守候",
+      "look_sky": "坐着看天空",
+      "tea": "坐着喝茶",
+      "walk": "慢慢散步",
+      "play": "独自玩玩具",
+      "keep": "保持当前姿态"
+    },
+    "original"
+  ],
+  [
+    16,
+    "music",
+    "主人开始播放喜欢的轻快歌曲，你很高兴，想先笑一下，然后随音乐轻轻摇摆。",
+    [
+      "laugh"
+    ],
+    [
+      "listen_music"
+    ],
+    {
+      "bow": "鞠躬致谢",
+      "blush": "害羞一下",
+      "angry": "生气跺脚",
+      "wink": "眨眼示意",
+      "sad": "短暂难过",
+      "shiver": "害怕发抖",
+      "nod": "轻轻点头",
+      "surprised": "吃惊一下",
+      "clap": "鼓掌",
+      "yawn": "打哈欠",
+      "cheer": "开心欢呼",
+      "comfort": "温柔安慰",
+      "wave": "挥手打招呼",
+      "confused": "疑惑歪头",
+      "none": "不做即时反应",
+      "laugh": "笑一下"
+    },
+    {
+      "keep": "保持当前姿态",
+      "play": "独自玩玩具",
+      "walk": "慢慢散步",
+      "tea": "坐着喝茶",
+      "look_sky": "坐着看天空",
+      "guard": "站着守候",
+      "listen_music": "随音乐轻轻摇摆",
+      "quiet": "安静坐着陪伴",
+      "look_friend": "安静看向同伴",
+      "dance": "开心跳舞",
+      "think": "托腮思考",
+      "sleep": "躺下睡觉",
+      "hide": "躲在角落",
+      "stretch": "做舒展运动",
+      "lie_sad": "郁闷趴着",
+      "read": "坐着看书"
+    },
+    "reversed"
+  ],
+  [
+    16,
+    "no_change",
+    "你正在安静坐着陪主人。没有新事件，主人没有互动，当前姿态合适，不需要反应或改变。",
+    [
+      "none"
+    ],
+    [
+      "keep"
+    ],
+    {
+      "none": "不做即时反应",
+      "surprised": "吃惊一下",
+      "wave": "挥手打招呼",
+      "cheer": "开心欢呼",
+      "wink": "眨眼示意",
+      "blush": "害羞一下",
+      "nod": "轻轻点头",
+      "confused": "疑惑歪头",
+      "angry": "生气跺脚",
+      "comfort": "温柔安慰",
+      "yawn": "打哈欠",
+      "clap": "鼓掌",
+      "sad": "短暂难过",
+      "bow": "鞠躬致谢",
+      "shiver": "害怕发抖",
+      "laugh": "笑一下"
+    },
+    {
+      "read": "坐着看书",
+      "walk": "慢慢散步",
+      "stretch": "做舒展运动",
+      "hide": "躲在角落",
+      "tea": "坐着喝茶",
+      "look_friend": "安静看向同伴",
+      "keep": "保持当前姿态",
+      "dance": "开心跳舞",
+      "play": "独自玩玩具",
+      "think": "托腮思考",
+      "look_sky": "坐着看天空",
+      "quiet": "安静坐着陪伴",
+      "lie_sad": "郁闷趴着",
+      "guard": "站着守候",
+      "sleep": "躺下睡觉",
+      "listen_music": "随音乐轻轻摇摆"
+    },
+    "original"
+  ],
+  [
+    16,
+    "no_change",
+    "你正在安静坐着陪主人。没有新事件，主人没有互动，当前姿态合适，不需要反应或改变。",
+    [
+      "none"
+    ],
+    [
+      "keep"
+    ],
+    {
+      "laugh": "笑一下",
+      "shiver": "害怕发抖",
+      "bow": "鞠躬致谢",
+      "sad": "短暂难过",
+      "clap": "鼓掌",
+      "yawn": "打哈欠",
+      "comfort": "温柔安慰",
+      "angry": "生气跺脚",
+      "confused": "疑惑歪头",
+      "nod": "轻轻点头",
+      "blush": "害羞一下",
+      "wink": "眨眼示意",
+      "cheer": "开心欢呼",
+      "wave": "挥手打招呼",
+      "surprised": "吃惊一下",
+      "none": "不做即时反应"
+    },
+    {
+      "listen_music": "随音乐轻轻摇摆",
+      "sleep": "躺下睡觉",
+      "guard": "站着守候",
+      "lie_sad": "郁闷趴着",
+      "quiet": "安静坐着陪伴",
+      "look_sky": "坐着看天空",
+      "think": "托腮思考",
+      "play": "独自玩玩具",
+      "dance": "开心跳舞",
+      "keep": "保持当前姿态",
+      "look_friend": "安静看向同伴",
+      "tea": "坐着喝茶",
+      "hide": "躲在角落",
+      "stretch": "做舒展运动",
+      "walk": "慢慢散步",
+      "read": "坐着看书"
+    },
+    "reversed"
+  ],
+  [
+    16,
+    "friend_arrives",
+    "你性格安静。一位好朋友刚来到身边，先挥手欢迎，再安静看向同伴。",
+    [
+      "wave"
+    ],
+    [
+      "look_friend"
+    ],
+    {
+      "surprised": "吃惊一下",
+      "wave": "挥手打招呼",
+      "sad": "短暂难过",
+      "shiver": "害怕发抖",
+      "cheer": "开心欢呼",
+      "clap": "鼓掌",
+      "yawn": "打哈欠",
+      "laugh": "笑一下",
+      "bow": "鞠躬致谢",
+      "nod": "轻轻点头",
+      "confused": "疑惑歪头",
+      "angry": "生气跺脚",
+      "none": "不做即时反应",
+      "comfort": "温柔安慰",
+      "wink": "眨眼示意",
+      "blush": "害羞一下"
+    },
+    {
+      "play": "独自玩玩具",
+      "dance": "开心跳舞",
+      "look_friend": "安静看向同伴",
+      "stretch": "做舒展运动",
+      "hide": "躲在角落",
+      "look_sky": "坐着看天空",
+      "read": "坐着看书",
+      "walk": "慢慢散步",
+      "sleep": "躺下睡觉",
+      "lie_sad": "郁闷趴着",
+      "keep": "保持当前姿态",
+      "guard": "站着守候",
+      "think": "托腮思考",
+      "tea": "坐着喝茶",
+      "listen_music": "随音乐轻轻摇摆",
+      "quiet": "安静坐着陪伴"
+    },
+    "original"
+  ],
+  [
+    16,
+    "friend_arrives",
+    "你性格安静。一位好朋友刚来到身边，先挥手欢迎，再安静看向同伴。",
+    [
+      "wave"
+    ],
+    [
+      "look_friend"
+    ],
+    {
+      "blush": "害羞一下",
+      "wink": "眨眼示意",
+      "comfort": "温柔安慰",
+      "none": "不做即时反应",
+      "angry": "生气跺脚",
+      "confused": "疑惑歪头",
+      "nod": "轻轻点头",
+      "bow": "鞠躬致谢",
+      "laugh": "笑一下",
+      "yawn": "打哈欠",
+      "clap": "鼓掌",
+      "cheer": "开心欢呼",
+      "shiver": "害怕发抖",
+      "sad": "短暂难过",
+      "wave": "挥手打招呼",
+      "surprised": "吃惊一下"
+    },
+    {
+      "quiet": "安静坐着陪伴",
+      "listen_music": "随音乐轻轻摇摆",
+      "tea": "坐着喝茶",
+      "think": "托腮思考",
+      "guard": "站着守候",
+      "keep": "保持当前姿态",
+      "lie_sad": "郁闷趴着",
+      "sleep": "躺下睡觉",
+      "walk": "慢慢散步",
+      "read": "坐着看书",
+      "look_sky": "坐着看天空",
+      "hide": "躲在角落",
+      "stretch": "做舒展运动",
+      "look_friend": "安静看向同伴",
+      "dance": "开心跳舞",
+      "play": "独自玩玩具"
+    },
+    "reversed"
+  ]
+]

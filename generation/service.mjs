@@ -11,6 +11,7 @@ const MAX_BODY = 12 * 1024 * 1024;
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const safeError = error => {
   const s = String(error?.message ?? error);
+  if (/Transparency QC:/i.test(s)) return '透明背景处理未通过检查，原视频已保留；重试只重新抠像，不会重新生成视频。';
   if (/401|403|auth|key/i.test(s)) return '模型服务暂不可用，请联系管理员；已生成的结果会保留。';
   if (/429|rate|quota/i.test(s)) return '模型服务繁忙或额度不足，稍后可继续当前任务。';
   if (/content|safety|moderation/i.test(s)) return '素材未通过模型检查，请换一张合适的角色图片。';

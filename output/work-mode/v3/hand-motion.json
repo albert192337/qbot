@@ -1,0 +1,10 @@
+{
+  "computer_idle": {
+    "handMeanDifference": 0.003249122807017544,
+    "frames": 20
+  },
+  "computer_typing": {
+    "handMeanDifference": 36.27672514619883,
+    "frames": 20
+  }
+}

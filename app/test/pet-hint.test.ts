@@ -11,6 +11,9 @@ it('keeps hints wholly outside the actor at every edge, with negative monitor co
   }
 });
 it('suppresses the hint when no exterior space exists',()=>expect(exteriorHintPosition({x:0,y:0,width:360,height:360},{x:0,y:0,width:360,height:360})).toBeNull());
+it('places a top-edge hint directly below the pet before considering either side',()=>{
+  expect(exteriorHintPosition({x:400,y:20,width:360,height:360},{x:0,y:0,width:1920,height:1040})).toEqual({x:460,y:386});
+});
 it('caps at twice daily with four hours between, and respects dismissal across reload',()=>{
   const now=new Date(2026,8,25,9).getTime(),hour=3600000;
   expect(canRemind(undefined,now)).toBe(true);

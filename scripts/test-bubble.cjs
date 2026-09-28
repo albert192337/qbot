@@ -9,6 +9,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 app.whenReady().then(async () => {
   let idleSeconds = 60;
   ipcMain.handle('bubble:idleSeconds', () => idleSeconds);
+  ipcMain.handle('overlays:get', () => ({ revision: 0, winner: null }));
   const win = new BrowserWindow({
     width: 340, height: 500, show: false, frame: false,
     webPreferences: { preload: path.join(root, 'app/out/preload/index.js'), backgroundThrottling: false },
@@ -27,9 +28,14 @@ app.whenReady().then(async () => {
     assert.equal(await win.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.bubble')).borderLeftWidth`), '2px');
     assert.equal(await win.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.bubble .src')).display`), 'none');
     assert.ok(await win.webContents.executeJavaScript(`document.querySelector('.bubble').getBoundingClientRect().bottom <= 131`));
+    win.webContents.send('bubble:anchor', 'below', 154);
+    await wait(100);
+    assert.equal((await read()).below, true);
+    assert.ok(await win.webContents.executeJavaScript(`Math.abs(document.querySelector('.bubble').getBoundingClientRect().top) <= 1`));
+    assert.ok(await win.webContents.executeJavaScript(`document.querySelector('.bubble').getBoundingClientRect().bottom <= 154`));
     win.webContents.send('bubble:anchor', 'above', 0);
     await wait(100);
-    assert.ok(await win.webContents.executeJavaScript(`document.querySelector('.bubble').getBoundingClientRect().top >= 0`));
+    assert.ok(await win.webContents.executeJavaScript(`(() => { const stack = document.querySelector('#stack'); return stack.getBoundingClientRect().height === 0 && getComputedStyle(stack).overflow === 'hidden'; })()`));
     win.webContents.send('bubble:anchor', 'above', 130);
     await wait(250);
     await fs.mkdir(path.join(root, '.superpowers/bubble-preview'), { recursive: true });

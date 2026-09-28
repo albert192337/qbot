@@ -1,3 +1,5 @@
+@import '../speech-bubble.css';
+
 body.visit-mode.pair-mode { display:block; }
 body.visit-mode.pair-mode #stage, body.visit-mode.pair-mode #visitor-stage {
   position:absolute; top:10%; width:46%; height:82%; margin:0; transform:none;
@@ -13,10 +15,9 @@ body.visit-mode.pair-mode.flip-visitor #visitor-stage > canvas { transform:scale
 body.pair-mode #pet-hud, body.pair-mode .signboard { visibility:hidden; }
 #pair-interaction { --from:33%; --to:67%; position:absolute; inset:0; z-index:10; pointer-events:none; color:#594235; font:13px 'Microsoft YaHei',sans-serif; }
 body.pair-swapped #pair-interaction { --from:67%; --to:33%; }
-.pair-caption { position:absolute; bottom:78%; transform:translateX(-50%); background:#fff9ef; border:2px solid #72574a; border-radius:18px; padding:clamp(2px,1vh,4px) 12px; box-sizing:border-box; max-width:min(60%,28em); width:max-content; font-size:clamp(7px,3.6vh,13px); line-height:1.35; text-align:center; overflow-wrap:anywhere; }
+.pair-caption { position:absolute; bottom:78%; transform:translateX(-50%); max-width:min(64%,320px); width:max-content; }
 .pair-caption[data-speaker='host'] { left:var(--from); }
 .pair-caption[data-speaker='guest'] { left:var(--to); }
-.pair-caption::after { content:''; position:absolute; bottom:-7px; left:50%; width:10px; height:10px; background:#fff9ef; border-right:2px solid #72574a; border-bottom:2px solid #72574a; transform:translateX(-50%) rotate(45deg); }
 .pair-toolbar { position:absolute; bottom:2px; left:50%; transform:translateX(-50%); display:flex; align-items:center; justify-content:center; gap:4px; max-width:98%; flex-wrap:wrap; pointer-events:auto; background:#fff9eff2; border-radius:12px; padding:4px; }
 .pair-toolbar button { cursor:pointer; border:1px solid #cbb5a0; background:#fff9ef; color:#594235; border-radius:8px; padding:4px 7px; white-space:nowrap; font:inherit; }
 .pair-toolbar button:hover { background:#ffe3d6; }

@@ -10,9 +10,18 @@ export function mountPeerControls(stage:HTMLElement,owner:()=>string|undefined) 
   root.append(wheel,row,feedback);document.body.append(root);
   let timer:ReturnType<typeof setTimeout>|undefined,busy=false,version=0,loading=false;
   const close=()=>{clearTimeout(timer);version++;loading=false;root.hidden=!document.body.classList.contains('member-hidden');wheel.hidden=true;feedback.hidden=true;interaction.setAttribute('aria-expanded','false');interaction.removeAttribute('aria-busy');};
-  const show=()=>{clearTimeout(timer);if(document.body.classList.contains('desktop-hidden')||document.body.dataset.peek)return;if(root.hidden){root.hidden=false;window.qbot.desktop.openPeerControls();}};
+  const show=()=>{void refreshGarden();clearTimeout(timer);if(document.body.classList.contains('desktop-hidden')||document.body.dataset.peek)return;if(root.hidden){root.hidden=false;window.qbot.desktop.openPeerControls();}};
   const button=(name:string,icon:string)=>{const b=document.createElement('button');b.className='hud-chat';b.title=name;b.setAttribute('aria-label',name);b.innerHTML=icon;row.append(b);return b;};
   const garden=button('查看房友的花园',GARDEN_ICON);garden.onclick=()=>{const id=owner();if(id)window.qbot.garden.open('visit:'+id);};
+  let gardenIdentity:string|undefined;
+  async function refreshGarden(){
+    const id=owner();if(id===gardenIdentity)return;gardenIdentity=id;
+    garden.hidden=!id||id.startsWith('test:');
+    if(id?.startsWith('test:'))try{
+      const guests=await window.qbot.social.guests();
+      if(owner()===id)garden.hidden=guests.find(g=>'test:'+g.id===id)?.source!=='房友缓存';
+    }catch{gardenIdentity=undefined;}
+  }
   const interaction=button('互动',HEART_ICON);interaction.setAttribute('aria-expanded','false');
   const hide=button('在我的桌面隐藏',EYE_ICON);hide.classList.add('peer-hide');hide.onclick=()=>{const id=owner();if(id)void window.qbot.desktop.setMemberHidden(id,!document.body.classList.contains('member-hidden')).then(close).catch(error=>message(error));};
   let feedbackTimer:ReturnType<typeof setTimeout>|undefined;

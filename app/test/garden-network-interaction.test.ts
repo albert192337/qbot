@@ -1,13 +1,20 @@
 import {beforeEach,it,expect,vi} from 'vitest';
-const mock=vi.hoisted(()=>({send:vi.fn(),guest:true}));
+const mock=vi.hoisted(()=>({send:vi.fn(),guest:true,record:vi.fn(async()=>{})}));
+vi.mock('../src/main/relationships',()=>({relationships:{record:mock.record},localPerson:()=>({id:'host'}),peerPerson:()=>({id:'friend'})}));
 vi.mock('electron',()=>({app:{getPath:()=>''},BrowserWindow:{getAllWindows:()=>[]}}));
 vi.mock('../src/main/config',()=>({getSettings:async()=>({activeCharacter:'host'}),setSettings:vi.fn()}));
 vi.mock('../src/main/rooms/rooms',()=>({gardenRealm:()=>'',gardenRequest:vi.fn()}));
 vi.mock('../src/main/windows',()=>({getPetWindow:()=>({webContents:{send:mock.send}})}));
 vi.mock('../src/main/characters',()=>({getCharacter:async()=>({dirId:'host',manifest:{name:'主人',actions:{idle:{webm:'idle.webm'}}}})}));
-vi.mock('../src/main/rooms/room-pets',()=>({getMemberSnapshot:()=>({character:mock.guest?{dirId:'cached-friend',manifest:{name:'伙伴',actions:{idle:{webm:'idle.webm'}}}}:null})}));
+vi.mock('../src/main/rooms/room-pets',()=>({getContactRealm:()=> 'realm',getMemberSnapshot:()=>({character:mock.guest?{dirId:'cached-friend',manifest:{name:'伙伴',actions:{idle:{webm:'idle.webm'}}}}:null})}));
 import {playNetworkInteraction} from '../src/main/garden/network';
-beforeEach(()=>{mock.send.mockClear();mock.guest=true;});
+beforeEach(()=>{mock.send.mockClear();mock.record.mockClear();mock.guest=true;});
+it('records only the first accepted beat with the server session identity',async()=>{
+ await playNetworkInteraction({actor:'host',partner:'friend',kind:'tea',intent:'wave',step:0,session:'accepted'});
+ await playNetworkInteraction({actor:'host',partner:'friend',kind:'tea',intent:'tea',step:1,session:'accepted'});
+ expect(mock.record).toHaveBeenCalledTimes(1);
+ expect(mock.record).toHaveBeenCalledWith({id:'host'},{id:'friend'},'tea','online::accepted');
+});
 it('shows both cached characters once after a consented photo begins, without restarting at each beat',async()=>{await playNetworkInteraction({actor:'host',partner:'friend',kind:'photo',intent:'happy',step:0});expect(mock.send).toHaveBeenCalledWith('pet:menuCommand',expect.objectContaining({type:'networkPair',kind:'photo',recipient:true,guest:expect.objectContaining({dirId:'cached-friend'})}));await playNetworkInteraction({actor:'host',partner:'friend',kind:'photo',intent:'happy',step:1});expect(mock.send).toHaveBeenCalledTimes(1);});
 it('uses a compatible local action when partner media is unavailable, and ignores another role',async()=>{mock.guest=false;await playNetworkInteraction({actor:'host',partner:'friend',kind:'photo',intent:'happy',step:0});expect(mock.send).toHaveBeenCalledWith('pet:menuCommand',{type:'play',action:'idle'});mock.send.mockClear();await playNetworkInteraction({actor:'different',partner:'friend',kind:'photo',intent:'happy',step:0});expect(mock.send).not.toHaveBeenCalled();});
 

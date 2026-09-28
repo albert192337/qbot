@@ -1,9 +1,11 @@
+import { workIdleMilliseconds } from './work-input';
 import { registerRoomPetMenu } from './rooms/room-pet-menu';
 import { registerDesktopVisibility, desktopQuiet } from './desktop-visibility';
 import {registerDesktopOverlays} from './desktop-overlays';
 import {registerPetHints} from './pet-hint';
 import { saveResourceAnnotation, saveScenePools } from './resource-settings';
 import { registerSocialIpc } from './social-ipc';
+import { registerRelationshipsIpc } from './relationships-ipc';
 import { moveRoomPetWindow } from './windows';
 import { imageChoices, selectedImage, saveCover } from './character-images';
 import { prepareActionFrame, approveActionFrame, pendingActionFrame, actionReference } from './pipeline-bridge';
@@ -65,7 +67,7 @@ import {
 import { getAllRules, debugTrigger, triggerRules } from './behavior-rules';
 import { getExecutorState, stopAllBehaviors } from './behavior-executor';
 import { debugThink, requestThink } from './brain-llm';
-import { setGardenSpeechBounds } from './garden/windows';
+import { setGardenSpeechBounds, isGardenStrip } from './garden/windows';
 import { sendPetChat } from './pet-chat';
 import { openPetChat, closePetChat } from './windows';
 import { registerGardenIpc } from './garden/windows';
@@ -75,8 +77,9 @@ import { getIdlePlan } from './idle-plan';
 export function registerIpc(): void {
   registerDesktopVisibility();
   registerPetHints();
-  registerDesktopOverlays((id,kind)=>id===getPetWindow()?.webContents.id||(kind==='speech'&&id===getBubbleWindow()?.webContents.id));
+  registerDesktopOverlays((id,kind)=>id===getPetWindow()?.webContents.id||(kind==='speech'&&id===getBubbleWindow()?.webContents.id)||(kind==='cultivation'&&isGardenStrip(id)));
   registerSocialIpc();
+  registerRelationshipsIpc();
   ipcMain.handle('behavior:getIdlePlan',(_ev,id:string)=>getIdlePlan(id));
   ipcMain.handle('memory:retry', async () => {
     if (!(await getSettings()).developerMode) throw new Error('请先开启开发者模式');
@@ -342,7 +345,7 @@ export function registerIpc(): void {
   // 桌宠右键菜单：原生 Menu.popup 不受桌宠小窗边界约束（DOM 菜单会被截断）。
   // 只留「玩宠动作 + 去处」两段——所有配置/管理都收进控制台（一个窗、左侧栏二级目录），
   // 不再把托盘的 section 平铺进来。说话/播动作/举牌回渲染端执行；开窗口直调主进程
-  ipcMain.on('pet:popupMenu', async (ev, actions: PetMenuActionEntry[]) => {
+  ipcMain.on('pet:popupMenu', async (ev, actions: PetMenuActionEntry[], working?: boolean) => {
     const win = BrowserWindow.fromWebContents(ev.sender);
     if (!win) return;
     const send = (cmd: PetMenuCommand) => ev.sender.send('pet:menuCommand', cmd);
@@ -357,6 +360,7 @@ export function registerIpc(): void {
       ...(switchCharacter ? [switchCharacter] : []),
       // ── 玩宠（最高频，一级直达）─────────────────────────
       { label: '说句话', click: () => send({ type: 'speak' }) },
+      { label: working ? '结束一起工作' : '一起工作（键鼠联动）', enabled: Array.isArray(actions) && ['computer_idle','computer_typing'].every(id => actions.some(a => a.id === id)), click: () => send({ type: 'workMode' }) },
       { label: '双人互动（本地试演）', submenu: [
         ...PAIR_INTERACTIONS.map(({ id, label }) => ({ label:label+(CHARACTER_UNLOCKS.some(u=>u.kind===id&&u.level>actorLevel)?` · Lv.${CHARACTER_UNLOCKS.find(u=>u.kind===id)!.level} 解锁`:''),enabled:!CHARACTER_UNLOCKS.some(u=>u.kind===id&&u.level>actorLevel), submenu: guests.length
           ? guests.map(c => ({ label: c.manifest.name, click: () => send({ type: 'pair', kind: id, guestId: c.dirId }) }))
@@ -521,6 +525,8 @@ export function registerIpc(): void {
     });
     else win.webContents.send('behavior:say', msg);
   });
+  ipcMain.handle('pet:workIdleMs', () =>
+    powerMonitor.getSystemIdleState(15) === 'locked' ? Infinity : process.platform === 'win32' ? workIdleMilliseconds() : powerMonitor.getSystemIdleTime() * 1000);
   ipcMain.handle('bubble:idleSeconds', () =>
     powerMonitor.getSystemIdleState(15) === 'locked' ? 15 : powerMonitor.getSystemIdleTime());
 

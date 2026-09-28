@@ -30,6 +30,9 @@ steam_appid.txt
 # 本机部署依赖与 Electron 试住运行档案
 output/deploy-tools/
 output/**/profile/
+output/work-mode/trial-profile/
+output/perch-diagnosis/ffmpeg*.exe
+output/perch-diagnosis/ffmpeg*.gz
 
 # Python 临时字节码
 __pycache__/

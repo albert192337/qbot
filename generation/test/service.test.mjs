@@ -91,6 +91,9 @@ test('candidate retries and failure retries exceed former limits; responses reda
   await request(`/jobs/${id}/pick`,'POST',{index:0,persona:'沉稳克制'});await phase('failed');
   assert.ok(!(await(await request(`/jobs/${id}`)).text()).includes('secret-key-token'));
   for(let i=0;i<5;i++){const persona=i===0?'温柔慢热':'';assert.equal((await request(`/jobs/${id}/resume`,'POST',{persona})).status,202);await phase('failed');assert.equal((await(await request(`/jobs/${id}`)).json()).state.persona,persona);}
+  pipeline.runActions=async()=>{throw new Error('Transparency QC: green background remains; rekey the saved video');};
+  await request(`/jobs/${id}/resume`,'POST',{});await phase('failed');
+  assert.match((await(await request(`/jobs/${id}`)).json()).error,/重试只重新抠像/);
  }finally{app?.stop();await rm(dir,{recursive:true,force:true});}
 });
 

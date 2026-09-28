@@ -71,7 +71,7 @@ it('keeps the farm independent of pet docking and remembers a dragged position a
  expect(target.y).toBe(399);expect(target.x).toBeLessThan(400);
 });
 
-it('cultivation keeps the pet at the crop for three minutes and drag pauses the remaining time',async()=>{
+it('cultivation survives dragging and only explicit pause stops the remaining time',async()=>{
  vi.useFakeTimers();vi.setSystemTime(100000);
  const {initialGarden,transition}=await import('../src/main/garden/rules');let id=0;const rng={random:()=>.99,id:()=>String(id++)};
  const state=initialGarden(Date.now(),rng);state.seeds[0].genes=['rainbow'];
@@ -80,9 +80,15 @@ it('cultivation keeps the pet at the crop for three minutes and drag pauses the 
  const pet:any=new BrowserWindow({x:600,y:500,width:360,height:360});pet.visible=true;attachGarden(pet);registerGardenIpc();mocks.events.get('garden:toggle')!();mocks.windows[1].visible=true;
  const act=mocks.handlers.get('garden:act')!;
  expect((await act({},{type:'cultivate',plot:0})).ok).toBe(true);
- expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance','writing');
+ expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance','garden_sow');
  await vi.advanceTimersByTimeAsync(10000);expect(mocks.state.plots[0].revealed).not.toBe(true);expect(pet.getBounds().x).not.toBe(600);
- mocks.events.get('pet:move')!();await vi.advanceTimersByTimeAsync(0);expect(mocks.state.plots[0].cultivation).toEqual({remainingMs:170000});
+ const sent=pet.webContents.send.mock.calls.filter((c:any[])=>c[0]==='garden:performance').length;
+ expect((await act({},{type:'plant',plot:1,seed:mocks.state.seeds[0].id})).ok).toBe(true);
+ await vi.advanceTimersByTimeAsync(0);
+ expect(pet.webContents.send.mock.calls.filter((c:any[])=>c[0]==='garden:performance')).toHaveLength(sent);
+ expect(mocks.state.plots[0].cultivation.startedAt).toBeDefined();
+ mocks.events.get('pet:move')!();await vi.advanceTimersByTimeAsync(0);expect(mocks.state.plots[0].cultivation.startedAt).toBeDefined();
+ await act({},{type:'pauseCultivation',plot:0});expect(mocks.state.plots[0].cultivation).toEqual({remainingMs:170000});
  await vi.advanceTimersByTimeAsync(60000);expect(mocks.state.plots[0].revealed).not.toBe(true);
  expect((await act({},{type:'cultivate',plot:0})).ok).toBe(true);
  await vi.advanceTimersByTimeAsync(169999);expect(mocks.state.plots[0].revealed).not.toBe(true);
@@ -90,7 +96,7 @@ it('cultivation keeps the pet at the crop for three minutes and drag pauses the 
 expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance',null);
 });
 
-it('brings the pet and a read-only friend crop to the desktop, heartbeats once, and leaves on drag',async()=>{
+it('keeps a friend cultivation running across dragging and leaves only on explicit pause',async()=>{
  vi.useFakeTimers();vi.setSystemTime(100000);
  const {initialGarden}=await import('../src/main/garden/rules');
  mocks.state=initialGarden(Date.now(),{random:()=>.5,id:()=> 'own'});
@@ -102,13 +108,15 @@ it('brings the pet and a read-only friend crop to the desktop, heartbeats once, 
  const join=mocks.handlers.get('garden:cooperate')!;
  await join({},'friend',2,'join');
  const strip=mocks.windows[1];
- expect(pet.getBounds().x).not.toBe(600);expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance','writing');
+ expect(pet.getBounds().x).not.toBe(600);expect(pet.webContents.send).toHaveBeenCalledWith('garden:performance','garden_sow');
  const view=await mocks.handlers.get('garden:get')!({sender:strip.webContents});
  expect(view.cultivationVisit).toEqual({owner:'friend',plot:2});expect(view.plots[2].id).toBe('friend-secret');
  expect((await mocks.handlers.get('garden:act')!({sender:strip.webContents},{type:'harvest',plot:2})).ok).toBe(false);
  await join({},'friend',2,'join');expect(mocks.coop.some(c=>c.action==='leave')).toBe(false);
  await vi.advanceTimersByTimeAsync(5000);expect(mocks.coop.filter(c=>c.action==='join')).toHaveLength(3);
  mocks.events.get('pet:move')!();await vi.advanceTimersByTimeAsync(0);
+ expect(mocks.coop.some(c=>c.action==='leave')).toBe(false);
+ await join({},'friend',2,'leave');
  expect(mocks.coop.at(-1)).toEqual({owner:'friend',plot:2,action:'leave'});
  const count=mocks.coop.length;await vi.advanceTimersByTimeAsync(20000);expect(mocks.coop).toHaveLength(count);
  expect((await mocks.handlers.get('garden:get')!({sender:strip.webContents})).cultivationVisit).toBeUndefined();

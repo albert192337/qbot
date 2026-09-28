@@ -1,0 +1,22 @@
+{
+  "character": "C:\\Users\\beta\\AppData\\Roaming\\@qbot\\app\\characters\\53ed5068-dd60-4e2a-82c7-fb94250369d1",
+  "backup": "C:\\Users\\beta\\AppData\\Roaming\\@qbot\\app\\characters\\53ed5068-dd60-4e2a-82c7-fb94250369d1\\.job\\work-mode-backup-2026-09-27T07-05-24-368Z",
+  "installed": [
+    {
+      "file": "computer_idle.webm",
+      "sha256": "7502f95227e1854ac9dae2b95ce6252df827102fd4a64554e1c47bbb81a7b932"
+    },
+    {
+      "file": "computer_idle.gif",
+      "sha256": "b807a1e2309d88b79dea13a54772d11305e762833f171411f59b00311168b711"
+    },
+    {
+      "file": "computer_typing.webm",
+      "sha256": "53381d6752fa03ba1ab62568637836359b3e5d05014fb0d8d42d073a48e0ec98"
+    },
+    {
+      "file": "computer_typing.gif",
+      "sha256": "d4988147bc119e2d7629ed22544e8f95a634ebe5b417d4e59afb9ad2e7dcb014"
+    }
+  ]
+}

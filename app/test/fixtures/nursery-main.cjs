@@ -12,6 +12,10 @@ app.whenReady().then(async () => {
   session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_request,cb)=>cb({cancel:true}));
   protocol.handle('qbot-asset',async request=>{
     const url=new URL(request.url);const relative=decodeURIComponent(url.pathname).replace(/^\//,'');
+    if(relative==='__portrait.png'&&process.env.QBOT_QA_PORTRAITS==='1'){
+      const image=require('electron').nativeImage.createFromPath(path.join(preset,'turnaround.png')),size=image.getSize();
+      return new Response(image.crop({x:0,y:0,width:Math.floor(size.width/3),height:size.height}).toPNG(),{headers:{'Content-Type':'image/png'}});
+    }
     const sourceRoot=url.hostname==='white-dog'&&process.env.QBOT_QA_REAL_STICKERS?process.env.QBOT_QA_REAL_STICKERS:preset;
     const filename=path.join(sourceRoot,relative);
     if(!filename.startsWith(sourceRoot+path.sep))return new Response(null,{status:403});

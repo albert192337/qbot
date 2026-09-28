@@ -19,6 +19,7 @@ interface Module {
   discardChanges?(): void | Promise<void>;
 }
 const LOADERS: Record<string, () => Promise<Module>> = {
+  relationships: () => import('../console/panes/relationships'),
   memory: () => import('../console/panes/memory'),
   characters: () => import('../console/panes/characters'),
   profile: () => import('../console/panes/profile'),
@@ -50,6 +51,7 @@ const LOADERS: Record<string, () => Promise<Module>> = {
   furnish: () => import('./furnish'),
 };
 export const BOOK_TITLES: Record<string, string> = {
+  relationships: '关系手账',
   memory: '我记得的你',
   characters: '朋友相册',
   profile: '它的故事',
@@ -243,6 +245,7 @@ export class Book {
       );
     }
     this.tabs.append(button('我记得的你', () => this.request({ pane: 'memory' }), 'bookmark'));
+    this.tabs.append(button('关系手账', () => this.request({ pane: 'relationships' }), 'bookmark'));
     let entry = this.entries.get(id);
     if (!entry) {
       const root = el('section', undefined, 'pane active');

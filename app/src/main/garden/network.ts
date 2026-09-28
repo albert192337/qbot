@@ -62,9 +62,14 @@ export async function playNetworkInteraction(frame:Record<string,unknown>):Promi
   const kind=frame.kind as PairKind;
   let paired=false;
   if(typeof frame.partner==='string'){
-    const {getMemberSnapshot}=await import('../rooms/room-pets');
+    const {getMemberSnapshot,getContactRealm}=await import('../rooms/room-pets');
     const guest=getMemberSnapshot(frame.partner)?.character;
     if(guest){
+      if (frame.step === 0 && typeof frame.session === 'string') {
+        const {relationships,localPerson,peerPerson} = await import('../relationships');
+        await relationships.record(localPerson(character),peerPerson(guest,frame.partner,getContactRealm(),getMemberSnapshot(frame.partner)?.nickname),kind,`online:${gardenRealm()}:${frame.session}`)
+          .catch(error => console.error('[relationships] interaction save failed',error));
+      }
       paired=true;
       // All first beats have distinct intents, so existing servers also identify the
       // recipient without a protocol upgrade. Later network beats must not restart media.

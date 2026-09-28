@@ -50,6 +50,40 @@ beforeEach(() => {
 afterEach(() => { player.dispose(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('Player visibility and recovery', () => {
+  it('freezes the current work frame and resumes without a seek or decoder switch', async () => {
+    player.load('pet',manifest(['idle','computer_idle','computer_typing']));
+    player.playWork(false); await flush();
+    const clip=video('computer_typing');
+    expect(clip.paused).toBe(true);expect(clip.play).not.toHaveBeenCalled();
+    player.playWork(true); await flush(); clip.currentTime=2.37;
+    player.playWork(false); await flush();
+    expect(clip.paused).toBe(true); expect(clip.currentTime).toBe(2.37);
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(clip.load).not.toHaveBeenCalled();
+    player.playWork(true); await flush();
+    expect(clip.currentTime).toBe(2.37);expect(clip.paused).toBe(false);
+    expect(visible()).toEqual([clip]);
+    player.play('idle');await flush();expect(clip.paused).toBe(true);
+  });
+  it('keeps latest idle intent while the first work frame is loading', async () => {
+    player.load('pet',manifest(['idle','computer_typing']));
+    let resolve!:()=>void; const clip=video('computer_typing');
+    clip.play.mockImplementation(()=>new Promise<void>(r=>{resolve=r}));
+    player.playWork(true); player.playWork(false); resolve();await flush();
+    expect(clip.paused).toBe(true);expect(visible()).toEqual([clip]);
+  });
+  it('switches the computer pair without a smoke effect and keeps both clips looping', async () => {
+    player.load('pet',manifest(['idle','computer_idle','computer_typing']));
+    const poof=vi.spyOn(player,'triggerPoof');
+    player.play('idle');await flush();
+    player.playLooping('computer_idle');await flush();
+    expect(poof).toHaveBeenCalledTimes(1);
+    player.playLooping('computer_typing');await flush();
+    player.playLooping('computer_idle');await flush();
+    expect(poof).toHaveBeenCalledTimes(1);
+    expect(video('computer_idle').loop).toBe(true);
+    expect(video('computer_typing').loop).toBe(true);
+  });
   it('suspends playback and watchdogs without discarding assets, then explicitly resumes', async () => {
     player.play('tea');await flush();
     const clip=video('tea'),source=clip.src;

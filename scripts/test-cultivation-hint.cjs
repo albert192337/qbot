@@ -14,11 +14,18 @@ win.webContents.on('console-message',(_e,level,message)=>{if(level>=2)console.lo
 await win.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'strip'}});await js("Object.defineProperty(document,'hidden',{get:()=>false});void 0");
 for(let i=0;i<60&&!await js('!!document.querySelector(".cultivation-hint")');i++)await wait(100);
 const anchor=performer=>win.webContents.send('garden:anchor',{left:650,right:850,top:100,bottom:275,side:'left',performer});anchor({left:400,right:600,top:150,bottom:350});await wait(200);
-const rect=()=>js('(()=>{const r=document.querySelector(".cultivation-hint").getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})()');let r=await rect();if(r.y!==358)console.log('DIAG',r,await js('({body:document.body.className,style:document.querySelector(".cultivation-hint").getAttribute("style"),html:document.querySelector(".cultivation-hint").outerHTML})'));assert.equal(r.y,358);assert.ok(Math.abs(r.x+r.w/2-500)<2);assert.equal(await js('document.querySelector(".cultivation-pause").textContent'),'暂停');
+const rect=()=>js('(()=>{const r=document.querySelector(".cultivation-hint").getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})()');let r=await rect();assert.equal(r.y+r.h,142);assert.ok(Math.abs(r.x+r.w/2-500)<2);assert.equal(r.h,18);assert.equal(await js('document.querySelector(".cultivation-hint").textContent'),'');assert.equal(await js('getComputedStyle(document.querySelector(".cultivation-hint")).pointerEvents'),'none');
 const before=await js('document.querySelector(".cultivation-hint-progress").value');await wait(1300);assert.ok(await js('document.querySelector(".cultivation-hint-progress").value')>before);
-anchor({left:400,right:600,top:450,bottom:690});await wait(150);r=await rect();assert.ok(r.x>=608||r.x+r.w<=392||r.y+r.h<=442);assert.ok(r.y+r.h<=692);
-const out=path.join(root,'.superpowers/cultivation-hint');fs.mkdirSync(out,{recursive:true});anchor({left:400,right:600,top:150,bottom:350});await wait(200);fs.writeFileSync(path.join(out,'below-progress.png'),(await win.webContents.capturePage()).toPNG());
-await js('document.querySelector(".cultivation-pause").click()');await wait(200);assert.ok(paused);assert.equal(await js('!!document.querySelector(".cultivation-hint")'),false);
-console.log('PASS: performer-relative below placement, edge avoidance, live timed progress, compact pause and leave action');app.exit(0);
+anchor({left:400,right:600,top:450,bottom:690});await wait(150);r=await rect();assert.equal(r.y+r.h,442);
+const visible=()=>js('getComputedStyle(document.querySelector(".cultivation-hint")).visibility==="visible"');
+anchor({left:400,right:600,top:10,bottom:210});await wait(150);assert.equal(await visible(),false);
+anchor({left:400,right:600,top:150,bottom:350});await wait(150);assert.equal(await visible(),true);
+await js('window.savedBar=document.querySelector(".cultivation-hint-progress");void 0');
+for(let i=0;i<8;i++){task.updatedAt=Date.now();task.remaining-=180;win.webContents.send('garden:changed');await wait(100);assert.equal(await js('window.savedBar===document.querySelector(".cultivation-hint-progress")'),true,'refresh preserves the actual progress node');}
+for(const [i,winner] of ['speech','wish','cultivation','interaction',null].entries()){win.webContents.send('overlays:changed',{revision:i+1,winner});await wait(100);assert.equal(await visible(),winner!=='interaction');}
+win.webContents.send('garden:speechBounds',{left:390,right:610,top:110,bottom:150});await wait(100);assert.equal(await visible(),false);win.webContents.send('garden:speechBounds',null);await wait(100);assert.equal(await visible(),true);
+const out=path.join(root,'.superpowers/cultivation-hint');fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'above-progress.png'),(await win.webContents.capturePage()).toPNG());
+delete state.cultivationVisit;state.cooperations=[];plant.cultivation={remainingMs:180000,startedAt:Date.now()-90000};win.webContents.send('garden:changed');await wait(250);const localProgress=await js('document.querySelector(".cultivation-hint-progress").value');assert.ok(localProgress>=.5&&localProgress<.52,'local v3 uses the three-minute duration');delete plant.cultivation;win.webContents.send('garden:changed');await wait(250);assert.equal(await js('!!document.querySelector(".cultivation-hint")'),false);
+console.log('PASS: head-only bar, mouse pass-through, live progress, top edge hiding, shared overlay priority, speech avoidance and cleanup');app.exit(0);
 }catch(e){console.error(e);app.exit(1)}});
 }

@@ -1,0 +1,83 @@
+{
+  "load_seconds": 34.35288959999889,
+  "torch": "2.14.0+cpu",
+  "libraries": {
+    "laya": "0.3.20",
+    "transformers": "5.17.0",
+    "safetensors": "0.8.0",
+    "psutil": "7.2.2"
+  },
+  "platform": "Windows-11-10.0.26200-SP0",
+  "threads": 2,
+  "model_path": "D:/QBot-model-lab/laya-eval/model",
+  "config": {
+    "encoder": "jhu-clsp/mmBERT-base",
+    "head_layers": 2,
+    "max_len": 1024,
+    "head_max_len": 256,
+    "max_prefixes": 6,
+    "act_costs": {
+      "escalate": 0.5
+    },
+    "cost_wrong_act": 3.0,
+    "amp_dtype": "bf16",
+    "model_name": "rl-agent",
+    "temperature": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "temperature_by_options": {},
+    "training": {
+      "updates": 15987,
+      "epochs_completed": 4,
+      "hours": 4.97,
+      "world_size": 1,
+      "fine_tuned_from_checkpoint": false
+    }
+  },
+  "synthetic_cases": true,
+  "groups": {
+    "4": {
+      "pairs": 16,
+      "reaction_correct": 14,
+      "behavior_correct": 11,
+      "both_correct": 10,
+      "median_pair_seconds": 5.399325849997695,
+      "max_pair_seconds": 6.734043700002076,
+      "max_rss_mb": 1668.4140625,
+      "errors": 0,
+      "order_comparisons": 8,
+      "order_changed_pairs": 3
+    },
+    "8": {
+      "pairs": 16,
+      "reaction_correct": 12,
+      "behavior_correct": 10,
+      "both_correct": 6,
+      "median_pair_seconds": 6.679586999998719,
+      "max_pair_seconds": 7.7167944999964675,
+      "max_rss_mb": 1656.66015625,
+      "errors": 0,
+      "order_comparisons": 8,
+      "order_changed_pairs": 3
+    },
+    "16": {
+      "pairs": 16,
+      "reaction_correct": 11,
+      "behavior_correct": 6,
+      "both_correct": 4,
+      "median_pair_seconds": 6.947848050000175,
+      "max_pair_seconds": 8.685369999999239,
+      "max_rss_mb": 1664.56640625,
+      "errors": 0,
+      "order_comparisons": 8,
+      "order_changed_pairs": 4
+    }
+  },
+  "effective_limits": {
+    "max_len": 2048,
+    "head_max_len": 1024
+  },
+  "max_input_tokens": 195
+}

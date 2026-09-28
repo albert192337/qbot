@@ -1,6 +1,12 @@
 import {describe,it,expect} from 'vitest';
 import {HeadOverlayRegistry,headAllows,headWinner,HEAD_PRIORITY} from '../src/shared/desktop-overlays';
 describe('desktop head-area priority',()=>{
+ it('keeps cultivation above routine hints and resumes it after experience feedback',()=>{
+  const r=new HeadOverlayRegistry();r.report(1,'cultivation',true);r.report(2,'wish',true);r.report(3,'speech',true);
+  expect(r.snapshot().winner).toBe('cultivation');expect(headAllows('cultivation','speech')).toBe(false);
+  r.report(2,'interaction',true);expect(r.snapshot().winner).toBe('interaction');
+  r.report(2,'interaction',false);expect(r.snapshot().winner).toBe('cultivation');
+ });
  it('gives a food wish exclusive priority over speech and tasks regardless of arrival order',()=>{
   expect(headWinner(['quest','speech','wish'])).toBe('wish');expect(headWinner(['wish','quest','speech'])).toBe('wish');
   expect(headAllows('wish','speech')).toBe(false);expect(headAllows('wish','quest')).toBe(false);

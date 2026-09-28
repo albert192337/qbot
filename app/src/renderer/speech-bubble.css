@@ -1,0 +1,22 @@
+/* Shared appearance for solo speech and captions above paired characters. */
+.bubble, .pair-caption {
+  box-sizing: border-box;
+  background: #fff9ef;
+  border: 2px solid #594235;
+  border-radius: 16px 13px 15px 12px;
+  padding: 9px 15px;
+  box-shadow: 0 2px 0 rgba(63, 42, 30, 0.2);
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+}
+.text, .pair-caption-text {
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.55;
+  text-align: center;
+  color: #4b352b;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}

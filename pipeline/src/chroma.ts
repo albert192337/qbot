@@ -194,7 +194,7 @@ export async function sampleCornerAcrossFrames(
   const raw = await runFfmpeg(ffmpegPath, [
     '-i', videoPath,
     '-vf', `select='eq(n\\,0)+eq(n\\,${mid})+eq(n\\,${last})',crop=8:8:8:8`,
-    '-fps_mode', 'passthrough',
+    '-vsync', '0', // Also supported by the bundled Windows ffmpeg.
     '-f', 'rawvideo',
     '-pix_fmt', 'rgb24',
     'pipe:1',
@@ -232,7 +232,7 @@ export async function sampleBackgroundColors(
   const raw = await runFfmpeg(ffmpegPath, [
     '-i', videoPath,
     '-vf', `select='eq(n\\,0)+eq(n\\,${last})'`,
-    '-fps_mode', 'passthrough',
+    '-vsync', '0',
     '-f', 'rawvideo',
     '-pix_fmt', 'rgb24',
     'pipe:1',
@@ -273,10 +273,66 @@ export function chromaKeyParams(hex: string): { similarity: number; blend: numbe
   if (chroma >= 0.18) return { similarity: CHROMAKEY_SIMILARITY, blend: CHROMAKEY_BLEND };
   return { similarity: Math.max(0.01, Math.min(0.05, chroma * 0.4)), blend: Math.max(0.005, Math.min(0.015, chroma * 0.12)) };
 }
-function keyFilters(keys: string[]): string {
-  return keys
-    .map((k) => { const p = chromaKeyParams(k); return `chromakey=0x${k}:${p.similarity}:${p.blend}`; })
-    .join(',');
+export function keyFilters(keys: string[]): string {
+  const unique = [...new Set(keys)];
+  if (!unique.length || unique.some(k => !/^[0-9a-f]{6}$/i.test(k))) throw new Error('Invalid chroma keys');
+  const filter = (k: string) => {
+    const p = chromaKeyParams(k);
+    return `chromakey=0x${k}:${p.similarity}:${p.blend}`;
+  };
+  if (unique.length === 1) return filter(unique[0]);
+  // chromakey REPLACES alpha. Chaining keys resurrects pixels removed by an
+  // earlier key. Key independent copies and take the minimum alpha instead.
+  let graph = `format=yuva444p,split=${unique.length + 1}[ckbase]${unique.map((_, i) => `[ck${i}]`).join('')};`;
+  unique.forEach((k, i) => { graph += `[ck${i}]${filter(k)},alphaextract[cka${i}];`; });
+  let mask = 'cka0';
+  for (let i = 1; i < unique.length; i++) {
+    graph += `[${mask}][cka${i}]blend=all_mode=darken[ckmin${i}];`;
+    mask = `ckmin${i}`;
+  }
+  return graph + `[ckbase][${mask}]alphamerge`;
+}
+
+/** The source is required to have green corners. Check before normalization,
+ * whose transparent padding would otherwise conceal a failed key operation.
+ * Sample the whole clip, not just its first frame. Green costume interiors are
+ * deliberately excluded; only four small corner patches are inspected.
+ */
+export function assertGreenBackgroundCleared(rgba: Buffer, size = 96): void {
+  const stride = size * size * 4;
+  if (!rgba.length || rgba.length % stride) throw new Error('Transparency QC: missing frames');
+  for (let frame = 0; frame < rgba.length; frame += stride) {
+    let green = 0, remaining = 0;
+    for (const [cx, cy] of [[2, 2], [size - 6, 2], [2, size - 6], [size - 6, size - 6]]) {
+      for (let y = cy; y < cy + 4; y++) for (let x = cx; x < cx + 4; x++) {
+        const i = frame + (y * size + x) * 4;
+        if (rgba[i + 1] > rgba[i] + 25 && rgba[i + 1] > rgba[i + 2] + 20) {
+          green++;
+          if (rgba[i + 3] > 32) remaining++;
+        }
+      }
+    }
+    if (green >= 16 && remaining / green > 0.1) {
+      throw new Error('Transparency QC: green background remains; rekey the saved video');
+    }
+  }
+}
+
+/** Inspect actual encoded alpha, so missing VP9 alpha cannot pass as done. */
+export async function assertTransparentWebm(file: string, ffmpegPath: string): Promise<void> {
+  const size = 96;
+  const raw = await runFfmpeg(ffmpegPath, ['-c:v', 'libvpx-vp9', '-i', file,
+    '-vf', `select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,0.5)',scale=${size}:${size},format=rgba`,
+    '-vsync', '0', '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1']);
+  const stride = size * size * 4;
+  if (!raw.length || raw.length % stride) throw new Error('Transparency QC: missing encoded frames');
+  for (let off = 0; off < raw.length; off += stride) {
+    let clear = 0, solid = 0;
+    for (let i = off + 3; i < off + stride; i += 4) { if (raw[i] <= 16) clear++; if (raw[i] >= 224) solid++; }
+    if (clear < size * size * 0.01 || solid < size * size * 0.01) {
+      throw new Error('Transparency QC: encoded video is opaque or empty; rekey the saved video');
+    }
+  }
 }
 
 /** 视频像素尺寸（解析 ffmpeg stderr，ffmpeg-static 不带 ffprobe） */
@@ -493,6 +549,10 @@ export async function toWebm(
   despillMix: number = RIM_DESPILL_MIX,
   colorVf?: string,
 ): Promise<void> {
+  const check = await runFfmpeg(ffmpegPath, ['-i', inPath,
+    '-vf', `select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,0.5)',${keyFilters(keys)},scale=96:96,format=rgba`,
+    '-vsync', '0', '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1']);
+  assertGreenBackgroundCleared(check);
   const vf =
     `${keyFilters(keys)},format=yuva420p` +
     rimDespillFilter(despillMix) +
@@ -512,6 +572,7 @@ export async function toWebm(
     '-an',
     outPath,
   ]);
+  await assertTransparentWebm(outPath, ffmpegPath);
 }
 
 /**

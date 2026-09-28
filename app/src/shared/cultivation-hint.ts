@@ -7,7 +7,6 @@ export function cultivationFraction(task:CoopTask,now:number):number {
 }
 export function cultivationHintPosition(p:{left:number;right:number;top:number;bottom:number},width:number,height:number,vw:number,vh:number){
   const x=Math.max(8,Math.min((p.left+p.right-width)/2,vw-width-8));
-  const y=Math.max(8,Math.min((p.top+p.bottom-height)/2,vh-height-8));
-  return [{x,y:p.bottom+8},{x:p.right+8,y},{x:p.left-width-8,y},{x,y:p.top-height-8}]
-    .find(r=>r.x>=8&&r.y>=8&&r.x+width<=vw-8&&r.y+height<=vh-8)??null;
+  const y=p.top-height-8;
+  return x>=8&&y>=8&&x+width<=vw-8&&y+height<=vh-8?{x,y}:null;
 }

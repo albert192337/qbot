@@ -189,7 +189,7 @@ export function isRoomOpen(): boolean {
   return !!roomWindow && !roomWindow.isDestroyed();
 }
 
-/** 始终在头顶；顶部空间不足时内容贴顶，不翻到脚下。 */
+/** 优先贴近头顶，空间不足时先放脚下，再选两侧。 */
 function bubbleAnchor(pet: Electron.Rectangle) {
   const wa = screen.getDisplayMatching(pet).workArea;
   return aboveBubbleLayout(pet, wa, BUBBLE_W, BUBBLE_H, BUBBLE_OVERLAP);
@@ -665,7 +665,7 @@ export type ConsolePane =
   | 'market'
   | 'claude'
   | 'settings'
-  | 'devtools' | 'rewards' | 'furnish' | 'memory' | 'lounge' | 'sticker-create';
+  | 'devtools' | 'rewards' | 'furnish' | 'memory' | 'lounge' | 'sticker-create' | 'relationships';
 
 export function getConsoleWindow(): BrowserWindow | null {
   return consoleWindow;

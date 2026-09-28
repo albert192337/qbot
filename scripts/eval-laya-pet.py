@@ -6,6 +6,7 @@ import random
 import time
 import platform
 import importlib.metadata
+import statistics
 from pathlib import Path
 
 REACTIONS = {
@@ -45,6 +46,7 @@ def options(pool, expected, count, seed):
     return {k: pool[k] for k in chosen}
 
 def main():
+    print('Starting isolated two-slot evaluation',flush=True)
     ap = argparse.ArgumentParser()
     ap.add_argument('--model', default='.local/laya-eval/model')
     ap.add_argument('--output', default='output/laya-pet-eval')
@@ -53,8 +55,11 @@ def main():
     os.environ['HF_HUB_OFFLINE'] = '1'
     os.environ['TRANSFORMERS_OFFLINE'] = '1'
     os.environ['USE_TF'] = '0'
+    print('Importing torch',flush=True)
     import torch
+    print('Importing laya',flush=True)
     import laya
+    print('Importing psutil',flush=True)
     import psutil
     torch.set_num_threads(2)
     torch.set_num_interop_threads(1)
@@ -63,6 +68,7 @@ def main():
     if (dest/'results.jsonl').exists():
         raise SystemExit('Choose a fresh --output directory; existing results are preserved.')
     start = time.perf_counter()
+    print('Loading local checkpoint',flush=True)
     agent = laya.load(str(Path(args.model).resolve()), device='cpu')
     load_seconds = time.perf_counter()-start
     print(json.dumps({'loaded_seconds': load_seconds, 'config':agent.cfg}), flush=True)
@@ -91,7 +97,7 @@ def main():
         rows.append(row)
         with (dest/'results.jsonl').open('a',encoding='utf-8') as f: f.write(json.dumps(row,ensure_ascii=False,default=str)+'\n')
         print(json.dumps({k:row.get(k) for k in ['count','case','order','reaction','behavior','pair_ok','seconds','rss_mb','error']},ensure_ascii=False),flush=True)
-    summary={'load_seconds':load_seconds,'torch':torch.__version__,'libraries':{k:importlib.metadata.version(k) for k in ['laya','transformers','safetensors','psutil']},'platform':platform.platform(),'threads':2,'model_path':args.model,'config':agent.cfg,'synthetic_cases':True,'groups':{}}
+    summary={'load_seconds':load_seconds,'torch':torch.__version__,'libraries':{k:importlib.metadata.version(k) for k in ['laya','transformers','safetensors','psutil']},'platform':platform.platform(),'threads':2,'model_path':args.model,'config':agent.cfg,'effective_limits':{'max_len':2048,'head_max_len':1024},'synthetic_cases':True,'groups':{}}
     for n in (4,8,16):
         group=[r for r in rows if r['count']==n]
         if not group: continue
@@ -99,7 +105,7 @@ def main():
         original={r['case']:r for r in group if r['order']=='original'}
         reversed_rows=[r for r in group if r['order']=='reversed' and r['case'] in original]
         changed=sum((r.get('reaction'),r.get('behavior'))!=(original[r['case']].get('reaction'),original[r['case']].get('behavior')) for r in reversed_rows)
-        summary['groups'][str(n)]={'pairs':len(group),'reaction_correct':sum(r['reaction_ok'] for r in group),'behavior_correct':sum(r['behavior_ok'] for r in group),'both_correct':sum(r['pair_ok'] for r in group),'median_pair_seconds':times[len(times)//2],'max_pair_seconds':max(times),'max_rss_mb':max(r['rss_mb'] for r in group),'errors':sum('error' in r for r in group),'order_comparisons':len(reversed_rows),'order_changed_pairs':changed}
+        summary['groups'][str(n)]={'pairs':len(group),'reaction_correct':sum(r['reaction_ok'] for r in group),'behavior_correct':sum(r['behavior_ok'] for r in group),'both_correct':sum(r['pair_ok'] for r in group),'median_pair_seconds':statistics.median(times),'max_pair_seconds':max(times),'max_rss_mb':max(r['rss_mb'] for r in group),'errors':sum('error' in r for r in group),'order_comparisons':len(reversed_rows),'order_changed_pairs':changed}
     (dest/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2,default=str),encoding='utf-8')
     print(json.dumps(summary,ensure_ascii=False,default=str),flush=True)
 
