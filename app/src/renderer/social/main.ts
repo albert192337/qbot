@@ -3,7 +3,7 @@ import './style.css';
 import { ChatView } from './chat';
 import {PAIR_INTERACTIONS} from '../../shared/pair-interaction';
 import { mountSteam } from './steam';
-import { DEFAULT_ROOM } from '../room/rooms/default';
+
 import type { CreateRoomInput, RoomBrief, RoomSnapshot, RoomsStatus } from '../../shared/ipc-types';
 import type { ContactSnapshot, SocialProfile, TestGuest } from '../../shared/social';
 
@@ -131,7 +131,7 @@ function renderRooms():void{
 async function enter(code:string):Promise<void>{if(room&&room.roomId!==code&&!confirm('前往这间小屋会离开当前房间，继续吗？'))return;if(!(await api.social.prepareJoin()))return;await mutate(()=>api.rooms.join(code));await showPage('room');api.social.openChat();}
 const dialog=$<HTMLDialogElement>('room-dialog');
 const preview = document.querySelector('.room-preview > span');
-if (preview) { const image=document.createElement('img');image.src=DEFAULT_ROOM.background;image.alt='当前开启房间背景';image.style.cssText='width:88px;height:88px;object-fit:contain';preview.replaceWith(image); }
+if (preview) { const image=document.createElement('img');image.src=new URL('../online-room/art/greenhouse-v2.png',import.meta.url).href;image.alt='当前开启房间背景';image.style.cssText='width:160px;height:48px;object-fit:contain';preview.replaceWith(image); }
 if (!compact) {
   const filters=$('world-page').querySelector('.filters')!;
   const details=document.createElement('details'); details.className='filter-panel';

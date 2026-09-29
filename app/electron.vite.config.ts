@@ -20,12 +20,11 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          'spine-preview': resolve(__dirname, 'src/renderer/spine-preview/index.html'),
           'pet-hint': resolve(__dirname, 'src/renderer/pet-hint/index.html'),
           'gene-preview': resolve(__dirname, 'src/renderer/gene-preview/index.html'),
           'pineapple-preview': resolve(__dirname, 'src/renderer/pineapple-preview/index.html'),
           weather: resolve(__dirname, 'src/renderer/weather/index.html'),
-          cozy3d: resolve(__dirname, 'src/renderer/cozy3d/index.html'),
-          cozy: resolve(__dirname, 'src/renderer/cozy/index.html'),
           tearoom: resolve(__dirname, 'src/renderer/tearoom/index.html'),
           diyroom: resolve(__dirname, 'src/renderer/diyroom/index.html'),
           roomlab: resolve(__dirname, 'src/renderer/roomlab/index.html'),
@@ -35,7 +34,6 @@ export default defineConfig({
           sign: resolve(__dirname, 'src/renderer/sign/index.html'),
           nursery: resolve(__dirname, 'src/renderer/nursery/index.html'),
           pet: resolve(__dirname, 'src/renderer/pet/index.html'),
-          room: resolve(__dirname, 'src/renderer/room/index.html'),
           bubble: resolve(__dirname, 'src/renderer/bubble/index.html'),
           console: resolve(__dirname, 'src/renderer/console/index.html'),
           social: resolve(__dirname, 'src/renderer/social/index.html'),

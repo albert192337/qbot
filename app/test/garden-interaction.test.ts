@@ -22,6 +22,25 @@ vi.mock('../src/main/config',()=>({getSettings:async()=>({activeCharacter:'frog'
 vi.mock('../src/main/characters',()=>({getCharacter:async()=>({manifest:{actions:{idle:{status:'done'}},customActions:{writing:{status:'done',durationSec:5},garden_sow:{status:'done',durationSec:5},garden_harvest:{status:'done',durationSec:5}}}})}));
 afterEach(()=>{vi.useRealTimers();vi.resetModules();mocks.windows=[];mocks.handlers.clear();mocks.events.clear();mocks.ok=true;mocks.state=null;mocks.visit=null;mocks.coop=[]});
 describe('garden pet interaction',()=>{
+ it('uses only validated desktop scene anchors and returns to 2D positioning',async()=>{
+  vi.useFakeTimers();
+  const {BrowserWindow}=await import('electron');
+  const {attachGarden,registerGardenIpc}=await import('../src/main/garden/windows');
+  const pet:any=new BrowserWindow({x:600,y:500,width:360,height:360} as any);pet.visible=true;
+  attachGarden(pet);registerGardenIpc();mocks.events.get('garden:toggle')!();
+  const strip=mocks.windows[1];strip.visible=true;
+  const placement={width:600,height:400,plots:[{index:0,x:1000,y:700}]};
+  const publish=mocks.events.get('garden:scenePlacement')!;
+  publish({sender:strip.webContents},placement);
+  publish({sender:pet.webContents},{...placement,plots:[{index:0,x:10,y:10}]});
+  publish({sender:strip.webContents},{...placement,plots:[{index:0,x:NaN,y:10}]});
+  await mocks.handlers.get('garden:act')!({}, {type:'plant',plot:0});await vi.advanceTimersByTimeAsync(0);
+  expect(pet.getBounds()).toMatchObject({x:820,y:365});
+  await vi.advanceTimersByTimeAsync(5600);expect(pet.getBounds()).toMatchObject({x:600,y:500});
+  publish({sender:strip.webContents},null);
+  await mocks.handlers.get('garden:act')!({}, {type:'plant',plot:0});await vi.advanceTimersByTimeAsync(0);
+  expect(pet.getBounds()).toMatchObject(plotPetPosition(0,{x:600,y:500,width:360,height:360},strip.getBounds(),{x:0,y:0,width:1600,height:1000},{left:572.5,baseline:934}));
+ });
  it('positions all seven plots on the available side and clamps negative-origin monitors',()=>{
   const pet={x:600,y:500,width:360,height:360}, strip={x:230,y:280,width:1100}, area={x:0,y:0,width:1600,height:1000};
   const points=Array.from({length:7},(_,i)=>plotPetPosition(i,pet,strip,area));

@@ -76,7 +76,7 @@ function applyDisplayMode(): void {
   }
 
   if (displayMode === 'room') {
-    openRoomWindow('QBot 联机房间', true);
+    openRoomWindow('QBot 联机房间');
   } else {
     closeRoomSceneForModeChange();
   }
@@ -202,7 +202,7 @@ export function wireRoomPetDisplay(): void {
     if (inRoom && displayMode === 'room') void setRoomDisplayMode('desktop');
   });
   void getSettings().then((settings) => {
-    setRoomSizePreset(settings.roomSizePreset ?? 'large');
+    setRoomSizePreset(settings.roomSizePreset ?? 'small');
     displayMode = settings.roomsDisplayMode === 'desktop' ? 'desktop' : 'room';
     if (inRoom) applyDisplayMode();
     else pushToLounge('rooms:displayMode', displayMode);

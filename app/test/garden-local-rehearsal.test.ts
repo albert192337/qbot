@@ -17,22 +17,21 @@ describe('local garden rehearsal',()=>{
   expect(canBreed(s.plots[0]!)).toBe(true);expect(canBreed(s.produce[0])).toBe(true);
   const bred=r.act({type:'breed',first:s.plots[0]!.id,second:s.produce[0].id},'pet');expect(bred.ok).toBe(true);
   if(!bred.ok)throw Error(bred.error);expect(bred.reveal?.seed).toBeDefined();
-  expect(r.act({type:'plant',plot:3,seed:bred.reveal!.seed!.id},'pet').ok).toBe(false); // Lv.1 has three plots.
-  for(let i=0;i<3;i++){expect(r.act({type:'mature'},'pet').ok).toBe(true);expect(r.act({type:'harvest',plot:0},'pet').ok).toBe(true);}
-  expect(r.act({type:'plant',plot:0,seed:bred.reveal!.seed!.id},'pet').ok).toBe(true);
+  expect(r.act({type:'plant',plot:3,seed:bred.reveal!.seed!.id},'pet').ok).toBe(true); // Four plots no longer depend on levels.
+  expect(r.act({type:'mature'},'pet').ok).toBe(true);expect(r.act({type:'harvest',plot:0},'pet').ok).toBe(true);expect(r.get().plots[0]).toBeNull();
   const visit=r.visit('test:guest'),offer=visit.offers[0];
-  expect(r.act({type:'buyDaily',owner:visit.owner,offer:offer.id},'pet').ok).toBe(true);
+  expect(r.act({type:'buyFurniture',owner:visit.owner,item:'moss-stool'},'pet').ok).toBe(true);
   expect(r.get().coins).toBeLessThan(s.coins);expect(r.visit(visit.owner).plots).toEqual(visit.plots);
   const fresh=new LocalGardenRehearsal(members,()=>now);expect(fresh.get().coins).toBe(5000);
   s.coins=0;expect(r.get().coins).toBeGreaterThan(0);expect(()=>r.visit('REALACCOUNT1')).toThrow();
  });
- it('sprays only mature field crops and keeps rejected operations atomic',()=>{
+ it('retires legacy sprays without consuming existing items',()=>{
   const r=new LocalGardenRehearsal(members,()=>now),s=r.get();
   expect(r.act({type:'spray',target:s.produce[0].id,kind:'color'}).ok).toBe(false);
   expect(r.get().life!.sprays.color).toBe(5);
-  expect(r.act({type:'spray',target:s.plots[0]!.id,kind:'color'}).ok).toBe(true);
+  expect(r.act({type:'spray',target:s.plots[0]!.id,kind:'color'}).ok).toBe(false);
 
-  const dye=r.get().plots[0]!.dye;expect(dye).toBeDefined();expect(r.get().life!.pending).toBeUndefined();
+  const dye=r.get().plots[0]!.dye;expect(dye).toBeUndefined();expect(r.get().life!.sprays.color).toBe(5);expect(r.get().life!.pending).toBeUndefined();
   expect(r.act({type:'harvest',plot:0}).ok).toBe(true);expect(r.get().produce.at(-1)?.dye).toBe(dye);
  });
  it('completes a friend cultivation with heartbeat leases and grants a reward once',()=>{
@@ -52,6 +51,7 @@ describe('local garden rehearsal',()=>{
   const s=new LocalGardenRehearsal(members,()=>now).get();s.xp.apple=1000;
   const seed={id:'seed',species:'apple' as const,genes:[],bred:false};
   const p=makeV3Plant(s,seed,3,now,{id:()=> 'p',random:()=>.5});
-  expect((p.readyAt-now)/60000).toBeCloseTo(sowingMinutes('apple',s));expect(growthLabel('apple',s)).toContain('436.8 分钟成熟');
+  expect((p.readyAt-now)/60000).toBeCloseTo(sowingMinutes('apple',s));expect(growthLabel('apple',s)).toContain('480 分钟成熟');
  });
 });
+

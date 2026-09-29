@@ -227,12 +227,12 @@ async function think(trigger: string): Promise<void> {
 }
 
 /** 把模型决策组装成 BehaviorScript（动作意图 + 台词）。调用前已确保 do=true */
-function buildScript(d: { action?: string; say?: string; message?: string }): BehaviorScript | null {
+function buildScript(d: { action?: string; say?: string; message?: string; expression?: import('../shared/pet-expression').PetExpression }): BehaviorScript | null {
   if (!d.action && !d.say && !d.message) return null;
   const steps: BehaviorScript['steps'] = [];
   if (d.message) steps.push({ op: 'sign', text: d.message });
   if (d.action) steps.push({ op: 'play', action: d.action, loops: 1 });
-  if (d.say) steps.push({ op: 'say', text: d.say });
+  if (d.say) steps.push({ op: 'say', text: d.say, expression: d.expression });
   return {
     meta: {
       id: 'llm-brain',

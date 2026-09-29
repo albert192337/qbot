@@ -1,0 +1,54 @@
+{
+  "version": "qbot-validation-0.2",
+  "status": "isolated-proposal-not-production",
+  "seed": "qbot-20260928-v02",
+  "runs": 64,
+  "days": 60,
+  "startingCoins": 180,
+  "reserveCoins": 90,
+  "tutorialGrants": {"start":20,"firstHarvest":20,"firstSale":20,"firstFurniture":20},
+  "tutorialSeed": "carrot",
+  "dailyFurnitureLimit": 1,
+  "paidTripsPerWeek": 2,
+  "travelMinGapDays": 3,
+  "travelSpendShare": 0.25,
+  "giftBond": 2,
+  "interactionBond": 1,
+  "companionBondPer30Min": 1,
+  "companionBondDailyCap": 4,
+  "travelBond": 3,
+  "firstRegionBond": 3,
+  "pairBondDailyCap": 10,
+  "relationshipStages": [
+    {"id":"new","name":"初识","bond":0},
+    {"id":"familiar","name":"熟悉","bond":35},
+    {"id":"close","name":"亲近","bond":180},
+    {"id":"bonded","name":"默契","bond":400}
+  ],
+  "regions": [
+    {"id":"kyoto","name":"京都","fee":120,"minutes":120,"requiresTrips":0,"seed":"lotus","firstFurniture":"kyoto_chime"},
+    {"id":"paris","name":"巴黎","fee":180,"minutes":180,"requiresTrips":3,"seed":"tulip","firstFurniture":"paris_frame"},
+    {"id":"island","name":"海岛","fee":240,"minutes":240,"requiresTrips":6,"seed":"sunflower","firstFurniture":"island_shell"}
+  ],
+  "tutorialTrip": {"fee":60,"minutes":30,"seed":"strawberry","furniture":"travel_photo"},
+  "furniture": [
+    {"id":"desk_lamp","name":"小台灯","price":60,"minDay":1,"region":"","type":"environment"},
+    {"id":"plant_stand","name":"单株花架","price":180,"minDay":2,"region":"","type":"display"},
+    {"id":"photo_frame","name":"双人相框","price":300,"minDay":3,"region":"","type":"display"},
+    {"id":"tea_table","name":"小茶桌","price":600,"minDay":4,"region":"","type":"activity"},
+    {"id":"reading_lamp","name":"阅读落地灯","price":900,"minDay":5,"region":"","type":"environment"},
+    {"id":"collection_shelf","name":"收藏架","price":1400,"minDay":7,"region":"","type":"display"},
+    {"id":"rain_window","name":"雨景窗","price":2000,"minDay":10,"region":"","type":"environment"},
+    {"id":"shared_corner","name":"双人阅读角","price":2800,"minDay":14,"region":"","type":"activity"},
+    {"id":"kyoto_lantern","name":"京都纸灯","price":700,"minDay":3,"region":"kyoto","type":"environment"},
+    {"id":"kyoto_screen","name":"庭院屏风","price":1700,"minDay":7,"region":"kyoto","type":"environment"},
+    {"id":"paris_flowers","name":"巴黎花架","price":1800,"minDay":10,"region":"paris","type":"display"},
+    {"id":"island_view","name":"海岛窗景","price":2600,"minDay":18,"region":"island","type":"environment"}
+  ],
+  "profiles": [
+    {"id":"light","name":"短时每天一次","minutes":[0,5,15,30],"presence":30,"keepRate":0.05,"gift":false,"farm":"short"},
+    {"id":"regular","name":"两小时加晚间回访","minutes":[0,5,15,30,60,90,120,720],"presence":120,"keepRate":0.10,"gift":true,"farm":"mixed"},
+    {"id":"resident","name":"八小时常驻","minutes":[0,5,15,30,60,90,120,180,240,300,360,420,480,720],"presence":480,"keepRate":0.10,"gift":true,"farm":"mixed"},
+    {"id":"collector","name":"重收藏两小时","minutes":[0,5,15,30,60,90,120,720],"presence":120,"keepRate":0.35,"gift":true,"farm":"mixed"}
+  ]
+}

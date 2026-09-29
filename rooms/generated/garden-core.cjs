@@ -23,9 +23,13 @@ var server_entry_exports = {};
 __export(server_entry_exports, {
   AFFINITIES: () => AFFINITIES,
   AFFINITY_WEIGHTS: () => AFFINITY_WEIGHTS,
+  BREED_OILS: () => BREED_OILS,
+  CAPSULE: () => CAPSULE,
+  CAPSULE_POOL: () => CAPSULE_POOL,
   CHARACTER_UNLOCKS: () => CHARACTER_UNLOCKS,
   CHARACTER_XP: () => CHARACTER_XP,
   COOP_RULES: () => COOP_RULES,
+  CROPS: () => CROPS,
   CULTIVATION_MS: () => CULTIVATION_MS,
   DAY_MS: () => DAY_MS,
   DISCOVERY_POINTS: () => DISCOVERY_POINTS,
@@ -35,12 +39,17 @@ __export(server_entry_exports, {
   FOOD_ICONS: () => FOOD_ICONS,
   FRUITS: () => FRUITS,
   FRUIT_DRAG_TYPE: () => FRUIT_DRAG_TYPE,
+  FURNITURE_SHOP: () => FURNITURE_SHOP,
   HARVEST_XP: () => HARVEST_XP,
   LEVEL_XP: () => LEVEL_XP,
   MAX_GARDEN_PLOTS: () => MAX_GARDEN_PLOTS,
   PAIR_INTERACTIONS: () => PAIR_INTERACTIONS,
   REFRESH_MS: () => REFRESH_MS,
+  REGIONAL_FURNITURE: () => REGIONAL_FURNITURE,
+  RETIRED_FURNITURE: () => RETIRED_FURNITURE,
   SLOT_NAMES: () => SLOT_NAMES,
+  SOCIAL_TRIPS: () => SOCIAL_TRIPS,
+  SOCIAL_WISHES: () => SOCIAL_WISHES,
   SPECIES: () => SPECIES,
   SPRAYS: () => SPRAYS,
   TIER_NAMES: () => TIER_NAMES,
@@ -48,6 +57,8 @@ __export(server_entry_exports, {
   V3: () => V3,
   V3_WEATHER: () => V3_WEATHER,
   V3_XP: () => V3_XP,
+  WEATHER_CHANCE: () => WEATHER_CHANCE,
+  WEATHER_CHECKS: () => WEATHER_CHECKS,
   advanceV3: () => advanceV3,
   applyWeatherMutations: () => applyWeatherMutations,
   breedV3: () => breedV3,
@@ -63,6 +74,7 @@ __export(server_entry_exports, {
   dailyOffers: () => dailyOffers,
   dailyRandom: () => dailyRandom,
   emptyPlots: () => emptyPlots,
+  enableSocialEconomy: () => enableSocialEconomy,
   enableV3: () => enableV3,
   ensureLife: () => ensureLife,
   exposures: () => exposures,
@@ -72,6 +84,7 @@ __export(server_entry_exports, {
   fertilizerV3: () => fertilizerV3,
   fits: () => fits,
   fruitQuality: () => fruitQuality,
+  furnitureOffers: () => furnitureOffers,
   gardenDay: () => gardenDay,
   gardenQuest: () => gardenQuest,
   geneSlots: () => geneSlots,
@@ -83,6 +96,7 @@ __export(server_entry_exports, {
   lifeTransition: () => lifeTransition,
   makeV3Plant: () => makeV3Plant,
   mutationMultiplier: () => mutationMultiplier,
+  nativeSocialWeather: () => nativeSocialWeather,
   needsReveal: () => needsReveal,
   nextGardenDay: () => nextGardenDay,
   pairActions: () => pairActions,
@@ -97,6 +111,7 @@ __export(server_entry_exports, {
   qualityOf: () => qualityOf,
   recordGarden: () => recordGarden,
   refreshShop: () => refreshShop,
+  refreshSocial: () => refreshSocial,
   refreshV3Day: () => refreshV3Day,
   refreshV3Shop: () => refreshV3Shop,
   rollTraits: () => rollTraits,
@@ -104,6 +119,8 @@ __export(server_entry_exports, {
   settleFactors: () => settleFactors,
   settlePendingSpray: () => settlePendingSpray,
   sizeOf: () => sizeOf,
+  socialTransition: () => socialTransition,
+  socialWeatherPool: () => socialWeatherPool,
   sowingMinutes: () => sowingMinutes,
   speciesLevel: () => speciesLevel,
   sprayConflicts: () => sprayConflicts,
@@ -119,6 +136,7 @@ __export(server_entry_exports, {
   v3Value: () => v3Value,
   validateGarden: () => validateGarden,
   validateLife: () => validateLife,
+  validateSocial: () => validateSocial,
   validateV3: () => validateV3,
   value: () => value,
   visiblePlot: () => visiblePlot,
@@ -235,8 +253,86 @@ function recordGarden(s, now, kind, message, peer, plant) {
   s.v3.counters[kind] = (s.v3.counters[kind] ?? 0) + 1;
 }
 function v3Value(p) {
-  const sp = SPECIES[p.species], mass = Math.min(6, Math.max(0.4, p.kg / sp.kg)), bonus = p.traits.reduce((sum, t) => sum + (traitSlot(t) === "size" ? 0 : FACTOR_SCORE[TRAITS[t].tier]), 0);
-  return Math.max(1, Math.round(sp.price / (p.yieldCount ?? sp.harvests) + V3.hourIncome * sp.minutes / 60 * (0.7 + 0.3 * mass) * Math.min(3, 1 + bonus / 100)));
+  const bonus = p.traits.reduce((n, t) => n + (traitSlot(t) === "size" ? 0 : { blue: 0.02, purple: 0.05, gold: 0.1, rainbow: 0.15, normal: 0, green: 0 }[TRAITS[t].tier]), 0);
+  return Math.round(CROPS[p.species].sale * (1 + Math.min(0.3, bonus)));
+}
+
+// app/src/shared/social-economy.ts
+var CROPS = {
+  strawberry: { cost: 6, sale: 30, minutes: 30 },
+  sunflower: { cost: 12, sale: 55, minutes: 60 },
+  lotus: { cost: 12, sale: 55, minutes: 60 },
+  tulip: { cost: 12, sale: 55, minutes: 60 },
+  pineapple: { cost: 36, sale: 150, minutes: 240 },
+  apple: { cost: 54, sale: 220, minutes: 480 },
+  carrot: { cost: 3, sale: 12, minutes: 10 },
+  tomato: { cost: 8, sale: 36, minutes: 30 },
+  blueberry: { cost: 14, sale: 60, minutes: 60 }
+};
+var BREED_OILS = {
+  normal: { name: "\u666E\u901A\u7CBE\u6CB9", price: 35, single: 0.25, double: 0.3, pity: 10, size: 0.2, cap: 3 },
+  rich: { name: "\u6D53\u7F29\u7CBE\u6CB9", price: 80, single: 0.4, double: 0.5, pity: 5, size: 0.3, cap: 4 }
+};
+var FURNITURE_SHOP = [
+  { id: "moss-stool", name: "\u82D4\u7ED2\u5C0F\u51F3", price: 120, tier: "common" },
+  { id: "sprout-lamp", name: "\u94C3\u5170\u843D\u5730\u706F", price: 360, tier: "common" },
+  { id: "potting-shelf", name: "\u82B1\u5320\u7F6E\u7269\u67B6", price: 4e3, tier: "rare" },
+  { id: "fern-bench", name: "\u8568\u53F6\u53CC\u4EBA\u6905", price: 6e3, tier: "rare" },
+  { id: "moon-terrarium", name: "\u6708\u5149\u73BB\u7483\u5EAD\u9662", price: 9e3, tier: "epic" },
+  { id: "cloud-fountain", name: "\u4E91\u6735\u53E0\u6CC9", price: 9e3, tier: "epic" }
+];
+var RETIRED_FURNITURE = ["lantern", "plant", "fan", "clock", "teapot", "painting", "calligraphy", "shelf", "window", "screen", "kyoto-lantern", "kyoto-screen", "paris-painting", "paris-clock", "island-plant", "island-window"];
+var CAPSULE_POOL = [
+  { id: "strawberry-pack", kind: "seed", item: "strawberry", name: "\u8349\u8393\u79CD\u5B50", count: 3, tier: "common", weight: 25 },
+  { id: "flower-pack", kind: "seed", item: "tulip", name: "\u90C1\u91D1\u9999\u79CD\u5B50", count: 2, tier: "common", weight: 20 },
+  { id: "berry-pack", kind: "seed", item: "blueberry", name: "\u84DD\u8393\u79CD\u5B50", count: 2, tier: "common", weight: 15 },
+  { id: "speed-pack", kind: "fertilizer", item: "speed", name: "\u521D\u7EA7\u52A0\u901F\u80A5", count: 3, tier: "common", weight: 30 },
+  { id: "moss-stool", kind: "furniture", item: "moss-stool", name: "\u82D4\u7ED2\u5C0F\u51F3", count: 1, tier: "common", weight: 10 },
+  { id: "apple-pack", kind: "seed", item: "apple", name: "\u82F9\u679C\u79CD\u5B50", count: 2, tier: "rare", weight: 20 },
+  { id: "pineapple-pack", kind: "seed", item: "pineapple", name: "\u83E0\u841D\u79CD\u5B50", count: 3, tier: "rare", weight: 20 },
+  { id: "speed3-pack", kind: "fertilizer", item: "speed3", name: "\u9AD8\u7EA7\u52A0\u901F\u80A5", count: 2, tier: "rare", weight: 30 },
+  { id: "sprout-lamp", kind: "furniture", item: "sprout-lamp", name: "\u94C3\u5170\u843D\u5730\u706F", count: 1, tier: "rare", weight: 15 },
+  { id: "potting-shelf", kind: "furniture", item: "potting-shelf", name: "\u82B1\u5320\u7F6E\u7269\u67B6", count: 1, tier: "rare", weight: 8 },
+  { id: "fern-bench", kind: "furniture", item: "fern-bench", name: "\u8568\u53F6\u53CC\u4EBA\u6905", count: 1, tier: "rare", weight: 7 },
+  { id: "moon-terrarium", kind: "furniture", item: "moon-terrarium", name: "\u6708\u5149\u73BB\u7483\u5EAD\u9662", count: 1, tier: "epic", weight: 50 },
+  { id: "cloud-fountain", kind: "furniture", item: "cloud-fountain", name: "\u4E91\u6735\u53E0\u6CC9", count: 1, tier: "epic", weight: 50 }
+];
+function furnitureOffers(owner, day) {
+  const rand = dailyRandom(`furniture-v4:${owner}:${day}`);
+  const basic = FURNITURE_SHOP.filter((x) => x.tier === "common");
+  if (rand() >= 0.08) return [...basic];
+  const r = rand(), pool = FURNITURE_SHOP.filter((x) => x.price === (r < 0.6 ? 4e3 : r < 0.9 ? 6e3 : 9e3));
+  return [...basic, pool[Math.floor(rand() * pool.length)]];
+}
+var CAPSULE = { cost: 60, rarePity: 10, epicPity: 20, weights: [0.7, 0.25, 0.05], topUp: 300 };
+var SOCIAL_TRIPS = {
+  kyoto: { name: "\u4EAC\u90FD", cost: 120, minutes: 120, seed: "lotus" },
+  paris: { name: "\u5DF4\u9ECE", cost: 220, minutes: 180, seed: "tulip" },
+  island: { name: "\u6D77\u5C9B", cost: 300, minutes: 240, seed: "pineapple" }
+};
+var REGIONAL_FURNITURE = [
+  { id: "kyoto-sprout", name: "\u4EAC\u90FD\xB7\u6668\u9732\u94C3\u5170", base: "sprout-lamp", city: "kyoto", trips: 3, tint: "hue-rotate(340deg)" },
+  { id: "kyoto-moon", name: "\u4EAC\u90FD\xB7\u6708\u5EAD", base: "moon-terrarium", city: "kyoto", trips: 6, tint: "hue-rotate(340deg)" },
+  { id: "paris-moss", name: "\u5DF4\u9ECE\xB7\u82B1\u56ED\u7ED2\u51F3", base: "moss-stool", city: "paris", trips: 3, tint: "hue-rotate(20deg)" },
+  { id: "paris-fern", name: "\u5DF4\u9ECE\xB7\u5348\u540E\u957F\u6905", base: "fern-bench", city: "paris", trips: 6, tint: "hue-rotate(20deg)" },
+  { id: "island-shelf", name: "\u6D77\u5C9B\xB7\u7E41\u82B1\u67B6", base: "potting-shelf", city: "island", trips: 3, tint: "hue-rotate(30deg)" },
+  { id: "island-cloud", name: "\u6D77\u5C9B\xB7\u542C\u6F6E\u53E0\u6CC9", base: "cloud-fountain", city: "island", trips: 6, tint: "hue-rotate(30deg)" }
+];
+var WEATHER_CHECKS = [0.2, 0.4, 0.6, 0.8];
+var WEATHER_CHANCE = { R: [0.08, 0.019, 1e-3, 0], SR: [0.12, 0.05, 0.01, 0], SSR: [0.14, 0.12, 0.08, 0.01] };
+function socialWeatherPool(kind) {
+  const blue = { aurora: "velvet", meteor: "mist", prismatic: "shiny", daylight: "sugar", starchart: "petals" };
+  return [...V3_WEATHER[kind].pool, ...blue[kind] ? [blue[kind]] : []];
+}
+var SOCIAL_WISHES = { harvest: "\u60F3\u4E00\u8D77\u6536\u83B7\u4E00\u682A\u690D\u7269", visit: "\u60F3\u53BB\u670B\u53CB\u5BB6\u73A9", furniture: "\u60F3\u7ED9\u623F\u95F4\u6DFB\u4E00\u4EF6\u5BB6\u5177", breed: "\u60F3\u548C\u4F60\u7559\u4E0B\u65B0\u7684\u79CD\u5B50", feed: "\u60F3\u548C\u4F60\u5206\u4EAB\u4E00\u9897\u6C34\u679C" };
+function nativeSocialWeather(now, owner) {
+  const slot = Math.floor(now / 18e5), rand = dailyRandom(`social-weather:${owner}:${slot}`), roll = rand();
+  const rare = ["aurora", "meteor", "prismatic", "daylight", "starchart"];
+  const seasonal = ["breeze", "rain", "storm", "snow", "honeywind"];
+  const offset = Math.floor(dailyRandom(`weather-offset:${owner}`)() * 96);
+  const forced = ((slot + offset) % 96 + 96) % 96 === 95;
+  const kind = forced || roll < 0.02 ? rare[Math.floor(rand() * rare.length)] : roll < 0.1 ? seasonal[Math.floor(rand() * seasonal.length)] : "sunny";
+  return { id: `social-weather:${owner}:${slot}`, kind, start: slot * 18e5, end: (slot + 1) * 18e5, source: owner };
 }
 
 // app/src/shared/garden.ts
@@ -252,10 +348,11 @@ var SPECIES = {
   tulip: { name: "\u90C1\u91D1\u9999", minutes: 60, price: 55, kg: 0.25, harvests: 1, rarity: "green", chance: 0.7 }
 };
 function sowingMinutes(species2, state) {
+  if (state?.economy) return CROPS[species2].minutes;
   return SPECIES[species2].minutes * (state?.v3 ? 1 - 0.01 * (speciesLevel(state.xp[species2]) - 1) : state ? 1 - 0.03 * (level(state.xp[species2]) - 1) : 1);
 }
 function growthLabel(species2, state) {
-  const minutes = Number(sowingMinutes(species2, state).toFixed(2)), harvests = SPECIES[species2].harvests;
+  const minutes = Number(sowingMinutes(species2, state).toFixed(2)), harvests = state?.economy ? 1 : SPECIES[species2].harvests;
   return `${minutes} \u5206\u949F\u6210\u719F${harvests > 1 ? ` / \u8F6E \xB7 \u53EF\u91C7 ${harvests} \u6B21` : ""}`;
 }
 var TRAITS = {
@@ -374,6 +471,11 @@ function growth(p, now = Date.now()) {
   return Math.max(0, Math.min(1, (now - p.plantedAt) / Math.max(1, p.readyAt - p.plantedAt)));
 }
 function gardenQuest(s) {
+  if (s.economy) {
+    if (!s.economy.tutorial.claimed) return { text: "\u9080\u8BF7\u4F19\u4F34 \xB7 \u9886\u53D6\u91D1\u8272\u4EB2\u672C\u548C\u52A0\u901F\u80A5", page: "plots" };
+    if (!s.economy.tutorial.bred) return { text: "\u8BD5\u8BD5\u7B2C\u4E00\u6B21\u91D1\u8272\u7E41\u80B2", page: "plots" };
+    return { text: "\u62DC\u8BBF\u670B\u53CB \xB7 \u5171\u4EAB\u5929\u6C14 \xB7 \u5E03\u7F6E\u5C0F\u5C4B", page: "friends" };
+  }
   const j = s.journey ?? { bought: 0, planted: 0, harvested: 0, earned: 0, appleBought: 0 };
   if (!j.bought) return { text: "\u8D2D\u4E70\u4E00\u4EFD\u79CD\u5B50\uFF080/1\uFF09", page: "shop" };
   if (!j.planted) return { text: "\u79CD\u4E0B\u4E00\u682A\u690D\u7269\uFF080/1\uFF09", page: "plots" };
@@ -386,13 +488,13 @@ function gardenQuest(s) {
 
 // app/src/shared/garden-life.ts
 var DAY_MS = 864e5;
-var COOP_RULES = { work: 64800, speed: 360, maxPlayers: 8, leaseMs: 15e3, minSeconds: 20, minContribution: 0.02, dailyRewards: 5 };
+var COOP_RULES = { work: 64800, speed: 360, maxPlayers: 8, leaseMs: 15e3, minSeconds: 20, minContribution: 0.05, dailyRewards: 3 };
 var coopRareChance = (participants) => 0.18 + 0.09 * (Math.max(1, Math.min(8, participants)) - 1) / 7;
 var gardenDay = (now) => Math.floor((now + 4 * 36e5) / DAY_MS);
 var nextGardenDay = (day) => (day + 1) * DAY_MS - 4 * 36e5;
 var CHARACTER_XP = [0, 20, 60, 120, 200, 300, 440, 620, 840, 1100];
 var characterLevel = (xp) => CHARACTER_XP.filter((x) => xp >= x).length;
-var CHARACTER_UNLOCKS = [{ level: 3, kind: "flower", name: "\u9001\u82B1" }, { level: 5, kind: "photo", name: "\u5E76\u6392\u5408\u5F71" }, { level: 8, kind: "relay", name: "\u8868\u60C5\u63A5\u529B" }, { level: 10, kind: "celebrate", name: "\u5171\u540C\u5E86\u795D" }];
+var CHARACTER_UNLOCKS = [];
 var FRUITS = ["strawberry", "tomato", "blueberry", "pineapple", "apple"];
 var FOOD_ICONS = { lotus: "\u{1FAB7}", strawberry: "\u{1F353}", sunflower: "\u{1F33B}", carrot: "\u{1F955}", tomato: "\u{1F345}", blueberry: "\u{1FAD0}", pineapple: "\u{1F34D}", apple: "\u{1F34E}", tulip: "\u{1F337}" };
 var DYE_COLORS = { cream: { name: "\u5976\u6CB9", hue: 35 }, mint: { name: "\u8584\u8377\u7EFF", hue: 105 }, pink: { name: "\u6A31\u7C89", hue: 320 }, lilac: { name: "\u6DE1\u7D2B", hue: 260 }, ocean: { name: "\u6D77\u84DD", hue: 180 } };
@@ -445,7 +547,7 @@ function currentGrowth(s) {
 // app/src/shared/garden-progression.ts
 var MAX_GARDEN_PLOTS = 7;
 var plotsAtLevel = (level2) => Math.min(7, Math.max(3, level2 + 2));
-var unlockedPlots = (state) => plotsAtLevel(characterLevel(currentGrowth(state)?.xp ?? 0));
+var unlockedPlots = (state) => state.economy ? 4 : plotsAtLevel(characterLevel(currentGrowth(state)?.xp ?? 0));
 var visiblePlot = (state, index) => index < unlockedPlots(state) || !!state.plots[index];
 var emptyPlots = (state) => state.plots.filter((p, i) => !p && i < unlockedPlots(state)).length;
 function feedingWish(state, fruit) {
@@ -453,6 +555,263 @@ function feedingWish(state, fruit) {
   return currentGrowth(state)?.wishes.filter((w) => wishMatches(w, fruit)).sort((a, b) => b.xp - a.xp)[0];
 }
 var FRUIT_DRAG_TYPE = "application/x-qbot-garden-fruit";
+
+// app/src/main/garden/social-rules.ts
+function enableSocialEconomy(s, now) {
+  if (s.economy) {
+    const before = JSON.stringify(s.economy);
+    refreshSocial(s, now);
+    return before !== JSON.stringify(s.economy);
+  }
+  s.economy = {
+    version: 4,
+    furniture: {},
+    day: gardenDay(now),
+    purchases: {},
+    rareBought: 0,
+    tokens: 0,
+    topUpDay: -1,
+    rareMisses: 0,
+    epicMisses: 0,
+    draws: 0,
+    tutorial: { claimed: false, sped: false, fertilizer: 0, bred: false },
+    wishDay: gardenDay(now),
+    wishClaims: [],
+    wishBaseline: { ...s.v3?.counters },
+    notifications: [],
+    weatherHistory: [],
+    weatherSwitchAt: 0
+  };
+  s.shop.refreshAt = 0;
+  for (const c of Object.values(s.life?.characters ?? {})) c.wishes = [];
+  refreshSocial(s, now);
+  return true;
+}
+function refreshSocial(s, now) {
+  const e = s.economy;
+  if (!e) return;
+  const day = Math.max(e.day, gardenDay(now));
+  if (e.capsuleRevision !== 2) {
+    for (const id of RETIRED_FURNITURE) delete e.furniture[id];
+    if (e.furnitureReservation && RETIRED_FURNITURE.includes(e.furnitureReservation.item)) delete e.furnitureReservation;
+    if (e.wishes?.some((w) => w.kind === "furniture" && RETIRED_FURNITURE.includes(w.target ?? ""))) e.wishes = void 0;
+    e.capsuleRevision = 2;
+  }
+  e.travel ??= { week: weekKey(now), starts: 0, tutorialDone: false, counts: {}, history: [] };
+  if (e.travel.week < weekKey(now)) {
+    e.travel.week = weekKey(now);
+    e.travel.starts = 0;
+  }
+  if (day > e.day) {
+    e.day = day;
+    e.purchases = {};
+    e.rareBought = 0;
+  }
+  if (day > e.wishDay) {
+    e.wishDay = day;
+    e.wishClaims = [];
+    e.wishBaseline = { ...s.v3?.counters };
+    e.wishRerolls = 0;
+    e.wishes = void 0;
+  }
+  if (!e.wishes) {
+    const random = dailyRandom(`social-wish:${s.life?.owner}:${day}`), item = FURNITURE_SHOP.filter((x) => x.tier === "common" && !e.furniture[x.id]);
+    const furniture = item[Math.floor(random() * item.length)], peer = e.wishPeer;
+    e.wishes = [
+      { id: `${day}:harvest`, kind: "harvest", label: "\u60F3\u548C\u4F60\u4E00\u8D77\u6536\u83B7\u4E00\u682A\u690D\u7269", createdAt: now, done: false },
+      peer ? { id: `${day}:visit`, kind: "visit", target: peer.id, label: `\u60F3\u627E${peer.name}\u4E00\u8D77\u73A9`, createdAt: now, done: false } : furniture ? { id: `${day}:furniture`, kind: "furniture", target: furniture.id, label: `\u60F3\u7ED9\u623F\u95F4\u6DFB\u4E00\u4EF6${furniture.name}`, createdAt: now, done: false } : { id: `${day}:feed`, kind: "feed", label: "\u60F3\u548C\u4F60\u5206\u4EAB\u4E00\u9897\u6C34\u679C", createdAt: now, done: false }
+    ];
+  }
+}
+function socialTransition(s, c, now, rng, shopOwner) {
+  const e = s.economy;
+  if (!e) return { handled: false };
+  refreshSocial(s, now);
+  const reveal = (title, message) => ({ handled: true, reveal: { title, message } });
+  switch (c.type) {
+    case "travelExperience":
+    case "travelNext":
+      throw Error("\u65B0\u7248\u65C5\u884C\u8BF7\u5148\u9009\u76EE\u7684\u5730\u548C\u540C\u884C\u89D2\u8272\uFF0C\u518D\u51FA\u53D1");
+    case "tripStart": {
+      const t = e.travel;
+      if (!Object.hasOwn(SOCIAL_TRIPS, c.city) || !Array.isArray(c.actors) || c.actors.length < 1 || c.actors.length > 2 || new Set(c.actors).size !== c.actors.length || c.actors.some((id) => typeof id !== "string" || !Object.hasOwn(s.life.characters, id))) throw Error("\u8BF7\u9009\u62E9\u4E00\u5230\u4E24\u4F4D\u5DF2\u5728\u82B1\u56ED\u51FA\u73B0\u8FC7\u7684\u81EA\u5DF1\u7684\u89D2\u8272");
+      if (t.active) throw Error("\u5148\u8FCE\u63A5\u4E0A\u4E00\u961F\u65C5\u884C\u5F52\u6765");
+      if (c.tutorial && t.tutorialDone) throw Error("\u521D\u6B21\u77ED\u9014\u65C5\u884C\u5DF2\u7ECF\u4F53\u9A8C\u8FC7");
+      if (!c.tutorial && t.starts >= 2) throw Error("\u672C\u5468\u4E24\u6B21\u65C5\u884C\u5DF2\u51FA\u53D1\uFF0C\u4E0B\u5468\u518D\u53BB\u65B0\u5730\u65B9");
+      const destination = SOCIAL_TRIPS[c.city], cost = c.tutorial ? 60 : destination.cost, minutes = c.tutorial ? 10 : destination.minutes;
+      if (s.coins < cost) throw Error("\u82B1\u56ED\u5E01\u4E0D\u8DB3");
+      s.coins -= cost;
+      if (c.tutorial) t.tutorialDone = true;
+      else t.starts++;
+      t.active = { id: rng.id(), city: c.city, actors: [...c.actors], startedAt: now, readyAt: now + minutes * 6e4, tutorial: !!c.tutorial };
+      recordGarden(s, now, "tripStart", `\u6D3E\u51FA ${c.actors.length} \u4F4D\u89D2\u8272\u524D\u5F80${destination.name} \xB7 ${cost}\u91D1\u5E01`);
+      return reveal("\u65C5\u884C\u51FA\u53D1\u4E86", `${minutes} \u5206\u949F\u540E\u5F52\u6765\u3002\u53EF\u79BB\u7EBF\u7B49\u5F85\uFF0C\u540C\u884C\u4EBA\u6570\u4E0D\u4F1A\u500D\u589E\u5956\u52B1\u3002`);
+    }
+    case "tripClaim": {
+      const t = e.travel, trip = t.active;
+      if (!trip || trip.id !== c.id) throw Error("\u8FD9\u6B21\u65C5\u884C\u5DF2\u7ECF\u7ED3\u7B97");
+      if (now < trip.readyAt) throw Error("\u4F19\u4F34\u8FD8\u5728\u8DEF\u4E0A");
+      const destination = SOCIAL_TRIPS[trip.city];
+      s.seeds.push({ id: rng.id(), species: destination.seed, origin: trip.city, genes: [], bred: false });
+      const gifts = [];
+      if (!trip.tutorial) {
+        t.counts[trip.city] = (t.counts[trip.city] ?? 0) + 1;
+        for (const gift of REGIONAL_FURNITURE.filter((x) => x.city === trip.city && x.trips === t.counts[trip.city])) {
+          e.furniture[gift.id] = (e.furniture[gift.id] ?? 0) + 1;
+          gifts.push(gift.name);
+        }
+      }
+      t.history.push({ ...trip, claimedAt: now });
+      t.history = t.history.slice(-100);
+      delete t.active;
+      recordGarden(s, now, "tripReturn", `\u4ECE${destination.name}\u5E26\u56DE\u4E00\u5305\u5730\u533A\u690D\u7269\u79CD\u5B50${gifts.length ? "\u548C" + gifts.join("\u3001") : ""}`);
+      return reveal("\u65C5\u884C\u5F52\u6765\u4E86", `${destination.name}\u690D\u7269\u79CD\u5B50 \xD71${gifts.length ? " \xB7 " + gifts.join("\u3001") : ""}\u3002\u65C5\u884C\u8BB0\u5F55\u5DF2\u4FDD\u5B58\uFF0C\u5730\u533A\u5BB6\u5177\u53EF\u5728\u8336\u5BA4\u6446\u653E\u3002`);
+    }
+    case "appraiseStart":
+    case "upgradeSoil":
+    case "spray":
+    case "buyDaily":
+      throw Error("\u65B0\u7248\u8BF7\u4F7F\u7528\u79CD\u690D\u8865\u7ED9\u3001\u5929\u6C14\u5171\u4EAB\u548C\u5BB6\u5177\u5C0F\u5E97");
+    case "box":
+      throw Error("\u966A\u4F34\u5F00\u7BB1\u5DF2\u9000\u5F79\uFF0C\u8BF7\u5230\u5BB6\u5177\u5546\u5E97\u6216\u626D\u86CB\u673A\u770B\u770B");
+    case "socialStarter": {
+      if (e.tutorial.claimed) throw Error("\u65B0\u624B\u793C\u7269\u5DF2\u7ECF\u9886\u53D6");
+      const genes = ["starcore", "golden"], seed = rng.id(), parent = rng.id();
+      s.seeds.push({ id: seed, species: "strawberry", genes, slots: geneSlots(genes), bred: true });
+      const p = { id: parent, species: "strawberry", traits: [...genes], kg: SPECIES.strawberry.kg, value: 0, bred: false, growthVersion: 3, revealed: true, slots: geneSlots(genes), yieldCount: 1 };
+      p.value = v3Value(p);
+      s.produce.push(p);
+      e.tutorial = { claimed: true, sped: false, fertilizer: 1, seed, parent, bred: false };
+      s.v3.oils.normal++;
+      recordGarden(s, now, "starter", "\u9886\u5230\u91D1\u8272\u4EB2\u672C\u3001\u91D1\u8272\u79CD\u5B50\u3001\u65B0\u624B\u52A0\u901F\u80A5\u548C\u666E\u901A\u7CBE\u6CB9");
+      return reveal("\u4E00\u8D77\u79CD\u4E0B\u7B2C\u4E00\u4EFD\u671F\u5F85", "\u5DF2\u653E\u5165\u91D1\u8272\u4EB2\u672C\u3001\u91D1\u8272\u8349\u8393\u79CD\u5B50\u3001\u65B0\u624B\u52A0\u901F\u80A5 \xD71\u3001\u666E\u901A\u7CBE\u6CB9 \xD71\u3002\u5148\u9080\u8BF7\u4F19\u4F34\uFF0C\u518D\u79CD\u4E0B\u91D1\u8272\u79CD\u5B50\u8BD5\u8BD5\u7E41\u80B2\u3002");
+    }
+    case "tutorialSpeed": {
+      const p = s.plots[c.plot];
+      if (!e.tutorial.claimed || e.tutorial.fertilizer !== 1 || !p || p.id !== e.tutorial.seed || p.readyAt <= now) throw Error("\u8BF7\u5BF9\u65B0\u624B\u91D1\u8272\u79CD\u5B50\u957F\u51FA\u7684\u690D\u7269\u4F7F\u7528");
+      e.tutorial.fertilizer = 0;
+      e.tutorial.sped = true;
+      p.readyAt = now + 5e3;
+      p.batch.seedlingEnd = p.readyAt;
+      p.batch.naturalReadyAt = p.readyAt;
+      p.batch.settled = true;
+      p.value = v3Value(p);
+      p.revealed = true;
+      return reveal("\u4F19\u4F34\u9001\u6765\u4E86\u52A0\u901F\u80A5", "\u8FD9\u682A\u65B0\u624B\u91D1\u8272\u8349\u8393\u5C06\u5728 5 \u79D2\u540E\u6210\u719F\u3002\u4E4B\u540E\u7684\u79CD\u690D\u4F7F\u7528\u666E\u901A\u52A0\u901F\u80A5\u3002");
+    }
+    case "reserveFurniture":
+    case "buyFurniture": {
+      if (c.owner !== s.life.owner && c.owner !== shopOwner) throw Error("\u8BF7\u4ECE\u5DF2\u5F00\u653E\u7684\u597D\u53CB\u5546\u5E97\u8D2D\u4E70");
+      const reservation = e.furnitureReservation;
+      const reserved = c.type === "buyFurniture" && reservation?.owner === c.owner && reservation.item === c.item && reservation.expiresAt > now;
+      const item = reserved ? FURNITURE_SHOP.find((x) => x.id === c.item) : furnitureOffers(c.owner, e.day).find((x) => x.id === c.item);
+      if (!item) throw Error("\u5BB6\u5177\u8D27\u67B6\u5DF2\u5237\u65B0");
+      if (c.type === "reserveFurniture") {
+        if (item.tier === "common") throw Error("\u65E5\u5E38\u5BB6\u5177\u6BCF\u5929\u53EF\u4EE5\u4E70\uFF0C\u65E0\u9700\u9884\u7559");
+        if (reservation && reservation.expiresAt > now && reservation.owner === c.owner && reservation.item === c.item) return reveal("\u5DF2\u7ECF\u66FF\u4F60\u7559\u597D\u4E86", "\u62A5\u4EF7\u6709\u6548\u65F6\u95F4\u4E0D\u4F1A\u56E0\u91CD\u590D\u70B9\u51FB\u5EF6\u957F\u3002");
+        e.furnitureReservation = { owner: c.owner, item: c.item, price: item.price, expiresAt: now + 72 * 36e5 };
+        return reveal("\u66FF\u4F60\u7559\u597D\u8FD9\u4EF6\u5BB6\u5177", "\u4FDD\u7559\u62A5\u4EF7 72 \u5C0F\u65F6\uFF0C\u8D2D\u4E70\u65F6\u518D\u6263\u82B1\u56ED\u5E01\u3002\u53EA\u80FD\u4FDD\u7559\u4E00\u4EF6\uFF0C\u65B0\u7684\u9884\u7559\u4F1A\u66FF\u6362\u4E0A\u4E00\u4EF6\u3002");
+      }
+      const key = `${c.owner}:${c.item}`;
+      if (e.purchases[key]) throw Error("\u4ECA\u65E5\u5DF2\u7ECF\u5728\u8FD9\u5BB6\u5E97\u4E70\u8FC7\u8FD9\u4EF6\u5BB6\u5177");
+      if (item.tier !== "common" && e.rareBought >= 1) throw Error("\u4ECA\u5929\u5DF2\u8D2D\u5165\u4E00\u4EF6\u73CD\u7A00\u5BB6\u5177\uFF0C\u660E\u5929\u518D\u6765");
+      const cost = reserved ? reservation.price : item.price;
+      if (s.coins < cost) throw Error("\u82B1\u56ED\u5E01\u4E0D\u8DB3");
+      s.coins -= cost;
+      e.purchases[key] = 1;
+      e.furniture[item.id] = (e.furniture[item.id] ?? 0) + 1;
+      if (reserved) delete e.furnitureReservation;
+      if (item.tier !== "common") e.rareBought++;
+      recordGarden(s, now, "furniture", `\u4ECE${c.owner === s.life.owner ? "\u81EA\u5DF1\u7684" : "\u670B\u53CB\u7684"}\u5C0F\u5E97\u5E26\u56DE${item.name}`, c.owner);
+      return reveal("\u65B0\u5BB6\u5177\u5230\u5BB6\u4E86", `${item.name}\u5DF2\u6536\u5165\u6536\u85CF\uFF0C\u53EF\u4EE5\u653E\u8FDB 2D \u8336\u5BA4\u3002`);
+    }
+    case "capsuleTopUp": {
+      if (e.topUpDay >= e.day) throw Error("\u4ECA\u5929\u7684\u6A21\u62DF\u5145\u503C\u5DF2\u9886\u53D6");
+      e.topUpDay = e.day;
+      e.tokens += CAPSULE.topUp;
+      return reveal("\u6A21\u62DF\u5145\u503C\u5B8C\u6210", `\u6D4B\u8BD5\u4EE3\u5E01 +${CAPSULE.topUp}\u3002\u6CA1\u6709\u771F\u5B9E\u4ED8\u6B3E\uFF0C\u6BCF\u5929\u53EF\u6D4B\u8BD5\u4E00\u6B21\u3002`);
+    }
+    case "capsuleDraw": {
+      if (c.count !== 1 && c.count !== 10) throw Error("\u8BF7\u9009\u62E9\u5355\u62BD\u6216\u5341\u8FDE");
+      const cost = c.count * CAPSULE.cost;
+      if (e.tokens < cost) throw Error("\u6D4B\u8BD5\u4EE3\u5E01\u4E0D\u8DB3\uFF0C\u53EF\u4F7F\u7528\u6A21\u62DF\u5145\u503C");
+      const names = [], rewards = [];
+      e.tokens -= cost;
+      for (let i = 0; i < c.count; i++) {
+        const roll = rng.random();
+        let tier2 = roll < 0.7 ? "common" : roll < 0.95 ? "rare" : "epic";
+        if (e.epicMisses >= CAPSULE.epicPity - 1) tier2 = "epic";
+        else if (e.rareMisses >= CAPSULE.rarePity - 1 && tier2 === "common") tier2 = "rare";
+        const pool = CAPSULE_POOL.filter((x) => x.tier === tier2);
+        let pick = rng.random() * 100;
+        const item = pool.find((x) => (pick -= x.weight) < 0) ?? pool[pool.length - 1];
+        if (item.kind === "furniture") {
+          e.furniture[item.item] = (e.furniture[item.item] ?? 0) + item.count;
+          recordGarden(s, now, "furniture", `\u626D\u86CB\u673A\u5E26\u56DE${item.name}`);
+        } else if (item.kind === "seed") {
+          for (let n = 0; n < item.count; n++) s.seeds.push({ id: rng.id(), species: item.item, genes: [], bred: false });
+        } else s.fertilizers[item.item] = (s.fertilizers[item.item] ?? 0) + item.count;
+        e.rareMisses = tier2 === "common" ? e.rareMisses + 1 : 0;
+        e.epicMisses = tier2 === "epic" ? 0 : e.epicMisses + 1;
+        e.draws++;
+        names.push(`${item.name} \xD7${item.count}`);
+        rewards.push({ ...item });
+      }
+      e.lastCapsule = { id: rng.id(), at: now, rewards };
+      return reveal("\u626D\u86CB\u6253\u5F00\u4E86", names.join("\u3001") + " \xB7 \u5DF2\u6536\u5165\u80CC\u5305\u4E0E\u5BB6\u5177\u6536\u85CF\u3002");
+    }
+    case "socialWish": {
+      if (!Object.hasOwn(SOCIAL_WISHES, c.kind) || e.wishClaims.includes(c.kind) || e.wishClaims.length >= 2) throw Error("\u4ECA\u65E5\u5FC3\u613F\u5956\u52B1\u5DF2\u9886\u53D6");
+      const wish = e.wishes?.find((w) => w.kind === c.kind && !w.done);
+      if (!wish) throw Error("\u8FD9\u4EFD\u5FC3\u613F\u5DF2\u7ECF\u66F4\u6362\u6216\u5B8C\u6210");
+      const key = c.kind === "harvest" ? "socialHarvest" : c.kind;
+      if ((s.v3.counters[key] ?? 0) <= (e.wishBaseline[key] ?? 0)) throw Error("\u5148\u5B8C\u6210\u8FD9\u4EFD\u5FC3\u613F\uFF0C\u518D\u56DE\u6765\u9886\u53D6");
+      if (wish.target && c.kind === "furniture" && !e.furniture[wish.target]) throw Error("\u8FD8\u6CA1\u6709\u627E\u5230\u89D2\u8272\u671F\u5F85\u7684\u90A3\u4EF6\u5BB6\u5177");
+      if (wish.target && c.kind === "visit" && !s.v3.records.some((r) => r.kind === "visit" && r.peer === wish.target && r.at >= wish.createdAt)) throw Error("\u8FD8\u6CA1\u6709\u53BB\u627E\u8FD9\u4F4D\u670B\u53CB");
+      e.wishClaims.push(c.kind);
+      wish.done = true;
+      s.coins += 20;
+      recordGarden(s, now, "wish", wish.label + " \xB7 +20\u82B1\u56ED\u5E01");
+      return reveal("\u53C8\u591A\u4E86\u4E00\u6BB5\u5171\u540C\u7ECF\u5386", "\u82B1\u56ED\u5E01 +20\u3002\u6BCF\u5929\u6700\u591A\u9886\u53D6\u4E24\u4EFD\u5FC3\u613F\u5956\u52B1\u3002");
+    }
+    case "rerollSocialWish": {
+      const wish = e.wishes?.find((w) => w.id === c.id && !w.done);
+      if (!wish) throw Error("\u5FC3\u613F\u4E0D\u5B58\u5728\u6216\u5DF2\u7ECF\u5B8C\u6210");
+      if ((e.wishRerolls ?? 0) >= 2) throw Error("\u4ECA\u5929\u4E24\u6B21\u514D\u8D39\u66F4\u6362\u5DF2\u7528\u5B8C");
+      const kind = ["feed", "harvest", "breed"].find((k) => !e.wishes.some((w) => w.kind === k) && !e.wishClaims.includes(k));
+      if (!kind) throw Error("\u4ECA\u5929\u5DF2\u6CA1\u6709\u65B0\u7684\u5FC3\u613F");
+      wish.id += `:r${e.wishRerolls ?? 0}`;
+      wish.kind = kind;
+      wish.target = void 0;
+      wish.label = SOCIAL_WISHES[kind];
+      wish.createdAt = now;
+      e.wishRerolls = (e.wishRerolls ?? 0) + 1;
+      return { handled: true };
+    }
+    case "readMutations":
+      for (const n of e.notifications) n.read = true;
+      return { handled: true };
+    case "leaveWeather":
+      delete e.weather;
+      return { handled: true };
+    case "shareWeather":
+      throw Error("\u8BF7\u5728\u8054\u673A\u623F\u95F4\u5185\u9009\u62E9\u5171\u4EAB\u5929\u6C14");
+  }
+  return { handled: false };
+}
+function validateSocial(s) {
+  const e = s.economy;
+  if (!e) return;
+  const n = (x) => Number.isSafeInteger(x) && Number(x) >= 0;
+  if (e.version !== 4 || !e.furniture || !e.purchases || !e.tutorial || !Array.isArray(e.notifications) || !Array.isArray(e.weatherHistory) || !Array.isArray(e.wishClaims) || !e.wishBaseline || !n(e.day) || !n(e.tokens) || !n(e.draws) || !n(e.rareMisses) || e.rareMisses >= 10 || !n(e.epicMisses) || e.epicMisses >= 20 || Object.values(e.furniture).some((x) => !n(x))) throw Error("\u65B0\u7248\u793E\u4EA4\u7ECF\u6D4E\u5B58\u6863\u635F\u574F");
+  if (e.furnitureReservation && (!n(e.furnitureReservation.price) || e.furnitureReservation.price === 0 || !n(e.furnitureReservation.expiresAt) || !FURNITURE_SHOP.some((x) => x.id === e.furnitureReservation.item) && !RETIRED_FURNITURE.includes(e.furnitureReservation.item) || typeof e.furnitureReservation.owner !== "string")) throw Error("\u5BB6\u5177\u9884\u7559\u8BB0\u5F55\u635F\u574F");
+  if (e.wishes && (!Array.isArray(e.wishes) || e.wishes.length > 2 || e.wishes.some((w) => !w || !Object.hasOwn(SOCIAL_WISHES, w.kind) || typeof w.id !== "string" || typeof w.label !== "string" || typeof w.done !== "boolean" || !n(w.createdAt)))) throw Error("\u793E\u4EA4\u5FC3\u613F\u8BB0\u5F55\u635F\u574F");
+  if (e.travel) {
+    const t = e.travel;
+    const trip = (p) => p && typeof p.id === "string" && Object.hasOwn(SOCIAL_TRIPS, p.city) && Array.isArray(p.actors) && p.actors.length >= 1 && p.actors.length <= 2 && new Set(p.actors).size === p.actors.length && p.actors.every((id) => typeof id === "string") && n(p.startedAt) && n(p.readyAt) && p.readyAt > p.startedAt && typeof p.tutorial === "boolean";
+    if (!n(t.week) || !n(t.starts) || t.starts > 2 || !t.counts || Object.values(t.counts).some((x) => !n(x)) || !Array.isArray(t.history) || t.history.length > 100 || t.history.some((p) => !trip(p) || !n(p.claimedAt)) || t.active && !trip(t.active)) throw Error("\u65C5\u884C\u8BB0\u5F55\u635F\u574F");
+  }
+}
 
 // app/src/shared/travel.ts
 var DESTINATIONS = [
@@ -568,7 +927,10 @@ function ensureLife(s, now, rng, actor, migrate = true) {
     s.activeActor = actor;
     let c = l.characters[actor];
     if (!c) c = l.characters[actor] = { xp: 0, day, wishes: [], rerolled: false };
-    if (c.day < day || !c.wishes.length) {
+    if (s.economy) {
+      c.wishes = [];
+      c.day = day;
+    } else if (c.day < day || !c.wishes.length) {
       c.day = day;
       c.rerolled = false;
       c.wishes = makeWishes(s, actor, day);
@@ -692,6 +1054,13 @@ function lifeTransition(s, cmd, now, rng, actor, shopOwner) {
       if (cmd.actor !== void 0 && cmd.actor !== actor) throw Error("\u89D2\u8272\u5DF2\u5207\u6362\uFF0C\u8BF7\u91CD\u65B0\u6295\u5582");
       const c = actor && l.characters[actor];
       if (!c) throw Error("\u8BF7\u5148\u9009\u62E9\u81EA\u5DF1\u7684\u89D2\u8272");
+      if (s.economy) {
+        const i2 = s.produce.findIndex((p) => p.id === cmd.produce && !p.locked && !needsReveal(p));
+        if (i2 < 0) throw Error("\u8BF7\u9009\u62E9\u672A\u9501\u5B9A\u3001\u5DF2\u63ED\u6653\u7684\u679C\u5B9E");
+        s.produce.splice(i2, 1);
+        recordGarden(s, now, "feed", "\u548C\u89D2\u8272\u5206\u4EAB\u4E86\u4E00\u9897\u679C\u5B9E");
+        return { handled: true, reveal: { title: "\u4E00\u8D77\u5403\u5230\u4E86\uFF01", message: "\u8FD9\u4EFD\u5171\u540C\u7ECF\u5386\u5DF2\u8BB0\u5165\u5FC3\u613F\u3002" } };
+      }
       const w = c.wishes.find((w2) => w2.id === cmd.wish), i = s.produce.findIndex((p) => p.id === cmd.produce);
       if (!w || i < 0 || !wishMatches(w, s.produce[i])) throw Error("\u9700\u8981\u6B63\u786E\u7684\u6C34\u679C\u548C\u5168\u90E8\u6307\u5B9A\u8BCD\u6761\uFF0C\u4E14\u679C\u5B9E\u672A\u6536\u85CF\u9501\u5B9A");
       const old = characterLevel(c.xp), food = s.produce[i];
@@ -726,17 +1095,83 @@ function lifeTransition(s, cmd, now, rng, actor, shopOwner) {
   return { handled: false };
 }
 
+// app/src/main/garden/social-weather.ts
+function advanceSocialPlants(s, now) {
+  const e = s.economy;
+  if (!e) return false;
+  let changed = false;
+  for (const p of s.plots) {
+    if (!p?.batch) continue;
+    if (p.cultivation && p.cultivation.remainingMs > 18e4) {
+      p.cultivation.remainingMs = 18e4;
+      changed = true;
+    }
+    if (p.batch.settled && p.batch.candidates.length) {
+      p.traits = withSize(settleFactors([...p.traits, ...p.batch.candidates]), p.kg / SPECIES[p.species].kg);
+      p.slots = geneSlots(p.traits);
+      p.batch.candidates = [];
+      p.value = v3Value(p);
+      changed = true;
+    }
+    if (p.batch.settled) continue;
+    const b = p.batch;
+    b.socialChecks ??= 0;
+    const duration = (b.naturalReadyAt ?? p.readyAt) - p.plantedAt;
+    while (b.socialChecks < 4) {
+      const index = b.socialChecks, at = Math.max(p.plantedAt + duration * WEATHER_CHECKS[index], b.socialAdjustedAt ?? 0);
+      if (at > now) break;
+      const shared = [...e.weatherHistory, ...e.weather ? [e.weather] : []].filter((w2) => w2.acceptedAt + 12e4 <= at && w2.start <= at && w2.end > at).sort((a, b2) => b2.acceptedAt - a.acceptedAt)[0];
+      const weather = shared ?? nativeSocialWeather(at, s.life?.owner ?? "local");
+      const random = dailyRandom(`checkpoint4:${p.id}:${b.seed}:${index}`), roll = random(), w = V3_WEATHER[weather.kind], chances = WEATHER_CHANCE[w.grade];
+      let sum = 0, tier2;
+      for (let i = 0; i < 4; i++) {
+        sum += chances[i];
+        if (roll < sum) {
+          tier2 = ["blue", "purple", "gold", "rainbow"][i];
+          break;
+        }
+      }
+      const pool = socialWeatherPool(weather.kind).filter((t) => TRAITS[t].tier === tier2);
+      if (pool.length) {
+        const t = pool[Math.floor(random() * pool.length)], old = [...p.traits];
+        p.traits = withSize(settleFactors([...old, t]), p.kg / SPECIES[p.species].kg);
+        p.slots = geneSlots(p.traits);
+        if (p.traits.includes(t) && !old.includes(t)) {
+          const text = `${SPECIES[p.species].name}\u53D7${shared ? "\u4F19\u4F34\u5171\u4EAB\u7684" : ""}${w.name}\u5F71\u54CD\uFF0C\u957F\u51FA\u4E86\u300C${TRAITS[t].name}\u300D`;
+          e.notifications.push({ id: `${p.id}:${index}`, at, text, read: false });
+          e.notifications = e.notifications.slice(-100);
+          recordGarden(s, at, "mutation", text, shared?.source, p.id);
+        }
+      }
+      b.socialChecks++;
+      changed = true;
+    }
+    if (b.socialChecks === 4) {
+      const random = dailyRandom(`mass4:${p.id}:${b.seed}`), roll = random();
+      const mass = b.massGene ? { mini: 0.5, plump: 1.8, large: 3.5, giant: 5.3 }[b.massGene] ?? 1 : roll < 2e-3 ? 5.3 : roll < 0.052 ? 3.5 : roll < 0.152 ? 1.8 : 1;
+      p.kg = Math.round(SPECIES[p.species].kg * mass * 1e3) / 1e3;
+      p.traits = withSize(p.traits, mass);
+      b.settled = true;
+      b.candidates = [];
+      p.value = v3Value(p);
+      if (qualityOf(p) === "rainbow") p.readyAt = Math.min(p.readyAt, b.seedlingEnd);
+    }
+  }
+  return changed;
+}
+
 // app/src/main/garden/v3-rules.ts
 function enableV3(s, now) {
-  if (s.v3) return false;
+  if (s.v3) return enableSocialEconomy(s, now);
   for (const p of s.plots) if (p && p.growthVersion !== 3) p.legacyLevel = Math.max(1, LEVEL_XP.filter((x) => s.xp[p.species] >= x).length);
   for (const sp of Object.keys(SPECIES)) {
     const xp = s.xp[sp], i = Math.max(0, LEVEL_XP.filter((n) => xp >= n).length - 1);
     s.xp[sp] = Math.round(V3_XP[i] + (i < 7 ? (xp - LEVEL_XP[i]) / (LEVEL_XP[i + 1] - LEVEL_XP[i]) * (V3_XP[i + 1] - V3_XP[i]) : Math.min(1, (xp - LEVEL_XP[7]) / 400) * (V3_XP[8] - V3_XP[7])));
   }
   s.v3 = { version: 3, day: gardenDay(now), xpToday: {}, rainbowMisses: 0, pityEvents: [], week: weekKey(now), breeds: 0, geneMisses: 0, sizeMisses: 0, oils: { normal: 2, rich: 0 }, soil: Array(s.plots.length).fill(1), records: [], counters: {}, sunPartners: [], appraisals: {} };
+  enableSocialEconomy(s, now);
   s.shop.refreshAt = 0;
-  recordGarden(s, now, "welcome", "\u65B0\u82B1\u56ED\u624B\u518C\uFF1A\u9009\u4E00\u4E2A\u559C\u6B22\u7684\u7EC4\u5408\uFF0C\u6162\u6162\u79CD\u51FA\u81EA\u5DF1\u7684\u6536\u85CF\u3002");
+  recordGarden(s, now, "welcome", "\u65B0\u82B1\u56ED\u624B\u518C\uFF1A\u9080\u8BF7\u4F19\u4F34\uFF0C\u4E00\u8D77\u79CD\u51FA\u81EA\u5DF1\u7684\u6536\u85CF\u3002");
   return true;
 }
 function refreshV3Day(s, now) {
@@ -757,8 +1192,8 @@ function refreshV3Shop(s, now) {
   if (!s.v3) return false;
   refreshV3Day(s, now);
   if (s.shop.refreshAt > now) return true;
-  const day = s.v3.day, basic = ["carrot", "strawberry", "sunflower", "tomato", "tulip", "lotus"];
-  s.shop = { refreshAt: nextGardenDay(day), offers: [...basic.map((sp) => ({ id: `supply3:${day}:${sp}`, kind: "seed", item: sp, price: SPECIES[sp].price, stock: 99 })), ...Object.keys(FERTILIZERS).map((f) => ({ id: `supply3:${day}:${f}`, kind: "fertilizer", item: f, price: fertilizerV3(f).price, stock: [8, 3, 1, 1][FERTILIZERS[f].grade - 1] }))] };
+  const day = s.v3.day, basic = Object.keys(CROPS);
+  s.shop = { refreshAt: nextGardenDay(day), offers: [...basic.map((sp) => ({ id: `supply3:${day}:${sp}`, kind: "seed", item: sp, price: s.economy ? CROPS[sp].cost : SPECIES[sp].price, stock: 99 })), ...Object.keys(FERTILIZERS).filter((f) => !s.economy || FERTILIZERS[f].effect === "speed").map((f) => ({ id: `supply3:${day}:${f}`, kind: "fertilizer", item: f, price: fertilizerV3(f).price, stock: [8, 3, 1, 1][FERTILIZERS[f].grade - 1] }))] };
   return true;
 }
 var choose = (items, random) => items[Math.min(items.length - 1, Math.floor(random() * items.length))];
@@ -781,10 +1216,12 @@ function drawFactor(pool, weights, random) {
   return available.length ? choose(available, random) : void 0;
 }
 function makeV3Plant(s, seed, plot, now, rng, harvests = SPECIES[seed.species].harvests, index = 0) {
-  const duration = sowingMinutes(seed.species, s) * 6e4;
+  const duration = (s.economy ? CROPS[seed.species].minutes : sowingMinutes(seed.species, s)) * 6e4;
+  if (s.economy) harvests = 1;
   const traits = cappedTraits(seed.genes.filter((t) => traitSlot(t) !== "size")), slots = seed.slots ?? geneSlots(traits);
   return {
-    id: rng.id(),
+    id: s.economy?.tutorial.seed === seed.id ? seed.id : rng.id(),
+    origin: seed.origin,
     species: seed.species,
     traits,
     kg: SPECIES[seed.species].kg,
@@ -797,7 +1234,7 @@ function makeV3Plant(s, seed, plot, now, rng, harvests = SPECIES[seed.species].h
     baseTraits: traits,
     harvestsLeft: harvests,
     harvestIndex: index,
-    yieldCount: SPECIES[seed.species].harvests,
+    yieldCount: s.economy ? 1 : SPECIES[seed.species].harvests,
     lineage: seed.lineage,
     slots,
     batch: { seedlingEnd: now + duration * V3.seedling, naturalReadyAt: now + duration, settled: false, seed: Math.floor(rng.random() * 4294967296), realm: s.v3.realm ?? "garden", exposure: [], candidates: [], slots, massGene: seed.massGene, soil: s.v3.soil[plot], sunBonus: Math.min(2, s.v3.sunActive ?? 0) * 0.03 }
@@ -811,6 +1248,7 @@ function advanceV3(s, now) {
   if (!s.v3) return false;
   refreshV3Day(s, now);
   let changed = false;
+  if (s.economy) return advanceSocialPlants(s, now);
   for (const [plot, p] of s.plots.entries()) {
     const b = p?.batch;
     if (!p || p.growthVersion !== 3 || !b) continue;
@@ -903,26 +1341,25 @@ function protectV3(s, c) {
   const touches = (id) => "id" in c && c.id === id || "target" in c && c.target === id || "produce" in c && c.produce === id || "first" in c && (c.first === id || c.second === id) || "ids" in c && c.ids.includes(id) || "plot" in c && s.plots[c.plot]?.id === id;
   if (targets.some(touches)) throw Error("\u8FD9\u9897\u679C\u5B9E\u8FD8\u6709\u5F85\u9009\u62E9\u7684\u8BCD\u6761\u6216\u9274\u5B9A\uFF0C\u8BF7\u5148\u5904\u7406\u7ED3\u679C");
 }
-function legacyGenes(p, selected) {
-  if (p.growthVersion === 3) return p.slots?.filter((t) => !!t) ?? cappedTraits(p.traits).filter((t) => traitSlot(t) !== "size");
-  const base = p.traits.filter((t) => traitSlot(t) !== "size"), chosen = selected ?? base;
-  if (chosen.some((t) => !base.includes(t)) || cappedTraits(chosen).length !== chosen.length) throw Error("\u65E7\u7248\u6536\u85CF\u8BF7\u5148\u9009\u4E00\u4E2A\u7B26\u5408\u679C\u5B9E1/\u679C\u76AE1/\u6302\u99702\u7684\u9057\u4F20\u7EC4\u5408");
-  return chosen;
+function legacyGenes(p) {
+  return settleFactors(p.traits.filter((t) => traitSlot(t) !== "size"));
 }
 function breedV3(s, a, b, cmd, now, rng) {
   const v = s.v3;
   refreshV3Day(s, now);
+  if (!canBreed(a) || !canBreed(b)) throw Error("\u53CC\u65B9\u9700\u8981\u5DF2\u63ED\u6653\u3001\u672A\u7E41\u80B2\u8FC7\u7684\u91D1\u8272\u4EE5\u4E0A\u4EB2\u672C");
   if (a.locked || b.locked || b.traits.includes("mini")) throw Error("\u4EB2\u672C\u9700\u53D6\u6D88\u6536\u85CF\u9501\uFF0C\u4E14\u80CC\u5305\u7236\u672C\u4E0D\u80FD\u662F\u8FF7\u4F60");
   if (v.breeds >= 90) throw Error("\u672C\u5468\u5DF2\u5B8C\u6210 90 \u6B21\u7E41\u80B2\uFF0C\u4E0B\u5468\u53EF\u7EE7\u7EED");
   const oil = cmd.oil ?? "normal";
   if (!Object.hasOwn(v.oils, oil) || v.oils[oil] <= 0) throw Error("\u9700\u8981\u4E00\u74F6\u7E41\u80B2\u7CBE\u6CB9");
-  const ag = legacyGenes(a, cmd.firstGenes), bg = legacyGenes(b, cmd.secondGenes), as = a.growthVersion === 3 ? a.slots ?? geneSlots(ag) : geneSlots(ag), bs = b.growthVersion === 3 ? b.slots ?? geneSlots(bg) : geneSlots(bg);
+  const tuning = BREED_OILS[oil];
+  const ag = legacyGenes(a), bg = legacyGenes(b), as = a.growthVersion === 3 ? a.slots ?? geneSlots(ag) : geneSlots(ag), bs = b.growthVersion === 3 ? b.slots ?? geneSlots(bg) : geneSlots(bg);
   let genes = [];
   const inherited = as.map(() => null);
   const pool = [.../* @__PURE__ */ new Set([...ag, ...bg])];
   for (let i = 0; i < 4; i++) {
     const x = as[i], y = bs[i];
-    if ((x || y) && rng.random() < (x && y ? 0.3 : 0.25)) {
+    if ((x || y) && rng.random() < (x && y ? tuning.double : tuning.single)) {
       const t = x && y ? rng.random() < 0.5 ? x : y : x ?? y;
       if (fits(genes, t)) {
         genes.push(t);
@@ -931,7 +1368,7 @@ function breedV3(s, a, b, cmd, now, rng) {
     }
   }
   if (pool.length) {
-    if (!genes.length && v.geneMisses >= 9) {
+    if (!genes.length && v.geneMisses >= tuning.pity - 1) {
       genes = [choose(pool, () => rng.random())];
       v.geneMisses = 0;
     } else v.geneMisses = genes.length ? 0 : v.geneMisses + 1;
@@ -939,17 +1376,18 @@ function breedV3(s, a, b, cmd, now, rng) {
   const sizes = [...new Set([...a.traits, ...b.traits].filter((t) => traitSlot(t) === "size" && t !== "mini"))];
   let massGene;
   if (sizes.length) {
-    if (rng.random() < 0.2 || v.sizeMisses >= 9) {
+    if (rng.random() < tuning.size || v.sizeMisses >= tuning.pity - 1) {
       massGene = choose(sizes, () => rng.random());
       v.sizeMisses = 0;
     } else v.sizeMisses++;
   }
-  const cap = oil === "rich" ? 4 : 3;
+  const cap = tuning.cap;
   while (genes.length > cap) genes.splice(Math.floor(rng.random() * genes.length), 1);
   const seed = { id: rng.id(), species: rng.random() < 0.5 ? a.species : b.species, genes, slots: stableSlots(genes, inherited), massGene, bred: true, parents: [a.species, b.species], lineage: { parents: [a, b].map((p) => ({ id: p.id, species: p.species, traits: [...p.traits] })), at: now, owner: s.life?.owner } };
   v.oils[oil]--;
   v.breeds++;
   a.bred = b.bred = true;
+  if (s.economy) s.economy.tutorial.bred = true;
   recordGarden(s, now, "breed", `\u7E41\u80B2\u51FA${SPECIES[seed.species].name}\u79CD\u5B50\uFF0C\u4FDD\u7559 ${genes.length} \u4E2A\u56E0\u5B50${massGene ? "\u548C" + TRAITS[massGene].name + "\u4F53\u578B" : ""}`);
   return seed;
 }
@@ -970,11 +1408,11 @@ function v3Transition(s, c, now, rng) {
       return { handled: true };
     case "buyOil": {
       if (!["normal", "rich"].includes(c.kind)) throw Error("\u7CBE\u6CB9\u4E0D\u5B58\u5728");
-      const price = c.kind === "normal" ? 35 : 80;
+      const price = BREED_OILS[c.kind].price;
       if (s.coins < price) throw Error("\u82B1\u56ED\u5E01\u4E0D\u8DB3");
       s.coins -= price;
       v.oils[c.kind]++;
-      return { handled: true, reveal: { title: "\u7E41\u80B2\u7CBE\u6CB9\u5DF2\u653E\u597D", message: `${c.kind === "normal" ? "\u666E\u901A \xB7 \u6700\u591A\u4FDD\u75593\u56E0\u5B50" : "\u6D53\u7F29 \xB7 \u6700\u591A\u4FDD\u75594\u56E0\u5B50"}\uFF0C\u6BCF\u6B21\u7E41\u80B2\u6D88\u8017\u4E00\u74F6` } };
+      return { handled: true, reveal: { title: "\u7E41\u80B2\u7CBE\u6CB9\u5DF2\u653E\u597D", message: `${BREED_OILS[c.kind].name} \xB7 \u5355\u65B9\u69FD ${BREED_OILS[c.kind].single * 100}% / \u53CC\u65B9\u69FD ${BREED_OILS[c.kind].double * 100}%\uFF0C\u6700\u591A ${BREED_OILS[c.kind].pity} \u6B21\u4FDD\u8BC1\u968F\u673A\u7EE7\u627F\u4E00\u4E2A\u56E0\u5B50\uFF0C\u4E0D\u53EF\u6307\u5B9A\u8BCD\u6761` } };
     }
     case "upgradeSoil": {
       if (!Number.isInteger(c.plot) || c.plot < 0 || c.plot >= s.plots.length) throw Error("\u571F\u5730\u4E0D\u5B58\u5728");
@@ -1087,6 +1525,7 @@ function rollTraits(s, sp, rng, boost = 1, musicPlaying = false) {
 }
 function transition(input, cmd, now, rng, context = {}) {
   const s = validateGarden(structuredClone(input));
+  refreshSocial(s, now);
   advanceV3(s, now);
   const j = s.journey;
   refreshShop(s, now, rng);
@@ -1094,6 +1533,8 @@ function transition(input, cmd, now, rng, context = {}) {
   protectPending(s, cmd);
   protectV3(s, cmd);
   ensureLife(s, now, rng, context.actor, cmd.type !== "resolveSpray");
+  const social = socialTransition(s, cmd, now, rng, context.shopOwner);
+  if (social.handled) return { state: s, reveal: social.reveal };
   const modern = v3Transition(s, cmd, now, rng);
   if (modern.handled) return { state: s, reveal: modern.reveal };
   const life = lifeTransition(s, cmd, now, rng, context.actor, context.shopOwner);
@@ -1138,7 +1579,7 @@ function transition(input, cmd, now, rng, context = {}) {
     case "plantMany": {
       const seed = s.seeds.find((x) => x.id === cmd.seed);
       if (!seed) throw Error("\u79CD\u5B50\u5DF2\u7528\u5B8C");
-      const same = (x) => x.species === seed.species && x.bred === seed.bred && JSON.stringify([...x.genes].sort()) === JSON.stringify([...seed.genes].sort()) && JSON.stringify(x.parents) === JSON.stringify(seed.parents);
+      const same = (x) => x.species === seed.species && x.origin === seed.origin && x.massGene === seed.massGene && JSON.stringify(x.slots) === JSON.stringify(seed.slots) && x.bred === seed.bred && JSON.stringify([...x.genes].sort()) === JSON.stringify([...seed.genes].sort()) && JSON.stringify(x.parents) === JSON.stringify(seed.parents);
       const available = s.seeds.filter(same);
       let next = s, count = 0;
       for (let i = 0; i < s.plots.length && count < available.length; i++) if (!s.plots[i] && i < unlockedPlots(s)) next = transition(next, { type: "plant", plot: i, seed: available[count++].id }, now, rng, context).state;
@@ -1192,6 +1633,7 @@ function transition(input, cmd, now, rng, context = {}) {
       break;
     }
     case "fertilize": {
+      if (s.economy && Object.hasOwn(FERTILIZERS, cmd.fertilizer) && FERTILIZERS[cmd.fertilizer].effect !== "speed") throw Error("\u65B0\u7248\u4F7F\u7528\u5929\u6C14\u83B7\u5F97\u5F02\u53D8\uFF0C\u65E7\u53D8\u5F02\u80A5\u548C\u589E\u91CD\u80A5\u6682\u4E0D\u6D88\u8017");
       const p = plot(cmd.plot);
       if (!p || p.readyAt <= now)
         throw Error("\u53EA\u6709\u751F\u957F\u4E2D\u7684\u690D\u7269\u53EF\u4EE5\u65BD\u80A5");
@@ -1205,6 +1647,7 @@ function transition(input, cmd, now, rng, context = {}) {
         s.fertilizers[cmd.fertilizer]--;
         p.fertilizers.push(cmd.fertilizer);
         p.batch.fertilizedAt = now;
+        p.batch.socialAdjustedAt = now;
         if (f.effect === "speed") {
           p.readyAt = now + (p.readyAt - now) * (1 - f.speed);
           p.batch.naturalReadyAt = p.readyAt;
@@ -1253,13 +1696,14 @@ function transition(input, cmd, now, rng, context = {}) {
       if (!p || p.readyAt > now)
         throw Error("\u8FD8\u6CA1\u6709\u6210\u719F");
       if (needsReveal(p)) throw Error("\u5F69\u8272\u679C\u5B9E\u9700\u8981\u5148\u57F9\u80B2\u63ED\u6653");
-      const item = { dye: p.dye, growthVersion: p.growthVersion, revealed: p.revealed, id: p.id, species: p.species, traits: p.traits, kg: p.kg, value: p.value, bred: p.bred, yieldCount: p.yieldCount, slots: p.slots, lineage: p.lineage, appraised: p.appraised, locked: p.keep };
+      const item = { origin: p.origin, dye: p.dye, growthVersion: p.growthVersion, revealed: p.revealed, id: p.id, species: p.species, traits: p.traits, kg: p.kg, value: p.value, bred: p.bred, yieldCount: p.yieldCount, slots: p.slots, lineage: p.lineage, appraised: p.appraised, locked: p.keep };
       s.produce.push(item);
       if ((p.harvestsLeft ?? 1) > 1) {
         const next = p.growthVersion === 3 ? makeV3Plant(s, { id: p.id, species: p.species, genes: p.baseTraits ?? [], slots: p.batch.slots, massGene: p.batch.massGene, bred: false, lineage: p.lineage }, cmd.plot, now, rng, p.harvestsLeft - 1, (p.harvestIndex ?? 0) + 1) : nextBatch(s, p, now, rng, !!context.musicPlaying);
         s.plots[cmd.plot] = next;
       } else s.plots[cmd.plot] = null;
       j.harvested++;
+      if (s.economy) recordGarden(s, now, "socialHarvest", "\u4E00\u8D77\u6536\u83B7\u4E86" + SPECIES[p.species].name);
       s.xp[p.species] += p.growthVersion === 3 ? v3HarvestXp(s, p, now) : HARVEST_XP;
       for (const factor of ["base", ...p.traits]) {
         const key = `${p.species}:${factor}`;
@@ -1274,7 +1718,7 @@ function transition(input, cmd, now, rng, context = {}) {
         throw Error("\u9700\u8981\u4E24\u682A\u4E0D\u540C\u690D\u7269");
       const a = parent(cmd.first), b = parent(cmd.second);
       if (!a || !b || !canBreed(a) || !canBreed(b)) throw Error("\u53CC\u65B9\u9700\u8981\u5DF2\u63ED\u6653\u3001\u672A\u7E41\u80B2\u8FC7\u7684\u91D1\u8272\u6216\u5F69\u8272\u679C\u5B9E");
-      if (!(s.plots.some((p) => p?.id === a.id) && s.produce.some((p) => p.id === b.id) || s.plots.some((p) => p?.id === b.id) && s.produce.some((p) => p.id === a.id))) throw Error("\u8BF7\u9009\u62E9\u4E00\u682A\u5730\u91CC\u7684\u690D\u7269\u4E0E\u4E00\u9897\u80CC\u5305\u679C\u5B9E");
+      if (!s.economy && !(s.plots.some((p) => p?.id === a.id) && s.produce.some((p) => p.id === b.id) || s.plots.some((p) => p?.id === b.id) && s.produce.some((p) => p.id === a.id))) throw Error("\u8BF7\u9009\u62E9\u4E00\u682A\u5730\u91CC\u7684\u690D\u7269\u4E0E\u4E00\u9897\u80CC\u5305\u679C\u5B9E");
       if (s.v3) {
         const mother = s.plots.some((p) => p?.id === a.id) ? a : b, father = mother === a ? b : a;
         const normalized = mother === a ? cmd : { ...cmd, firstGenes: cmd.secondGenes, secondGenes: cmd.firstGenes };
@@ -1325,6 +1769,12 @@ function transition(input, cmd, now, rng, context = {}) {
       const keys = s.discovered.filter((k) => !s.claimed.includes(k));
       if (!keys.length)
         throw Error("\u6CA1\u6709\u5F85\u9886\u53D6\u7684\u56FE\u9274\u79EF\u5206");
+      if (s.economy) {
+        s.coins += keys.length * 5;
+        s.claimed.push(...keys);
+        reveal = { title: "\u65B0\u7684\u56FE\u9274\u8BB0\u5F55", message: `\u9996\u6B21\u53D1\u73B0\u5956\u52B1 ${keys.length * 5} \u82B1\u56ED\u5E01` };
+        break;
+      }
       points = keys.length * DISCOVERY_POINTS;
       for (const key of keys)
         s.xp[key.split(":")[0]] += DISCOVERY_POINTS;
@@ -1373,6 +1823,7 @@ function transition(input, cmd, now, rng, context = {}) {
 }
 function validateGarden(raw) {
   const s = raw;
+  if (s) validateSocial(s);
   if (s) validateLife(s);
   if (s) validateV3(s);
   if (s && s.version === 1) {
@@ -1482,6 +1933,7 @@ function weatherRoll(key) {
 }
 function applyWeatherMutations(s, now, roll = weatherRoll) {
   const v3Changed = advanceV3(s, now);
+  if (s.economy) return v3Changed;
   const migrated = s.weatherCheckedAt === void 0;
   if (migrated) {
     const current = gardenWeather(now).current;
@@ -1561,7 +2013,7 @@ function pairActions(manifest) {
     const source = m.stickerLibrary?.scenes[id] ?? id;
     const item = m.stickerLibrary?.items.find((i) => i.id === source);
     const variant = m.stickerLibrary?.variants?.[source];
-    return !!clip?.webm && (!clip.status || clip.status === "done") && (!item || item.enabled && !item.error) && (!variant || variant.enabled);
+    return !!(clip?.webm || m.spine?.actions[id]) && (!clip.status || clip.status === "done") && (!item || item.enabled && !item.error) && (!variant || variant.enabled);
   }));
 }
 var MEANINGS = {
@@ -1662,7 +2114,10 @@ function publicGardenState(state) {
   s.plots = s.plots.map((p) => p ? publicGardenPlant(p) : null);
   if (s.v3) {
     for (const a of Object.values(s.v3.appraisals)) a.board = [];
-    for (const r of s.v3.records) if (r.plant && hidden.has(r.plant) && ["settlement", "choose", "rainbowPity"].includes(r.kind)) r.message = "\u53D1\u73B0\u795E\u79D8\u679C\u5B9E \xB7 \uFF1F \uFF1F \uFF1F \xB7 \u57F9\u80B2\u540E\u63ED\u6653";
+    for (const r of s.v3.records) if (r.plant && hidden.has(r.plant) && ["settlement", "choose", "rainbowPity", "mutation"].includes(r.kind)) r.message = "\u53D1\u73B0\u795E\u79D8\u679C\u5B9E \xB7 \uFF1F \uFF1F \uFF1F \xB7 \u57F9\u80B2\u540E\u63ED\u6653";
+  }
+  if (s.economy) {
+    for (const n of s.economy.notifications) if ([...hidden].some((id) => n.id.startsWith(id + ":"))) n.text = "\u690D\u7269\u53D7\u5929\u6C14\u5F71\u54CD\uFF0C\u51FA\u73B0\u4E86\u795E\u79D8\u5F02\u53D8\uFF0C\u57F9\u80B2\u540E\u63ED\u6653\u3002";
   }
   return s;
 }
@@ -1677,9 +2132,13 @@ function cultivationSeed(fruit, participants, rng) {
 0 && (module.exports = {
   AFFINITIES,
   AFFINITY_WEIGHTS,
+  BREED_OILS,
+  CAPSULE,
+  CAPSULE_POOL,
   CHARACTER_UNLOCKS,
   CHARACTER_XP,
   COOP_RULES,
+  CROPS,
   CULTIVATION_MS,
   DAY_MS,
   DISCOVERY_POINTS,
@@ -1689,12 +2148,17 @@ function cultivationSeed(fruit, participants, rng) {
   FOOD_ICONS,
   FRUITS,
   FRUIT_DRAG_TYPE,
+  FURNITURE_SHOP,
   HARVEST_XP,
   LEVEL_XP,
   MAX_GARDEN_PLOTS,
   PAIR_INTERACTIONS,
   REFRESH_MS,
+  REGIONAL_FURNITURE,
+  RETIRED_FURNITURE,
   SLOT_NAMES,
+  SOCIAL_TRIPS,
+  SOCIAL_WISHES,
   SPECIES,
   SPRAYS,
   TIER_NAMES,
@@ -1702,6 +2166,8 @@ function cultivationSeed(fruit, participants, rng) {
   V3,
   V3_WEATHER,
   V3_XP,
+  WEATHER_CHANCE,
+  WEATHER_CHECKS,
   advanceV3,
   applyWeatherMutations,
   breedV3,
@@ -1717,6 +2183,7 @@ function cultivationSeed(fruit, participants, rng) {
   dailyOffers,
   dailyRandom,
   emptyPlots,
+  enableSocialEconomy,
   enableV3,
   ensureLife,
   exposures,
@@ -1726,6 +2193,7 @@ function cultivationSeed(fruit, participants, rng) {
   fertilizerV3,
   fits,
   fruitQuality,
+  furnitureOffers,
   gardenDay,
   gardenQuest,
   geneSlots,
@@ -1737,6 +2205,7 @@ function cultivationSeed(fruit, participants, rng) {
   lifeTransition,
   makeV3Plant,
   mutationMultiplier,
+  nativeSocialWeather,
   needsReveal,
   nextGardenDay,
   pairActions,
@@ -1751,6 +2220,7 @@ function cultivationSeed(fruit, participants, rng) {
   qualityOf,
   recordGarden,
   refreshShop,
+  refreshSocial,
   refreshV3Day,
   refreshV3Shop,
   rollTraits,
@@ -1758,6 +2228,8 @@ function cultivationSeed(fruit, participants, rng) {
   settleFactors,
   settlePendingSpray,
   sizeOf,
+  socialTransition,
+  socialWeatherPool,
   sowingMinutes,
   speciesLevel,
   sprayConflicts,
@@ -1773,6 +2245,7 @@ function cultivationSeed(fruit, participants, rng) {
   v3Value,
   validateGarden,
   validateLife,
+  validateSocial,
   validateV3,
   value,
   visiblePlot,

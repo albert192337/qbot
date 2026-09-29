@@ -1,5 +1,6 @@
 import { scenePool } from '../../shared/action-resources';
 import { SpinePlayer } from './spine-player';
+import type { SpineExpression } from './spine-face';
 /**
  * WebM 播放器：每个已生成动作一个 <video> 预创建堆叠，新动作开始播放后才切 visibility（保留上一帧）。
  * idle/drag 循环播放；auto 动作不 loop，靠 ended 事件计数。
@@ -18,7 +19,7 @@ export class Player {
   setSuspended(value: boolean): void {
     this.suspended=value;
     if(value)this.endWork();
-    this.spine?.setSuspended(value);
+    this.spine?.setSuspended(value||!!this.current);
     if(!value)return;
     this.generation++;
     this.cancelAttempt?.();this.cancelAttempt=null;
@@ -79,7 +80,6 @@ export class Player {
     if(manifest.spine){
       this.spine=new SpinePlayer(this.container,dirId,manifest,this.onEnded);
       this.spine.setSuspended(this.suspended);
-      return Object.keys(manifest.spine.actions);
     }
     // 只清理 video + poof 元素，保留 signboard 等其他 DOM
     for (const el of Array.from(this.container.querySelectorAll('video,.stage-poof'))) {
@@ -94,7 +94,7 @@ export class Player {
     }
     this.videos.clear();
     this.current = null;
-    const available: PlayableId[] = [];
+    const available: PlayableId[] = Object.keys(manifest.spine?.actions??{});
     /**
      * 缓存击穿标记：重抠/重新生成动作后文件内容变了但 qbot-asset URL 一模一样，
      * Chromium 会直接吃缓存 → 界面上还是旧动画（实测踩到：重生 walk 后播的仍是旧的）。
@@ -127,6 +127,7 @@ export class Player {
       ...(Object.entries(manifest.customActions ?? {}) as [string, ManifestAction][]),
     ];
     for (const [id, action] of new Map(all.filter(([, a]) => a.status === undefined || a.status === 'done'))) {
+      if(!action.webm)continue;
       const video = document.createElement('video');
       video.src = `qbot-asset://${dirId}/${action.webm}?v=${nonce}`;
       video.muted = true; // 必须：否则 autoplay 策略拦截
@@ -142,8 +143,10 @@ export class Player {
       this.videos.set(id, video);
       available.push(id);
     }
-    return available;
+    return [...new Set(available)];
   }
+
+  setSpineExpression(expression:SpineExpression|null):void {this.spine?.setExpression(expression);}
 
   /** 硬切到指定动作（同动作重复调用 = 从头重播） */
   play(action: PlayableId): void {
@@ -181,10 +184,9 @@ export class Player {
       }
       return;
     }
+    // A previous transient decode failure must not disable work for this character forever.
+    this.failed.delete('computer_typing');
     this.playImpl('computer_typing', true, false, false, typing);
-    // playImpl reveals the prepared frame asynchronously and applies the latest input state.
-    this.workVideo = this.videos.get('computer_typing') ?? null;
-    this.workTyping = typing;
   }
 
   private endWork(): void {
@@ -195,7 +197,14 @@ export class Player {
   private playImpl(action: PlayableId, forceLoop: boolean, forceOnce = false, usePool = true, workTyping?: boolean): void {
     if(this.suspended)return;
     this.endWork();
-    if(this.spine){this.spine.play(action,!forceOnce&&(forceLoop||LOOPING.has(action)));return;}
+    if(this.spine&&this.manifest?.spine?.actions[action]){
+      this.generation++;this.cancelAttempt?.();this.cancelAttempt=null;this.clearSafetyTimer();
+      if(this.recoveryTimer)clearTimeout(this.recoveryTimer);this.recoveryTimer=null;
+      for(const video of this.videos.values()){video.pause();video.style.visibility='hidden';}
+      this.current=null;this.requested=null;this.selected=null;
+      if(this.fallback)this.fallback.style.visibility='hidden';
+      this.spine.setVisible(true);this.spine.play(action,!forceOnce&&(forceLoop||LOOPING.has(action)));return;
+    }
     if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
     this.recoveryTimer = null;
     const generation = ++this.generation;
@@ -210,6 +219,7 @@ export class Player {
     const id = [this.selected, action, 'idle', ...this.videos.keys()]
       .find((candidate) => this.videos.has(candidate) && !this.failed.has(candidate));
     if (!id) {
+      if(this.spine){this.playImpl('idle',true);return;}
       // A temporary decoder/load failure must not strand a looping visitor on its source photo.
       // Bounded backoff avoids continuously retrying genuinely broken packs or stale one-shot actions.
       if (this.videos.size && !forceOnce && (forceLoop || LOOPING.has(action)) && this.recoveryAttempts < 3) {
@@ -224,6 +234,8 @@ export class Player {
       return;
     }
     const next = this.videos.get(id)!;
+    // Retain the current live frame while loading; its old one-shot must not finish over the new request.
+    this.spine?.setSuspended(true);
     if (workTyping !== undefined) { this.workVideo = next; this.workTyping = workTyping; }
     const active = () => generation === this.generation;
     let retries = 0;
@@ -232,6 +244,11 @@ export class Player {
     let attempt = 0;
     let completed = false;
     let pendingFrame: (() => void) | null = null;
+    const clearPendingFrame = () => {
+      if (!pendingFrame) return;
+      for (const event of ['loadeddata', 'canplay', 'seeked']) next.removeEventListener(event, pendingFrame);
+      pendingFrame = null;
+    };
     const clearWatchdog = () => {
       if (watchdog !== null) clearTimeout(watchdog);
       watchdog = null;
@@ -240,7 +257,7 @@ export class Player {
       clearWatchdog();
       watchdog = setTimeout(() => {
         if (!next.isConnected) { this.dispose(); return; }
-        if (this.workVideo === next && !this.workTyping) { armWatchdog(); return; }
+        if (this.workVideo === next && !this.workTyping && this.current === id && next.readyState >= 2) { armWatchdog(); return; }
         fail('no playback progress for 12s');
       }, 12_000);
     };
@@ -262,6 +279,7 @@ export class Player {
     };
     const reveal = () => {
       if (!active()) return;
+      this.spine?.setVisible(false);
       this.recoveryAttempts = 0;
       const workPair = new Set(['computer_idle', 'computer_typing']);
       if (this.current && this.current !== id && !(workPair.has(this.current) && workPair.has(id))) this.triggerPoof();
@@ -295,6 +313,7 @@ export class Player {
     next.addEventListener('ended', onEnded);
     this.cancelAttempt = () => {
       attempt++;
+      clearPendingFrame();
       clearWatchdog();
       next.removeEventListener('timeupdate', onProgress);
       next.removeEventListener('error', onError);
@@ -304,6 +323,7 @@ export class Player {
     };
     const start = (reload: boolean) => {
       const token = ++attempt;
+      clearPendingFrame();
       completed = false;
       this.clearSafetyTimer();
       lastTime = -1;
@@ -314,15 +334,17 @@ export class Player {
         if (next.readyState > 0) next.currentTime = 0;
         if (this.workVideo === next && !this.workTyping) {
           // Decode a still frame without ever starting playback on mode entry.
-          if (next.readyState >= 2) reveal();
+          if (next.readyState >= 2 && !next.seeking) reveal();
           else {
-            pendingFrame = () => { pendingFrame = null; if (active() && token === attempt) {
+            // Re-entering seeks an already loaded clip; loadeddata need not fire again.
+            pendingFrame = () => { if (active() && token === attempt && next.readyState >= 2 && !next.seeking) {
+              clearPendingFrame();
               reveal();
               if (this.workTyping) this.playWork(true);
             } };
-            next.addEventListener('loadeddata', pendingFrame, { once: true });
+            for (const event of ['loadeddata', 'canplay', 'seeked']) next.addEventListener(event, pendingFrame);
             next.preload = 'auto';
-            next.load();
+            if (!next.seeking) next.load();
           }
           return;
         }

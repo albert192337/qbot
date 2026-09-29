@@ -63,6 +63,9 @@ function buildNode(msg: BubbleItem): HTMLElement {
   const el = document.createElement('div');
   el.className = `bubble ${msg.kind}`;
   el.classList.toggle('pet-speech', msg.source === '桌宠');
+  el.classList.toggle('pet-thought', msg.expression === 'thought');
+  if (msg.expression === 'thought') el.setAttribute('aria-label', '心里想：' + msg.text);
+  else el.removeAttribute('aria-label');
   const src = document.createElement('div');
   src.className = 'src';
   const text = document.createElement('div');
@@ -177,6 +180,9 @@ function onMessage(msg: BubbleItem): void {
     // 同会话就地更新
     if (!msg.rewards) el.className = `bubble ${msg.kind} show`;
     el.classList.toggle('pet-speech', msg.source === '桌宠');
+    el.classList.toggle('pet-thought', msg.expression === 'thought');
+    if (msg.expression === 'thought') el.setAttribute('aria-label', '心里想：' + msg.text);
+    else el.removeAttribute('aria-label');
     const text = el.querySelector('.text');
     if (text) text.textContent = msg.text;
   } else {
@@ -223,7 +229,7 @@ window.qbot.bubble.onAnchor((_side, contentHeight = 500) => {
 
 // ── 行为引擎说话气泡（规则命中的 say 步骤走这里）──
 // 共用奶白描边气泡栈。主动聊天每句独立，普通自言自语不挤掉对话。
-window.qbot.behaviorSay.onSay(({ text, durationMs, source, traceId }) => {
+window.qbot.behaviorSay.onSay(({ text, durationMs, source, traceId, expression }) => {
   onMessage({
     sessionKey: source === 'chat' ? `chat:${crypto.randomUUID()}` : source === 'llm' ? 'llm' : 'behavior',
     source: '桌宠',
@@ -232,6 +238,7 @@ window.qbot.behaviorSay.onSay(({ text, durationMs, source, traceId }) => {
     text,
     at: Date.now(),
     durationMs,
+    expression,
   });
   // 先放入回复再移除思考，避免空栈通知把刚到的回复窗口隐藏。
   if (source === 'chat') setThinking(false);

@@ -1,15 +1,19 @@
 import { PettingGesture } from '../../shared/petting';
 import { isDesktopQuiet } from './desktop-visibility';
 import './petting.css';
+import { petEffects } from './interaction-effects';
 
 /** The action owns a lease, renewed by motion; chat is emitted only at entry. */
 export function mountPetting(stage:HTMLElement, ready:()=>boolean, react:()=>()=>void): {stop():void} {
   const gesture=new PettingGesture();
+  const effects=petEffects(stage);
+  let pointer: {x:number;y:number}|undefined;
   let active=false,owned=false,pending=false,version=0;
   let until=0,lastMotion=0,lastPulse=0;
   let cleanup:(()=>void)|undefined;
   const allowed=()=>!document.hidden&&!isDesktopQuiet()&&ready();
   const stop=()=>{
+    effects.clear('heart');pointer=undefined;
     version++;gesture.reset();
     const notify=owned;owned=false;
     if(active){active=false;stage.classList.remove('petting');const end=cleanup;cleanup=undefined;end?.();}
@@ -17,14 +21,17 @@ export function mountPetting(stage:HTMLElement, ready:()=>boolean, react:()=>()=
   };
   const start=()=>{
     until=performance.now()+1500;
-    if(active)return;
+    if(active){effects.heart(pointer?.x,pointer?.y);return;}
     active=true;stage.classList.add('petting');cleanup=react();
+    effects.heart(pointer?.x,pointer?.y);
   };
   stage.addEventListener('pointermove',e=>{
     if(e.pointerType!=='mouse'||e.buttons||!allowed()||(e.target as Element).closest('button,[role="button"],.player-nameplate')){stop();return;}
     const now=performance.now();
+    pointer={x:e.clientX,y:e.clientY};
     lastMotion=now;
     if(active&&owned){
+      effects.heart(e.clientX,e.clientY);
       until=now+1500;
       if(now-lastPulse>=500){lastPulse=now;void window.qbot.social.pet('keep').catch(()=>stop());}
       return;

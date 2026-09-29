@@ -92,6 +92,14 @@ app.whenReady().then(async()=>{try{
   await fs.writeFile(path.join(root,'output/work-mode/fast-stop-verification.json'),JSON.stringify({stopLatencyMs,beforeStop,frozen,resumed,pausedFrameStable:true},null,2));
   await doubleClick();await until(visible('idle'),'double click exits and restores normal idle');
   await wait(300);assert.equal(await evaluate(visible('computer_typing')),false);
+  idle=10000;
+  for(let n=0;n<3;n++){
+    await doubleClick();await until(visible('computer_idle'),'warm reentry shows the still computer frame');
+    await wait(150);assert.equal(await evaluate(`[...document.querySelectorAll('#stage video')].find(v=>v.style.visibility==='visible').currentTime`),0);
+    idle=0;await until(visible('computer_typing'),'warm reentry resumes on input');
+    await wait(200);await doubleClick();await until(visible('idle'),'warm reentry exits');idle=10000;
+  }
+  idle=0;
   win.webContents.send('pet:menuCommand',{type:'workMode'});await until(visible('computer_typing'),'reenter');
   await play('sleep');
   win.webContents.send('pet:menuCommand',{type:'workMode'});await until(visible('computer_typing'),'reenter after manual playback');

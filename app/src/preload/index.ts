@@ -69,6 +69,7 @@ const api: QBotApi = {
     toggle: () => ipcRenderer.send('garden:toggle'),
     collapse: () => ipcRenderer.send('garden:collapse'),
     drag: (phase, x, y) => ipcRenderer.send('garden:drag', phase, x, y),
+    scenePlacement: placement => ipcRenderer.send('garden:scenePlacement', placement),
     open: page => ipcRenderer.send('garden:open', page),
     ignoreMouse: ignore => ipcRenderer.send('garden:ignore', ignore),
     onAnchor: cb => { const fn = (_ev: unknown, anchor: Parameters<typeof cb>[0]) => cb(anchor); ipcRenderer.on('garden:anchor', fn); return () => ipcRenderer.removeListener('garden:anchor', fn); },
@@ -130,7 +131,7 @@ const api: QBotApi = {
     },
   },
   room: {
-    openCozyPreview: () => ipcRenderer.send('room:openCozyPreview'),
+    openDecorEditor: () => ipcRenderer.send('room:openDecorEditor'),
     openHome: () => ipcRenderer.send('room:openHome'),
     open: () => ipcRenderer.send('room:open'),
     move: (x, y) => ipcRenderer.send('room:move', x, y),

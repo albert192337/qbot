@@ -53,8 +53,8 @@ export interface VisionChatOpts {
 
 export interface ArkClient {
   generateImage(opts: GenerateImageOpts): Promise<Buffer>;
-  /** 返回 taskId。frame 同时作 first_frame 和 last_frame（循环靠生成层保证） */
-  submitVideoTask(opts: { prompt: string; frameDataUrl: string }): Promise<string>;
+  /** 默认首尾同帧；非循环演出可显式关闭尾帧约束。 */
+  submitVideoTask(opts: { prompt: string; frameDataUrl: string; loopFrame?: boolean }): Promise<string>;
   getVideoTask(taskId: string): Promise<VideoTaskStatus>;
   downloadVideo(url: string, destPath: string): Promise<void>;
   /** 视觉理解（chat/completions）：返回助手回复的纯文本 */
@@ -142,6 +142,7 @@ export function createArkClient(
           },
         ],
       };
+      if (opts.loopFrame === false) body.content = body.content.filter(item => item.role !== 'last_frame');
       const res = await request(`${baseUrl}/contents/generations/tasks`, {
         method: 'POST',
         headers,

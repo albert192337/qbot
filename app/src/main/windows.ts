@@ -3,7 +3,7 @@ import { BrowserWindow, app, screen, shell } from 'electron';
 import { trackDesktopWindow, allowDesktopWindow, desktopQuiet, desktopHidden, desktopSnapshot, onDesktopVisibilityChanged, windowPeeking, setPairedMember } from './desktop-visibility';
 import path from 'node:path';
 import type { CharacterMeta, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
-import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset, resolveRoomSceneSize } from './rooms/rooms-rules';
+import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset } from './rooms/rooms-rules';
 import { clampPetScale, petTargetSize, pairWindowBounds } from './pet-geometry';
 import { attachPetWindowRecovery } from './pet-window-recovery';
 import { aboveBubbleLayout } from './bubble-layout';
@@ -16,14 +16,6 @@ const PET_SIZE = 360;
 const ROOM_PET_GAP = 20;
 const ROOM_SCENE_PET_SIZE = 180;
 const ROOM_SCENE_PET_GAP = 12;
-/**
- * 小房间窗边长。素材是 1024x1024，560 时 fit~0.55 -- 房间只占屏幕一小块，
- * 家具缩到 ~120px，观感「又小又挤」。放大到 960 让素材接近 1:1。
- * 实际值由 roomSize() 按工作区夹取，避免小屏被裁。
- */
-const ROOM_SIZE_PREFERRED = 960;
-/** 房间素材设计尺寸；超过它就是放大插值，别再往上加 */
-const ROOM_ART_SIZE = 1024;
 /** 气泡窗：固定尺寸，创建后只 setPosition 永不改大小（绕开透明窗 resize 渲染 bug） */
 const BUBBLE_W = 340;
 const BUBBLE_H = 500;
@@ -35,9 +27,9 @@ let petWindow: BrowserWindow | null = null;
 const roomPetWindows = new Map<string, BrowserWindow>();
 const roomPetSizes = new WeakMap<BrowserWindow, number>();
 let roomWindow: BrowserWindow | null = null;
-let panoramicRoom = false;
-let panoramicSizePreset: RoomSizePreset = 'small';
-let cozyPreviewWindow: BrowserWindow | null = null;
+
+
+
 let consoleWindow: BrowserWindow | null = null;
 let nurseryWindow: BrowserWindow | null = null;
 let loungeWindow: BrowserWindow | null = null;
@@ -53,7 +45,7 @@ let petVisitMode = false;
 let beforeVisit: { x: number; y: number } | null = null;
 let roomWindowBoundsChanged: (() => void) | null = null;
 let roomWindowClosed: (() => void) | null = null;
-let roomSizePreset: RoomSizePreset = 'large';
+let roomSizePreset: RoomSizePreset = 'small';
 
 /**
  * 摆放固定尺寸的透明窗，**每次都重申权威尺寸**。
@@ -103,28 +95,7 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds();
 }
 
-type RendererPage = 'social' | 'pet' | 'room' | 'online-room' | 'cozy' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat' | 'sign';
-
-/** A local, framed preview: never changes room membership or the active desktop pet. */
-export function openCozyPreview(): BrowserWindow {
-  allowDesktopWindow(cozyPreviewWindow);
-  if (cozyPreviewWindow && !cozyPreviewWindow.isDestroyed()) {
-    cozyPreviewWindow.show(); cozyPreviewWindow.focus(); return cozyPreviewWindow;
-  }
-  const area = screen.getPrimaryDisplay().workArea;
-  const win = new BrowserWindow({
-    width: Math.min(1160, area.width), height: Math.min(850, area.height),
-    minWidth: Math.min(720, area.width), minHeight: Math.min(580, area.height),
-    title: 'QBot · 奶油小屋试住', backgroundColor: '#f6f1e8', autoHideMenuBar: true, show:false,
-    webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false },
-  });
-  cozyPreviewWindow = win;
-  allowDesktopWindow(win); win.once('ready-to-show',()=>win.show());
-  win.on('closed', () => { cozyPreviewWindow = null; });
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  load(win, 'cozy');
-  return win;
-}
+type RendererPage = 'social' | 'pet' | 'online-room' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat' | 'sign';
 
 let chatWindow: BrowserWindow | null = null;
 const desktopWindowGroup = () => [petWindow, desktopSign?.getWindow() ?? null, bubbleWindow, chatWindow];
@@ -540,8 +511,8 @@ export function setPetVisitMode(enter: boolean, partner?: string): void {
 }
 
 export function moveRoomWindow(x: number, y: number): void {
-  const s = panoramicRoom ? Math.min(({small:600,medium:800,large:1000})[panoramicSizePreset], screen.getPrimaryDisplay().workArea.width) : roomSize();
-  moveFixedSize(roomWindow, x, y, { width: s, height: panoramicRoom ? Math.ceil(s*.295) : s });
+  const s = roomSize();
+  moveFixedSize(roomWindow, x, y, { width: s, height: Math.ceil(s*.295) });
   roomWindowBoundsChanged?.();
 }
 
@@ -555,26 +526,25 @@ export function setRoomIgnoreMouse(ignore: boolean): void {
  * 统一走 closed 事件恢复 pet 窗。
  */
 /**
- * 房间窗边长：取偏好值，但留出工作区边距并不超过素材原尺寸。
- * 小屏（笔记本 768p）会被夹到装得下的最大方形，避免窗口比屏幕还高。
+ * 横向房间宽度：取偏好值，并限制在屏幕工作区内。
+ * 高度沿用 1000:295 的画面比例。
  */
 function roomSize(display = screen.getPrimaryDisplay()): number {
   const { workArea } = display;
-  return Math.min(ROOM_SIZE_PREFERRED, ROOM_ART_SIZE, resolveRoomSceneSize(roomSizePreset, workArea.width, workArea.height));
+  return Math.min(({small:600,medium:800,large:1000})[roomSizePreset], workArea.width);
 }
 
 export function getRoomSizePreset(): RoomSizePreset {
-  return panoramicRoom ? panoramicSizePreset : roomSizePreset;
+  return roomSizePreset;
 }
 
 export function setRoomSizePreset(preset: RoomSizePreset): RoomSizePreset {
-  if (panoramicRoom) panoramicSizePreset = normalizeRoomSizePreset(preset);
-  else roomSizePreset = normalizeRoomSizePreset(preset);
-  if (!roomWindow || roomWindow.isDestroyed()) return panoramicRoom ? panoramicSizePreset : roomSizePreset;
+  roomSizePreset = normalizeRoomSizePreset(preset);
+  if (!roomWindow || roomWindow.isDestroyed()) return roomSizePreset;
   const current = roomWindow.getBounds();
   const display = screen.getDisplayMatching(current);
-  const size = panoramicRoom ? Math.min(({small:600,medium:800,large:1000})[panoramicSizePreset],display.workArea.width) : roomSize(display);
-  const height = panoramicRoom ? Math.ceil(size * .295) : size;
+  const size = roomSize(display);
+  const height = Math.ceil(size * .295);
   const x = Math.max(
     display.workArea.x,
     Math.min(
@@ -591,11 +561,10 @@ export function setRoomSizePreset(preset: RoomSizePreset): RoomSizePreset {
   );
   moveFixedSize(roomWindow, x, y, { width: size, height }, true);
   roomWindowBoundsChanged?.();
-  return panoramicRoom ? panoramicSizePreset : roomSizePreset;
+  return roomSizePreset;
 }
 
-export function openRoomWindow(title: string, panoramic = false): BrowserWindow {
-  if(roomWindow && !roomWindow.isDestroyed() && panoramicRoom !== panoramic) roomWindow.close();
+export function openRoomWindow(title: string): BrowserWindow {
   if (roomWindow && !roomWindow.isDestroyed()) {
     roomWindow.focus();
     return roomWindow;
@@ -604,9 +573,9 @@ export function openRoomWindow(title: string, panoramic = false): BrowserWindow 
   hideBubbleWindow(); // 角色进小房间：气泡跟着走
   if (process.platform === 'darwin') void app.dock?.show();
   const display = screen.getPrimaryDisplay();
-  panoramicRoom = panoramic;
-  const size = panoramic ? Math.min(({small:600,medium:800,large:1000})[panoramicSizePreset],display.workArea.width) : roomSize(display);
-  const height = panoramic ? Math.ceil(size * .295) : size;
+
+  const size = roomSize(display);
+  const height = Math.ceil(size * .295);
   const { workArea } = display;
   roomWindow = new BrowserWindow({
     show:false,
@@ -631,7 +600,7 @@ export function openRoomWindow(title: string, panoramic = false): BrowserWindow 
     },
   });
   trackDesktopWindow(roomWindow,'decoration');
-  if(panoramic)roomWindow.setAlwaysOnTop(true,'floating');
+  roomWindow.setAlwaysOnTop(true,'floating');
   roomWindow.once('ready-to-show',()=>roomWindow?.show());
   roomWindow.on('closed', () => {
     roomWindow = null;
@@ -640,7 +609,7 @@ export function openRoomWindow(title: string, panoramic = false): BrowserWindow 
     if (process.platform === 'darwin' && !consoleWindow && !nurseryWindow && !loungeWindow) app.dock?.hide();
   });
   roomWindow.on('move', () => roomWindowBoundsChanged?.());
-  load(roomWindow, panoramic ? 'online-room' : 'room');
+  load(roomWindow, 'online-room');
   return roomWindow;
 }
 

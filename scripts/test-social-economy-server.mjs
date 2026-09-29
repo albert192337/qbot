@@ -1,0 +1,62 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync,readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { Gardens } from '../rooms/garden.mjs';
+import core from '../rooms/generated/garden-core.cjs';
+let now=Date.UTC(2026,8,29,8);
+const people=Object.fromEntries(['host','guest','outsider',...Array.from({length:7},(_,i)=>'helper'+i)].map(id=>[id,{nickname:id,character:id}]));
+const contacts={people,areFriends:()=>true};
+const file=path.join(mkdtempSync(path.join(tmpdir(),'qbot-social-economy-')),'gardens.json');
+let db=new Gardens(file,contacts,()=>now);
+const context={id:'ROOM',owner:'host',members:['host','guest']};
+const get=id=>db.handle(id,{action:'get',actor:id,roomContext:context});
+const act=(id,command,extra={})=>db.handle(id,{action:'act',actor:id,command,operation:`${now}-${randomUUID()}`,roomContext:context,...extra});
+get('host');get('guest');get('outsider');
+act('guest',{type:'socialStarter'});
+assert.throws(()=>act('guest',{type:'socialStarter'}),/已经领取/);
+const operation=`${now}-${randomUUID()}`;
+act('guest',{type:'capsuleTopUp'},{operation});
+act('guest',{type:'capsuleTopUp'},{operation});
+assert.equal(get('guest').state.economy.tokens,300);
+const draw=`${now}-${randomUUID()}`;
+act('guest',{type:'capsuleDraw',count:1},{operation:draw});
+const drawn=structuredClone(get('guest').state.economy);
+db=new Gardens(file,contacts,()=>now);
+act('guest',{type:'capsuleDraw',count:1},{operation:draw});
+assert.deepEqual(get('guest').state.economy,drawn);
+act('guest',{type:'shareWeather',source:'guest'});
+assert.equal(get('guest').state.economy.weather,undefined);
+act('host',{type:'shareWeather',source:'guest'});
+act('guest',{type:'shareWeather',source:'guest'});
+const shared=get('host').state.economy.weather;
+assert.equal(shared.id,get('guest').state.economy.weather.id);
+assert.equal(shared.source,'guest');
+assert.throws(()=>act('outsider',{type:'shareWeather',source:'guest'}),/同一个房间/);
+assert.throws(()=>act('guest',{type:'shareWeather',source:'outsider'}),/同一个房间/);
+const end=shared.end;now+=120000;
+db.transaction(()=>db.stopSharedWeather('guest'));
+assert.equal(get('guest').state.economy.weather,undefined);
+assert.equal(get('host').state.economy.weather.end,end);
+assert.equal(get('guest').state.economy.weatherHistory.at(-1).end,now);
+// Buyer-local stock and real furniture inventory; the owner never receives minted coins.
+const hostCoins=get('host').state.coins,previousLantern=get('guest').state.economy.furniture['moss-stool']??0;
+act('guest',{type:'buyFurniture',owner:'host',item:'moss-stool'});
+assert.equal(get('guest').state.economy.furniture['moss-stool'],previousLantern+1);
+assert.equal(get('host').state.coins,hostCoins);
+assert.throws(()=>act('guest',{type:'buyFurniture',owner:'host',item:'moss-stool'}),/买过/);
+// A growing ordinary crop can receive one task, capped to four people's speed.
+const s=db.ensure('host').state;
+s.plots[0]=core.makeV3Plant(s,{id:'seed',species:'apple',genes:[],bred:false},0,now,db.rng);
+const ready=s.plots[0].readyAt;
+for(const who of ['guest',...Array.from({length:7},(_,i)=>'helper'+i)]){db.ensure(who);db.coop(who,'host',0,'join');}
+const task=db.data.tasks[s.plots[0].id];
+for(let i=0;i<5;i++){now+=10000;for(const m of Object.values(task.members))m.seenAt=now;db.advance(task);}
+assert.equal(task.done,true);assert.ok(s.plots[0].readyAt<ready);
+assert.equal(task.members.guest.seconds,45);assert.equal(task.members.guest.work/core.COOP_RULES.work,1/8);
+db.coop('guest','host',0,'claim');const count=db.ensure('guest').state.seeds.length;
+db.coop('guest','host',0,'claim');assert.equal(db.ensure('guest').state.seeds.length,count);
+assert.equal(db.ensure('guest').state.seeds.at(-1).species,'strawberry');
+console.log('PASS: persisted transaction retries, gold tutorial, visitor weather/host acceptance/leave, per-buyer furniture, eight-player ordinary crop assistance');
+

@@ -176,8 +176,10 @@ export interface Manifest {
     skeleton: string;
     atlas: string;
     texture: string;
-    skin: 'wuxie' | 'hood';
-    actions: Record<string, string>;
+      skin: 'wuxie' | 'hood';
+      actions: Record<string, string>;
+      faceStyle?: 'capsule';
+      seat?: { texture: string; x: number; y: number; width: number; height: number };
   };
   resourceAnnotations?: Record<string, { name: string; meaning: string; tags: string[] }>;
   scenePools?: Record<string, string[]>;

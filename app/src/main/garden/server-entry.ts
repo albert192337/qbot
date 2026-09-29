@@ -11,3 +11,6 @@ export * from './v3-rules';
 export * from '../../shared/garden-public';
 export * from '../../shared/garden-progression';
 export * from '../../shared/garden-friends';
+
+export * from '../../shared/social-economy';
+export * from './social-rules';

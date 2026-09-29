@@ -214,6 +214,7 @@ async function executeStep(step: BehaviorStep): Promise<void> {
         const win = showBubbleWindow();
         const msg = {
           text: step.text,
+          expression: step.expression,
           source: current.script.meta.id === 'llm-chat' ? 'chat' : current.script.meta.source === 'llm' ? 'llm' : 'behavior',
           traceId: current.script.meta.traceId,
           durationMs: step.durationMs || calculateSayDuration(step.text),
@@ -227,7 +228,7 @@ async function executeStep(step: BehaviorStep): Promise<void> {
           }
           win.webContents.send('behavior:say', msg);
           if (run!.script.meta.source === 'llm' && run!.script.meta.characterId) {
-            rememberConversation(run!.script.meta.characterId, { at: Date.now(), role: 'assistant', source: run!.script.meta.id === 'llm-chat' ? 'chat' : 'auto', text: step.text });
+            rememberConversation(run!.script.meta.characterId, { at: Date.now(), role: 'assistant', source: run!.script.meta.id === 'llm-chat' ? 'chat' : 'auto', text: step.text, ...(step.expression === 'thought' ? { expression: step.expression } : {}) });
           }
           void updateBrainCall(run!.script.meta.traceId, '气泡已发送', {}, step.text);
           void recordBehavior({ at: Date.now(), kind: 'say', detail: step.text });

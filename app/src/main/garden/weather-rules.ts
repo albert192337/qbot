@@ -7,6 +7,7 @@ export function weatherRoll(key:string):number{return createHash('sha256').updat
 /** Per-event winners persist even after harvest, so the guarantee cannot refill on new crops. */
 export function applyWeatherMutations(s:GardenState,now:number,roll=weatherRoll):boolean{
  const v3Changed=advanceV3(s,now);
+ if(s.economy)return v3Changed;
  const migrated=s.weatherCheckedAt===undefined;
  if(migrated){const current=gardenWeather(now).current;s.weatherCheckedAt=current?current.start-1:now;if(!current)return true;}
  const checkpoint=s.weatherCheckedAt??now;

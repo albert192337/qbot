@@ -17,7 +17,8 @@ export function publicGardenState(state:GardenState):GardenState {
  s.plots=s.plots.map(p=>p?publicGardenPlant(p):null);
  if(s.v3){
   for(const a of Object.values(s.v3.appraisals))a.board=[];
-  for(const r of s.v3.records)if(r.plant&&hidden.has(r.plant)&&['settlement','choose','rainbowPity'].includes(r.kind))r.message='发现神秘果实 · ？ ？ ？ · 培育后揭晓';
+  for(const r of s.v3.records)if(r.plant&&hidden.has(r.plant)&&['settlement','choose','rainbowPity','mutation'].includes(r.kind))r.message='发现神秘果实 · ？ ？ ？ · 培育后揭晓';
  }
+ if(s.economy)for(const n of s.economy.notifications)if([...hidden].some(id=>n.id.startsWith(id+':')))n.text='植物受天气影响，出现了神秘异变，培育后揭晓。';
  return s;
 }

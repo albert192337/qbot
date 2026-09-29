@@ -12,6 +12,7 @@ import { getSettings } from '../config';
 import { getCharacter } from '../characters';
 import { choosePairAction } from '../../shared/pair-interaction';
 import { plotPetPosition } from './interaction';
+import { validGardenScenePlacement, type GardenScenePlacement } from '../../shared/garden-scene-layout';
 let strip: BrowserWindow | null = null, panel: BrowserWindow | null = null, pet: BrowserWindow | null = null;
 let expanded = false;
 export const isGardenStrip=(id:number)=>!!strip&&!strip.isDestroyed()&&strip.webContents.id===id;
@@ -19,6 +20,7 @@ onDesktopVisibilityChanged(() => { if (desktopQuiet()) stopPerformance(); });
 let travelPanel: BrowserWindow | null = null;
 let stripSize = {width:1100,height:800};
 let farm = {left:54, baseline:734};
+let scenePlacement: GardenScenePlacement | null = null;
 let farmDrag: {x:number;y:number;left:number;baseline:number} | null = null;
 let speechBounds: { left: number; right: number; top: number; bottom: number } | null = null;
 export function setGardenSpeechBounds(bounds: typeof speechBounds): void {
@@ -65,7 +67,9 @@ async function perform(plot: number, kind: 'plant' | 'harvest' | 'cultivate', du
     const action = (kind==='cultivate'?research:[kind === 'plant' ? 'garden_sow' : 'garden_harvest',kind==='plant'?'wave':'talk_happy','idle']).filter((id):id is string=>!!id).find(id => actions[id] && (!actions[id].status || actions[id].status === 'done'));
     if (!action) return false;
     const bounds = pet.getBounds(); home = {x:bounds.x,y:bounds.y};
-    const target = plotPetPosition(plot, bounds, strip.getBounds(), screen.getDisplayMatching(strip.getBounds()).workArea, farm);
+    const area=screen.getDisplayMatching(strip.getBounds()).workArea;
+    const scenePlot=scenePlacement?.plots.find(p=>p.index===plot), sb=strip.getBounds();
+    const target = scenePlot ? {x:Math.round(Math.max(area.x,Math.min(sb.x+scenePlot.x-bounds.width/2,area.x+area.width-bounds.width))),y:Math.round(Math.max(area.y,Math.min(sb.y+scenePlot.y-bounds.height+25,area.y+area.height-bounds.height)))} : plotPetPosition(plot, bounds, sb, area, farm);
     pet.webContents.send('garden:performance', action);
     pet.setPosition(target.x, target.y);
     if(kind==='cultivate'){
@@ -121,7 +125,7 @@ function toggle(): void {
         trackDesktopWindow(strip,'decoration'); allowDesktopWindow(strip);
         strip.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         strip.setIgnoreMouseEvents(true, { forward: true });
-        strip.on('closed', () => { strip = null; expanded = false; stopPerformance(); });
+        strip.on('closed', () => { strip = null; scenePlacement=null; expanded = false; stopPerformance(); });
         strip.webContents.on('did-finish-load', () => { anchor(); if (expanded && pet?.isVisible())
             strip?.showInactive(); });
         load(strip, 'strip');
@@ -243,9 +247,14 @@ export function registerGardenIpc(): void {
         if(!Number.isFinite(x)||!Number.isFinite(y))return;
         if(phase==='start'){stopPerformance();farmDrag={x,y,...farm};return;}
         if(phase!=='move'||!farmDrag)return;
-        farm={left:Math.max(8,Math.min(stripSize.width-463,farmDrag.left+x-farmDrag.x)),
-            baseline:Math.max(180,Math.min(stripSize.height-66,farmDrag.baseline+y-farmDrag.y))};
+        farm={left:Math.max(8,Math.min(stripSize.width-(scenePlacement?.width??455)-8,farmDrag.left+x-farmDrag.x)),
+            baseline:Math.max(scenePlacement?scenePlacement.height+8:180,Math.min(stripSize.height-66,farmDrag.baseline+y-farmDrag.y))};
         anchor();
+    });
+    ipcMain.on('garden:scenePlacement',(ev,placement)=>{
+        if(!strip||ev.sender!==strip.webContents)return;
+        if(placement===null){scenePlacement=null;return;}
+        if(validGardenScenePlacement(placement,stripSize.width,stripSize.height))scenePlacement=placement;
     });
     ipcMain.on('garden:open', (_ev, page) => openGardenPanel(typeof page === 'string' ? page : 'bag'));
     ipcMain.on('garden:closeTravel', ev => {if(travelPanel && ev.sender === travelPanel.webContents) travelPanel.close();});

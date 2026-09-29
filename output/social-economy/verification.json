@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "checks": [
+    "simulated topup",
+    "draw cost and saved reward",
+    "buy 2D furniture",
+    "place and save moss stool",
+    "restart preserves tokens and daily cap",
+    "560px width"
+  ],
+  "errors": []
+}

@@ -1,0 +1,378 @@
+{
+  "version": "qbot-social-economy-0.3",
+  "status": "superseded-historical-proposal",
+  "retired": [
+    "legacyFurniturePool",
+    "idleBoxes",
+    "boxPoints",
+    "furnitureCrafting",
+    "characterFeedingXP",
+    "characterLevelActionGates",
+    "characterLevelPlotGates"
+  ],
+  "startCoins": 180,
+  "plots": 4,
+  "tutorialCoins": 80,
+  "tutorialPlantMinutes": 5,
+  "plants": [
+    {
+      "id": "strawberry",
+      "name": "草莓",
+      "minutes": 30,
+      "seedCost": 6,
+      "baseSale": 30
+    },
+    {
+      "id": "sunflower",
+      "name": "向日葵",
+      "minutes": 60,
+      "seedCost": 12,
+      "baseSale": 55
+    },
+    {
+      "id": "lotus",
+      "name": "莲花",
+      "minutes": 60,
+      "seedCost": 12,
+      "baseSale": 55
+    },
+    {
+      "id": "tulip",
+      "name": "郁金香",
+      "minutes": 60,
+      "seedCost": 12,
+      "baseSale": 55
+    },
+    {
+      "id": "pineapple",
+      "name": "菠萝",
+      "minutes": 240,
+      "seedCost": 36,
+      "baseSale": 150
+    },
+    {
+      "id": "apple",
+      "name": "苹果",
+      "minutes": 480,
+      "seedCost": 54,
+      "baseSale": 220
+    }
+  ],
+  "weather": {
+    "slotMinutes": 30,
+    "grades": [
+      {
+        "id": "common",
+        "chance": 0.9,
+        "factorChances": {
+          "blue": 0.08,
+          "purple": 0.019,
+          "gold": 0.001,
+          "rainbow": 0
+        }
+      },
+      {
+        "id": "seasonal",
+        "chance": 0.08,
+        "factorChances": {
+          "blue": 0.12,
+          "purple": 0.05,
+          "gold": 0.01,
+          "rainbow": 0
+        }
+      },
+      {
+        "id": "rare",
+        "chance": 0.02,
+        "factorChances": {
+          "blue": 0.14,
+          "purple": 0.12,
+          "gold": 0.08,
+          "rainbow": 0.01
+        }
+      }
+    ],
+    "checkpoints": [
+      0.2,
+      0.4,
+      0.6,
+      0.8
+    ],
+    "qualificationMinutes": 2,
+    "switchCooldownMinutes": 5,
+    "pitySlots": 96,
+    "maxEffectiveWeather": 1,
+    "types": [
+      {
+        "id": "sunny",
+        "name": "晴日",
+        "grade": "common",
+        "weight": 1,
+        "pools": {
+          "blue": [
+            "sugar",
+            "shiny"
+          ],
+          "purple": [
+            "honey"
+          ],
+          "gold": [
+            "golden"
+          ],
+          "rainbow": []
+        }
+      },
+      {
+        "id": "breeze",
+        "name": "花风",
+        "grade": "seasonal",
+        "weight": 1,
+        "pools": {
+          "blue": [
+            "petals",
+            "fragrant"
+          ],
+          "purple": [
+            "butterfly",
+            "flowerknot"
+          ],
+          "gold": [
+            "delicate",
+            "goldbell"
+          ],
+          "rainbow": []
+        }
+      },
+      {
+        "id": "rain",
+        "name": "甘霖",
+        "grade": "seasonal",
+        "weight": 1,
+        "pools": {
+          "blue": [
+            "raindrop",
+            "mint"
+          ],
+          "purple": [
+            "dew",
+            "celadon"
+          ],
+          "gold": [
+            "jade"
+          ],
+          "rainbow": []
+        }
+      },
+      {
+        "id": "aurora",
+        "name": "极光",
+        "grade": "rare",
+        "weight": 1,
+        "pools": {
+          "blue": [
+            "velvet",
+            "mist"
+          ],
+          "purple": [
+            "nightdye"
+          ],
+          "gold": [
+            "crystal",
+            "silver"
+          ],
+          "rainbow": [
+            "rainbow",
+            "iridescent"
+          ]
+        }
+      },
+      {
+        "id": "meteor",
+        "name": "流星",
+        "grade": "rare",
+        "weight": 1,
+        "pools": {
+          "blue": [
+            "leafwhistle",
+            "shiny"
+          ],
+          "purple": [
+            "pearl"
+          ],
+          "gold": [
+            "moon",
+            "starcore"
+          ],
+          "rainbow": [
+            "stardust",
+            "meteorRing"
+          ]
+        }
+      }
+    ]
+  },
+  "mutationSaleBonus": {
+    "blue": 0.02,
+    "purple": 0.05,
+    "gold": 0.1,
+    "rainbow": 0.15
+  },
+  "saleBonusCap": 0.3,
+  "shop": {
+    "rareSlotChance": 0.08,
+    "refreshHours": 24,
+    "rareBuyerDailyLimit": 1,
+    "reservationHours": 72,
+    "maxReservations": 1,
+    "rarePool": [
+      {
+        "id": "firefly_lamp",
+        "name": "萤火灯",
+        "price": 4000,
+        "weight": 60
+      },
+      {
+        "id": "aurora_window",
+        "name": "极光窗",
+        "price": 6000,
+        "weight": 30
+      },
+      {
+        "id": "star_mobile",
+        "name": "星空吊饰",
+        "price": 9000,
+        "weight": 10
+      }
+    ]
+  },
+  "cooperation": {
+    "workSeconds": 180,
+    "maxSpeedParticipants": 4,
+    "maxParticipants": 8,
+    "minimumSeconds": 20,
+    "minimumShare": 0.05,
+    "helperSeedsPerDay": 3,
+    "seedReward": "strawberry"
+  },
+  "breeding": {
+    "feeEach": 20,
+    "soloFee": 40,
+    "minutes": 10,
+    "attemptsPerWeek": 3,
+    "parentLifetimeUses": 1,
+    "targetSingle": 0.65,
+    "targetShared": 0.9,
+    "otherSingle": 0.25,
+    "otherShared": 0.5,
+    "ordinarySlots": 4,
+    "maxInheritedOrdinary": 3,
+    "requestExpiresHours": 24,
+    "maxPendingRequests": 5,
+    "fallbacks": {
+      "strawberry": [
+        "sugar",
+        "fragrant"
+      ],
+      "apple": [
+        "sugar",
+        "shiny"
+      ],
+      "sunflower": [
+        "shiny",
+        "petals"
+      ],
+      "lotus": [
+        "mist",
+        "raindrop"
+      ],
+      "tulip": [
+        "petals",
+        "velvet"
+      ],
+      "pineapple": [
+        "juicy",
+        "fragrant"
+      ]
+    }
+  },
+  "wishes": {
+    "visible": 2,
+    "completionsPerDay": 2,
+    "coinsPerCompletion": 20,
+    "bondPerCompletion": 2,
+    "freeReplacementsPerDay": 2,
+    "expireDays": 3
+  },
+  "relationship": {
+    "interactionDaily": 1,
+    "companionPer30Min": 1,
+    "companionDailyCap": 4,
+    "eventBond": 2,
+    "dailyCap": 10,
+    "earlyMemory": 10,
+    "stages": [
+      0,
+      35,
+      180,
+      400
+    ]
+  },
+  "travel": {
+    "tutorialMinutes": 10,
+    "tutorialFee": 60,
+    "normalFees": [
+      120,
+      220,
+      300
+    ],
+    "normalMinutes": [
+      120,
+      180,
+      240
+    ],
+    "weeklyLimit": 2
+  },
+  "furniture": [
+    {
+      "id": "lamp",
+      "name": "小台灯",
+      "price": 120
+    },
+    {
+      "id": "plant_stand",
+      "name": "花架",
+      "price": 360
+    },
+    {
+      "id": "photo_frame",
+      "name": "回忆相框",
+      "price": 480
+    },
+    {
+      "id": "tea_table",
+      "name": "茶桌",
+      "price": 900
+    },
+    {
+      "id": "reading_lamp",
+      "name": "阅读灯",
+      "price": 1200
+    },
+    {
+      "id": "shelf",
+      "name": "收藏架",
+      "price": 1600
+    },
+    {
+      "id": "rain_window",
+      "name": "雨景窗",
+      "price": 2400
+    },
+    {
+      "id": "shared_corner",
+      "name": "双人阅读角",
+      "price": 3600
+    }
+  ],
+  "supersededBy": "../economy-validation-v0.4/实现与试玩说明.md"
+}

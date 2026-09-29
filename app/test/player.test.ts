@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Manifest } from '@qbot/pipeline';
 import { Player } from '../src/renderer/pet/player';
+vi.mock('../src/renderer/pet/spine-player',()=>({SpinePlayer:class {
+ play=vi.fn();setSuspended=vi.fn();setVisible=vi.fn();setExpression=vi.fn();dispose=vi.fn();
+}}));
 
 class Element extends EventTarget {
   style = { visibility: 'hidden', cssText: '' };
@@ -49,7 +52,67 @@ beforeEach(() => {
 });
 afterEach(() => { player.dispose(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
+describe('hybrid Spine and video',()=>{
+ const load=()=>{
+  const m=manifest(['idle','highlight']);m.actions.idle.webm='';
+  m.spine={skeleton:'spine/character.json',atlas:'spine/character.atlas',texture:'spine/character.png',skin:'hood',actions:{idle:'idle',drag:'drag'}};
+  const available=player.load('hybrid',m);
+  return {available,spine:(player as any).spine};
+ };
+ it('loads both backends, reveals only a ready video, and returns to Spine',async()=>{
+  const {available,spine}=load();expect(available).toEqual(['idle','drag','highlight']);
+  expect(stage.children.filter(e=>e.tag==='video')).toHaveLength(1);
+  player.play('idle');player.playOnce('highlight');expect(spine.setVisible).not.toHaveBeenCalledWith(false);
+  await flush();expect(spine.setVisible).toHaveBeenLastCalledWith(false);expect(visible()).toEqual([video('highlight')]);
+  video('highlight').emit('ended');expect(ended).toHaveBeenCalledOnce();
+  player.play('idle');expect(visible()).toEqual([]);expect(spine.setVisible).toHaveBeenLastCalledWith(true);
+ });
+ it('a delayed video cannot replace a drag that interrupted it',async()=>{
+  const {spine}=load();let resolve!:()=>void;
+  video('highlight').play.mockImplementation(()=>new Promise<void>(r=>{resolve=r;}));
+  player.play('highlight');player.play('drag');resolve();await flush();
+  expect(visible()).toEqual([]);expect(spine.play).toHaveBeenLastCalledWith('drag',true);expect(ended).not.toHaveBeenCalled();
+ });
+ it('a broken high point returns to live idle without leaving a blank character',async()=>{
+  const {spine}=load();video('highlight').play.mockRejectedValue(new Error('bad clip'));
+  player.play('highlight');await flush();await flush();await flush();
+  expect(spine.play).toHaveBeenLastCalledWith('idle',true);expect(spine.setVisible).toHaveBeenLastCalledWith(true);expect(visible()).toEqual([]);
+ });
+});
+
 describe('Player visibility and recovery', () => {
+  it('retries the computer clip on entry after an earlier decoder failure', async () => {
+    player.load('pet', manifest(['idle', 'computer_typing']));
+    const clip = video('computer_typing');
+    clip.play.mockRejectedValue(new Error('temporary decoder failure'));
+    player.playLooping('computer_typing'); await flush(); await flush();
+    expect(visible()).toEqual([video('idle')]);
+    clip.play.mockImplementation(async () => { clip.paused = false; });
+    player.playWork(false); await flush();
+    expect(visible()).toEqual([clip]);
+    expect(clip.paused).toBe(true);
+    player.playWork(true); await flush();
+    expect(clip.paused).toBe(false);
+  });
+  it('reveals a still work frame after a warm seek without another loadeddata event', async () => {
+    player.load('pet', manifest(['idle', 'computer_typing']));
+    player.playWork(true); await flush();
+    const clip = video('computer_typing');
+    player.play('idle'); await flush();
+    let time = 2;
+    Object.defineProperty(clip, 'currentTime', { get: () => time, set: value => {
+      time = value; clip.readyState = 1; (clip as any).seeking = true;
+    } });
+    player.playWork(false);
+    expect(visible()).toEqual([video('idle')]);
+    expect(clip.load).not.toHaveBeenCalled();
+    clip.readyState = 4; (clip as any).seeking = false; clip.emit('seeked');
+    expect(visible()).toEqual([clip]);
+    expect(clip.paused).toBe(true);
+    expect(clip.currentTime).toBe(0);
+    player.play('idle'); await flush(); clip.emit('canplay');
+    expect(visible()).toEqual([video('idle')]);
+  });
   it('freezes the current work frame and resumes without a seek or decoder switch', async () => {
     player.load('pet',manifest(['idle','computer_idle','computer_typing']));
     player.playWork(false); await flush();

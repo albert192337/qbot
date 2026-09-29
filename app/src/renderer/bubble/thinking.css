@@ -18,6 +18,40 @@
   filter: drop-shadow(0 2px 1px #59423524);
 }
 .thinking-cloud path, .thinking-cloud circle { fill: #fff3df; }
+/* The text stays in normal flow so longer thoughts grow with the speech font. */
+.bubble.pet-thought {
+  position: relative;
+  flex-shrink: 0;
+  padding: 18px 25px;
+  margin: 2px 2px 20px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  isolation: isolate;
+}
+.bubble.pet-thought::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120' preserveAspectRatio='none'%3E%3Cpath d='M28 94C4 91 1 70 14 57C2 36 19 18 44 23C51 4 80 1 101 12C124 1 147 3 163 12C188 0 211 7 219 19C250 9 272 23 271 40C300 44 304 69 284 81C289 103 263 115 239 105C218 121 194 115 181 107C155 119 133 116 117 106C90 119 67 110 62 103C46 110 32 106 28 94Z' fill='%23f1eafa' stroke='%23988aa8' stroke-width='1.5'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+.bubble.pet-thought::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 32%;
+  width: 10px;
+  height: 8px;
+  border: 1px solid #988aa8;
+  border-radius: 50%;
+  background: #f1eafa;
+  box-shadow: -10px 9px 0 -2px #d7cce4;
+}
+.bubble.pet-thought .text { color: #62506f; }
+body.below .bubble.pet-thought { margin: 20px 2px 2px; }
+body.below .bubble.pet-thought::after { top: -9px; bottom: auto; box-shadow: -10px -9px 0 -2px #d7cce4; }
 .thinking-dots {
   position: absolute;
   left: 29px;

@@ -105,6 +105,6 @@ app.whenReady().then(async () => {
   const pushVisibility=()=>win.webContents.send('ui:nurseryVisibility',win.isVisible()&&!win.isMinimized());
   for(const event of ['show','hide','minimize','restore'])win.on(event,pushVisibility);
   qa.push=status=>{qa.status=status;win.webContents.send('hatch:cloudStatus',{dirId:'new-friend',status});};
-  await win.loadFile(path.join(root,process.env.QBOT_QA_CONSOLE==='1'?'app/out/renderer/console/index.html':'app/out/renderer/nursery/index.html'), process.env.QBOT_QA_CONSOLE==='1'?{query:{pane:'persona'}}:undefined);
+  await win.loadFile(path.join(root,process.env.QBOT_QA_CONSOLE==='1'?'app/out/renderer/console/index.html':'app/out/renderer/nursery/index.html'), process.env.QBOT_QA_CONSOLE==='1'?{query:{pane:process.env.QBOT_QA_PANE||'persona'}}:undefined);
 });
 app.on('window-all-closed',()=>app.quit());

@@ -166,3 +166,16 @@ it('仅留言也记录预算，排队文字在开始执行时重新检查', asyn
   expect(conversationFor(characterId).at(-1)?.text).toBe('我去喝茶');
   expect(web.send).not.toHaveBeenCalled();
 });
+
+it('思考气泡传递表达方式、保留记忆标记并消耗主动文字预算', async () => {
+ const characterId = 'thought-budget';
+ execute({ meta: { id: 'llm-brain', source: 'llm', priority: 10, characterId }, steps: [{ op: 'say', text: '陪他坐一会儿。', expression: 'thought' }] });
+ await vi.advanceTimersByTimeAsync(0);
+ expect(web.send).toHaveBeenCalledWith('behavior:say', expect.objectContaining({ expression: 'thought', text: '陪他坐一会儿。' }));
+ expect(conversationFor(characterId).at(-1)).toMatchObject({ expression: 'thought', source: 'auto' });
+ await vi.advanceTimersByTimeAsync(20000);
+ web.send.mockClear();
+ execute({ meta: { id: 'llm-brain', source: 'llm', priority: 10, characterId }, steps: [{ op: 'say', text: '再想一下', expression: 'thought' }] });
+ await vi.advanceTimersByTimeAsync(0);
+ expect(web.send).not.toHaveBeenCalled();
+});

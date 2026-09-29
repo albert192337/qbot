@@ -450,6 +450,7 @@ function leaveRoom(ws, notify = true) {
   companions?.left(ws);
   const roomId = ws.roomId;
   if (!roomId) return;
+  if(gardens.data.people[ws.memberId]?.state.economy?.weather)gardens.transaction(()=>gardens.stopSharedWeather(ws.memberId));
   ws.roomId = null;
   const peers = online.get(roomId);
   if (peers) {
@@ -591,7 +592,9 @@ const handlers = {
         if(!contacts.areFriends(ws.memberId,f.target))throw Error('请选择已确认的游戏好友');
 
       }
-      const result=gardens.handle(ws.memberId,{...f,realm:ws.roomId??'garden'});
+      const weatherRoom=rooms.get(ws.roomId);
+      const roomContext=weatherRoom?{id:weatherRoom.roomId,owner:weatherRoom.ownerId,members:weatherRoom.members.filter(m=>m.companion||m.memberId===ws.memberId||[...(online.get(ws.roomId)??[])].some(peer=>peer.memberId===m.memberId)).map(m=>m.memberId)}:undefined;
+      const result=gardens.handle(ws.memberId,{...f,realm:ws.roomId??'garden',roomContext});
       if(f.action==='coop'&&f.command==='invite'){
         const p=result.visit.plots[f.plot];
         for(const [key,i] of gardenInvites)if(i.expiresAt<Date.now()||i.from===ws.memberId&&i.to===f.target&&i.plant===p.id)gardenInvites.delete(key);

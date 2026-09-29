@@ -1,0 +1,143 @@
+{
+  "version": "qbot-social-economy-0.3",
+  "method": "exact-independent-draw-formulas-not-gameplay-simulation",
+  "weather": [
+    {
+      "grade": "common",
+      "any": 0.3439,
+      "goldOrRainbow": 0.003994003998999962,
+      "rainbow": 0
+    },
+    {
+      "grade": "seasonal",
+      "any": 0.5478782399999998,
+      "goldOrRainbow": 0.039403990000000055,
+      "rainbow": 0
+    },
+    {
+      "grade": "rare",
+      "any": 0.8214937500000001,
+      "goldOrRainbow": 0.3142503899999999,
+      "rainbow": 0.039403990000000055
+    }
+  ],
+  "discovery": [
+    {
+      "n": 1,
+      "weather": 0.020000000000000018,
+      "furniture": 0.07999999999999996
+    },
+    {
+      "n": 5,
+      "weather": 0.09607920320000007,
+      "furniture": 0.34091847679999987
+    },
+    {
+      "n": 10,
+      "weather": 0.1829271931124533,
+      "furniture": 0.5656115457763677
+    },
+    {
+      "n": 20,
+      "weather": 0.33239202824490577,
+      "furniture": 0.8113066708372033
+    },
+    {
+      "n": 100,
+      "weather": 0.8673804441052471,
+      "furniture": 0.999760788125343
+    }
+  ],
+  "breeding": [
+    {
+      "kind": "one",
+      "chance": 0.65,
+      "byThree": 0.957125,
+      "p50": 1,
+      "p90": 3
+    },
+    {
+      "kind": "shared",
+      "chance": 0.9,
+      "byThree": 0.999,
+      "p50": 1,
+      "p90": 1
+    }
+  ],
+  "growing": [
+    {
+      "id": "strawberry",
+      "name": "草莓",
+      "netAllSold": 24,
+      "netKeep35": 13.5,
+      "sellBreakEven": 0.2,
+      "netPerPlotHour": 48
+    },
+    {
+      "id": "sunflower",
+      "name": "向日葵",
+      "netAllSold": 43,
+      "netKeep35": 23.75,
+      "sellBreakEven": 0.21818181818181817,
+      "netPerPlotHour": 43
+    },
+    {
+      "id": "lotus",
+      "name": "莲花",
+      "netAllSold": 43,
+      "netKeep35": 23.75,
+      "sellBreakEven": 0.21818181818181817,
+      "netPerPlotHour": 43
+    },
+    {
+      "id": "tulip",
+      "name": "郁金香",
+      "netAllSold": 43,
+      "netKeep35": 23.75,
+      "sellBreakEven": 0.21818181818181817,
+      "netPerPlotHour": 43
+    },
+    {
+      "id": "pineapple",
+      "name": "菠萝",
+      "netAllSold": 114,
+      "netKeep35": 61.5,
+      "sellBreakEven": 0.24,
+      "netPerPlotHour": 28.5
+    },
+    {
+      "id": "apple",
+      "name": "苹果",
+      "netAllSold": 166,
+      "netKeep35": 89,
+      "sellBreakEven": 0.24545454545454545,
+      "netPerPlotHour": 20.75
+    }
+  ],
+  "coop": [
+    {
+      "n": 1,
+      "seconds": 180,
+      "share": 1
+    },
+    {
+      "n": 2,
+      "seconds": 90,
+      "share": 0.5
+    },
+    {
+      "n": 4,
+      "seconds": 45,
+      "share": 0.25
+    },
+    {
+      "n": 8,
+      "seconds": 45,
+      "share": 0.125
+    }
+  ],
+  "pity": {
+    "meanSlots": 42.81092075561493,
+    "longRunRareShare": 0.023358525870267426
+  }
+}

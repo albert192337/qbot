@@ -4,14 +4,14 @@ import {V3_WEATHER,AFFINITIES} from './garden-v3';
 export const DAY_MS = 86400000;
 // Up to 8 participants at 360 work/second. Qualified participants receive seeds;
 // the chance of a seed carrying a crop trait rises from 18% to 27% with participation.
-export const COOP_RULES={work:64800,speed:360,maxPlayers:8,leaseMs:15000,minSeconds:20,minContribution:.02,dailyRewards:5} as const;
+export const COOP_RULES={work:64800,speed:360,maxPlayers:8,leaseMs:15000,minSeconds:20,minContribution:.05,dailyRewards:3} as const;
 export const coopRareChance=(participants:number)=>.18+.09*(Math.max(1,Math.min(8,participants))-1)/7;
 /** 04:00 Asia/Shanghai. Persisted day keys never move backwards. */
 export const gardenDay = (now: number) => Math.floor((now + 4 * 3600000) / DAY_MS);
 export const nextGardenDay = (day: number) => (day + 1) * DAY_MS - 4 * 3600000;
 export const CHARACTER_XP = [0, 20, 60, 120, 200, 300, 440, 620, 840, 1100] as const;
 export const characterLevel = (xp: number) => CHARACTER_XP.filter(x => xp >= x).length;
-export const CHARACTER_UNLOCKS = [{level:3,kind:'flower',name:'送花'}, {level:5,kind:'photo',name:'并排合影'}, {level:8,kind:'relay',name:'表情接力'}, {level:10,kind:'celebrate',name:'共同庆祝'}] as const;
+export const CHARACTER_UNLOCKS:readonly {level:number;kind:string;name:string}[]=[];
 export const FRUITS: Species[] = ['strawberry','tomato','blueberry','pineapple','apple'];
 export const FOOD_ICONS: Record<Species,string> = {lotus:'🪷',strawberry:'🍓',sunflower:'🌻',carrot:'🥕',tomato:'🍅',blueberry:'🫐',pineapple:'🍍',apple:'🍎',tulip:'🌷'};
 export const DYE_COLORS = {cream:{name:'奶油',hue:35},mint:{name:'薄荷绿',hue:105},pink:{name:'樱粉',hue:320},lilac:{name:'淡紫',hue:260},ocean:{name:'海蓝',hue:180}} as const;
@@ -62,4 +62,4 @@ export function wishMatches(w:FoodWish,p:Produce):boolean {return !w.done&&!p.lo
 export function wishLabel(w:FoodWish):string {return `${SPECIES[w.species].name} ×1${w.traits.length?' · '+w.traits.map(t=>TRAITS[t].name).join('＋'):''}`;}
 export function currentGrowth(s:GardenState):CharacterGrowth|undefined {return s.activeActor?s.life?.characters[s.activeActor]:undefined;}
 export interface GardenVisit {companion?:boolean;friend?:boolean;plotCount?:number;owner:string;name:string;plots:GardenState['plots'];offers:DailyOffer[];day:number;visibility:GardenLife['visibility'];actorLevel:number;actorName?:string;landOpen?:boolean;shopOpen?:boolean;rewardsLeft?:number;tasks?:CoopTask[]}
-export interface CoopTask {workBudget?:number;id:string;owner:string;plant:string;plot:number;remaining:number;updatedAt:number;members:Record<string,{work:number;seconds:number;seenAt:number}>;done:boolean;claimed:string[];shared?:boolean;invited?:string[];room?:string;fruit?:import('./garden').Plant}
+export interface CoopTask {growthHelp?:boolean;workBudget?:number;id:string;owner:string;plant:string;plot:number;remaining:number;updatedAt:number;members:Record<string,{work:number;seconds:number;seenAt:number}>;done:boolean;claimed:string[];shared?:boolean;invited?:string[];room?:string;fruit?:import('./garden').Plant}

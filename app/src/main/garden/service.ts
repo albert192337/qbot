@@ -120,11 +120,7 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
             const settings=await getSettings();
             if(getRehearsal()){const rehearsal=getRehearsal()!;rehearsal.initializeOwn((await load()).state);const result=rehearsal.act(command,settings.activeCharacter??undefined);for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');return result;}
             if(settings.gardenOnline){
-                if(command?.type==='box'){
-                    const result=(await (await import('./network-box')).onlineBox())!;
-                    for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');
-                    return result;
-                }
+                if(command?.type==='box')return {ok:false,error:'陪伴开箱已退役，请到家具商店看看'};
                 return (await import('./network')).networkAction(command);
             }
             if (!command || typeof command !== 'object')

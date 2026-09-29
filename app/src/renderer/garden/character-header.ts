@@ -37,6 +37,12 @@ export function renderCharacterHeader(c: Context): HTMLElement {
   const { state } = c, growth = currentGrowth(state), xp = growth?.xp ?? 0, lv = characterLevel(xp);
   const meta = c.characters.find(m => m.dirId === state.activeActor);
   const header = el('header', '', 'character-header'); header.setAttribute('aria-label', '角色与今日心愿');
+  if(state.economy){
+    const identity=el('div','','character-identity');identity.append(portrait(meta),el('strong',meta?.manifest.name??'选择角色'));
+    const select=el('select');select.setAttribute('aria-label','一起种植的角色');for(const m of c.characters)select.append(new Option(m.manifest.name,m.dirId));select.value=state.activeActor??'';select.onchange=()=>void c.switchActor(select.value);identity.append(select);
+    const wallet=el('div','','character-wallet');wallet.append(el('small','花园币'),el('strong',String(state.coins)));
+    header.append(identity,el('p','一起种植 · 四块土地 · 心愿记录共同经历'),wallet);return header;
+  }
   const identity = el('div', '', 'character-identity'); const face = button('', '把背包果实拖到这里投喂', () => c.notice('把背包里的果实拖到角色或今日心愿上，也可点击果实的投喂按钮。'), !state.activeActor);
   face.className = 'character-feed-target'; face.append(portrait(meta));
   const summary = el('div', '', 'character-summary'), name = el('div', '', 'character-name');

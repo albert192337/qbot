@@ -16,7 +16,7 @@
 /** 单个脚本步骤（原子操作） */
 export type BehaviorStep =
   | { op: 'play'; action: string; loops?: number }
-  | { op: 'say'; text: string; durationMs?: number }
+  | { op: 'say'; text: string; durationMs?: number; expression?: import('./pet-expression').PetExpression }
   | { op: 'sign'; text: string | null } // null = 收牌
   | { op: 'wait'; ms: number }
   | { op: 'move'; x: number; y: number } // 阶段 D
@@ -134,6 +134,7 @@ export function validateScript(script: unknown): ValidateResult {
           }
           break;
         case 'say':
+          if (step.expression !== undefined && step.expression !== 'speech' && step.expression !== 'thought') errors.push(prefix + '.expression must be speech/thought');
           if (typeof step.text !== 'string') {
             errors.push(`${prefix}.text is required`);
           } else if (step.text.length > MAX_TEXT_LEN) {

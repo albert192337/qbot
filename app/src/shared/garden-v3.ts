@@ -1,4 +1,5 @@
 import {SPECIES,TRAITS,FERTILIZERS,traitSlot,type Trait,type Species,type Produce,type Fertilizer,type GardenState} from './garden';
+import {CROPS} from './social-economy';
 import {dailyRandom,gardenDay,traitSource} from './garden-life';
 
 /** Original reference / project tuning are separate in docs/garden-v3-balance.md. */
@@ -59,10 +60,13 @@ export type GeneSlots=[Trait|null,Trait|null,Trait|null,Trait|null];
 export function geneSlots(ts:Trait[]):GeneSlots {const capped=cappedTraits(ts).filter(t=>traitSlot(t)!=='size');return [capped.find(t=>traitSlot(t)==='fruit')??null,capped.find(t=>traitSlot(t)==='skin')??null,...[0,1].map(i=>capped.filter(t=>traitSlot(t)==='accessory')[i]??null)] as GeneSlots;}
 export function stableSlots(ts:Trait[],previous?:GeneSlots):GeneSlots {const next:GeneSlots=[null,null,null,null];for(let i=0;i<4;i++){const t=previous?.[i];if(t&&ts.includes(t))next[i]=t;}for(const t of ts){if(traitSlot(t)==='size'||next.includes(t))continue;const indices=traitSlot(t)==='fruit'?[0]:traitSlot(t)==='skin'?[1]:[2,3];const i=indices.find(i=>next[i]===null);if(i!==undefined)next[i]=t;}return next;}
 export interface Lineage {parents:{id:string;species:Species;traits:Trait[]}[];at:number;owner?:string}
-export interface BatchV3 {seedlingEnd:number;naturalReadyAt?:number;settled:boolean;seed:number;realm:string;exposure:Exposure[];candidates:Trait[];fertilizedAt?:number;slots:GeneSlots;massGene?:Trait;soil:number;sunBonus:number}
+export interface BatchV3 {socialChecks?:number;socialAdjustedAt?:number;seedlingEnd:number;naturalReadyAt?:number;settled:boolean;seed:number;realm:string;exposure:Exposure[];candidates:Trait[];fertilizedAt?:number;slots:GeneSlots;massGene?:Trait;soil:number;sunBonus:number}
 export interface Appraisal {row:number;factor:number;done:boolean;board:number[][];history:{row:number;column:number;multiplier:number}[];baseKg:number;maxRows:number}
 export interface GardenV3 {version:3;realm?:string;sunActive?:number;sunRequests?:string[];day:number;xpToday:Partial<Record<Species,number>>;rainbowMisses:number;pityEvents:string[];week:number;breeds:number;geneMisses:number;sizeMisses:number;oils:{normal:number;rich:number};soil:number[];goal?:{species:Species;traits:Trait[]};records:{at:number;kind:string;message:string;peer?:string;plant?:string}[];counters:Record<string,number>;sunPartners:string[];appraisals:Record<string,Appraisal>}
 export type V3Command={type:'sunRequest'|'sunRemove';target:string}|{type:'sunAnswer';target:string;accept:boolean}|{type:'resolveFactors';target:string;chosen:Trait[]}|{type:'collectionGoal';species:Species;traits:Trait[]}|{type:'clearCollectionGoal'}|{type:'buyOil';kind:'normal'|'rich'}|{type:'upgradeSoil';plot:number}|{type:'appraiseStart';target:string}|{type:'appraisePick';target:string;column:number}|{type:'appraiseStop';target:string};
 export const weekKey=(now:number)=>Math.floor((gardenDay(now)-4)/7);
 export function recordGarden(s:GardenState,now:number,kind:string,message:string,peer?:string,plant?:string):void {if(!s.v3)return;s.v3.records.push({at:now,kind,message,peer,plant});s.v3.records=s.v3.records.slice(-150);s.v3.counters[kind]=(s.v3.counters[kind]??0)+1;}
-export function v3Value(p:Pick<Produce,'species'|'kg'|'traits'|'yieldCount'>):number {const sp=SPECIES[p.species],mass=Math.min(6,Math.max(.4,p.kg/sp.kg)),bonus=p.traits.reduce((sum,t)=>sum+(traitSlot(t)==='size'?0:FACTOR_SCORE[TRAITS[t].tier]),0);return Math.max(1,Math.round(sp.price/(p.yieldCount??sp.harvests)+V3.hourIncome*sp.minutes/60*(.7+.3*mass)*Math.min(3,1+bonus/100)));}
+export function v3Value(p:Pick<Produce,'species'|'kg'|'traits'|'yieldCount'>):number {
+ const bonus=p.traits.reduce((n,t)=>n+(traitSlot(t)==='size'?0:({blue:.02,purple:.05,gold:.10,rainbow:.15,normal:0,green:0})[TRAITS[t].tier]),0);
+ return Math.round(CROPS[p.species].sale*(1+Math.min(.30,bonus)));
+}

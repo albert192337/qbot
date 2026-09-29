@@ -1,5 +1,6 @@
 import { WorkMode, WORK_IDLE, WORK_TYPING } from './work-mode';
 import { mountPetting } from './petting';
+import { petEffects } from './interaction-effects';
 import { choosePairAction } from '../../shared/pair-interaction';
 import { scenePool } from '../../shared/action-resources';
 import { resolvePetDrop } from './drop-target';
@@ -16,7 +17,7 @@ import { Signboard } from './signboard';
 import { ProgressHud } from './hud';
 import { isStaleProgress } from './hud-format';
 import { POINTS_PER_BOX } from '../../shared/furniture';
-import { DECOR_BY_ID } from '../room/decor-pack';
+import { DECOR_BY_ID } from '../furniture/catalog';
 import { DEFAULT_VOICE_SETTINGS, Speaker, type VoiceSettings } from './voice/speak';
 import { PairInteraction } from './pair-interaction';
 import { PAIR_INTERACTIONS, pairActions, type PairKind } from '../../shared/pair-interaction';
@@ -562,6 +563,8 @@ function dispatch(event: Parameters<typeof step>[1]): void {
 function activateCharacter(meta: CharacterMeta): void {
   if (!meta?.manifest) return;
   if(gardenPerforming&&currentCharacter?.dirId===meta.dirId&&JSON.stringify(currentCharacter.manifest)===JSON.stringify(meta.manifest))return;
+  petEffects(stage).clear();
+  petting.stop();
   stopWork();
   if(currentCharacter?.dirId!==meta.dirId){window.qbot.pet.detachPerch();applyPerch(null);}
   if (gardenPerforming) window.qbot.garden.cancelPerformance();

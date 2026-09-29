@@ -15,7 +15,7 @@ export function ensureLife(s:GardenState,now:number,rng:Random,actor?:string,mig
     s.activeActor=actor;
     let c=l.characters[actor];
     if(!c)c=l.characters[actor]={xp:0,day,wishes:[],rerolled:false};
-    if(c.day<day||!c.wishes.length){c.day=day;c.rerolled=false;c.wishes=makeWishes(s,actor,day);recordGarden(s,now,'wishes','角色有了三份新的食物心愿');}
+    if(s.economy){c.wishes=[];c.day=day;}else if(c.day<day||!c.wishes.length){c.day=day;c.rerolled=false;c.wishes=makeWishes(s,actor,day);recordGarden(s,now,'wishes','角色有了三份新的食物心愿');}
   }else delete s.activeActor;
   return before!==JSON.stringify(s.life);
 }
@@ -106,6 +106,7 @@ export function lifeTransition(s:GardenState,cmd:GardenCommand,now:number,rng:Ra
     case 'feed':{
       if(cmd.actor!==undefined&&cmd.actor!==actor)throw Error('角色已切换，请重新投喂');
       const c=actor&&l.characters[actor];if(!c)throw Error('请先选择自己的角色');
+      if(s.economy){const i=s.produce.findIndex(p=>p.id===cmd.produce&&!p.locked&&!needsReveal(p));if(i<0)throw Error('请选择未锁定、已揭晓的果实');s.produce.splice(i,1);recordGarden(s,now,'feed','和角色分享了一颗果实');return {handled:true,reveal:{title:'一起吃到了！',message:'这份共同经历已记入心愿。'}};}
       const w=c.wishes.find(w=>w.id===cmd.wish),i=s.produce.findIndex(p=>p.id===cmd.produce);
       if(!w||i<0||!wishMatches(w,s.produce[i]))throw Error('需要正确的水果和全部指定词条，且果实未收藏锁定');
       const old=characterLevel(c.xp),food=s.produce[i];recordGarden(s,now,'feed',`投喂${SPECIES[food.species].name} · 放下${food.value}币出售收益，获得${w.xp}角色经验`);s.produce.splice(i,1);w.done=true;c.xp+=w.xp;

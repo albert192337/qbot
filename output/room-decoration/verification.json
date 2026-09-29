@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "checks": [
+    "24 independently selectable sprites",
+    "four theme presets",
+    "theme and category filters",
+    "mixed-theme save",
+    "room shell and separate furniture",
+    "save failure preserves editable draft",
+    "save and reload preserves all-empty layout",
+    "owned furniture quantity shared across slots",
+    "discard and default set",
+    "600px editor"
+  ],
+  "errors": []
+}

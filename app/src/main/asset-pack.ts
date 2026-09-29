@@ -36,8 +36,8 @@ export interface PackedCharacter {
 /** 从 manifest 收集要打包的动作文件（标准 + 自定义，只要 done 的） */
 function collectActionFiles(manifest: Record<string, unknown>): string[] {
   const out: string[] = [];
-  const spine=manifest.spine as {skeleton?:string;atlas?:string;texture?:string}|undefined;
-  if(spine)for(const file of [spine.skeleton,spine.atlas,spine.texture]){
+  const spine=manifest.spine as {skeleton?:string;atlas?:string;texture?:string;seat?:{texture?:string}}|undefined;
+  if(spine)for(const file of [spine.skeleton,spine.atlas,spine.texture,...(spine.seat?[spine.seat.texture]:[])]){
     if(typeof file!=='string'||!/^spine\/[a-zA-Z0-9_-]+\.(json|atlas|png)$/.test(file))throw Error('Invalid Spine asset');
     out.push(file);
   }

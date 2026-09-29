@@ -1,4 +1,5 @@
 import type { Manifest } from '@qbot/pipeline';
+import { createCapsuleEyes, type SpineExpression } from './spine-face';
 
 // The runtime must match the 4.0 skeleton export, not the newest Spine release.
 let runtimePromise: Promise<any> | undefined;
@@ -20,6 +21,8 @@ export class SpinePlayer {
   private disposed=false;
   private suspended=false;
   private ready=false;
+  private face:ReturnType<typeof createCapsuleEyes>|null=null;
+  private expression:SpineExpression|null=null;
   private frame=0;
   private last=0;
   private elapsed=0;
@@ -58,9 +61,11 @@ export class SpinePlayer {
     this.renderer=new api.SceneRenderer(this.canvas,this.gl);
     this.assets=new api.AssetManager(this.gl);
     this.assets.loadTextureAtlas(base+config.atlas);this.assets.loadJson(base+config.skeleton);
+    if(config.seat){if(!/^spine\/[a-zA-Z0-9_-]+\.png$/.test(config.seat.texture))throw Error('Invalid seat texture');this.assets.loadTexture(base+config.seat.texture);}
     await this.assets.loadAll();if(this.disposed){this.assets.dispose();return;}
     const data=new api.SkeletonJson(new api.AtlasAttachmentLoader(this.assets.get(base+config.atlas))).readSkeletonData(this.assets.get(base+config.skeleton));
     this.sk=new api.Skeleton(data);this.state=new api.AnimationState(new api.AnimationStateData(data));
+    if(config.faceStyle==='capsule')this.face=createCapsuleEyes(api,this.gl,config.skin);
     for(const name of Object.values(config.actions))if(!data.findAnimation(name))throw Error('Unknown Spine action '+name);
     this.ready=true;this.canvas.dataset.ready='true';this.select();this.schedule();
   }
@@ -69,6 +74,8 @@ export class SpinePlayer {
     this.canvas.dataset.action=this.action;
     if(this.ready)this.select();this.schedule();
   }
+  setExpression(value:SpineExpression|null){this.expression=value;}
+  setVisible(value:boolean){this.canvas.style.visibility=value?'visible':'hidden';this.setSuspended(!value);}
   private select(){
     this.sk.setToSetupPose();this.state.clearTracks();
     this.state.setAnimation(0,this.manifest.spine!.actions[this.action],this.looping);
@@ -123,6 +130,8 @@ export class SpinePlayer {
       sk.setAttachment(slot,name);sk.findSlot(slot).color.set(1,1,1,1);
     }
     if(['sleep','thinking','talk_annoyed'].includes(this.action))sk.findSlot('mouth_A0').color.a=0;
+    const expression:SpineExpression=closed?'sleepy':this.expression??(['talk_happy','cheer','heart'].includes(this.action)?'happy':this.action==='talk_annoyed'?'annoyed':['curious','thinking'].includes(this.action)?'curious':'neutral');
+    this.face?.apply(sk,expression);this.canvas.dataset.expression=expression;
     this.gaze(dt);sk.updateWorldTransform();
     if(this.manifest.spine!.actions[this.action]==='town_shuangren_tietie01'){
       for(const side of ['L','R']){
@@ -134,7 +143,10 @@ export class SpinePlayer {
     for(const name of ['eye_LA0','eye_RA0'])this.shiftEyes(sk.findSlot(name));
     gl.viewport(0,0,512,512);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
     r.camera.position.set(0,240,0);r.camera.viewportWidth=620;r.camera.viewportHeight=620;
-    r.begin();r.drawSkeleton(sk,false);r.end();
+    r.begin();
+    const seat=this.manifest.spine!.seat;
+    if(seat&&this.action==='perch')r.drawTexture(this.assets.get(`qbot-asset://${this.dirId}/${seat.texture}`),seat.x,seat.y,seat.width,seat.height);
+    r.drawSkeleton(sk,false);r.end();
     this.canvas.dataset.time=this.elapsed.toFixed(3);
     const entry=this.state.getCurrent(0);
     if(!this.looping&&!this.finished&&entry&&entry.trackTime>=entry.animationEnd){this.finished=true;this.onEnded();}
@@ -142,7 +154,7 @@ export class SpinePlayer {
   dispose(){
     this.disposed=true;cancelAnimationFrame(this.frame);window.removeEventListener('pointermove',this.pointer);
     if(this.cursorTimer)clearInterval(this.cursorTimer);
-    this.canvas.remove();this.originals.clear();if(this.ready)this.assets?.dispose();this.renderer?.dispose();
+    this.canvas.remove();this.originals.clear();this.face?.dispose();if(this.ready)this.assets?.dispose();this.renderer?.dispose();
     this.gl?.getExtension('WEBGL_lose_context')?.loseContext();
   }
 }

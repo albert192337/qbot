@@ -3,28 +3,32 @@ import {sowingMinutes,SPECIES,TRAITS,LEVEL_XP,FERTILIZERS,traitSlot,needsReveal,
 import {dailyRandom,gardenDay,nextGardenDay} from '../../shared/garden-life';
 import {FACTOR_SCORE,V3,V3_XP,AFFINITIES,AFFINITY_WEIGHTS,V3_WEATHER,weatherWeights,exposures,fits,cappedTraits,withSize,qualityOf,scoreOf,speciesLevel,fertilizerV3,v3Value,weekKey,geneSlots,stableSlots,recordGarden,type FactorQuality,type Exposure} from '../../shared/garden-v3';
 import type {Random} from './rules';
+import { enableSocialEconomy } from './social-rules';
+import { CROPS, BREED_OILS } from '../../shared/social-economy';
+import { advanceSocialPlants } from './social-weather';
 
 export function enableV3(s:GardenState,now:number):boolean {
- if(s.v3)return false;
+ if(s.v3)return enableSocialEconomy(s,now);
  for(const p of s.plots)if(p&&p.growthVersion!==3)p.legacyLevel=Math.max(1,LEVEL_XP.filter(x=>s.xp[p.species]>=x).length);
  for(const sp of Object.keys(SPECIES) as Species[]){const xp=s.xp[sp],i=Math.max(0,LEVEL_XP.filter(n=>xp>=n).length-1);s.xp[sp]=Math.round(V3_XP[i]+(i<7?(xp-LEVEL_XP[i])/(LEVEL_XP[i+1]-LEVEL_XP[i])*(V3_XP[i+1]-V3_XP[i]):Math.min(1,(xp-LEVEL_XP[7])/400)*(V3_XP[8]-V3_XP[7])));}
  s.v3={version:3,day:gardenDay(now),xpToday:{},rainbowMisses:0,pityEvents:[],week:weekKey(now),breeds:0,geneMisses:0,sizeMisses:0,oils:{normal:2,rich:0},soil:Array(s.plots.length).fill(1),records:[],counters:{},sunPartners:[],appraisals:{}};
- s.shop.refreshAt=0;recordGarden(s,now,'welcome','新花园手册：选一个喜欢的组合，慢慢种出自己的收藏。');return true;
+ enableSocialEconomy(s,now);s.shop.refreshAt=0;recordGarden(s,now,'welcome','新花园手册：邀请伙伴，一起种出自己的收藏。');return true;
 }
 export function refreshV3Day(s:GardenState,now:number):void {const v=s.v3;if(!v)return;const day=Math.max(v.day,gardenDay(now));if(day!==v.day){v.day=day;v.xpToday={};}const week=Math.max(v.week,weekKey(now));if(week!==v.week){v.week=week;v.breeds=0;}}
 export function refreshV3Shop(s:GardenState,now:number):boolean {
  if(!s.v3)return false;refreshV3Day(s,now);if(s.shop.refreshAt>now)return true;
- const day=s.v3.day,basic:Species[]=['carrot','strawberry','sunflower','tomato','tulip','lotus'];
- s.shop={refreshAt:nextGardenDay(day),offers:[...basic.map(sp=>({id:`supply3:${day}:${sp}`,kind:'seed' as const,item:sp,price:SPECIES[sp].price,stock:99})),...(Object.keys(FERTILIZERS) as (keyof typeof FERTILIZERS)[]).map(f=>({id:`supply3:${day}:${f}`,kind:'fertilizer' as const,item:f,price:fertilizerV3(f).price,stock:[8,3,1,1][FERTILIZERS[f].grade-1]}))]};return true;
+ const day=s.v3.day,basic:Species[]=Object.keys(CROPS) as Species[];
+ s.shop={refreshAt:nextGardenDay(day),offers:[...basic.map(sp=>({id:`supply3:${day}:${sp}`,kind:'seed' as const,item:sp,price:s.economy?CROPS[sp].cost:SPECIES[sp].price,stock:99})),...(Object.keys(FERTILIZERS) as (keyof typeof FERTILIZERS)[]).filter(f=>!s.economy||FERTILIZERS[f].effect==='speed').map(f=>({id:`supply3:${day}:${f}`,kind:'fertilizer' as const,item:f,price:fertilizerV3(f).price,stock:[8,3,1,1][FERTILIZERS[f].grade-1]}))]};return true;
 }
 const choose=<T>(items:T[],random:()=>number):T=>items[Math.min(items.length-1,Math.floor(random()*items.length))];
 export function poisson(mean:number,random:()=>number):number {let p=1,n=0;const stop=Math.exp(-Math.max(0,Math.min(5,mean)));do{n++;p*=Math.max(Number.EPSILON,Math.min(1-Number.EPSILON,random()));}while(p>stop&&n<64);return n-1;}
 function weighted<T>(items:T[],weight:(t:T)=>number,random:()=>number):T {let ticket=random()*items.reduce((sum,x)=>sum+weight(x),0);return items.find(x=>(ticket-=weight(x))<0)??items.at(-1)!;}
 function drawFactor(pool:Trait[],weights:number[],random:()=>number):Trait|undefined {const tiers:FactorQuality[]=['blue','purple','gold','rainbow'];const q=weighted(tiers,t=>weights[tiers.indexOf(t)],random),available=pool.filter(t=>TRAITS[t].tier===q);return available.length?choose(available,random):undefined;}
 export function makeV3Plant(s:GardenState,seed:Seed,plot:number,now:number,rng:Random,harvests:number=SPECIES[seed.species].harvests,index=0):Plant {
- const duration=sowingMinutes(seed.species,s)*60000;
+ const duration=(s.economy?CROPS[seed.species].minutes:sowingMinutes(seed.species,s))*60000;
+ if(s.economy)harvests=1;
  const traits=cappedTraits(seed.genes.filter(t=>traitSlot(t)!=='size')),slots=seed.slots??geneSlots(traits);
- return {id:rng.id(),species:seed.species,traits,kg:SPECIES[seed.species].kg,value:0,bred:false,growthVersion:3,plantedAt:now,readyAt:now+duration,fertilizers:[],baseTraits:traits,harvestsLeft:harvests,harvestIndex:index,yieldCount:SPECIES[seed.species].harvests,lineage:seed.lineage,slots,
+ return {id:s.economy?.tutorial.seed===seed.id?seed.id:rng.id(),origin:seed.origin,species:seed.species,traits,kg:SPECIES[seed.species].kg,value:0,bred:false,growthVersion:3,plantedAt:now,readyAt:now+duration,fertilizers:[],baseTraits:traits,harvestsLeft:harvests,harvestIndex:index,yieldCount:s.economy?1:SPECIES[seed.species].harvests,lineage:seed.lineage,slots,
  batch:{seedlingEnd:now+duration*V3.seedling,naturalReadyAt:now+duration,settled:false,seed:Math.floor(rng.random()*4294967296),realm:s.v3!.realm??'garden',exposure:[],candidates:[],slots,massGene:seed.massGene,soil:s.v3!.soil[plot],sunBonus:Math.min(2,s.v3!.sunActive??0)*.03}};
 }
 const massRange=(t:Trait):[number,number]=>t==='giant'?[5,5.6]:t==='large'?[3,4.2]:t==='plump'?[1.5,2.4]:[.45,.58];
@@ -32,6 +36,7 @@ const massRange=(t:Trait):[number,number]=>t==='giant'?[5,5.6]:t==='large'?[3,4.
 export function settleFactors(traits:Trait[]):Trait[]{return cappedTraits([...new Set(traits)].filter(t=>traitSlot(t)!=='size').sort((a,b)=>FACTOR_SCORE[TRAITS[b].tier]-FACTOR_SCORE[TRAITS[a].tier]));}
 export function advanceV3(s:GardenState,now:number):boolean {
  if(!s.v3)return false;refreshV3Day(s,now);let changed=false;
+ if(s.economy)return advanceSocialPlants(s,now);
  for(const [plot,p] of s.plots.entries()){
   const b=p?.batch;if(!p||p.growthVersion!==3||!b)continue;
   // Migrate a saved choice without rerolling or requiring another player action.
@@ -75,24 +80,22 @@ export function protectV3(s:GardenState,c:GardenCommand):void {
  const touches=(id:string)=>('id'in c&&c.id===id)||('target'in c&&c.target===id)||('produce'in c&&c.produce===id)||('first'in c&&(c.first===id||c.second===id))||('ids'in c&&c.ids.includes(id))||('plot'in c&&s.plots[c.plot]?.id===id);
  if(targets.some(touches))throw Error('这颗果实还有待选择的词条或鉴定，请先处理结果');
 }
-function legacyGenes(p:Produce,selected?:Trait[]):Trait[]{
- if(p.growthVersion===3)return p.slots?.filter((t):t is Trait=>!!t)??cappedTraits(p.traits).filter(t=>traitSlot(t)!=='size');
- const base=p.traits.filter(t=>traitSlot(t)!=='size'),chosen=selected??base;
- if(chosen.some(t=>!base.includes(t))||cappedTraits(chosen).length!==chosen.length)throw Error('旧版收藏请先选一个符合果实1/果皮1/挂饰2的遗传组合');return chosen;
+function legacyGenes(p:Produce):Trait[]{
+ return settleFactors(p.traits.filter(t=>traitSlot(t)!=='size'));
 }
 export function breedV3(s:GardenState,a:Produce,b:Produce,cmd:Extract<GardenCommand,{type:'breed'}>,now:number,rng:Random):Seed {
- const v=s.v3!;refreshV3Day(s,now);if(a.locked||b.locked||b.traits.includes('mini'))throw Error('亲本需取消收藏锁，且背包父本不能是迷你');
+ const v=s.v3!;refreshV3Day(s,now);if(!canBreed(a)||!canBreed(b))throw Error('双方需要已揭晓、未繁育过的金色以上亲本');if(a.locked||b.locked||b.traits.includes('mini'))throw Error('亲本需取消收藏锁，且背包父本不能是迷你');
  if(v.breeds>=90)throw Error('本周已完成 90 次繁育，下周可继续');
  const oil=cmd.oil??'normal';if(!Object.hasOwn(v.oils,oil)||v.oils[oil]<=0)throw Error('需要一瓶繁育精油');
- const ag=legacyGenes(a,cmd.firstGenes),bg=legacyGenes(b,cmd.secondGenes),as=a.growthVersion===3?a.slots??geneSlots(ag):geneSlots(ag),bs=b.growthVersion===3?b.slots??geneSlots(bg):geneSlots(bg);
+ const tuning=BREED_OILS[oil];const ag=legacyGenes(a),bg=legacyGenes(b),as=a.growthVersion===3?a.slots??geneSlots(ag):geneSlots(ag),bs=b.growthVersion===3?b.slots??geneSlots(bg):geneSlots(bg);
  let genes:Trait[]=[];const inherited=as.map(()=>null) as typeof as;const pool=[...new Set([...ag,...bg])];
- for(let i=0;i<4;i++){const x=as[i],y=bs[i];if((x||y)&&rng.random()<(x&&y ? .3 : .25)){const t=x&&y?(rng.random()<.5?x:y):x??y!;if(fits(genes,t)){genes.push(t);inherited[i]=t;}}}
- if(pool.length){if(!genes.length&&v.geneMisses>=9){genes=[choose(pool,()=>rng.random())];v.geneMisses=0;}else v.geneMisses=genes.length?0:v.geneMisses+1;}
+ for(let i=0;i<4;i++){const x=as[i],y=bs[i];if((x||y)&&rng.random()<(x&&y ? tuning.double : tuning.single)){const t=x&&y?(rng.random()<.5?x:y):x??y!;if(fits(genes,t)){genes.push(t);inherited[i]=t;}}}
+ if(pool.length){if(!genes.length&&v.geneMisses>=tuning.pity-1){genes=[choose(pool,()=>rng.random())];v.geneMisses=0;}else v.geneMisses=genes.length?0:v.geneMisses+1;}
  const sizes=[...new Set([...a.traits,...b.traits].filter(t=>traitSlot(t)==='size'&&t!=='mini'))];let massGene:Trait|undefined;
- if(sizes.length){if(rng.random()<.2||v.sizeMisses>=9){massGene=choose(sizes,()=>rng.random());v.sizeMisses=0;}else v.sizeMisses++;}
- const cap=oil==='rich'?4:3;while(genes.length>cap)genes.splice(Math.floor(rng.random()*genes.length),1);
+ if(sizes.length){if(rng.random()<tuning.size||v.sizeMisses>=tuning.pity-1){massGene=choose(sizes,()=>rng.random());v.sizeMisses=0;}else v.sizeMisses++;}
+ const cap=tuning.cap;while(genes.length>cap)genes.splice(Math.floor(rng.random()*genes.length),1);
  const seed:Seed={id:rng.id(),species:rng.random()<.5?a.species:b.species,genes,slots:stableSlots(genes,inherited),massGene,bred:true,parents:[a.species,b.species],lineage:{parents:[a,b].map(p=>({id:p.id,species:p.species,traits:[...p.traits]})),at:now,owner:s.life?.owner}};
- v.oils[oil]--;v.breeds++;a.bred=b.bred=true;recordGarden(s,now,'breed',`繁育出${SPECIES[seed.species].name}种子，保留 ${genes.length} 个因子${massGene?'和'+TRAITS[massGene].name+'体型':''}`);return seed;
+ v.oils[oil]--;v.breeds++;a.bred=b.bred=true;if(s.economy)s.economy.tutorial.bred=true;recordGarden(s,now,'breed',`繁育出${SPECIES[seed.species].name}种子，保留 ${genes.length} 个因子${massGene?'和'+TRAITS[massGene].name+'体型':''}`);return seed;
 }
 export function v3Transition(s:GardenState,c:GardenCommand,now:number,rng:Random):{handled:boolean;reveal?:GardenReveal} {
  if(!s.v3)return {handled:false};const v=s.v3;refreshV3Day(s,now);
@@ -101,7 +104,7 @@ export function v3Transition(s:GardenState,c:GardenCommand,now:number,rng:Random
  case 'resolveFactors':throw Error('果实现在自动结算，无需选择词条');
  case 'collectionGoal':if(!Object.hasOwn(SPECIES,c.species)||!Array.isArray(c.traits)||!c.traits.length||c.traits.some(t=>!Object.hasOwn(TRAITS,t))||cappedTraits(c.traits).length!==c.traits.length)throw Error('请选择兼容的收藏目标');v.goal={species:c.species,traits:[...c.traits]};return {handled:true};
  case 'clearCollectionGoal':delete v.goal;return {handled:true};
- case 'buyOil':{if(!['normal','rich'].includes(c.kind))throw Error('精油不存在');const price=c.kind==='normal'?35:80;if(s.coins<price)throw Error('花园币不足');s.coins-=price;v.oils[c.kind]++;return {handled:true,reveal:{title:'繁育精油已放好',message:`${c.kind==='normal'?'普通 · 最多保留3因子':'浓缩 · 最多保留4因子'}，每次繁育消耗一瓶`}};}
+ case 'buyOil':{if(!['normal','rich'].includes(c.kind))throw Error('精油不存在');const price=BREED_OILS[c.kind].price;if(s.coins<price)throw Error('花园币不足');s.coins-=price;v.oils[c.kind]++;return {handled:true,reveal:{title:'繁育精油已放好',message:`${BREED_OILS[c.kind].name} · 单方槽 ${BREED_OILS[c.kind].single*100}% / 双方槽 ${BREED_OILS[c.kind].double*100}%，最多 ${BREED_OILS[c.kind].pity} 次保证随机继承一个因子，不可指定词条`}};}
  case 'upgradeSoil':{if(!Number.isInteger(c.plot)||c.plot<0||c.plot>=s.plots.length)throw Error('土地不存在');if(c.plot>=unlockedPlots(s))throw Error('当前角色等级尚未解锁这块土地');const lv=v.soil[c.plot],cost=lv===1?300:700;if(lv>=3)throw Error('这块地已经养得很好了');if(s.coins<cost)throw Error('花园币不足');s.coins-=cost;v.soil[c.plot]++;recordGarden(s,now,'soil',`${c.plot+1}号地升到${lv+1}级，下一轮生长生效`);return {handled:true};}
  case 'appraiseStart':{const p=find(c.target);if(!p||p.growthVersion!==3||p.locked||needsReveal(p)||p.appraised||!['gold','rainbow'].includes(qualityOf(p))||speciesLevel(s.xp[p.species])<5||('readyAt'in p&&Number(p.readyAt)>now))throw Error('鉴定需 Lv.5 物种的已揭晓金色以上果实，每果一次');if(s.coins<20)throw Error('鉴定需要 20 花园币');s.coins-=20;p.appraised=true;const board=Array.from({length:7},(_,i)=>{const values=i<3?[1.15,1.15,.9]:i<6?[1.35,.85,.85]:[1.6,.7,.7];for(let j=2;j>0;j--){const k=Math.floor(rng.random()*(j+1));[values[j],values[k]]=[values[k],values[j]];}return values;});v.appraisals[p.id]={row:0,factor:1,done:false,board,history:[],baseKg:p.kg,maxRows:speciesLevel(s.xp[p.species])>=10?7:speciesLevel(s.xp[p.species])>=7?5:3};return {handled:true};}
  case 'appraisePick':case 'appraiseStop':{const p=find(c.target),a=v.appraisals[c.target];if(!p||!a||a.done)throw Error('鉴定已结束');if(c.type==='appraisePick'){if(!Number.isInteger(c.column)||c.column<0||c.column>2)throw Error('请选择一格');const m=a.board[a.row][c.column];a.history.push({row:a.row,column:c.column,multiplier:m});a.factor*=m;a.row++;if(m<1||a.row>=a.maxRows)a.done=true;}else a.done=true;if(a.done){p.kg=Math.round(Math.min(SPECIES[p.species].kg*8,Math.max(SPECIES[p.species].kg*.4,a.baseKg*a.factor))*1000)/1000;p.traits=withSize(p.traits,p.kg/SPECIES[p.species].kg);p.value=v3Value(p);p.revealed=true;recordGarden(s,now,'appraise',`鉴定收手：${SPECIES[p.species].name}重量为原来的 ${a.factor.toFixed(2)} 倍`,undefined,p.id);}return {handled:true,reveal:a.done?{title:'果实平安带回来了',message:`最终 ${p.kg.toFixed(3)} kg，鉴定不会销毁果实。`}:undefined};}

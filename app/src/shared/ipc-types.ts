@@ -637,8 +637,8 @@ export interface QBotApi {
     onError(cb: (msg: string) => void): () => void;
   };
   room: {
-    /** Local art/layout preview, separate from multiplayer and owned furniture. */
-    openCozyPreview(): void;
+    /** Open the local room decoration editor. */
+    openDecorEditor(): void;
     openHome(): void;
     /** 兼容旧调用：打开统一联机空间 */
     open(): void;
@@ -853,7 +853,7 @@ export interface QBotApi {
 
   /** 行为引擎 → bubble 窗：说话气泡 */
   behaviorSay: {
-    onSay(cb: (payload: { text: string; durationMs: number; source?: string; traceId?: string }) => void): () => void;
+    onSay(cb: (payload: { text: string; durationMs: number; source?: string; traceId?: string; expression?: import('./pet-expression').PetExpression }) => void): () => void;
   };
 }
 

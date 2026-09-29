@@ -5,6 +5,8 @@ const summary=p=>({id:p.id,species:p.species,traits:[...p.traits],kg:p.kg,value:
 const fingerprint=p=>JSON.stringify(summary(p));
 function refreshCompanion(db,id,c){
   requireThat(db.contacts.people[c.owner]?.companion===true&&db.contacts.areFriends(id,c.owner),'只能刷新已成为好友的陪伴角色花园');
+  const tutorial=db.ensure(id).state.economy?.tutorial;
+  requireThat(!tutorial?.friendRefreshUsed,'首次陪伴好友体验已准备过，后续请和朋友一起种出新亲本');
   db.allow(id,c.owner);
   const row=db.ensure(c.owner),s=row.state,now=db.now();
   requireThat(!row.testRefreshedAt||now-row.testRefreshedAt>=10000,'刚刚刷新过，10秒后可以再试');
@@ -12,6 +14,7 @@ function refreshCompanion(db,id,c){
   const plots=core.unlockedPlots?.(s)??Math.min(s.plots.length,7,core.characterLevel(s.life.characters[s.activeActor]?.xp??0)+2);
   const available=s.plots.map((p,i)=>({p,i})).filter(({p,i})=>i<plots&&(!p||(!p.locked&&(!p.keep||p.companionTest)&&!p.cultivation&&!pending.has(p.id)&&(!db.data.tasks[p.id]||db.data.tasks[p.id].done)))).slice(0,2);
   requireThat(available.length===2,'请先完成正在进行的培育或处理繁育申请，再刷新测试作物');
+  if(tutorial)tutorial.friendRefreshUsed=true;
   for(const [n,{p,i}] of available.entries()){
     const species=p?.species??'carrot',genes=n===0?['starcore','golden']:['starcore','rainbow','halo'];
     const plant=core.makeV3Plant(s,{id:db.rng.id(),species,genes,bred:false},i,now,db.rng);

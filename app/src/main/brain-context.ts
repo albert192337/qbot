@@ -18,7 +18,7 @@ export function formatBrainContext(input: BrainInput): string {
       ClaudeCode任务状态: input.agentLabel, 正在开会: input.inMeeting, 正在听歌: input.musicPlaying,
       距用户上次说话分钟数: lastUser ? Math.max(0, Math.floor((now - lastUser.at) / 60000)) : null,
       最近对话: lines.filter(line => line.source === 'chat').map(line => ({ ...line, 时间: new Date(line.at).toISOString(), 距今分钟: Math.max(0, Math.floor((now - line.at) / 60000)) })),
-      主动发言记录仅供去重不是事实: lines.filter(line => line.source === 'auto').slice(-5).map(line => ({ text: line.text, at: line.at })),
+      主动发言记录仅供去重不是事实: lines.filter(line => line.source === 'auto').slice(-5).map(line => ({ text: line.text, at: line.at, expression: line.expression ?? 'speech' })),
       主动文字预算: automaticSpeechBudget(lines, now),
       最近已说台词: input.recentLines,
       长期了解: (input.userMemories ?? []).map(m => ({ id: m.id, 内容: m.text, 类别: m.kind, 确定程度: m.certainty,

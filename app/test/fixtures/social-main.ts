@@ -58,6 +58,7 @@ app.whenReady().then(async()=>{
   registerSocialIpc(fakeSteam ? () => fakeSteam! : getSteam);
   const handlers:Record<string,(...args:any[])=>unknown>={
     'rooms:getSceneMembers':()=>getRoomSceneMembers(),
+    'decor:get':()=>[],
     'room:getSizePreset':()=>Windows.getRoomSizePreset(),
     'room:setSizePreset':(_e,preset)=>Windows.setRoomSizePreset(preset),
     'characters:getActive':async()=>({dirId:'host',manifest:JSON.parse(await readFile(path.join(chars,'host/manifest.json'),'utf8')),hasUnfinishedJob:false}),

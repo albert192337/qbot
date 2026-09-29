@@ -55,10 +55,10 @@ export class LocalGardenRehearsal {
       if(t.done)continue;
       let from=t.updatedAt;
       const boundaries=[...new Set([...Object.values(t.members).map(m=>m.seenAt+COOP_RULES.leaseMs).filter(at=>at>from&&at<now),now])].sort((a,b)=>a-b);
-      for(const end of boundaries){const active=Object.values(t.members).filter(m=>m.seenAt+COOP_RULES.leaseMs>from);if(active.length){const seconds=Math.min((end-from)/1000,t.remaining/(COOP_RULES.speed*active.length));for(const m of active){m.work+=COOP_RULES.speed*seconds;m.seconds+=seconds;}t.remaining=Math.max(0,t.remaining-seconds*COOP_RULES.speed*active.length);}from=end;if(!t.remaining)break;}
+      for(const end of boundaries){const active=Object.values(t.members).filter(m=>m.seenAt+COOP_RULES.leaseMs>from);if(active.length){const seconds=Math.min((end-from)/1000,t.remaining/(COOP_RULES.speed*Math.min(4,active.length)));for(const m of active){m.work+=COOP_RULES.speed*Math.min(1,4/active.length)*seconds;m.seconds+=seconds;}t.remaining=Math.max(0,t.remaining-seconds*COOP_RULES.speed*Math.min(4,active.length));}from=end;if(!t.remaining)break;}
       t.updatedAt=now;
       const p=this.gardens.get(t.owner)?.plots[t.plot];
-      if(p?.id===t.plant){p.cultivation={remainingMs:t.remaining/COOP_RULES.speed*1000};if(!t.remaining){p.revealed=true;delete p.cultivation;t.done=true;t.fruit=structuredClone(p);}}
+      if(p?.id===t.plant){p.cultivation={remainingMs:t.remaining/COOP_RULES.speed*1000};if(!t.remaining){if(t.growthHelp){p.readyAt=now+Math.max(0,p.readyAt-now)*.9;if(p.batch){p.batch.naturalReadyAt=p.readyAt;p.batch.seedlingEnd=p.plantedAt+(p.readyAt-p.plantedAt)*.8;p.batch.socialAdjustedAt=now;}}else p.revealed=true;delete p.cultivation;t.done=true;t.fruit=structuredClone(p);}}
     }
   }
   get(actor?:string):GardenState {
@@ -72,24 +72,24 @@ export class LocalGardenRehearsal {
       if(command.type==='cultivate'||command.type==='pauseCultivation'){
         this.cooperate('test:me',command.plot,command.type==='cultivate'?'join':'leave');return {ok:true,state:this.get(actor)};
       }
-      if(command.type==='buyDaily')this.requireMember(command.owner);
+      if(command.type==='buyDaily'||command.type==='buyFurniture'||command.type==='reserveFurniture')this.requireMember(command.owner);
       // Prevent a simulation from invoking unrelated account features.
       if(command.type.startsWith('travel')||['exchange','box'].includes(command.type))throw Error('此操作请退出试演后进行');
-      const result=transition(s,command,this.now(),this.rng,{actor,shopOwner:command.type==='buyDaily'?command.owner:undefined});
+      const result=transition(s,command,this.now(),this.rng,{actor,shopOwner:command.type==='buyDaily'||command.type==='buyFurniture'||command.type==='reserveFurniture'?command.owner:undefined});
       if(result.points||result.boxes)throw Error('试演不使用真实积分或宝箱');
       this.gardens.set('test:me',result.state);return {ok:true,state:this.get(actor),reveal:result.reveal};
     }catch(e){return {ok:false,error:e instanceof Error?e.message:String(e)};}
   }
   visit(owner:string):GardenVisit {
     this.advance();const s=this.ensure(owner);ensureLife(s,this.now(),this.rng);
-    return structuredClone({plotCount:unlockedPlots(s),owner,name:this.members.find(m=>m.id===owner)!.name+' · 模拟',plots:s.plots.map(p=>p?publicGardenPlant(p):null),offers:dailyOffers(owner,s.life!.day),day:s.life!.day,visibility:'public',actorLevel:characterLevel(currentGrowth(s)?.xp??0),landOpen:true,shopOpen:true,rewardsLeft:Math.max(0,5-(this.rewards.get(String(s.life!.day))??0)),tasks:[...this.tasks.values()].filter(t=>t.owner===owner)});
+    return structuredClone({plotCount:unlockedPlots(s),owner,name:this.members.find(m=>m.id===owner)!.name+' · 模拟',plots:s.plots.map(p=>p?publicGardenPlant(p):null),offers:dailyOffers(owner,s.life!.day),day:s.life!.day,visibility:'public',actorLevel:characterLevel(currentGrowth(s)?.xp??0),landOpen:true,shopOpen:true,rewardsLeft:Math.max(0,COOP_RULES.dailyRewards-(this.rewards.get(String(s.life!.day))??0)),tasks:[...this.tasks.values()].filter(t=>t.owner===owner)});
   }
   cooperate(owner:string,plot:number,action:'join'|'leave'|'claim'|'share'|'invite',target?:string,task?:string):GardenVisit {
     this.advance();const s=this.ensure(owner),p=s.plots[plot];
     if(!Number.isInteger(plot)||plot<0||plot>6)throw Error('无效土地');
     let t=task?this.tasks.get(task):p?this.tasks.get(p.id):undefined;
     if(t&&(t.owner!==owner||t.plot!==plot))throw Error('无效培育任务');
-    if(!t){if(!p||p.readyAt>this.now()||!needsReveal(p))throw Error('请选择成熟的问号作物');t={id:p.id,plant:p.id,owner,plot,remaining:COOP_RULES.work,updatedAt:this.now(),members:{},done:false,claimed:[]};this.tasks.set(t.id,t);}
+    if(!t){if(!p||p.readyAt<=this.now()&&!needsReveal(p))throw Error('请选择生长中的植物或待揭晓果实');t={growthHelp:!needsReveal(p),id:p.id,plant:p.id,owner,plot,remaining:COOP_RULES.work,updatedAt:this.now(),members:{},done:false,claimed:[]};this.tasks.set(t.id,t);}
     if(action==='join'){
       if(t.done)return this.visit(owner);
       if([...this.tasks.values()].some(x=>x!==t&&!x.done&&(x.members['test:me']?.seenAt??0)+COOP_RULES.leaseMs>this.now()))throw Error('请先暂停另一株作物的培育');
@@ -99,8 +99,8 @@ export class LocalGardenRehearsal {
       if(p)p.cultivation={remainingMs:t.remaining/COOP_RULES.speed*1000};
     }else if(action==='leave'){for(const m of Object.values(t.members))m.seenAt=0;}
     else if(action==='claim'){
-      const me=t.members['test:me'];if(!t.done||!me||me.seconds<COOP_RULES.minSeconds||me.work<COOP_RULES.work*COOP_RULES.minContribution)throw Error('培育完成并参与至少20秒、贡献2%后可领取');
-      if(!t.claimed.includes('test:me')){const mine=this.ensure('test:me'),key=String(mine.life!.day),count=this.rewards.get(key)??0;if(count>=5)throw Error('今日助育奖励已领满');if(!t.fruit)throw Error('培育成果暂不可用');const qualified=Object.values(t.members).filter(m=>m.seconds>=COOP_RULES.minSeconds&&m.work>=COOP_RULES.work*COOP_RULES.minContribution).length;mine.seeds.push(cultivationSeed(t.fruit,qualified,this.rng));t.claimed.push('test:me');this.rewards.set(key,count+1);}
+      const me=t.members['test:me'];if(!t.done||!me||me.seconds<COOP_RULES.minSeconds||me.work<COOP_RULES.work*COOP_RULES.minContribution)throw Error('培育完成并参与至少20秒、贡献5%后可领取');
+      if(!t.claimed.includes('test:me')){const mine=this.ensure('test:me'),key=String(mine.life!.day),count=this.rewards.get(key)??0;if(count>=COOP_RULES.dailyRewards)throw Error('今日助育奖励已领满');if(!t.fruit)throw Error('培育成果暂不可用');const qualified=Object.values(t.members).filter(m=>m.seconds>=COOP_RULES.minSeconds&&m.work>=COOP_RULES.work*COOP_RULES.minContribution).length;if(owner==='test:me')throw Error('主人保留作物，互助奖励属于来访伙伴');mine.seeds.push({id:this.rng.id(),species:'strawberry',genes:[],bred:false});t.claimed.push('test:me');this.rewards.set(key,count+1);}
     }else {
       if(owner!=='test:me'||t.done)throw Error('只能邀请培育自己尚未完成的作物');
       const ids=action==='invite'?[target!]:this.members.filter(m=>m.id!=='test:me').map(m=>m.id);for(const id of ids)this.requireMember(id);

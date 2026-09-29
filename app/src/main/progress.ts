@@ -1,4 +1,5 @@
 import { DEFAULT_MAX_BOXES } from '../shared/furniture';
+import { RETIRED_FURNITURE } from '../shared/social-economy';
 /**
  * 游戏化积累持久化：userData/progress.json
  *
@@ -38,7 +39,7 @@ import {
 import { sendToWindows } from './windows';
 
 /** 首次运行送几个空箱子：否则新用户开局装饰托盘全锁着，房间看着像坏了 */
-const STARTER_BOXES = 2;
+const STARTER_BOXES = 0;
 /** 落盘防抖 */
 const SAVE_DEBOUNCE_MS = 2_000;
 /** 广播节流：键盘加分每秒都在变，不节流就是每秒几十条 IPC */
@@ -92,7 +93,8 @@ async function load(): Promise<Progress> {
       scheduleSave();
     }
     const previous = cache;
-    cache = grantWelcome(cache);
+    for(const id of RETIRED_FURNITURE)if(Object.hasOwn(cache.inventory,id)){delete cache.inventory[id];scheduleSave();}
+    // Legacy balances remain readable for transaction recovery. No new boxes are granted.
     if (cache !== previous) scheduleSave();
     return cache;
   })();
@@ -154,16 +156,7 @@ export async function getProgress(): Promise<Progress> {
   return load();
 }
 
-export async function addPoints(n: number, kind: 'key' | 'run'): Promise<void> {
-  if (!Number.isFinite(n) || n <= 0) return;
-  const p = await load();
-  commit({
-    ...p,
-    points: p.points + Math.floor(n),
-    keysCounted: kind === 'key' ? p.keysCounted + Math.floor(n / POINTS_PER_KEY) : p.keysCounted,
-    runsCounted: kind === 'run' ? p.runsCounted + 1 : p.runsCounted,
-  });
-}
+export async function addPoints(_n: number, _kind: 'key' | 'run'): Promise<void> { /* Legacy hook; economic rewards now come from the garden. */ }
 
 /** input-monitor 的钩子：一秒内数到的按键数 */
 export async function addKeystrokes(keys: number): Promise<void> {
@@ -185,11 +178,7 @@ async function idleTick(): Promise<void> {
   commit(settleCompanion(p, delta, DEFAULT_MAX_BOXES));
 }
 
-export function startProgressTicker(): void {
-  if (idleTimer) return;
-  lastIdleAt = Date.now();
-  idleTimer = setInterval(() => void idleTick(), IDLE_TICK_MS);
-}
+export function startProgressTicker(): void { /* Legacy box production retired. */ }
 
 export function stopProgressTicker(): void {
   if (idleTimer) {
@@ -199,12 +188,7 @@ export function stopProgressTicker(): void {
 }
 
 /** 开箱：扣 1 箱 + 500 点，补给发往当前本地或联机花园。 */
-export async function openBox(): Promise<OpenBoxResult> {
-  const { gardenAction } = await import('./garden/service');
-  const result = await gardenAction({ type: 'box' });
-  if (!result.ok) return result;
-  return { ok: true, stickerId: 'garden-supply', tier: 'common', progress: await load(), gardenReward: result.reveal?.message ?? '花园补给', gardenItems: result.reveal?.items };
-}
+export async function openBox(): Promise<OpenBoxResult> { return {ok:false,error:'陪伴开箱已退役，请到家具商店或扭蛋机看看'}; }
 
 /** Garden's durable transaction journal retries this receipt after an interrupted save. */
 export async function applyGardenTransaction(id: string, points: number, boxes = 0): Promise<boolean> {
@@ -217,17 +201,7 @@ export async function applyGardenTransaction(id: string, points: number, boxes =
 }
 
 /** 合成：同档任意 CRAFT_COST 件 → 上一档随机 1 件 */
-export async function craft(tier: FurnitureTier): Promise<CraftResult> {
-  const up = nextTier(tier);
-  if (!up) return { ok: false, error: '已是最高品质，无法继续合成' };
-  const p = await load();
-  const take = pickCraftSacrifice(p.inventory, tier, CRAFT_COST);
-  if (!take) return { ok: false, error: `${CRAFT_COST} 件才能合成，现在不够` };
-  const pool = idsOfTier(up);
-  const stickerId = pool[Math.floor(Math.random() * pool.length)] ?? pool[0];
-  const next = commit(applyCraft(p, take, stickerId));
-  return { ok: true, stickerId, tier: up, consumed: take, progress: next };
-}
+export async function craft(_tier: FurnitureTier): Promise<CraftResult> { return {ok:false,error:'旧家具合成已退役，请到家具商店看看'}; }
 
 // ── 调试用：直接注水（对应调试面板的三个按钮） ───────────────
 

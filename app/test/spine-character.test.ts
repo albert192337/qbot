@@ -22,7 +22,7 @@ describe('realtime Spine presets',()=>{
   try{
    await unpackCharacter(packed.buffer,dest);
    const received=JSON.parse(await readFile(path.join(dest,'manifest.json'),'utf8'));
-   expect(received.persona).toBeUndefined();expect(received.spine).toEqual(m.spine);
+   expect(received.persona).toBe(m.persona);expect(received.spine).toEqual(m.spine);
    for(const file of [m.spine!.skeleton,m.spine!.atlas,m.spine!.texture])expect((await readFile(path.join(dest,file))).equals(await readFile(path.join(dir,file)))).toBe(true);
   }finally{await rm(dest,{recursive:true,force:true});}
  },30000);

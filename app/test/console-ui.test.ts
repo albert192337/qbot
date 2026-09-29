@@ -77,12 +77,12 @@ describe('console UI invariants', () => {
   });
 
   it('offers persisted room-size presets in the room context menu', () => {
-    const roomSource = read('../src/renderer/room/main.ts');
+    const roomSource = read('../src/renderer/online-room/index.html');
     const preload = read('../src/preload/index.ts');
-    expect(roomSource).toContain('房间大小');
-    expect(roomSource).toContain("['small', '小']");
-    expect(roomSource).toContain("['medium', '中']");
-    expect(roomSource).toContain("['large', '大']");
+    expect(roomSource).toContain('房间宽度');
+    expect(roomSource).toContain('value="small"');
+    expect(roomSource).toContain('value="medium"');
+    expect(roomSource).toContain('value="large"');
     expect(preload).toContain("ipcRenderer.invoke('room:setSizePreset', preset)");
   });
 });

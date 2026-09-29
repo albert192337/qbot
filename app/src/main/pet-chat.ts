@@ -44,7 +44,7 @@ export async function sendPetChat(text: unknown): Promise<{ ok: boolean; error?:
     applyIdleDecision(character,decision,latest.idleCandidates?.map(a=>a.id)??[]);
     execute({ meta: { id: 'llm-chat', source: 'llm', priority: 100, reason: '用户主动聊天', traceId, characterId: character },
       steps: [...(decision.message ? [{ op: 'sign' as const, text: decision.message }] : []),
-        ...decision.lines.map(line => ({ op: 'say' as const, text: line })),
+        ...decision.lines.map(line => ({ op: 'say' as const, text: line, expression: decision.expression })),
         ...(decision.action ? [{ op: 'play' as const, action: decision.action, loops: 1 }] : [])] });
     await queueMemoryExtraction(character, text.trim(), settings.arkApiKey, userAt).catch(error => console.error('[memory] 整理任务保存失败', error));
     return { ok: true };

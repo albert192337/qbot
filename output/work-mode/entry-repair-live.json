@@ -1,0 +1,34 @@
+{
+  "passed": true,
+  "states": [
+    {
+      "mode": "idle",
+      "videos": [
+        {
+          "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_typing.webm?v=1790609026333",
+          "paused": true,
+          "time": 0
+        }
+      ]
+    },
+    {
+      "videos": [
+        {
+          "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/idle.webm?v=1790609026333",
+          "paused": false,
+          "time": 0.408069
+        }
+      ]
+    },
+    {
+      "mode": "idle",
+      "videos": [
+        {
+          "src": "qbot-asset://53ed5068-dd60-4e2a-82c7-fb94250369d1/actions/computer_typing.webm?v=1790609026333",
+          "paused": true,
+          "time": 0
+        }
+      ]
+    }
+  ]
+}

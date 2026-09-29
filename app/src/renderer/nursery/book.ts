@@ -66,7 +66,7 @@ export const BOOK_TITLES: Record<string, string> = {
   claude: '工作信号台',
   devtools: '工具抽屉',
   lounge: '一起玩',
-  rewards: '陪伴的礼物',
+  rewards: '家具商店与扭蛋',
   furnish: '我的小屋',
 };
 const TABS = [
@@ -177,6 +177,7 @@ export class Book {
     const editing = editor ? await getEditingCharacter() : null;
     if (revision !== this.revision) return;
     this.current = id;
+    this.root.dataset.view = id;
     this.root.hidden = false;
     this.title.textContent = BOOK_TITLES[id];
     this.pauseMedia();
@@ -232,7 +233,7 @@ export class Book {
     } else if (id === 'rewards' || id === 'furnish') {
       this.tabs.append(
         button(
-          '礼物与收藏',
+          '家具商店与扭蛋',
           () => void this.open({ pane: 'rewards' }),
           'bookmark',
         ),
@@ -288,8 +289,8 @@ export class Book {
         v.autoplay = false;
         v.pause();
       }
-      v.controls = !v.closest('.action-card')?.querySelector('.preview-action');
-      v.preload = 'metadata';
+      v.controls = !v.classList.contains('cg-video') && !v.closest('.action-card')?.querySelector('.preview-action');
+      v.preload = v.classList.contains('cg-video') ? 'auto' : 'metadata';
       if (force || this.root.hidden || v.closest<HTMLElement>('.pane')?.hidden)
         v.pause();
     });

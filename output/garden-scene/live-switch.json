@@ -1,0 +1,17 @@
+{
+  "pid": 25848,
+  "before": {
+    "visible3d": true,
+    "mode": "3d"
+  },
+  "after": {
+    "visible3d": true,
+    "mode": "3d",
+    "ready": "true",
+    "plotCount": 4
+  },
+  "plotsUnchanged": true,
+  "nativeClicks": true,
+  "restarted": false,
+  "screenshot": "C:\\Users\\beta\\Documents\\Codex\\2026-08-25\\github-albert192337-qbot\\output\\garden-scene\\live-switch.png"
+}

@@ -17,13 +17,14 @@ import { BrowserWindow, Menu, dialog, ipcMain, powerMonitor, screen } from 'elec
 import path from 'node:path';
 import { writeFile, readFile } from 'node:fs/promises';
 import { app } from 'electron';
-import { showBubbleWindow, getBubbleWindow, openCozyPreview, displayDesktopSign } from './windows';
+import { showBubbleWindow, getBubbleWindow, displayDesktopSign } from './windows';
 import { openGenePreview, openDesktopGenePreview, openPineapplePreview } from './gene-preview';
 import { getBrainLog, updateBrainCall } from './brain-log';
 import type { CharacterForm, CharacterStyle, ImageProvider } from '@qbot/pipeline';
 import type { PerceptionInteractKind, PetMenuActionEntry, PetMenuCommand, CreateRoomInput, RoomKind, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
 import { charactersDir, getCharacter, listCharacters, renameCharacter, deleteCharacter, deleteGenerationTask } from './characters';
 import { getSettings, setSettings } from './config';
+import { notifyGardenRenderMode } from './garden/render-settings';
 import { createNurseryWindow, closeRoomWindow, openRoomWindow, createConsoleWindow, createLoungeWindow, movePetWindow, setPetScale, broadcastCharacterActivated, moveRoomWindow, setRoomIgnoreMouse, setPetVisitMode, hideBubbleWindow, sendToWindows, findRoomPetMemberId, getPetWindow, getRoomSizePreset, setRoomSizePreset, type ConsolePane } from './windows';
 import { downloadSkin, listSkins, removeSkin, uploadSkin } from './market';
 import { listRooms, createRoom, joinRoom, leaveRoom, getRoomsStatus, getRoomsCache, isSecureTransport, reportChat, sendChat, deleteChat, waveAt, updateRoom, kickMember, toggleFavorite, disconnectRooms, pushLocalSign } from './rooms/rooms';
@@ -228,7 +229,7 @@ export function registerIpc(): void {
   // ── room ───────────────────────────────────────────────
   // 旧的小房间调用兼容到统一联机空间；房间场景由联机空间内的展示模式控制。
   ipcMain.on('room:open', () => createLoungeWindow());
-  ipcMain.on('room:openCozyPreview', () => openCozyPreview());
+  ipcMain.on('room:openDecorEditor', () => createConsoleWindow('furnish'));
   ipcMain.on('room:openHome', () => {
     if (getRoomsStatus().phase === 'in-room') void setRoomDisplayMode('room');
     else openRoomWindow('QBot 我的小屋');
@@ -285,6 +286,7 @@ export function registerIpc(): void {
     }
     // 语音设置实时生效（pet + room）
     sendToWindows('settings:changed', next);
+    notifyGardenRenderMode(next.gardenRenderMode);
   });
 
   // ── studio ──────────────────────────────────────────────

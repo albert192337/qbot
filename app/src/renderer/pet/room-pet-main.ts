@@ -1,4 +1,5 @@
 import { mountPetting } from './petting';
+import { petEffects } from './interaction-effects';
 import { choosePairAction } from '../../shared/pair-interaction';
 import { createNameplate } from './nameplate';
 import { mountPeerControls } from './peer-controls';
@@ -69,6 +70,7 @@ window.qbot.roomPet.onHello(({ nickname: n,memberId }) => {
 
 window.qbot.roomPet.onCharacter((meta) => {
   if (!meta?.manifest) return;
+  petEffects(stage).clear();
   petManifest = meta.manifest;
   transferText = null;
   const available = player.load(meta.dirId, meta.manifest);
@@ -108,6 +110,7 @@ window.qbot.roomPet.onPackFailed(() => {
 });
 
 window.qbot.roomPet.onLeft(() => {
+  petEffects(stage).clear();
   gone = true;
   if (chatClearTimer) { clearTimeout(chatClearTimer); chatClearTimer = null; }
   chatText = null;

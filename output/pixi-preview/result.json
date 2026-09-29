@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "checks": [
+    "gesture hearts",
+    "lazy cancellation",
+    "pointer passthrough",
+    "XP threshold and actor",
+    "resize",
+    "idle ticker stopped",
+    "switch and hide cleanup",
+    "reduced motion"
+  ],
+  "idleCpu": [
+    {
+      "type": "Browser",
+      "cpu": 0
+    },
+    {
+      "type": "GPU",
+      "cpu": 0
+    },
+    {
+      "type": "Utility",
+      "cpu": 0
+    },
+    {
+      "type": "Tab",
+      "cpu": 0
+    }
+  ]
+}

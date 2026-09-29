@@ -1,5 +1,23 @@
 # 公共房间服务部署（rooms）
 
+## 2026-09-29：混合奖池 v2 已上线
+
+- 用户明确回复「允许，备份后更新」，授权上传规则及验证脚本到既有服务器。只替换 generated/garden-core.cjs，其余线上模块保持现状。
+- 21 份独立线上存档副本迁移通过：旧十件收藏和六件地区旧版家具退出库存，种子／果实／金币保留，代币／抽数／保底原值保留。服务端综合回归通过。
+- 停服落盘备份 `/root/qbot-capsule-v2-20260929/state-before.tgz`，SHA256 `d180d7c63780c80a3d8391cf9b207b4976a9dd7dd2f5aef974145cfca423f5d7`；原规则为同目录 core.before.cjs，预演副本位于 candidate/ 和 preflight-data/。
+- 新 core SHA256 `c1158c3702fac6f7d5dd632082dfe388074ea976624671f1a9bf070d0335b6cd`。公网验证 capsuleRevision=2；rooms/market/generation active，rooms NRestarts=0。没有使用用户资产充值或抽取。
+- 回退可停 rooms、恢复旧 core 后启动；已经清理的旧家具库存不会由代码回退自动恢复。若需恢复历史家具，需按备份逐项恢复，不能用旧存档覆盖上线后的新奖励和余额。
+
+## 2026-09-29：社交花园与家具经济 v0.4 已上线
+
+- 用户提供临时登录并要求继续更新。密码仅用于 SSH 临时会话，未保存至文件；本机首次登记此地址主机密钥。本轮没有再次取得独立指纹比对依据。
+- 下载比对线上三份模块，server 仅增加共享天气上下文与离开处理，garden-breeding 仅限制首次测试亲本刷新；部署 server.mjs、garden.mjs、garden-breeding.mjs、generated/garden-core.cjs。旧开箱 prepare 在扣费前拒绝。
+- 隔离副本通过新版服务端交易／天气／八人互助测试、真实回环协议检查，以及 20 份已有花园迁移与重载。已有金币、种子、果实和地块数量保留，允许正常补发每日免费草莓种子。
+- 停服落盘后完整数据备份 `/root/qbot-economy-20260929/state-before.tgz`，SHA256 `89fedaf8e2646d97275e810a89f31065d1a527dd2262a2a69bb2467256455e60`；旧四份代码在同目录 `backup/`。验证副本与记录在 `candidate/`、`preflight-data/`；预演进程已停止。
+- 公网验证 economy.version=4、两份心愿及旅行状态，没有为用户充值、购买或抽取。服务恢复原 8 房间、28 角色包、6 陪伴角色；rooms/market/generation 全部 active，rooms NRestarts=0。四份线上文件 SHA256 与本地一致。
+- 回退先停 rooms，恢复 backup 中四份代码后启动；保留当前玩家数据，不用历史快照覆盖新增资产。客户端已显示新版提示的用户重新打开页面即可取新数据。
+- 验证脚本：scripts/preflight-social-economy.mjs（仅隔离数据目录）、scripts/verify-social-economy-online.mjs。客户端补充旧服务器提示页的「布置已有家具」「重新检查」入口，已构建。
+
 ## 2026-09-26 21:31：假人花园刷新测试
 
 - 沿用用户本任务的上线授权与临时 SSH 登录，严格匹配既有主机指纹；未保存密码。仅更新 garden.mjs 和 garden-breeding.mjs，不覆盖其他线上模块或生成核心。
@@ -252,3 +270,4 @@ ls -la /var/lib/qbot-rooms/rooms.json            # 数据文件（房间 + 成�
 备份目录 `/root/qbot-visits-20260926/`，停服一致性快照 `state-before.tgz`，SHA256 `234a307eaaa4e903d681e00e7b0f1e7152ea6ea16aaee1d8dcd29973bde26146`；原代码 `server.before.mjs` / `companions.before.mjs`。正式服务重启后 active；公网三房六角色和花园验证通过。回滚仅将两份原代码 install -m644 到 /opt/qbot-rooms 后重启，无需覆盖用户数据。
 
 客户端需加载新构建；本机已重启。测试：8 组模块、真实 WS、生产副本、专用 Electron 无房间邀请、类型检查与构建通过。旧综合 UI 脚本此前聊天气泡可见性断言失败；邀请专测独立通过。
+

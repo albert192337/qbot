@@ -1,4 +1,5 @@
 import type { TravelState, TravelCommand } from './travel';
+import {CROPS} from './social-economy';
 import {qualityOf,speciesLevel} from './garden-v3';
 /** Garden demo contract. No Electron or existing game dependencies. */
 export const SPECIES = {
@@ -15,10 +16,11 @@ export const SPECIES = {
 export type Species = keyof typeof SPECIES;
 /** Unfertilized duration of each harvest; shared by shop and seed picker. */
 export function sowingMinutes(species:Species,state?:GardenState):number {
+    if(state?.economy)return CROPS[species].minutes;
     return SPECIES[species].minutes * (state?.v3 ? 1-.01*(speciesLevel(state.xp[species])-1) : state ? 1-.03*(level(state.xp[species])-1) : 1);
 }
 export function growthLabel(species: Species,state?:GardenState): string {
-    const minutes=Number(sowingMinutes(species,state).toFixed(2)),harvests=SPECIES[species].harvests;
+    const minutes=Number(sowingMinutes(species,state).toFixed(2)),harvests=state?.economy?1:SPECIES[species].harvests;
     return `${minutes} 分钟成熟${harvests>1?` / 轮 · 可采 ${harvests} 次`:''}`;
 }
 export const TRAITS = {
@@ -102,6 +104,7 @@ export const FERTILIZERS = {
 } as const;
 export type Fertilizer = keyof typeof FERTILIZERS;
 export interface Seed {
+    origin?:import('./social-economy').TripCity;
     slots?:import('./garden-v3').GeneSlots;
     massGene?:Trait;
     lineage?:import('./garden-v3').Lineage;
@@ -115,6 +118,7 @@ export interface Seed {
     ];
 }
 export interface Produce {
+    origin?:import('./social-economy').TripCity;
     dye?: import('./garden-life').Dye;
     growthVersion?: 2|3;
     slots?:import('./garden-v3').GeneSlots;
@@ -152,6 +156,8 @@ export interface Offer {
     stock: number;
 }
 export interface GardenState {
+    roomWeather?:{isHost:boolean;active?:string;sources:{id:string;name:string;kind:import('./garden-v3').V3Weather}[]};
+    economy?:import('./social-economy').SocialEconomy;
     friendBreeding?: import('./garden-friends').FriendBreedRequest[];
     cultivationVisit?: {owner:string;plot:number};
     rehearsal?: { members: {id:string;name:string}[] };
@@ -182,7 +188,7 @@ export interface GardenState {
         offers: Offer[];
     };
 }
-export type GardenCommand = import('./garden-friends').FriendBreedCommand | import('./garden-v3').V3Command | import('./garden-life').LifeCommand | TravelCommand | { type: 'cultivate' | 'pauseCultivation' | 'revealPlant'; plot: number } | {
+export type GardenCommand = import('./social-economy').SocialCommand | import('./garden-friends').FriendBreedCommand | import('./garden-v3').V3Command | import('./garden-life').LifeCommand | TravelCommand | { type: 'cultivate' | 'pauseCultivation' | 'revealPlant'; plot: number } | {
     type: 'buyMany'; items: { offer: string; count: number }[];
 } | { type: 'sellMany'; ids: string[];
 } | { type: 'plantMany'; seed: string;
@@ -258,6 +264,7 @@ export interface GardenApi {
     toggle(): void;
     collapse(): void;
     drag(phase: 'start'|'move'|'end', x: number, y: number): void;
+    scenePlacement(placement: import('./garden-scene-layout').GardenScenePlacement | null): void;
     open(page: string): void;
     ignoreMouse(ignore: boolean): void;
     onAnchor(cb: (anchor: {
@@ -303,6 +310,7 @@ export function tier(traits: Trait[]): Tier {
 export function growth(p: Plant, now = Date.now()): number { return Math.max(0, Math.min(1, (now - p.plantedAt) / Math.max(1, p.readyAt - p.plantedAt))); }
 
 export function gardenQuest(s: GardenState): { text: string; page: string } {
+    if(s.economy){if(!s.economy.tutorial.claimed)return {text:'邀请伙伴 · 领取金色亲本和加速肥',page:'plots'};if(!s.economy.tutorial.bred)return {text:'试试第一次金色繁育',page:'plots'};return {text:'拜访朋友 · 共享天气 · 布置小屋',page:'friends'};}
     const j = s.journey ?? { bought: 0, planted: 0, harvested: 0, earned: 0, appleBought: 0 };
     if (!j.bought) return { text: '购买一份种子（0/1）', page: 'shop' };
     if (!j.planted) return { text: '种下一株植物（0/1）', page: 'plots' };

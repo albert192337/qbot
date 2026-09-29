@@ -1,4 +1,6 @@
 import { MAX_GARDEN_PLOTS, unlockedPlots } from '../../shared/garden-progression';
+import { socialTransition, validateSocial, refreshSocial } from './social-rules';
+import { recordGarden } from '../../shared/garden-v3';
 import { travelTransition, validateTravel } from '../../shared/travel';
 import { ensureLife, lifeTransition, protectPending, validateLife, settlePendingSpray } from './life-rules';
 import {advanceV3,refreshV3Shop,makeV3Plant,v3HarvestXp,breedV3,protectV3,v3Transition,validateV3} from './v3-rules';
@@ -42,6 +44,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
     boxes?: number;
 } {
     const s = validateGarden(structuredClone(input));
+    refreshSocial(s,now);
     advanceV3(s,now);
     const j = s.journey!;
     refreshShop(s, now, rng);
@@ -49,6 +52,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
     protectPending(s,cmd);
     protectV3(s,cmd);
     ensureLife(s,now,rng,context.actor,cmd.type!=='resolveSpray');
+    const social=socialTransition(s,cmd,now,rng,context.shopOwner);if(social.handled)return {state:s,reveal:social.reveal};
     const modern=v3Transition(s,cmd,now,rng);if(modern.handled)return {state:s,reveal:modern.reveal};
     const life=lifeTransition(s,cmd,now,rng,context.actor,context.shopOwner);
     if(life.handled){if(life.changed)life.changed.value=value(life.changed);return {state:s,reveal:life.reveal};}
@@ -81,7 +85,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
         case 'plantMany': {
             const seed = s.seeds.find(x => x.id === cmd.seed);
             if (!seed) throw Error('种子已用完');
-            const same = (x: Seed) => x.species === seed.species && x.bred === seed.bred && JSON.stringify([...x.genes].sort()) === JSON.stringify([...seed.genes].sort()) && JSON.stringify(x.parents) === JSON.stringify(seed.parents);
+            const same = (x: Seed) => x.species === seed.species && x.origin===seed.origin && x.massGene===seed.massGene && JSON.stringify(x.slots)===JSON.stringify(seed.slots) && x.bred === seed.bred && JSON.stringify([...x.genes].sort()) === JSON.stringify([...seed.genes].sort()) && JSON.stringify(x.parents) === JSON.stringify(seed.parents);
             const available = s.seeds.filter(same);
             let next = s, count = 0;
             for (let i = 0; i < s.plots.length && count < available.length; i++) if (!s.plots[i] && i < unlockedPlots(s)) next = transition(next, { type: 'plant', plot: i, seed: available[count++].id }, now, rng, context).state;
@@ -123,6 +127,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             break;
         }
         case 'fertilize': {
+            if(s.economy&&Object.hasOwn(FERTILIZERS,cmd.fertilizer)&&FERTILIZERS[cmd.fertilizer].effect!=='speed')throw Error('新版使用天气获得异变，旧变异肥和增重肥暂不消耗');
             const p = plot(cmd.plot);
             if (!p || p.readyAt <= now)
                 throw Error('只有生长中的植物可以施肥');
@@ -132,7 +137,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
                 throw Error(p.growthVersion===3?'每轮生长只能施一种肥料':'每株一生只能施肥一次');
             if(p.growthVersion===3){
                 if(p.batch!.settled||now>=p.batch!.seedlingEnd)throw Error('已经过了幼苗期，这一轮不用再施肥啦');
-                const f=fertilizerV3(cmd.fertilizer);s.fertilizers[cmd.fertilizer]--;p.fertilizers.push(cmd.fertilizer);p.batch!.fertilizedAt=now;
+                const f=fertilizerV3(cmd.fertilizer);s.fertilizers[cmd.fertilizer]--;p.fertilizers.push(cmd.fertilizer);p.batch!.fertilizedAt=now;p.batch!.socialAdjustedAt=now;
                 if(f.effect==='speed'){p.readyAt=now+(p.readyAt-now)*(1-f.speed);p.batch!.naturalReadyAt=p.readyAt;p.batch!.seedlingEnd=now+(p.batch!.seedlingEnd-now)*(1-f.speed);}
                 break;
             }
@@ -176,7 +181,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             if (!p || p.readyAt > now)
                 throw Error('还没有成熟');
             if (needsReveal(p)) throw Error('彩色果实需要先培育揭晓');
-            const item: Produce = { dye:p.dye, growthVersion: p.growthVersion, revealed: p.revealed, id: p.id, species: p.species, traits: p.traits, kg: p.kg, value: p.value, bred: p.bred, yieldCount: p.yieldCount,slots:p.slots,lineage:p.lineage,appraised:p.appraised,locked:p.keep };
+            const item: Produce = { origin:p.origin,dye:p.dye, growthVersion: p.growthVersion, revealed: p.revealed, id: p.id, species: p.species, traits: p.traits, kg: p.kg, value: p.value, bred: p.bred, yieldCount: p.yieldCount,slots:p.slots,lineage:p.lineage,appraised:p.appraised,locked:p.keep };
             s.produce.push(item);
             if ((p.harvestsLeft ?? 1) > 1) {
                 const next = p.growthVersion===3?makeV3Plant(s,{id:p.id,species:p.species,genes:p.baseTraits??[],slots:p.batch!.slots,massGene:p.batch!.massGene,bred:false,lineage:p.lineage},cmd.plot,now,rng,p.harvestsLeft!-1,(p.harvestIndex??0)+1):nextBatch(s, p, now, rng, !!context.musicPlaying);
@@ -184,6 +189,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
                 s.plots[cmd.plot] = next;
             } else s.plots[cmd.plot] = null;
             j.harvested++;
+            if(s.economy)recordGarden(s,now,'socialHarvest','一起收获了'+SPECIES[p.species].name);
             s.xp[p.species] += p.growthVersion===3?v3HarvestXp(s,p,now):HARVEST_XP;
             for (const factor of ['base', ...p.traits]) {
                 const key = `${p.species}:${factor}`;
@@ -198,7 +204,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
                 throw Error('需要两株不同植物');
             const a = parent(cmd.first), b = parent(cmd.second);
             if (!a || !b || !canBreed(a) || !canBreed(b)) throw Error('双方需要已揭晓、未繁育过的金色或彩色果实');
-            if (!((s.plots.some(p=>p?.id===a.id) && s.produce.some(p=>p.id===b.id)) || (s.plots.some(p=>p?.id===b.id) && s.produce.some(p=>p.id===a.id)))) throw Error('请选择一株地里的植物与一颗背包果实');
+            if (!s.economy&&!((s.plots.some(p=>p?.id===a.id) && s.produce.some(p=>p.id===b.id)) || (s.plots.some(p=>p?.id===b.id) && s.produce.some(p=>p.id===a.id)))) throw Error('请选择一株地里的植物与一颗背包果实');
             if(s.v3){const mother=s.plots.some(p=>p?.id===a.id)?a:b,father=mother===a?b:a;const normalized=mother===a?cmd:{...cmd,firstGenes:cmd.secondGenes,secondGenes:cmd.firstGenes};const seed=breedV3(s,mother,father,normalized,now,rng);s.seeds.push(seed);reveal={title:'新生命诞生！',seed};break;}
             const genes = [...new Set([...a.traits, ...b.traits])].filter(t => rng.random() < (a.traits.includes(t) && b.traits.includes(t) ? .8 : .4));
             const seed: Seed = { id: rng.id(), species: rng.random() < .5 ? a.species : b.species, genes, bred: true, parents: [a.species, b.species] };
@@ -242,6 +248,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
             const keys = s.discovered.filter(k => !s.claimed.includes(k));
             if (!keys.length)
                 throw Error('没有待领取的图鉴积分');
+            if(s.economy){s.coins+=keys.length*5;s.claimed.push(...keys);reveal={title:'新的图鉴记录',message:`首次发现奖励 ${keys.length*5} 花园币`};break;}
             points = keys.length * DISCOVERY_POINTS;
             for (const key of keys)
                 s.xp[key.split(':')[0] as Species] += DISCOVERY_POINTS;
@@ -282,6 +289,7 @@ export function transition(input: GardenState, cmd: GardenCommand, now: number, 
 /** Reject incompatible/corrupt saves and recover a backup instead of silently losing items. */
 export function validateGarden(raw: unknown): GardenState {
     const s = raw as GardenState;
+    if(s)validateSocial(s);
     if(s)validateLife(s);
     if(s)validateV3(s);
     if (s && s.version === 1) {

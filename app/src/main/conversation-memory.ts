@@ -1,4 +1,4 @@
-export interface ConversationLine { at: number; role: 'user' | 'assistant'; source: 'chat' | 'auto'; text: string }
+export interface ConversationLine { expression?: import('../shared/pet-expression').PetExpression; at: number; role: 'user' | 'assistant'; source: 'chat' | 'auto'; text: string }
 const memories = new Map<string, ConversationLine[]>();
 const chatting = new Set<string>();
 let revision = 0;

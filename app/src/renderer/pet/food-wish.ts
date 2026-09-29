@@ -4,9 +4,12 @@ import './food-wish.css';
 import {canRemind,recordReminder,reminderDay,type WishReminder} from '../../shared/wish-reminder';
 import type {ContactSnapshot} from '../../shared/social';
 import type {PetHint} from '../../shared/pet-hint';
+import {petEffects} from './interaction-effects';
 
 /** A quiet, clickable wish. No mutation happens until explicit submission in the garden. */
 export function mountFoodWish():()=>void{
+  const stage=document.getElementById('stage');
+  const effects=stage?petEffects(stage):undefined;
   const quiet=()=>document.body.classList.contains('desktop-hidden')||!!document.body.dataset.peek;
   const root=document.createElement('div');root.id='food-wish';root.hidden=true;root.inert=true;
   const open=document.createElement('button');open.className='food-wish-open';
@@ -43,7 +46,7 @@ export function mountFoodWish():()=>void{
     }).finally(()=>{answering=false;syncPriority();});
   });
   const refresh=async()=>{const request=++version;try{const s=await window.qbot.garden.get();if(disposed||request!==version)return;const c=currentGrowth(s),w=c?.wishes.find(w=>!w.done);currentKey=`${s.activeActor}:${w?.id}`;
-    if(actor!==s.activeActor){actor=s.activeActor??'';until=0;hiddenKey='';if(experience&&experience.actor!==actor){clearTimeout(effectTimer);effectActive=false;effect.hidden=true;experience=undefined;}}
+    if(actor!==s.activeActor){effects?.clear();actor=s.activeActor??'';until=0;hiddenKey='';if(experience&&experience.actor!==actor){clearTimeout(effectTimer);effectActive=false;effect.hidden=true;experience=undefined;}}
     const now=Date.now(),blocked=quiet()||document.hidden||document.body.classList.contains('pair-mode')||document.body.classList.contains('garden-performing');
     if(!w||blocked)until=0;
     if(w&&actor&&!blocked&&!effectActive&&until<=now&&canRemind(records[actor],now)){
@@ -59,10 +62,10 @@ export function mountFoodWish():()=>void{
   const initialRevision=contactRevision;
   void window.qbot.social.contacts(false).then(snapshot=>{if(!disposed&&contactRevision===initialRevision){invitations=snapshot.available?snapshot.invitations:[];syncPriority();}}).catch(()=>{});
   const invitationTimer=setInterval(syncPriority,500);
-  const interactionOff=window.qbot.garden.onInteraction(e=>{if(quiet()||document.hidden||e.experience&&actor&&e.experience.actor!==actor)return;clearTimeout(effectTimer);experience=e.experience;effectActive=true;effect.replaceChildren();effect.dataset.kind=e.kind;const prop=document.createElement('span');prop.textContent=e.kind==='feed'?e.effect:({flower:'🌷',photo:'📷 ✨',celebrate:'🎉',heart:'♥',tea:'☕',wave:'✦'} as Record<string,string>)[e.effect]??'💬';const caption=document.createElement('small');caption.textContent=e.caption;effect.append(prop,caption);effect.hidden=false;root.hidden=true;syncPriority();effectTimer=setTimeout(()=>{experience=undefined;effectActive=false;effect.hidden=true;void refresh();},4500);});
+  const interactionOff=window.qbot.garden.onInteraction(e=>{if(quiet()||document.hidden||e.experience&&actor&&e.experience.actor!==actor)return;clearTimeout(effectTimer);effects?.clear('star');if(e.experience&&Number.isFinite(e.experience.from)&&Number.isFinite(e.experience.to)&&characterLevel(e.experience.to)>characterLevel(e.experience.from))effects?.levelUp();experience=e.experience;effectActive=true;effect.replaceChildren();effect.dataset.kind=e.kind;const prop=document.createElement('span');prop.textContent=e.kind==='feed'?e.effect:({flower:'🌷',photo:'📷 ✨',celebrate:'🎉',heart:'♥',tea:'☕',wave:'✦'} as Record<string,string>)[e.effect]??'💬';const caption=document.createElement('small');caption.textContent=e.caption;effect.append(prop,caption);effect.hidden=false;root.hidden=true;syncPriority();effectTimer=setTimeout(()=>{experience=undefined;effectActive=false;effect.hidden=true;void refresh();},4500);});
   const observer=new MutationObserver(()=>{if(quiet()){until=0;if(!root.hidden)root.hidden=true;if(effectActive){clearTimeout(effectTimer);effectActive=false;effect.hidden=true;}}syncPriority();});observer.observe(document.body,{attributes:true,attributeFilter:['class','hidden','style','data-peek'],subtree:true});
   const visibility=()=>{if(document.hidden){until=0;root.hidden=true;clearTimeout(effectTimer);experience=undefined;effectActive=false;effect.hidden=true;syncPriority();}else void refresh();};
   document.addEventListener('visibilitychange',visibility);
   const timer=setInterval(()=>{if(!document.hidden)void refresh();},60000);void refresh();
-  return ()=>{disposed=true;version++;contactsOff();clearInterval(invitationTimer);observer.disconnect();document.removeEventListener('visibilitychange',visibility);overlayOff();hintOff();window.qbot.overlays.hint(null);for(const kind of ['wish','interaction','speech'] as const)window.qbot.overlays.report(kind,false);off();settingsOff();interactionOff();clearTimeout(effectTimer);clearTimeout(wishTimer);clearInterval(timer);root.remove();effect.remove();};
+  return ()=>{effects?.clear('star');disposed=true;version++;contactsOff();clearInterval(invitationTimer);observer.disconnect();document.removeEventListener('visibilitychange',visibility);overlayOff();hintOff();window.qbot.overlays.hint(null);for(const kind of ['wish','interaction','speech'] as const)window.qbot.overlays.report(kind,false);off();settingsOff();interactionOff();clearTimeout(effectTimer);clearTimeout(wishTimer);clearInterval(timer);root.remove();effect.remove();};
 }

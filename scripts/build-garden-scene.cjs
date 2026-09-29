@@ -1,0 +1,3 @@
+// Rebuild only the garden page; preserve unrelated entry points in this shared workspace.
+const path=require('node:path'),{pathToFileURL}=require('node:url');
+(async()=>{const root=path.resolve(__dirname,'..');const {build}=await import(pathToFileURL(require.resolve('vite',{paths:[path.join(root,'app')]})).href);await build({configFile:false,root:path.join(root,'app/src/renderer'),base:'./',build:{outDir:path.join(root,process.argv.includes('--production')?'app/out/renderer':'output/garden-scene-app'),emptyOutDir:false,rollupOptions:{input:path.join(root,'app/src/renderer/garden/index.html')}}});})().catch(e=>{console.error(e);process.exitCode=1;});

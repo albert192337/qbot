@@ -1,2 +1,126 @@
-.relationship-book{max-width:1040px;margin:auto;color:#55465a;padding:12px}.relationship-book h2{font-size:28px;margin:6px 0}.rel-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.rel-heading p,.rel-footnote,.rel-small{color:#86758a;font-size:13px;line-height:1.8}.rel-picker{display:flex;gap:12px;align-items:center;margin:18px 0}.relationship-book input,.relationship-book select,.relationship-book textarea{font:inherit;color:inherit;border:1px solid #ddcfe2;border-radius:10px;padding:10px;background:#fffdfb;max-width:100%;box-sizing:border-box}.rel-layout{display:grid;grid-template-columns:190px minmax(0,1fr);gap:22px;align-items:start}.rel-self{background:#f4eaf7;padding:20px 14px;text-align:center;border-radius:18px;position:sticky;top:12px}.rel-portrait{position:relative;display:grid;place-items:center;background:#eee3f0;border-radius:18px;overflow:hidden;width:76px;height:76px;flex-shrink:0}.rel-portrait>span{font-size:30px;color:#ae92b6}.rel-portrait img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}.rel-portrait img[hidden]{display:none}.rel-self .rel-portrait{width:100%;height:180px;background:#fffaf3}.rel-self h3{overflow-wrap:anywhere}.rel-paper{background:#fffcf6;border:1px solid #e8ddcc;outline:1px dashed #e8ddcc;outline-offset:-7px;border-radius:20px;padding:24px;min-height:350px;min-width:0}.rel-list-heading{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}.rel-list-heading h3{width:100%;margin:0 0 6px}.rel-list-heading input{flex:1;min-width:100px}.rel-list{display:grid;gap:12px}.rel-card{font:inherit;display:flex;align-items:center;gap:14px;text-align:left;padding:12px;background:white;border:1px solid #e3d8e8;border-radius:15px;color:inherit;width:100%;cursor:pointer}.rel-card:hover{background:#f8f0fc;border-color:#b69bc4}.rel-card>span:nth-child(2){flex:1;min-width:0;overflow-wrap:anywhere}.rel-card strong,.rel-card small,.rel-duo strong,.rel-duo>div>span{display:block}.rel-card small{font-size:11px;color:#8e8094;margin:5px 0}.rel-score{color:#ae709a;white-space:nowrap}.rel-duo{display:flex;align-items:center;justify-content:center;gap:24px;text-align:center;margin:25px 0 8px}.rel-duo .rel-portrait{width:110px;height:110px}.rel-heart{color:#d791b7;font-size:30px}.rel-owner{text-align:center;font-size:12px;color:#8e8094}.rel-paper progress{width:100%;height:10px;accent-color:#ac85bc}.rel-form{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0 8px}.rel-form label{display:grid;gap:8px;font-size:13px}.rel-wide{grid-column:1/-1}.rel-form .rel-check{display:flex;align-items:center}.rel-memories{list-style:none;padding:0;font-size:13px}.rel-memories li{display:flex;gap:12px;padding:12px 0;border-bottom:1px dashed #e8ddcc}.rel-memories li span{flex:1}.rel-memories time{color:#8e8094}.rel-memories b{color:#ae709a}.rel-empty{text-align:center;padding:55px 16px;line-height:2;color:#8e8094}.relationship-book button:focus-visible{outline:3px solid #ad87c3;outline-offset:2px}.rel-footnote{margin:16px 0 0}@media(max-width:760px){.rel-layout{grid-template-columns:minmax(0,1fr)}.rel-self{display:none}.rel-paper{padding:18px}.rel-card{gap:8px}.rel-card .rel-portrait{width:58px;height:58px}.rel-form{grid-template-columns:1fr}.rel-duo{gap:14px}.rel-duo .rel-portrait{width:82px;height:82px}}
-.relationship-book .rel-heading h2{font-size:26px;margin:4px 0}.relationship-book .rel-heading p{margin:4px 0}.relationship-book .rel-picker{margin:12px 0}.relationship-book .rel-paper h3{margin:12px 0;font-size:20px}.relationship-book .rel-list-heading h3{margin:0}.relationship-book .rel-self p{margin:8px 0}.relationship-book .rel-form label{margin:0}.relationship-book .rel-paper h4{margin:18px 0 8px}#book-pages .rel-heading h2,#book-pages .rel-heading .eyebrow{display:none}#book-pages .relationship-book{padding:0}#book-pages .rel-layout{grid-template-columns:145px minmax(0,1fr);gap:14px}#book-pages .rel-self{padding:12px}#book-pages .rel-self .rel-portrait{height:145px}#book-pages .rel-paper{padding:16px}#book-pages .rel-duo{margin:12px 0 6px;gap:16px}#book-pages .rel-duo .rel-portrait{width:76px;height:76px}@media(max-width:760px){#book-pages .rel-layout{grid-template-columns:minmax(0,1fr)}}
+@font-face{font-family:RelationshipRound;src:url('./relationship-art/ZCOOLKuaiLe-Regular.ttf') format('truetype');font-display:swap}
+#house-book[data-view='relationships']{inset:0;height:auto;padding:0;border:0;border-radius:0;background:#537f79;z-index:6;overflow:hidden}
+#house-book[data-view='relationships']::before,#house-book[data-view='relationships']>.book-tabs,#house-book[data-view='relationships']>.book-context,#house-book[data-view='relationships']>.book-head{display:none}
+#house-book[data-view='relationships'] #book-pages{overflow:auto;scrollbar-color:#b7a58c #557c75;--tertiary:#705348;--neutral:#fff1d9;--error:#ac675b}
+#book-pages .relationship-book,.relationship-book{position:relative;min-height:720px;color:#694d43;background:#54837e url('./relationship-art/forest.png') repeat-x top left;background-size:auto 440px;font:20px/1.35 RelationshipRound,'Microsoft YaHei',sans-serif;padding:0 34px 0 276px;text-align:left;isolation:isolate}
+.relationship-book *{box-sizing:border-box}
+#book-pages .relationship-book :is(h2,h3,h4,button,input,textarea,select),.relationship-book :is(h2,h3,h4,button,input,textarea,select){font-family:RelationshipRound,'Microsoft YaHei',sans-serif;letter-spacing:0;color:inherit}
+.relationship-book button{cursor:pointer}
+.relationship-book button:focus-visible,.relationship-book :is(input,textarea,select):focus-visible{outline:3px solid #cf9478;outline-offset:3px}
+.relationship-book .rel-journal{max-width:650px;margin:0 auto;position:relative}
+.relationship-book .rel-card-stage{height:283px;display:flex;justify-content:center;position:relative;z-index:2;padding-top:20px;pointer-events:none}
+.relationship-book .rel-collectible{position:relative;width:207px;height:286px;border:8px solid #fff8e9;outline:2px solid #795d54;border-radius:24px;background:linear-gradient(#dfc2f5,#b8a2dc);box-shadow:inset 0 0 0 2px #f9e8fc;transform:rotate(-1deg);padding:11px 7px}
+.relationship-book .rel-card-names{display:block;text-align:center;font-size:14px;line-height:1.15;margin-left:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:1px 1px #fff5db,-1px -1px #fff5db}
+.relationship-book .rel-heart-badge{position:absolute;top:4px;left:-14px;background:#edaaaa;border:3px solid #a8756b;box-shadow:0 0 0 3px #fff0df;border-radius:45% 45% 40% 40%;padding:6px;min-width:43px;text-align:center;font-size:22px;transform:rotate(-6deg);color:#fff7e5;-webkit-text-stroke:3px #76544e;paint-order:stroke fill}
+.relationship-book .rel-card-pair{display:flex;height:192px;align-items:center;justify-content:center;position:relative}
+.relationship-book .rel-card-pair::before{content:'♡';position:absolute;top:12px;font-size:80px;color:#e4c8ef}
+.relationship-book .rel-portrait{position:relative;flex-shrink:0;width:62px;height:70px;display:grid;place-items:center;overflow:hidden;border-radius:16px;background:#e6d8c4}
+.relationship-book .rel-portrait>span{color:#ae9581;font-size:30px}
+.relationship-book .rel-portrait img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
+.relationship-book .rel-card-pair .rel-portrait{width:50%;height:152px;background:none;border-radius:0;z-index:1}
+.relationship-book .rel-card-pair .rel-portrait>span{visibility:hidden}
+.relationship-book .rel-card-stage-label{display:block;border-radius:18px;background:#fff2db;text-align:center;padding:3px 10px;font-size:17px}
+#book-pages .relationship-book .rel-paper,.relationship-book .rel-paper{position:relative;background:#f3e1c7;border-radius:55% 55% 0 0 / 35px 35px 0 0;min-height:460px;padding:85px 28px 25px;box-shadow:0 -3px #7a5d50}
+.relationship-book .rel-bindings{position:absolute;top:0;left:27px;right:27px;height:62px;background:url('./relationship-art/binding.png') no-repeat left top,url('./relationship-art/binding.png') no-repeat right top;background-size:80px auto;pointer-events:none}
+.relationship-book .rel-watermark{position:absolute;top:33px;left:22%;right:22%;height:57px;background:url('./relationship-art/journal-title.png') center/contain no-repeat;mix-blend-mode:multiply;pointer-events:none}
+.relationship-book .rel-content{position:relative}
+.relationship-book .rel-form{margin:0;display:block}
+.relationship-book .rel-icon{width:37px;height:37px;object-fit:contain;flex-shrink:0}
+.relationship-book .rel-identity-row{display:flex;gap:14px;align-items:stretch}
+.relationship-book .rel-name-pill,.relationship-book .rel-favorite{border-radius:28px;background:#fff1dd;min-height:43px;display:flex;align-items:center;gap:10px;padding:5px 12px}
+.relationship-book .rel-name-pill{flex:1;min-width:0;font-size:21px}
+.relationship-book .rel-name-pill>span{overflow-wrap:anywhere}
+.relationship-book .rel-favorite{position:relative;font-size:19px;cursor:pointer;white-space:nowrap}
+.relationship-book .rel-favorite input{position:absolute;opacity:0;width:1px;height:1px}
+.relationship-book .rel-favorite span{font-size:32px;color:#cabaa3;-webkit-text-stroke:2px #8c6b50;paint-order:stroke fill}
+.relationship-book .rel-favorite:has(:checked) span{color:#f6d07b}
+.relationship-book .rel-favorite:has(:focus-visible){outline:3px solid #cc967b}
+.relationship-book .rel-owner{margin:4px 12px 9px;font-size:12px;color:#a28c76}
+.relationship-book .rel-fields{display:flex;gap:14px}
+.relationship-book .rel-fields label{display:flex;gap:8px;align-items:center;min-width:0;flex:1;background:#fff1dd;border-radius:28px;padding:5px 10px;font-size:19px}
+.relationship-book .rel-fields label>span{white-space:nowrap}
+.relationship-book .rel-fields input{width:100%;min-width:0;padding:4px 0;border:0;background:transparent;font-size:21px;color:#705144}
+.relationship-book input::placeholder,.relationship-book textarea::placeholder{color:#b59d88}
+#book-pages .relationship-book .rel-section-title,.relationship-book .rel-section-title{font-size:24px;line-height:1.25;color:#6c5148;margin:19px 0 12px;padding:8px 0;background:#e8d2b7;border-radius:17px;text-align:center;font-weight:400;display:flex;justify-content:center;align-items:center;gap:35px}
+.relationship-book .rel-section-title::before,.relationship-book .rel-section-title::after{content:'';width:22px;height:25px;background:url('./relationship-art/paw.png') center/contain no-repeat}
+.relationship-book .rel-bond{display:flex;gap:15px;align-items:center;min-height:83px;background:#fff1dd;border-radius:24px;padding:13px 16px}
+.relationship-book .rel-bond>.rel-icon{width:47px;height:47px}
+.relationship-book .rel-bond strong{font-size:22px;font-weight:400;white-space:nowrap}
+.relationship-book .rel-progress{flex:1;display:grid;grid-template-columns:1fr auto;gap:7px 10px;min-width:0;align-items:center}
+.relationship-book .rel-progress progress{width:100%;min-width:30px;height:23px;border:0;border-radius:16px;overflow:hidden;background:#bfd4aa}
+.relationship-book progress::-webkit-progress-bar{background:#bfd4aa;border-radius:16px}
+.relationship-book progress::-webkit-progress-value{background:#97c690;border:3px solid #72a274;border-radius:16px}
+.relationship-book .rel-progress span{font-size:19px;white-space:nowrap}
+.relationship-book .rel-progress small{grid-column:1/-1;font-size:15px}
+.relationship-book .rel-note{position:relative;display:block;border-radius:25px;background:#fff1dd;padding:13px 46px 10px 20px}
+.relationship-book .rel-note textarea{display:block;width:100%;resize:vertical;min-height:86px;max-height:300px;font:21px/1.6 RelationshipRound,sans-serif;background:transparent;color:#705348;border:0;outline-offset:0;padding:0}
+.relationship-book .rel-edit-note{position:absolute;right:10px;top:12px;background:none;border:0;padding:0}
+.relationship-book .rel-edit-note .rel-icon{width:31px;height:34px}
+.relationship-book .rel-save-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px}
+.relationship-book .rel-save-row [role=status]{font-size:12px;color:#94745e}
+.relationship-book .rel-save{background:#aacf9b;color:#5b6746;border:2px solid #87916b;border-radius:18px;padding:6px 15px;font-size:17px;box-shadow:0 2px #87916b}
+.relationship-book .rel-save:disabled{opacity:.65;cursor:wait}
+.relationship-book .rel-memories{padding:3px 17px;margin:0;list-style:none;background:#fff1dd;border-radius:24px}
+.relationship-book .rel-memories li{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:2px solid #ead8bc;font-size:18px;line-height:1.5}
+.relationship-book .rel-memories li:last-child{border:0}
+.relationship-book .rel-memories li>span{flex:1;overflow-wrap:anywhere}
+.relationship-book .rel-memories b{font-size:25px;color:#80ab78;font-weight:400}
+.relationship-book .rel-game-tabs{position:sticky;bottom:0;z-index:3;background:#8fa4c2 url('./relationship-art/footer-pattern.png') repeat-x bottom;background-size:auto 82px;height:112px;border-top:3px solid #7c6257;margin:0;left:auto;right:auto;display:block;color:#fff8ec}
+.relationship-book .rel-game-tabs nav{display:flex;gap:8px;padding:5px 9px 0}
+.relationship-book .rel-game-tabs nav button{flex:1;border:3px solid #7d645c;background:#a9b5c8;border-radius:19px 19px 24px 24px;padding:9px 5px;font-size:22px;color:#fff7e8;-webkit-text-stroke:3px #79594c;paint-order:stroke fill}
+.relationship-book .rel-game-tabs nav button[aria-current=page]{background:#f3e1c7;border-top-color:#f3e1c7;position:relative;top:-8px;padding-top:17px}
+.relationship-book .rel-close{display:block;margin:0 auto;border:0;background:none;color:#fff8eb;font:bold 57px/.85 sans-serif;-webkit-text-stroke:5px #79594c;paint-order:stroke fill;cursor:pointer}
+.relationship-book .rel-rail{position:absolute;left:29px;top:28px;width:205px;color:#fff2db}
+#book-pages .relationship-book .rel-rail h2{display:block;font:32px RelationshipRound,sans-serif;color:#fff2db;margin:0 0 25px;-webkit-text-stroke:4px #6b5148;paint-order:stroke fill}
+.relationship-book .rel-picker{display:grid;gap:7px;font-size:15px}
+.relationship-book .rel-picker select,.relationship-book .rel-list-heading :is(input,select){max-width:100%;font:17px RelationshipRound,sans-serif;background:#fff0d5;border:2px solid #826754;border-radius:16px;padding:8px;color:#735547}
+.relationship-book .rel-rail-friends{max-height:405px;overflow:auto;scrollbar-width:thin;margin-top:15px}
+.relationship-book .rel-rail-friend{display:flex;align-items:center;gap:9px;text-align:left;width:100%;color:#fff1da;background:#557770;border:2px solid #c1c1a880;border-radius:20px;padding:7px;margin-bottom:9px;font-size:19px}
+.relationship-book .rel-rail-friend[aria-pressed=true]{background:#f2dfb8;color:#735348;border-color:#987a5f;box-shadow:0 3px #765d4a}
+.relationship-book .rel-rail-friend>span{min-width:0;overflow-wrap:anywhere}
+.relationship-book .rel-rail-friend small{display:block;font-size:13px;margin-top:5px}
+.relationship-book .rel-rail-friend .rel-portrait{width:47px;height:54px}
+.relationship-book .rel-refresh{border:2px solid #897660;color:#765941;background:#ead7b3;padding:7px 12px;border-radius:20px;font-size:16px}
+.relationship-book .rel-footnote{color:#d2dbca;font-size:12px;line-height:1.7;margin-top:12px}
+.relationship-book .rel-list-heading{display:flex;gap:8px;margin:15px 0}
+.relationship-book .rel-list-heading input{min-width:0;flex:1}
+.relationship-book .rel-list{display:grid;gap:12px;min-height:250px}
+.relationship-book .rel-card{display:flex;align-items:center;gap:12px;background:#fff1dd;border:2px solid #b79a80;border-radius:21px;padding:10px;width:100%;text-align:left;font-size:21px}
+.relationship-book .rel-card>span:nth-child(2){flex:1;min-width:0;overflow-wrap:anywhere}
+.relationship-book .rel-card strong{font-weight:400;display:block}
+.relationship-book .rel-card small{display:block;font-size:12px;margin:5px 0;color:#ac8f76}
+.relationship-book .rel-score{white-space:nowrap;color:#c28688}
+.relationship-book .rel-empty{padding:60px 10px;text-align:center;line-height:2}
+.relationship-book .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+@media(max-width:760px){.relationship-book,#book-pages .relationship-book{padding:0 10px}.relationship-book .rel-rail{position:relative;left:auto;top:auto;width:auto;padding:12px;display:flex;align-items:center;gap:10px}.relationship-book .rel-rail :is(h2,.rel-footnote,.rel-rail-friends){display:none!important}.relationship-book .rel-picker{flex:1;font-size:12px}.relationship-book .rel-journal{max-width:600px}.relationship-book .rel-paper{padding-left:17px;padding-right:17px}.relationship-book .rel-fields{gap:7px}.relationship-book .rel-fields label{gap:4px;font-size:16px}.relationship-book .rel-fields input{font-size:17px}.relationship-book .rel-bond{gap:8px}.relationship-book .rel-bond strong{font-size:18px}.relationship-book .rel-progress span{font-size:15px}}
+/* Console entry uses the same scene, without the surrounding management chrome. */
+body:has(#pane-relationships.active) :is(#sidebar,#contextbar,#subnav){display:none!important}
+#content:has(#pane-relationships.active){padding:0;background:#54837e}
+#pane-relationships.active{padding:0;max-width:none;height:100%;overflow:auto;background:#54837e}
+#pane-relationships .relationship-book{min-height:100%;padding-top:0}
+#pane-relationships .rel-rail h2{display:block;font-size:32px;margin:0 0 25px;color:#fff2db;-webkit-text-stroke:4px #6b5148;paint-order:stroke fill}
+/* Keep the portrait journal proportions from the approved image inside a desktop scene. */
+.relationship-book .rel-journal{width:650px;zoom:.58;max-width:none}
+.relationship-book,#book-pages .relationship-book{background-size:100% 100%;background-repeat:no-repeat;min-height:720px}
+.relationship-book .rel-card-stage{height:245px}
+.relationship-book .rel-collectible{height:260px}
+.relationship-book .rel-card-pair{height:167px}
+.relationship-book .rel-card-pair .rel-portrait{mix-blend-mode:multiply;isolation:auto}
+.relationship-book .rel-portrait img{mix-blend-mode:multiply}
+.relationship-book .rel-watermark{background:none;text-align:center;left:15%;right:15%;top:26px}
+.relationship-book .rel-watermark::before{content:'关系手账';font:49px RelationshipRound,sans-serif;color:#fff0d6;opacity:.66}
+.relationship-book .rel-bindings{background:none}
+.relationship-book .rel-bindings::before,.relationship-book .rel-bindings::after{content:'';position:absolute;top:0;width:75px;height:50px;background:url('./relationship-art/binding.png') center/contain no-repeat;border-radius:12px;mix-blend-mode:multiply}
+.relationship-book .rel-bindings::after{right:0}
+#book-pages .relationship-book .rel-fields input,#pane-relationships .relationship-book .rel-fields input{border:0;box-shadow:none;background:transparent;padding:2px 0;color:#705144}
+#book-pages .relationship-book .rel-note textarea,#pane-relationships .relationship-book .rel-note textarea{border:0;box-shadow:none;background:transparent;padding:0}
+#book-pages .relationship-book .rel-picker select,#pane-relationships .relationship-book .rel-picker select{color:#735547}
+#book-pages .relationship-book .rel-rail-friend[aria-pressed=true],#pane-relationships .relationship-book .rel-rail-friend[aria-pressed=true]{color:#735348}
+#book-pages .relationship-book .rel-refresh,#pane-relationships .relationship-book .rel-refresh{color:#735348}
+.relationship-book .rel-close{line-height:1;font-size:51px;min-height:45px}
+@media(max-width:760px){.relationship-book .rel-journal{zoom:1;width:100%;max-width:600px}.relationship-book .rel-card-stage{height:235px}}
+.relationship-book .rel-journal{zoom:.68}
+#book-pages .relationship-book .rel-progress progress,#pane-relationships .relationship-book .rel-progress progress{height:23px;min-height:23px;appearance:none;display:block;border:0;box-shadow:none}
+.relationship-book .rel-note textarea{resize:none}
+.relationship-book .rel-bindings::before,.relationship-book .rel-bindings::after{mix-blend-mode:normal}
+@media(max-width:760px){.relationship-book .rel-journal{zoom:1}}

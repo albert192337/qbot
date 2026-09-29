@@ -67,6 +67,16 @@ describe('ark client', () => {
     expect(id).toBe('cgt-123');
   });
 
+  it('non-loop performance sends only the starting frame', async () => {
+    const fetchMock=vi.fn(async (_url: RequestInfo | URL, init?: RequestInit)=>{
+      const body=JSON.parse(init?.body as string);
+      expect(body.content.filter((c:{type:string})=>c.type==='image_url').map((c:{role:string})=>c.role)).toEqual(['first_frame']);
+      return jsonResponse({id:'first-only'});
+    });
+    const ark=createArkClient(CFG,fetchMock as unknown as typeof fetch);
+    expect(await ark.submitVideoTask({prompt:'free movement',frameDataUrl:'data:image/png;base64,x',loopFrame:false})).toBe('first-only');
+  });
+
   it('getVideoTask 解析状态与 video_url', async () => {
     const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
       expect(String(url)).toBe('https://ark.test/api/v3/contents/generations/tasks/cgt-123');

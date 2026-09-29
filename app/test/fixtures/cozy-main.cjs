@@ -34,7 +34,11 @@ app.whenReady().then(async()=>{
   ipcMain.handle('characters:list',()=>list);
   ipcMain.handle('characters:getActive',()=>meta);
   ipcMain.handle('characters:activate',()=>{global.cozyQA.writes++;});
-  ipcMain.handle('decor:set',()=>{global.cozyQA.writes++;});
+  const layouts=new Map();
+  ipcMain.handle('decor:get',(_e,key)=>layouts.get(key)||[]);
+  ipcMain.handle('decor:set',(_e,key,value)=>{if(global.cozyQA.failSave)throw Error('模拟写入失败');global.cozyQA.writes++;layouts.set(key,value);for(const w of BrowserWindow.getAllWindows())w.webContents.send('decor:changed',{roomName:key,placements:value});});
+  ipcMain.handle('garden:get',()=>({economy:{furniture:{}}}));
+  ipcMain.handle('progress:get',()=>({inventory:{'moss-stool':1}}));
   const panorama=process.env.QBOT_ONLINE_PREVIEW==='1';
   const roomlab=process.env.QBOT_ROOMLAB==='1';
   const win = new BrowserWindow({width:1160,height:850,show:process.env.QBOT_COZY_SHOW==='1',backgroundColor:roomlab?'#191a1c':'#f6f1e8',autoHideMenuBar:true,title:'QBot · 奶油小屋试住',webPreferences:{preload:path.join(root,roomlab?'app/test/fixtures/roomlab-preload.cjs':'app/out/preload/index.js'),contextIsolation:true,sandbox:false}});
@@ -61,7 +65,7 @@ app.whenReady().then(async()=>{
   win.once('ready-to-show',()=>{if(process.env.QBOT_COZY_SHOW==='1'){win.show();win.focus();}});
   if(process.env.QBOT_TEAROOM==='1')win.setTitle('QBot · 窗边茶室试住');
   if(process.env.QBOT_DIYROOM==='1')win.setTitle('QBot · 我的小屋 · 自由布置');
-  await win.loadFile(path.join(root,panorama?'app/out/renderer/online-room/index.html':roomlab?'app/out/renderer/roomlab/index.html':process.env.QBOT_DIYROOM==='1'?'app/out/renderer/diyroom/index.html':process.env.QBOT_TEAROOM==='1'?'app/out/renderer/tearoom/index.html':process.env.QBOT_COZY_3D==='1'?'app/out/renderer/cozy3d/index.html':'app/out/renderer/cozy/index.html'));
+  await win.loadFile(path.join(root,panorama?'app/out/renderer/online-room/index.html':roomlab?'app/out/renderer/roomlab/index.html':process.env.QBOT_DIYROOM==='1'?'app/out/renderer/diyroom/index.html':process.env.QBOT_TEAROOM==='1'?'app/out/renderer/tearoom/index.html':'app/out/renderer/online-room/index.html'));
   if(roomlab && process.env.QBOT_COZY_SHOW==='1'){
     const fs=require('node:fs/promises'),out=path.join(root,'output/roomlab');await fs.mkdir(out,{recursive:true});win.show();win.focus();
     setTimeout(async()=>{if(win.isDestroyed())return;await fs.writeFile(path.join(out,'opened.json'),JSON.stringify({pid:process.pid,visible:win.isVisible(),ready:await win.webContents.executeJavaScript('document.body.dataset.ready'),at:Date.now()}));await fs.writeFile(path.join(out,'live-preview.png'),(await win.webContents.capturePage()).toPNG());},4500);

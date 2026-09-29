@@ -23,9 +23,13 @@ app.whenReady().then(async()=>{try{
  await store.record(a,b,'wave','local-ui');
  await until(()=>global.qa?.win,'window creation');const win=global.qa.win;
  const evaluate=async code=>{try{return await win.webContents.executeJavaScript(code);}catch(e){console.error('Renderer check:',code);throw e;}};
- await until(()=>evaluate('!!window.qbot && !!document.querySelector("#scene canvas")'),'renderer ready');
+ await until(()=>evaluate('!!window.qbot && !!document.querySelector("#scene canvas, #contextbar")'),'renderer ready');
  await evaluate('window.qbot.ui.openConsole("relationships")');
+ await until(()=>evaluate('!!document.querySelector("[data-tab=partners]")'),'relationship scene');
+ await evaluate('document.querySelector("[data-tab=partners]").click()');
  await until(()=>evaluate('document.querySelectorAll(".rel-card").length===2'),'known character list');
+ await evaluate('document.fonts.ready.then(()=>true)');
+ assert.equal(await evaluate('document.fonts.check("20px RelationshipRound")'),true);
  await until(()=>evaluate('Array.from(document.querySelectorAll(".rel-portrait img")).every(i=>i.naturalWidth>0)'),'portraits loaded');
  await wait(250);await fs.writeFile(path.join(output,'list.png'),(await win.webContents.capturePage()).toPNG());
  await evaluate('document.querySelector(".rel-card").click()');
@@ -44,11 +48,11 @@ app.whenReady().then(async()=>{try{
  assert.equal(await evaluate('document.querySelector("[name=note]").value'),'保留这个草稿');
  failSave=false;await evaluate('document.querySelector(".rel-form").requestSubmit()');await until(async()=> (await store.snapshot()).relationships.find(r=>r.people.includes(c.id)).settings[a.id].note==='保留这个草稿','save retry');
  await until(()=>evaluate('!document.querySelector(".rel-form button").disabled'),'save finished');
- await evaluate('document.querySelector("[data-back]").click()');
+ await evaluate('document.querySelector("[data-tab=partners]").click()');
  await evaluate('const f=document.querySelector("[data-filter]");f.value="local";f.dispatchEvent(new Event("change"))');
  assert.equal(await evaluate('document.querySelectorAll(".rel-card").length'),1);
- await evaluate('document.querySelector(".rel-card").click()');assert.match(await evaluate('document.querySelector(".rel-paper").textContent'),/5 好感度/);
- await evaluate('document.querySelector("[name=note]").value="未保存";document.querySelector("[data-back]").click()');
+ await evaluate('document.querySelector(".rel-card").click()');assert.match(await evaluate('document.querySelector(".rel-heart-badge").getAttribute("aria-label")'),/5 好感度/);
+ await evaluate('document.querySelector("[name=note]").value="未保存";document.querySelector("[data-tab=partners]").click()');
  assert.equal(await evaluate('!!document.querySelector(".studio-confirm")'),true);
  // A small viewport must scroll vertically, never cut off form controls horizontally.
  await evaluate('document.querySelector(".studio-confirm-mask").remove()');

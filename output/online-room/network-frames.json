@@ -5,9 +5,9 @@
     "contacts": 1,
     "garden": 1,
     "petting": 2,
-    "memberId": "38CE927939B7",
+    "memberId": "17E40F88A2E1",
     "contactToken": "[redacted]",
-    "serverTime": 1790408841506,
+    "serverTime": 1790612971873,
     "requestId": "qa-1"
   },
   "joined": {
@@ -16,26 +16,26 @@
       "description": "",
       "language": "all",
       "chatEnabled": true,
-      "roomId": "B3S247HS",
+      "roomId": "A8UYCLDE",
       "name": "横向联机验收",
       "kind": "idle",
       "capacity": 12,
       "listed": false,
-      "ownerId": "BF5C2DB928BA",
+      "ownerId": "60DB2685B22E",
       "members": [
         {
-          "memberId": "BF5C2DB928BA",
+          "memberId": "60DB2685B22E",
           "companion": false,
           "nickname": "小岛来客",
-          "joinedAt": 1790408841407,
+          "joinedAt": 1790612971811,
           "online": true,
           "mode": "idle"
         },
         {
-          "memberId": "38CE927939B7",
+          "memberId": "17E40F88A2E1",
           "companion": false,
           "nickname": "真实连接房友",
-          "joinedAt": 1790408841510,
+          "joinedAt": 1790612971878,
           "online": true,
           "mode": "idle"
         }

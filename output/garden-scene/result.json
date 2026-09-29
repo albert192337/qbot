@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "checks": [
+    "editable preview preserves crops and care targets",
+    "single shared 3D scene",
+    "7 real slots",
+    "24-slot fixture",
+    "native sow and rotated harvest",
+    "2D/3D preserves state",
+    "camera rotation zoom reset",
+    "screen bounds",
+    "unrevealed appearance protected",
+    "screen-local performance positions",
+    "idle rendering and visibility recovery",
+    "missing model fallback"
+  ],
+  "errors": []
+}
