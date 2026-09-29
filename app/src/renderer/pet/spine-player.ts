@@ -75,6 +75,16 @@ export class SpinePlayer {
     if(this.ready)this.select();this.schedule();
   }
   setExpression(value:SpineExpression|null){this.expression=value;}
+  /** Stable skeleton-space anchors in the fixed 620-unit canvas projection (top-left UV).
+   * Scene adapters can align a pelvis to furniture without resizing by animated alpha bounds. */
+  getSceneAnchor(kind:'seat'|'floor'):{x:number;y:number}|null {
+    if(!this.ready)return null;
+    const left=this.sk.findBone('leg_L0'),right=this.sk.findBone('leg_R0');
+    if(kind==='seat'&&(!left||!right))return null;
+    const x=kind==='seat'?(left.worldX+right.worldX)/2:0;
+    const y=kind==='seat'?(left.worldY+right.worldY)/2-10:0;
+    return {x:(x+310)/620,y:(550-y)/620};
+  }
   setVisible(value:boolean){this.canvas.style.visibility=value?'visible':'hidden';this.setSuspended(!value);}
   private select(){
     this.sk.setToSetupPose();this.state.clearTracks();

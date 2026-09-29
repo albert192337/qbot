@@ -637,6 +637,8 @@ export interface QBotApi {
     onError(cb: (msg: string) => void): () => void;
   };
   room: {
+    /** Open the separate 3D tea room specimen. */
+    openTea3d(): void;
     /** Open the local room decoration editor. */
     openDecorEditor(): void;
     openHome(): void;

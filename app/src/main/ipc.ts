@@ -1,4 +1,5 @@
 import { workIdleMilliseconds } from './work-input';
+import { openTea3dPreview } from './tea3d-preview';
 import { registerRoomPetMenu } from './rooms/room-pet-menu';
 import { registerDesktopVisibility, desktopQuiet } from './desktop-visibility';
 import {registerDesktopOverlays} from './desktop-overlays';
@@ -230,6 +231,7 @@ export function registerIpc(): void {
   // 旧的小房间调用兼容到统一联机空间；房间场景由联机空间内的展示模式控制。
   ipcMain.on('room:open', () => createLoungeWindow());
   ipcMain.on('room:openDecorEditor', () => createConsoleWindow('furnish'));
+  ipcMain.on('room:openTea3d', () => openTea3dPreview());
   ipcMain.on('room:openHome', () => {
     if (getRoomsStatus().phase === 'in-room') void setRoomDisplayMode('room');
     else openRoomWindow('QBot 我的小屋');

@@ -131,6 +131,7 @@ const api: QBotApi = {
     },
   },
   room: {
+    openTea3d: () => ipcRenderer.send('room:openTea3d'),
     openDecorEditor: () => ipcRenderer.send('room:openDecorEditor'),
     openHome: () => ipcRenderer.send('room:openHome'),
     open: () => ipcRenderer.send('room:open'),

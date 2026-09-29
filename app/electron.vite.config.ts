@@ -20,6 +20,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          tea3d: resolve(__dirname, 'src/renderer/tea3d/index.html'),
           'spine-preview': resolve(__dirname, 'src/renderer/spine-preview/index.html'),
           'pet-hint': resolve(__dirname, 'src/renderer/pet-hint/index.html'),
           'gene-preview': resolve(__dirname, 'src/renderer/gene-preview/index.html'),

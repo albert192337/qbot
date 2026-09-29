@@ -61,6 +61,7 @@ document.addEventListener('visibilitychange',visibility);
 $('theme').onchange=()=>void changeTheme($<HTMLSelectElement>('theme').value);
 $('size').onchange=()=>void window.qbot.room.setSizePreset($<HTMLSelectElement>('size').value as RoomSizePreset);
 $('decorate').onclick=()=>window.qbot.room.openDecorEditor();
+const tea3dButton=document.createElement('button');tea3dButton.textContent='3D 试住';tea3dButton.title='打开听雨茶室 3D 样板';tea3dButton.onclick=()=>window.qbot.room.openTea3d();$('decorate').after(tea3dButton);
 $('chat').onclick=()=>window.qbot.rooms.open();$('off').onclick=()=>window.qbot.desktop.openMenu();
 canvas.onclick=e=>{const x=(e.clientX-canvas.getBoundingClientRect().left)/canvas.clientWidth*1000,index=Math.floor((x-60)/(880/Math.max(1,actors.size))),a=[...actors.values()][index];if(a){$('status').textContent=a.member.nickname;canvas.title=a.member.nickname;}};canvas.ondblclick=()=>window.qbot.rooms.open();
 window.addEventListener('beforeunload',()=>{disposed=true;cancelAnimationFrame(frame);cleanups.forEach(fn=>fn());actors.forEach(a=>a.player.dispose());});

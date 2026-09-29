@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "checks": [
+    "eight independent models",
+    "two live Spine characters",
+    "two seat anchors",
+    "model replacement preserves seats",
+    "native furniture dragging",
+    "rotation and undo",
+    "saved layout reload",
+    "three camera modes and two floors",
+    "occupied seat removal",
+    "concept sheet",
+    "680px layout"
+  ],
+  "stats": {
+    "calls": 49,
+    "triangles": 134438,
+    "geometries": 53,
+    "textures": 17,
+    "models": 8,
+    "dirty": true
+  },
+  "errors": []
+}
