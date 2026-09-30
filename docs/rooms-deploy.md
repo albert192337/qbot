@@ -4,7 +4,7 @@
 
 - 09:40:37（北京时间）更新 generated/garden-core.cjs，其余线上模块校验未变。月蚀之门、步生花可购买／抽取与单角色独占装配；蓝焰仍为试用。
 - 23 份线上存档副本迁移与重载通过，金币、种子、果实、地块数量、代币、抽数和两档保底保持；外观空初始化。候选环境购买防重扣、账号隔离、转交、重启、卸下及现有经济回归通过。
-- 停服完整备份 `/root/qbot-appearance-20260930-093949/state-before.tgz`，SHA256 `5bad3ef863441fe9b3dca7393025df022f726037c3ce88dd5f623602300006925`；旧规则同目录 `core.before.cjs`，候选与预演副本保留。
+- 停服完整备份 `/root/qbot-appearance-20260930-093949/state-before.tgz`，SHA256 `5bad3ef863441fe9b3dca7393025df022f726037c3ce88dd5f62360230006925`；旧规则同目录 `core.before.cjs`，候选与预演副本保留。
 - 发布 core SHA256 `6f38d82821331d9da4306036c246b0b167a94f0621580eb8f3b7833e80af57c5`。公网 TLS 巡检确认 economy.version=4、capsuleRevision=2 和空外观库存；使用独立巡检账号，无购买、充值或抽奖。
 - rooms/market/generation 全部 active，rooms NRestarts=0，恢复 8 房间、29 角色包、6 陪伴角色。服务切换约 6 秒。客户端重新打开商城获取新版规则；未发布安装包或强制重启客户端。
 - 回退需停止 rooms、恢复旧 core 后启动，保留当前玩家存档；不要覆盖上线后取得的物品、余额与装配。
