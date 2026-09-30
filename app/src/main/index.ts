@@ -1,3 +1,4 @@
+import { setRoomRenderMode } from './windows';
 import { startSteam, stopSteam, handleSteamArgs } from './steam/runtime';
 import { recoverCloudJobs } from './cloud-generation';
 import { initUserMemory, flushUserMemory } from './user-memory';
@@ -193,6 +194,7 @@ app.whenReady().then(async () => {
   const characters = (await listCharacters()).filter((c) => c.manifest);
   const initial =
     characters.find((c) => c.dirId === settings.activeCharacter) ?? characters[0];
+  setRoomRenderMode(settings.roomRenderMode==='2d'?'2d':'3d');
   const pet = createPetWindow();
   if (initial) {
     await setSettings({ activeCharacter: initial.dirId });

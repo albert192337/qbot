@@ -41,6 +41,7 @@ __export(server_entry_exports, {
   FRUIT_DRAG_TYPE: () => FRUIT_DRAG_TYPE,
   FURNITURE_SHOP: () => FURNITURE_SHOP,
   HARVEST_XP: () => HARVEST_XP,
+  LEGACY_CAPSULE_POOL: () => LEGACY_CAPSULE_POOL,
   LEVEL_XP: () => LEVEL_XP,
   MAX_GARDEN_PLOTS: () => MAX_GARDEN_PLOTS,
   PAIR_INTERACTIONS: () => PAIR_INTERACTIONS,
@@ -290,13 +291,16 @@ var CAPSULE_POOL = [
   { id: "moss-stool", kind: "furniture", item: "moss-stool", name: "\u82D4\u7ED2\u5C0F\u51F3", count: 1, tier: "common", weight: 10 },
   { id: "apple-pack", kind: "seed", item: "apple", name: "\u82F9\u679C\u79CD\u5B50", count: 2, tier: "rare", weight: 20 },
   { id: "pineapple-pack", kind: "seed", item: "pineapple", name: "\u83E0\u841D\u79CD\u5B50", count: 3, tier: "rare", weight: 20 },
-  { id: "speed3-pack", kind: "fertilizer", item: "speed3", name: "\u9AD8\u7EA7\u52A0\u901F\u80A5", count: 2, tier: "rare", weight: 30 },
+  { id: "speed3-pack", kind: "fertilizer", item: "speed3", name: "\u9AD8\u7EA7\u52A0\u901F\u80A5", count: 2, tier: "rare", weight: 20 },
+  { id: "petal-steps", kind: "appearance", item: "petal-steps", name: "\u6B65\u751F\u82B1", count: 1, tier: "rare", weight: 10 },
   { id: "sprout-lamp", kind: "furniture", item: "sprout-lamp", name: "\u94C3\u5170\u843D\u5730\u706F", count: 1, tier: "rare", weight: 15 },
   { id: "potting-shelf", kind: "furniture", item: "potting-shelf", name: "\u82B1\u5320\u7F6E\u7269\u67B6", count: 1, tier: "rare", weight: 8 },
   { id: "fern-bench", kind: "furniture", item: "fern-bench", name: "\u8568\u53F6\u53CC\u4EBA\u6905", count: 1, tier: "rare", weight: 7 },
-  { id: "moon-terrarium", kind: "furniture", item: "moon-terrarium", name: "\u6708\u5149\u73BB\u7483\u5EAD\u9662", count: 1, tier: "epic", weight: 50 },
-  { id: "cloud-fountain", kind: "furniture", item: "cloud-fountain", name: "\u4E91\u6735\u53E0\u6CC9", count: 1, tier: "epic", weight: 50 }
+  { id: "moon-terrarium", kind: "furniture", item: "moon-terrarium", name: "\u6708\u5149\u73BB\u7483\u5EAD\u9662", count: 1, tier: "epic", weight: 40 },
+  { id: "cloud-fountain", kind: "furniture", item: "cloud-fountain", name: "\u4E91\u6735\u53E0\u6CC9", count: 1, tier: "epic", weight: 40 },
+  { id: "eclipse-portal", kind: "appearance", item: "eclipse-portal", name: "\u6708\u8680\u4E4B\u95E8", count: 1, tier: "epic", weight: 20 }
 ];
+var LEGACY_CAPSULE_POOL = CAPSULE_POOL.filter((x) => x.kind !== "appearance").map((x) => ({ ...x, weight: x.id === "speed3-pack" ? 30 : x.tier === "epic" ? 50 : x.weight }));
 function furnitureOffers(owner, day) {
   const rand = dailyRandom(`furniture-v4:${owner}:${day}`);
   const basic = FURNITURE_SHOP.filter((x) => x.tier === "common");
@@ -556,6 +560,15 @@ function feedingWish(state, fruit) {
 }
 var FRUIT_DRAG_TYPE = "application/x-qbot-garden-fruit";
 
+// app/src/shared/appearances.ts
+var APPEARANCES = [
+  { id: "eclipse-portal", name: "\u6708\u8680\u4E4B\u95E8", slot: "entrance", tier: "epic", price: 9e3, duplicateTokens: 60, description: "\u94F6\u7D2B\u88C2\u9699\u5C55\u5F00\uFF0C\u89D2\u8272\u4ECE\u6697\u5904\u663E\u73B0\u3002" },
+  { id: "petal-steps", name: "\u6B65\u751F\u82B1", slot: "footsteps", tier: "rare", price: 4e3, duplicateTokens: 30, description: "\u968F\u5DE6\u53F3\u811A\u843D\u5730\uFF0C\u7559\u4E0B\u5C11\u91CF\u8F7B\u76C8\u82B1\u74E3\u3002" }
+];
+function appearance(id) {
+  return APPEARANCES.find((a) => a.id === id);
+}
+
 // app/src/main/garden/social-rules.ts
 function enableSocialEconomy(s, now) {
   if (s.economy) {
@@ -591,6 +604,7 @@ function refreshSocial(s, now) {
   const e = s.economy;
   if (!e) return;
   const day = Math.max(e.day, gardenDay(now));
+  e.appearances ??= { owned: {}, equipped: {} };
   if (e.capsuleRevision !== 2) {
     for (const id of RETIRED_FURNITURE) delete e.furniture[id];
     if (e.furnitureReservation && RETIRED_FURNITURE.includes(e.furnitureReservation.item)) delete e.furnitureReservation;
@@ -629,6 +643,25 @@ function socialTransition(s, c, now, rng, shopOwner) {
   refreshSocial(s, now);
   const reveal = (title, message) => ({ handled: true, reveal: { title, message } });
   switch (c.type) {
+    case "buyAppearance": {
+      const item = appearance(c.item);
+      if (!item) throw Error("\u5916\u89C2\u4E0D\u5B58\u5728");
+      const inventory = e.appearances;
+      if (inventory.owned[item.id]) throw Error("\u5DF2\u7ECF\u62E5\u6709\u8FD9\u4EF6\u5916\u89C2");
+      if (s.coins < item.price) throw Error("\u82B1\u56ED\u5E01\u4E0D\u8DB3");
+      s.coins -= item.price;
+      inventory.owned[item.id] = true;
+      recordGarden(s, now, "appearance", `\u89E3\u9501${item.name}`);
+      return reveal("\u65B0\u5916\u89C2\u5DF2\u5165\u6536\u85CF", `${item.name}\u53EF\u88C5\u914D\u7ED9\u4E00\u4F4D\u81EA\u5DF1\u7684\u89D2\u8272\u3002`);
+    }
+    case "equipAppearance": {
+      const item = appearance(c.item), inventory = e.appearances;
+      if (!item || !inventory.owned[item.id]) throw Error("\u8BF7\u5148\u83B7\u5F97\u8FD9\u4EF6\u5916\u89C2");
+      if (c.actor !== null && (typeof c.actor !== "string" || !Object.hasOwn(s.life.characters, c.actor))) throw Error("\u8BF7\u9009\u62E9\u81EA\u5DF1\u5DF2\u6709\u7684\u89D2\u8272");
+      if (c.actor === null) delete inventory.equipped[item.id];
+      else inventory.equipped[item.id] = c.actor;
+      return reveal(c.actor ? "\u5916\u89C2\u5DF2\u88C5\u914D" : "\u5916\u89C2\u5DF2\u5378\u4E0B", c.actor ? `${item.name}\u5DF2\u8F6C\u4EA4\u7ED9\u6240\u9009\u89D2\u8272\uFF0C\u540C\u65F6\u53EA\u4F9B\u4E00\u4F4D\u89D2\u8272\u4F7F\u7528\u3002` : `${item.name}\u5DF2\u653E\u56DE\u6536\u85CF\u3002`);
+    }
     case "travelExperience":
     case "travelNext":
       throw Error("\u65B0\u7248\u65C5\u884C\u8BF7\u5148\u9009\u76EE\u7684\u5730\u548C\u540C\u884C\u89D2\u8272\uFF0C\u518D\u51FA\u53D1");
@@ -745,7 +778,14 @@ function socialTransition(s, c, now, rng, shopOwner) {
         const pool = CAPSULE_POOL.filter((x) => x.tier === tier2);
         let pick = rng.random() * 100;
         const item = pool.find((x) => (pick -= x.weight) < 0) ?? pool[pool.length - 1];
-        if (item.kind === "furniture") {
+        let duplicateTokens;
+        if (item.kind === "appearance") {
+          const cosmetic = appearance(item.item);
+          if (e.appearances.owned[cosmetic.id]) {
+            duplicateTokens = cosmetic.duplicateTokens;
+            e.tokens += duplicateTokens;
+          } else e.appearances.owned[cosmetic.id] = true;
+        } else if (item.kind === "furniture") {
           e.furniture[item.item] = (e.furniture[item.item] ?? 0) + item.count;
           recordGarden(s, now, "furniture", `\u626D\u86CB\u673A\u5E26\u56DE${item.name}`);
         } else if (item.kind === "seed") {
@@ -754,11 +794,11 @@ function socialTransition(s, c, now, rng, shopOwner) {
         e.rareMisses = tier2 === "common" ? e.rareMisses + 1 : 0;
         e.epicMisses = tier2 === "epic" ? 0 : e.epicMisses + 1;
         e.draws++;
-        names.push(`${item.name} \xD7${item.count}`);
-        rewards.push({ ...item });
+        names.push(`${item.name} \xD7${item.count}${duplicateTokens ? `\uFF08\u91CD\u590D\u8F6C\u6362 ${duplicateTokens} \u4EE3\u5E01\uFF09` : ""}`);
+        rewards.push({ ...item, ...duplicateTokens ? { duplicateTokens } : {} });
       }
       e.lastCapsule = { id: rng.id(), at: now, rewards };
-      return reveal("\u626D\u86CB\u6253\u5F00\u4E86", names.join("\u3001") + " \xB7 \u5DF2\u6536\u5165\u80CC\u5305\u4E0E\u5BB6\u5177\u6536\u85CF\u3002");
+      return reveal("\u626D\u86CB\u6253\u5F00\u4E86", names.join("\u3001") + " \xB7 \u5DF2\u6536\u5165\u80CC\u5305\u4E0E\u6536\u85CF\u3002");
     }
     case "socialWish": {
       if (!Object.hasOwn(SOCIAL_WISHES, c.kind) || e.wishClaims.includes(c.kind) || e.wishClaims.length >= 2) throw Error("\u4ECA\u65E5\u5FC3\u613F\u5956\u52B1\u5DF2\u9886\u53D6");
@@ -803,6 +843,10 @@ function validateSocial(s) {
   const e = s.economy;
   if (!e) return;
   const n = (x) => Number.isSafeInteger(x) && Number(x) >= 0;
+  if (e.appearances) {
+    const a = e.appearances;
+    if (!a.owned || !a.equipped || Object.entries(a.owned).some(([id, v]) => !appearance(id) || v !== true) || Object.entries(a.equipped).some(([id, actor]) => !appearance(id) || !a.owned[id] || typeof actor !== "string" || !Object.hasOwn(s.life?.characters ?? {}, actor))) throw Error("\u5916\u89C2\u6536\u85CF\u6216\u88C5\u914D\u8BB0\u5F55\u635F\u574F");
+  }
   if (e.version !== 4 || !e.furniture || !e.purchases || !e.tutorial || !Array.isArray(e.notifications) || !Array.isArray(e.weatherHistory) || !Array.isArray(e.wishClaims) || !e.wishBaseline || !n(e.day) || !n(e.tokens) || !n(e.draws) || !n(e.rareMisses) || e.rareMisses >= 10 || !n(e.epicMisses) || e.epicMisses >= 20 || Object.values(e.furniture).some((x) => !n(x))) throw Error("\u65B0\u7248\u793E\u4EA4\u7ECF\u6D4E\u5B58\u6863\u635F\u574F");
   if (e.furnitureReservation && (!n(e.furnitureReservation.price) || e.furnitureReservation.price === 0 || !n(e.furnitureReservation.expiresAt) || !FURNITURE_SHOP.some((x) => x.id === e.furnitureReservation.item) && !RETIRED_FURNITURE.includes(e.furnitureReservation.item) || typeof e.furnitureReservation.owner !== "string")) throw Error("\u5BB6\u5177\u9884\u7559\u8BB0\u5F55\u635F\u574F");
   if (e.wishes && (!Array.isArray(e.wishes) || e.wishes.length > 2 || e.wishes.some((w) => !w || !Object.hasOwn(SOCIAL_WISHES, w.kind) || typeof w.id !== "string" || typeof w.label !== "string" || typeof w.done !== "boolean" || !n(w.createdAt)))) throw Error("\u793E\u4EA4\u5FC3\u613F\u8BB0\u5F55\u635F\u574F");
@@ -2150,6 +2194,7 @@ function cultivationSeed(fruit, participants, rng) {
   FRUIT_DRAG_TYPE,
   FURNITURE_SHOP,
   HARVEST_XP,
+  LEGACY_CAPSULE_POOL,
   LEVEL_XP,
   MAX_GARDEN_PLOTS,
   PAIR_INTERACTIONS,

@@ -1,4 +1,4 @@
-import type { WeatherKind } from '../shared/weather';
+import type { VisualWeatherKind } from '../shared/weather';
 import { weatherReaction } from '../shared/weather-reaction';
 import { getSettings } from './config';
 import { getCharacter } from './characters';
@@ -11,7 +11,7 @@ let generation=0;
 let stopThinking: (() => void) | undefined;
 export function cancelWeatherReaction():void {generation++;stopThinking?.();stopThinking=undefined;}
 /** Explicit and scheduled scenery reactions use the current character's persona. */
-export async function reactToWeather(kind:WeatherKind):Promise<void> {
+export async function reactToWeather(kind:VisualWeatherKind):Promise<void> {
   cancelWeatherReaction();
   const version=generation,pet=getPetWindow();
   if(!pet||pet.isDestroyed()||!pet.isVisible())return;

@@ -2,14 +2,14 @@ import { beginGardenWeatherTest, endGardenWeatherTest } from './garden/service';
 import { desktopQuiet, onDesktopVisibilityChanged } from './desktop-visibility';
 import { app, dialog, powerMonitor, screen } from 'electron';
 
-import { WEATHER_PRESETS, WEATHER_TEST_MS, type WeatherKind } from '../shared/weather';
+import { WEATHER_PRESETS, WEATHER_TEST_MS, type VisualWeatherKind } from '../shared/weather';
 import { WeatherSession, type WeatherSurface } from './weather-session';
 import { createBitmapWeatherSurface } from './weather-surface';
 import { cancelWeatherReaction, reactToWeather } from './weather-reaction';
 let reactionRequest = 0;
 let visualSource: 'test'|'scheduled'|null=null;
 export function weatherPreview(){return visualSource==='test'?session.current:null;}
-export async function showScheduledWeather(kind:WeatherKind,until:number){await changeWeatherTest(kind,undefined,Math.max(1,until-Date.now()),'scheduled');}
+export async function showScheduledWeather(kind:VisualWeatherKind,until:number){if(visualSource==='test')return;await changeWeatherTest(kind,undefined,Math.max(1,until-Date.now()),'scheduled');}
 export async function clearScheduledWeather(){if(visualSource==='scheduled')await changeWeatherTest(null);}
 
 let anchor: Electron.Rectangle | undefined;
@@ -49,14 +49,14 @@ export function initWeatherTest(): void {
   powerMonitor.on('lock-screen', stopWeatherTest);
 }
 
-export async function changeWeatherTest(kind: WeatherKind | null, bounds?: Electron.Rectangle, durationMs=WEATHER_TEST_MS, source:'test'|'scheduled'='test'): Promise<void> {
+export async function changeWeatherTest(kind: VisualWeatherKind | null, bounds?: Electron.Rectangle, durationMs=WEATHER_TEST_MS, source:'test'|'scheduled'='test'): Promise<void> {
   if (kind && desktopQuiet()) return;
   initWeatherTest();
   const startedAt=Date.now();
   visualSource=kind?source:null;
   const request = ++reactionRequest; cancelWeatherReaction();
   clearTimeout(expiry); expiry = undefined;
-  if(source==='test'&&kind)await beginGardenWeatherTest(kind,durationMs);else await endGardenWeatherTest();
+  if(source==='test'&&kind&&kind!=='nebula')await beginGardenWeatherTest(kind,durationMs);else await endGardenWeatherTest();
   if(request!==reactionRequest)return;
   anchor = bounds;
   const changing = session.change(kind);
@@ -69,7 +69,7 @@ export async function changeWeatherTest(kind: WeatherKind | null, bounds?: Elect
 
 /** Test controls are available in both the pet menu and tray (including restore). */
 export function weatherTestMenu(bounds?: Electron.Rectangle): Electron.MenuItemConstructorOptions {
-  const run = (kind: WeatherKind | null) => {
+  const run = (kind: VisualWeatherKind | null) => {
     console.info('[weather] requested', kind ?? 'restore');
     void changeWeatherTest(kind, bounds).catch(error => {
       console.error('[weather] failed', error);
@@ -84,6 +84,6 @@ export function weatherTestMenu(bounds?: Electron.Rectangle): Electron.MenuItemC
       click: () => run(preset.id) })),
     { type: 'separator' },
     { label: '恢复原壁纸', enabled: !!session.current || session.busy, click: () => run(null) },
-    { label: process.platform === 'win32' ? '真实变异 · 每场判定一次 · 3 分钟自动恢复' : '当前测试仅支持 Windows', enabled: false },
+    { label: process.platform === 'win32' ? '星云仅观赏 · 流星/极光真实变异 · 3 分钟自动恢复' : '当前测试仅支持 Windows', enabled: false },
   ] };
 }

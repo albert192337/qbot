@@ -23,7 +23,7 @@ export const FURNITURE_SHOP = [
 ] as const;
 export const RETIRED_FURNITURE=['lantern','plant','fan','clock','teapot','painting','calligraphy','shelf','window','screen','kyoto-lantern','kyoto-screen','paris-painting','paris-clock','island-plant','island-window'];
 export type CapsuleTier='common'|'rare'|'epic';
-export interface CapsuleReward {id:string;kind:'seed'|'fertilizer'|'furniture';item:string;name:string;count:number;tier:CapsuleTier;weight:number}
+export interface CapsuleReward {id:string;kind:'seed'|'fertilizer'|'furniture'|'appearance';item:string;name:string;count:number;tier:CapsuleTier;weight:number;duplicateTokens?:number}
 /** Weights are conditional within a tier; every tier sums to 100. */
 export const CAPSULE_POOL:CapsuleReward[]=[
  {id:'strawberry-pack',kind:'seed',item:'strawberry',name:'草莓种子',count:3,tier:'common',weight:25},
@@ -33,13 +33,17 @@ export const CAPSULE_POOL:CapsuleReward[]=[
  {id:'moss-stool',kind:'furniture',item:'moss-stool',name:'苔绒小凳',count:1,tier:'common',weight:10},
  {id:'apple-pack',kind:'seed',item:'apple',name:'苹果种子',count:2,tier:'rare',weight:20},
  {id:'pineapple-pack',kind:'seed',item:'pineapple',name:'菠萝种子',count:3,tier:'rare',weight:20},
- {id:'speed3-pack',kind:'fertilizer',item:'speed3',name:'高级加速肥',count:2,tier:'rare',weight:30},
+ {id:'speed3-pack',kind:'fertilizer',item:'speed3',name:'高级加速肥',count:2,tier:'rare',weight:20},
+ {id:'petal-steps',kind:'appearance',item:'petal-steps',name:'步生花',count:1,tier:'rare',weight:10},
  {id:'sprout-lamp',kind:'furniture',item:'sprout-lamp',name:'铃兰落地灯',count:1,tier:'rare',weight:15},
  {id:'potting-shelf',kind:'furniture',item:'potting-shelf',name:'花匠置物架',count:1,tier:'rare',weight:8},
  {id:'fern-bench',kind:'furniture',item:'fern-bench',name:'蕨叶双人椅',count:1,tier:'rare',weight:7},
- {id:'moon-terrarium',kind:'furniture',item:'moon-terrarium',name:'月光玻璃庭院',count:1,tier:'epic',weight:50},
- {id:'cloud-fountain',kind:'furniture',item:'cloud-fountain',name:'云朵叠泉',count:1,tier:'epic',weight:50},
+ {id:'moon-terrarium',kind:'furniture',item:'moon-terrarium',name:'月光玻璃庭院',count:1,tier:'epic',weight:40},
+ {id:'cloud-fountain',kind:'furniture',item:'cloud-fountain',name:'云朵叠泉',count:1,tier:'epic',weight:40},
+ {id:'eclipse-portal',kind:'appearance',item:'eclipse-portal',name:'月蚀之门',count:1,tier:'epic',weight:20},
 ];
+/** Older servers have not yet enabled appearances; display their actual historical odds. */
+export const LEGACY_CAPSULE_POOL:CapsuleReward[]=CAPSULE_POOL.filter(x=>x.kind!=='appearance').map(x=>({...x,weight:x.id==='speed3-pack'?30:x.tier==='epic'?50:x.weight}));
 export function furnitureOffers(owner:string,day:number) {
   const rand=dailyRandom(`furniture-v4:${owner}:${day}`);
   const basic=FURNITURE_SHOP.filter(x=>x.tier==='common');
@@ -66,6 +70,7 @@ export interface SocialTrip {id:string;city:TripCity;actors:string[];startedAt:n
 export interface SocialWish {id:string;kind:'harvest'|'visit'|'furniture'|'breed'|'feed';target?:string;label:string;createdAt:number;done:boolean}
 export interface SharedWeather {id:string;kind:V3Weather;start:number;end:number;source:string;room:string;acceptedAt:number}
 export interface SocialEconomy {
+  appearances?:import('./appearances').AppearanceInventory;
   capsuleRevision?:2;lastCapsule?:{id:string;at:number;rewards:CapsuleReward[]};
   version:4; furniture:Record<string,number>; day:number; purchases:Record<string,number>; rareBought:number;
   furnitureReservation?:{owner:string;item:string;price:number;expiresAt:number};
@@ -78,6 +83,7 @@ export interface SocialEconomy {
   travel?:{week:number;starts:number;tutorialDone:boolean;counts:Partial<Record<TripCity,number>>;active?:SocialTrip;history:(SocialTrip&{claimedAt:number})[]};
 }
 export type SocialCommand =
+  {type:'buyAppearance';item:string} | {type:'equipAppearance';item:string;actor:string|null} |
   {type:'socialStarter'} | {type:'tutorialSpeed';plot:number} |
   {type:'buyFurniture';owner:string;item:string} | {type:'reserveFurniture';owner:string;item:string} | {type:'capsuleTopUp'} | {type:'capsuleDraw';count:1|10} |
   {type:'socialWish';kind:'harvest'|'visit'|'furniture'|'breed'|'feed'} | {type:'readMutations'} |

@@ -14,3 +14,5 @@
 .strip .farm-preview-controls button{padding:3px 7px;min-width:28px;border:0;border-radius:9px;background:#e8edda;color:#536148;font:inherit}
 .strip .farm-preview-controls button:disabled{opacity:.4}
 .strip .farm-bed-count{font-size:11px}
+
+.strip .farm-scene .farm-mystery.secret-growth{opacity:0}

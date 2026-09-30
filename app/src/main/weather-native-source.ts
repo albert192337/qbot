@@ -24,6 +24,7 @@ public static class WeatherNative {
  [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr w);
  [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr w);
  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr w);
+ [DllImport("user32.dll")] static extern bool SystemParametersInfo(uint action,uint param,out bool value,uint flags);
  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr w,out uint pid);
  [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr c);
  [DllImport("user32.dll",SetLastError=true)] static extern bool SetWindowPos(IntPtr w,IntPtr after,int x,int y,int width,int height,uint flags);
@@ -83,6 +84,7 @@ public static class WeatherNative {
 
  public class Layer : NativeWindow, IDisposable {
   IntPtr dc=IntPtr.Zero,bitmap=IntPtr.Zero,old=IntPtr.Zero;
+  Image[] nebula; Stopwatch drift=Stopwatch.StartNew(); long lastFrame=-1000; bool stillDrawn=false;
   SIZE size; Desktop desktop;
   public Layer(string path,Rectangle bounds,Desktop host) {
    desktop=host; size=new SIZE(bounds.Width,bounds.Height);
@@ -96,6 +98,10 @@ public static class WeatherNative {
     }
     dc=CreateCompatibleDC(IntPtr.Zero); if(dc==IntPtr.Zero||bitmap==IntPtr.Zero)throw new Exception("Bitmap allocation failed");
     old=SelectObject(dc,bitmap);
+    if(Path.GetFileName(path)=="nebula.png") {
+     nebula=new Image[3];
+     for(int i=0;i<3;i++)nebula[i]=Image.FromFile(Path.Combine(Path.GetDirectoryName(path),"nebula-layer-"+i+".png"));
+    }
     CreateHandle(new CreateParams { Caption="QBot Weather Bitmap",ClassName="STATIC",Parent=host.Parent,
      X=p.X,Y=p.Y,Width=size.X,Height=size.Y,Style=host.Parent==IntPtr.Zero?unchecked((int)0x80000000):0x40000000,
      ExStyle=0x00080000|0x08000000|0x20|0x80 });
@@ -120,7 +126,27 @@ public static class WeatherNative {
    base.WndProc(ref m);
   }
   public bool Validate(){return desktop.Ordered(Handle);}
+  public void Animate() {
+   if(nebula==null||drift.ElapsedMilliseconds-lastFrame<66)return;
+   // Respect the live Windows animation preference, including changes during playback.
+   bool moving;
+   if(!SystemParametersInfo(0x1042,0,out moving,0))moving=SystemInformation.UIEffectsEnabled;
+   if(!moving&&stillDrawn)return;
+   double t=moving?drift.Elapsed.TotalSeconds:0;
+   lastFrame=drift.ElapsedMilliseconds;stillDrawn=!moving;
+   using(var g=Graphics.FromHdc(dc)) {
+    g.DrawImage(nebula[0],new Rectangle(0,0,size.X,size.Y));
+    float dx=(float)(Math.Sin(t/19)*size.X*.009),dy=(float)(Math.Sin(t/27)*size.Y*.008);
+    g.DrawImage(nebula[1],new RectangleF(-size.X*.035f+dx,-size.Y*.035f+dy,size.X*1.07f,size.Y*1.07f));
+    using(var attr=new ImageAttributes()) {
+     var matrix=new ColorMatrix();matrix.Matrix33=(float)(.76+.15*Math.Sin(t/4+1));attr.SetColorMatrix(matrix);
+     g.DrawImage(nebula[2],new Rectangle(0,0,size.X,size.Y),0,0,nebula[2].Width,nebula[2].Height,GraphicsUnit.Pixel,attr);
+    }
+   }
+   InvalidateRect(Handle,IntPtr.Zero,false);
+  }
   public void Dispose(){
+   if(nebula!=null){foreach(var image in nebula)if(image!=null)image.Dispose();nebula=null;}
    if(Handle!=IntPtr.Zero)DestroyHandle();
    if(dc!=IntPtr.Zero){if(old!=IntPtr.Zero)SelectObject(dc,old);DeleteDC(dc);dc=IntPtr.Zero;}
    if(bitmap!=IntPtr.Zero){DeleteObject(bitmap);bitmap=IntPtr.Zero;}
@@ -148,6 +174,8 @@ public static class WeatherNative {
   timer.Tick+=(sender,args)=>{
    try {
     if(inputClosed||ownerProcess.HasExited||lifetime.ElapsedMilliseconds>3600000){close();return;}
+    if(current!=null)current.Animate();
+    if(incoming!=null)incoming.Animate();
     if(watchdog.ElapsedMilliseconds>1000){
      watchdog.Restart();
      if((current!=null&&!current.Validate())||(incoming!=null&&!incoming.Validate()))throw new Exception("Desktop layer changed");

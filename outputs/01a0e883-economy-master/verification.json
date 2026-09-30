@@ -1,0 +1,29 @@
+{
+  "counts": {
+    "regions": 24,
+    "plants": 48,
+    "furniture": 144,
+    "cosmetics": 16
+  },
+  "sheets": 23,
+  "profileChecks": [
+    {
+      "choice": 1,
+      "minGold": 979,
+      "endGold": 5115
+    },
+    {
+      "choice": 2,
+      "minGold": 1015,
+      "endGold": 6990
+    },
+    {
+      "choice": 3,
+      "minGold": 1126,
+      "endGold": 5040
+    }
+  ],
+  "formulaCells": 2206,
+  "sourceReferences": 14,
+  "nativeExcelVerified": false
+}

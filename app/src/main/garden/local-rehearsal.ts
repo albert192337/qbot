@@ -69,6 +69,7 @@ export class LocalGardenRehearsal {
   act(command:GardenCommand,actor?:string):GardenResult {
     try{
       this.advance();const s=this.ensure('test:me');ensureLife(s,this.now(),this.rng,actor);
+      if(command.type==='equipAppearance'&&command.actor)ensureLife(s,this.now(),this.rng,command.actor);
       if(command.type==='cultivate'||command.type==='pauseCultivation'){
         this.cooperate('test:me',command.plot,command.type==='cultivate'?'join':'leave');return {ok:true,state:this.get(actor)};
       }

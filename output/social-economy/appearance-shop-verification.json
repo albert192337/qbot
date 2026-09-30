@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "checks": [
+    "purchase both appearances",
+    "equipment transfer is exclusive",
+    "both slots on same character",
+    "invalid character rejected",
+    "duplicate draw compensation",
+    "restart preserves equipment",
+    "unequip keeps unlock"
+  ],
+  "errors": []
+}

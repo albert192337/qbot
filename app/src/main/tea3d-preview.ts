@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron';
 import path from 'node:path';
+import { installTeaDesktop } from './tea3d-desktop';
 
 let preview: BrowserWindow | null = null;
 /** Furniture specimen. Layout stays in its own renderer storage; characters are read only. */
@@ -10,7 +11,7 @@ export function openTea3dPreview(): BrowserWindow {
     webPreferences:{preload:path.join(__dirname,'../preload/index.js'),contextIsolation:true,sandbox:true,nodeIntegration:false},
   });
   preview=win;win.on('closed',()=>{preview=null;});
-  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  installTeaDesktop(win, path.join(__dirname,'../preload/index.js'));
   win.webContents.on('will-navigate',event=>event.preventDefault());
   if(process.env.ELECTRON_RENDERER_URL)void win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/tea3d/index.html`);
   else void win.loadFile(path.join(__dirname,'../renderer/tea3d/index.html'));

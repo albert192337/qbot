@@ -1,0 +1,22 @@
+import fs from 'node:fs/promises';
+const pid=Number(process.argv[2]),mode=process.argv[3]||'inspect';if(!Number.isInteger(pid)||pid<1)throw Error('PID required');
+let prior=false;try{prior=(await fetch('http://127.0.0.1:9229/json/list')).ok;}catch{}
+process._debugProcess(pid);let targets;for(let i=0;i<40;i++){try{targets=await(await fetch('http://127.0.0.1:9229/json/list')).json();break;}catch{await new Promise(r=>setTimeout(r,100));}}
+if(!targets?.length)throw Error('Inspector unavailable');
+const ws=new WebSocket(targets[0].webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});let seq=0;const pending=new Map();ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id){pending.get(m.id)?.(m);pending.delete(m.id);}};
+const evaluate=expression=>new Promise((resolve,reject)=>{const id=++seq;pending.set(id,m=>m.result?.exceptionDetails?reject(Error(m.result.exceptionDetails.exception?.description||m.result.exceptionDetails.text)):resolve(m.result?.result?.value));ws.send(JSON.stringify({id,method:'Runtime.evaluate',params:{expression,returnByValue:true,awaitPromise:true}}));});
+const prefix="const e=process.getBuiltinModule('module').createRequire(process.cwd()+'/package.json')('electron');";
+try{if(await evaluate('process.pid')!==pid)throw Error('Wrong inspector target');
+if(mode==='restart'){
+ const guard=await evaluate('(()=>{'+prefix+'return {name:e.app.getName(),path:e.app.getAppPath()}})()');if(!guard.path.replaceAll('\\','/').endsWith('github-albert192337-qbot/app'))throw Error('Unexpected app');
+ console.log(await evaluate('(()=>{'+prefix+'e.app.relaunch();setTimeout(()=>e.app.quit(),300);return "relaunch scheduled"})()'));
+}else if(mode==='polish'){
+ console.log(await evaluate("(async()=>{"+prefix+"const r=e.BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes(\"/tea3d/\"));await r.webContents.insertCSS(\"html.desktop #desktop-bar{width:max-content;max-width:calc(100% - 12px);gap:8px;white-space:nowrap}#desktop-bar button{flex:none}\");return true})()"));
+}else if(mode==='verify'){
+ const report=await evaluate("(async()=>{"+prefix+"const all=e.BrowserWindow.getAllWindows(),r=all.find(w=>w.webContents.getURL().includes(\"/tea3d/\")),c=all.find(w=>w.webContents.getURL().includes(\"/console/\"));const scene=await r.webContents.executeJavaScript(\"({ready:document.body.dataset.ready,error:document.body.dataset.error,actors:window.tea3d.actors.map(a=>({ready:a.ready,kind:a.kind})),models:window.tea3d.stats().models})\");const editor=await c.webContents.executeJavaScript(\"(()=>{const f=document.querySelector(\\\"#pane-furnish iframe\\\");return {frame:!!f,ready:f?.contentDocument.body.dataset.ready,error:f?.contentDocument.body.dataset.error,visible:!f?.parentElement.hidden,bridge:!!f?.contentWindow.qbot?.room?.save3d}})()\");const fs=process.getBuiltinModule(\"fs\");fs.writeFileSync(\"C:/Users/beta/Documents/Codex/2026-08-25/github-albert192337-qbot/output/room3d-official/formal-desktop.png\",(await r.webContents.capturePage()).toPNG());fs.writeFileSync(\"C:/Users/beta/Documents/Codex/2026-08-25/github-albert192337-qbot/output/room3d-official/formal-editor.png\",(await c.webContents.capturePage()).toPNG());return{scene,editor}})()");console.log(JSON.stringify(report));await fs.writeFile("output/room3d-official/formal-result.json",JSON.stringify(report,null,2));
+}else if(mode==='show'){
+ console.log(await evaluate('(async()=>{'+prefix+'const win=e.BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes("/tea3d/"));if(!win)throw Error("Formal room absent");await win.webContents.executeJavaScript("window.qbot.room.openDecorEditor()");return {room:win.webContents.getURL(),visible:win.isVisible()}})()'));
+}else{
+ const report=await evaluate('(async()=>{'+prefix+'return {pid:process.pid,name:e.app.getName(),path:e.app.getAppPath(),windows:await Promise.all(e.BrowserWindow.getAllWindows().map(async w=>({id:w.id,title:w.getTitle(),url:w.webContents.getURL(),visible:w.isVisible(),dirty:await w.webContents.executeJavaScript("!!document.querySelector(\'[data-dirty=true]\')").catch(()=>false)})))}})()');console.log(JSON.stringify(report));await fs.writeFile('output/room3d-official/live-client.json',JSON.stringify(report,null,2));
+}
+}finally{if(mode!=='restart'&&!prior)await evaluate("(()=>{setTimeout(()=>process.getBuiltinModule('inspector').close(),150);return true})()").catch(()=>{});ws.close();}

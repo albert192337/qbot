@@ -1,7 +1,7 @@
 import { app, BrowserWindow, screen } from 'electron';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { WEATHER_PRESETS, type WeatherKind } from '../shared/weather';
+import { WEATHER_PRESETS, type VisualWeatherKind } from '../shared/weather';
 import { startNativeWeather } from './weather-native';
 import type { WeatherSurface } from './weather-session';
 
@@ -18,7 +18,7 @@ export async function createBitmapWeatherSurface(display: Electron.Display,onLos
   let disposed=false,foreground:BrowserWindow|null=null;
   let native:Awaited<ReturnType<typeof startNativeWeather>>|undefined;
   const directory=path.join(app.getPath('userData'),'weather-bitmaps');
-  const images=new Map<WeatherKind,string>();
+  const images=new Map<VisualWeatherKind,string>();
   const stopForeground=()=>{const win=foreground;foreground=null;if(win&&!win.isDestroyed())win.destroy();};
   const dispose=()=>{if(disposed)return;disposed=true;stopForeground();native?.dispose();if(!raster.isDestroyed())raster.destroy();};
   const lose=()=>{dispose();onLost();};
@@ -34,6 +34,8 @@ export async function createBitmapWeatherSurface(display: Electron.Display,onLos
       if(dark<10)throw new Error('天气背景渲染异常');
       const file=path.join(directory,`${preset.id}.png`);await writeFile(file,image.toPNG());images.set(preset.id,file);
     }
+    const layers:string[]=await raster.webContents.executeJavaScript('window.qbotWeather.layers()');
+    for(let i=0;i<layers.length;i++)await writeFile(path.join(directory,`nebula-layer-${i}.png`),Buffer.from(layers[i].split(',')[1],'base64'));
     raster.destroy();
     if(disposed)throw new Error('天气已取消');
     native=await startNativeWeather(screen.dipToScreenRect(null,bounds),directory,lose,preview);
@@ -42,7 +44,7 @@ export async function createBitmapWeatherSurface(display: Electron.Display,onLos
       if(disposed)throw new Error('天气已关闭');
       stopForeground();
       await native!.show(kind?images.get(kind)!:null);
-      if(!kind||disposed||preview)return;
+      if(!kind||kind==='nebula'||disposed||preview)return;
       const win=new BrowserWindow({...bounds,show:false,frame:false,transparent:true,hasShadow:false,focusable:false,
         skipTaskbar:true,resizable:false,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});
       foreground=win;win.setIgnoreMouseEvents(true);win.setAlwaysOnTop(true,'floating');

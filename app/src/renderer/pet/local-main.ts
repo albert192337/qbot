@@ -1,4 +1,5 @@
 import { WorkMode, WORK_IDLE, WORK_TYPING } from './work-mode';
+import { EquippedEffects } from './appearance-effects';
 import { mountPetting } from './petting';
 import { petEffects } from './interaction-effects';
 import { choosePairAction } from '../../shared/pair-interaction';
@@ -68,6 +69,7 @@ const workMode = new WorkMode(() => window.qbot.bubble.getWorkIdleMs(), id => {
   stage.dataset.workMode = id === WORK_TYPING ? 'typing' : 'idle';
   player.playWork(id === WORK_TYPING);
 });
+const equippedEffects=new EquippedEffects(stage,player);
 function stopWork(): void {
   const wasWorking = workMode.active;
   workMode.stop();
@@ -432,6 +434,7 @@ function stopDesktopWalk(): void {
  * 方向固定为 WALK_DIR，夹在工作区内；贴边时只播动画不挪。
  */
 function startDesktopWalk(): void {
+  equippedEffects.beginWalk();
   if (walkRaf !== null) {
     cancelAnimationFrame(walkRaf);
     walkRaf = null;
@@ -445,7 +448,8 @@ function startDesktopWalk(): void {
   const w = window.outerWidth;
   const room =
     WALK_DIR > 0 ? availL + window.screen.availWidth - (startX + w) : startX - availL;
-  const dist = Math.min(WALK_DISTANCE, Math.max(0, room));
+  const stride=currentCharacter?.manifest.spine?stage.getBoundingClientRect().height*.73*.14:WALK_DISTANCE;
+  const dist = Math.min(stride, Math.max(0, room));
   // 走路时收牌，停下再弹（同被拎起的处理）
   hostSignboard.onDragStart();
   if (dist < 8) {
@@ -460,6 +464,7 @@ function startDesktopWalk(): void {
   const tick = (t: number): void => {
     const k = Math.min(1, (t - t0) / durationMs);
     window.qbot.pet.move(Math.round(startX + WALK_DIR * dist * k), y);
+    equippedEffects.stepWalk((t-t0)/1000,durationMs/1000);
     if (k < 1) {
       walkRaf = requestAnimationFrame(tick);
     } else {
@@ -575,6 +580,7 @@ function activateCharacter(meta: CharacterMeta): void {
     if(plan&&currentCharacter?.dirId===meta.dirId&&(!idleDirector.plan||plan.chosenAt>=idleDirector.plan.chosenAt))idleDirector.accept(plan);
   }).catch(()=>{});
   available = player.load(meta.dirId, meta.manifest);
+  equippedEffects.activate(meta.dirId);
   stepCtx = {
     available,
     rng,

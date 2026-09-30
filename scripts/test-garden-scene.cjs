@@ -86,6 +86,11 @@ app.whenReady().then(async()=>{try{
  win.setSize(1280,850);state=structuredClone(original);state.plots[0].revealed=false;state.plots[0].growthVersion=2;state.plots[0].traits=['rainbow'];changed();
  await until(()=>js(`!!document.querySelector('[data-plot="0"] .secret-growth')`),'hidden fruit');await shot('unrevealed');
  assert.equal(await js(`document.querySelectorAll('.farm-canvas').length`),1);
+ assert.equal(await js(`getComputedStyle(document.querySelector('[data-plot="0"] .secret-growth')).opacity`),'0');
+ // Exercise every shader family with both models, and preserve a visual review fixture.
+ state.plots=['rainbow','crystal','golden','frost','prism','nebula'].flatMap(t=>[crop('strawberry',[t]),crop('pineapple',[t])]);changed();
+ await until(()=>js(`document.querySelectorAll('.farm-plot').length===12&&Number(document.querySelector('.farm-scene').dataset.models)===12`),'mutation materials');
+ await shot('mutation-materials');
  // Hidden scenes remain idle; restoring visibility requests a fresh frame.
  await wait(300);const draws=await js(`document.querySelector('.farm-scene').dataset.draws`);await wait(1200);
  assert.equal(await js(`document.querySelector('.farm-scene').dataset.draws`),draws);

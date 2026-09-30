@@ -1,4 +1,5 @@
-import { WEATHER_FADE_MS, isWeatherKind, type WeatherKind } from '../../shared/weather';
+import { createNebulaScene, nebulaLayers } from './nebula';
+import { WEATHER_FADE_MS, isWeatherKind, type VisualWeatherKind } from '../../shared/weather';
 import './style.css';
 
 const root = document.querySelector<HTMLElement>('#sky')!;
@@ -7,7 +8,8 @@ let sequence = 0;
 type Scene = { element: HTMLElement; dispose(): void };
 let scenes: Scene[] = [];
 
-function createScene(kind: WeatherKind): Scene {
+function createScene(kind: VisualWeatherKind): Scene {
+  if(kind==='nebula')return createNebulaScene(root);
   const element = document.createElement('section');
   element.className = `scene ${kind}`;
   element.innerHTML = '<div class="haze"></div><div class="moon"></div>' +
@@ -64,7 +66,7 @@ function createScene(kind: WeatherKind): Scene {
   return { element, dispose() { cancelAnimationFrame(frame); window.removeEventListener('resize', resize); element.remove(); } };
 }
 
-async function transition(kind: WeatherKind | null): Promise<void> {
+async function transition(kind: VisualWeatherKind | null): Promise<void> {
   if (kind !== null && !isWeatherKind(kind)) throw new Error('Unknown weather');
   const version = ++sequence;
   const old = [...scenes];
@@ -85,7 +87,7 @@ async function transition(kind: WeatherKind | null): Promise<void> {
   document.documentElement.dataset.weather = kind ?? 'original';
 }
 
-async function snapshot(kind: WeatherKind): Promise<void> {
+async function snapshot(kind: VisualWeatherKind): Promise<void> {
   if(!isWeatherKind(kind))throw new Error('Unknown weather');
   sequence++; scenes.forEach(scene=>scene.dispose());
   const scene=createScene(kind); scene.element.style.opacity='1';scenes=[scene];
@@ -93,8 +95,9 @@ async function snapshot(kind: WeatherKind): Promise<void> {
 }
 
 /** Foreground is canvas-only: no opaque background, no interactive elements. */
-async function burst(kind: WeatherKind): Promise<void> {
+async function burst(kind: VisualWeatherKind): Promise<void> {
   if(!isWeatherKind(kind))throw new Error('Unknown weather');
+  if(kind==='nebula')return;
   sequence++;scenes.forEach(scene=>scene.dispose());scenes=[];root.replaceChildren();
   const canvas=document.createElement('canvas');root.append(canvas);
   const ctx=canvas.getContext('2d')!;
@@ -140,5 +143,5 @@ async function burst(kind: WeatherKind): Promise<void> {
   });
 }
 
-declare global { interface Window { qbotWeather: { transition: typeof transition; snapshot: typeof snapshot; burst: typeof burst; }; } }
-window.qbotWeather = { transition, snapshot, burst };
+declare global { interface Window { qbotWeather: { transition: typeof transition; snapshot: typeof snapshot; burst: typeof burst; layers: () => string[]; }; } }
+window.qbotWeather = { transition, snapshot, burst, layers: () => nebulaLayers().map(c => c.toDataURL()) };

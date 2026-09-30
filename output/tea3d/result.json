@@ -11,13 +11,22 @@
     "three camera modes and two floors",
     "occupied seat removal",
     "concept sheet",
-    "680px layout"
+    "680px layout",
+    "existing video character switching and playback",
+    "switch disposes prior media",
+    "transparent desktop window with current unsaved state",
+    "desktop hit regions and close",
+    "desktop camera locked while zoom remains available",
+    "editor camera and wall visibility inherited",
+    "side walls toggle and centered front view",
+    "floor and cushion contact shadows",
+    "native near-overhead orbit and wider side angle"
   ],
   "stats": {
-    "calls": 49,
-    "triangles": 134438,
-    "geometries": 53,
-    "textures": 17,
+    "calls": 52,
+    "triangles": 134054,
+    "geometries": 54,
+    "textures": 15,
     "models": 8,
     "dirty": true
   },

@@ -1,0 +1,15 @@
+{
+  "scene": {
+    "models": "0",
+    "plots": "4",
+    "camera": "perspective",
+    "elevation": "47",
+    "sceneReady": "true",
+    "draws": "1",
+    "angle": "0",
+    "scale": "1"
+  },
+  "scripts": [
+    "file:///C:/Users/beta/Documents/Codex/2026-08-25/github-albert192337-qbot/app/out/renderer/assets/index-C0TLE3Wb.js"
+  ]
+}

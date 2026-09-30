@@ -50,12 +50,13 @@ function lantern(){const g=new T.Group(),m=mats();for(const y of [.055,.57])box(
 function rug(){const g=new T.Group(),m=mats();box(g,3.7,.018,2.6,0,.012,0,m.rug,.007,'woven-rug');for(const x of [-1.65,1.65])box(g,.025,.003,2.3,x,.024,0,m.gold,.001);for(const z of [-1.13,1.13])box(g,3.32,.003,.025,0,.024,z,m.gold,.001);for(const x of [-1.5,1.5])for(const z of [-.98,.98]){box(g,.24,.003,.025,x,.025,z,m.gold,.001);box(g,.025,.003,.18,x+Math.sign(x)*.11,.025,z-Math.sign(z)*.08,m.gold,.001);}return g;}
 export function createModel(id){let g;if(id==='jade-sofa'||id==='walnut-bench')g=sofa(id==='walnut-bench');else if(id==='tea-table'||id==='round-table')g=table(id==='round-table');else if(id==='tea-cabinet')g=cabinet();else if(id==='broadleaf'){g=new T.Group();plant(g,1.45);}else if(id==='lantern')g=lantern();else if(id==='jade-rug')g=rug();else throw Error('Unknown furniture: '+id);g.name=id;g.userData={assetId:id,units:'metres',front:'+Z',origin:'floor-centre',revision:1};return g;}
 export function createShell(onReady=()=>{}){const g=new T.Group(),m=mats();
- box(g,9.25,.22,5.55,0,-.14,0,m.dark,.065,'foundation');
+ box(g,9.12,.065,5.44,0,-.0575,0,m.dark,.018,'foundation');
  for(let x=0;x<12;x++)for(let z=0;z<8;z++)box(g,.747,.06,.673,-4.125+x*.75,-.005,-2.365+z*.675,m.stone,.012,'stone-tile');
  // Lower panelling, solid side walls and a genuinely open central window.
  box(g,9,.95,.18,0,.475,-2.66,m.wood);for(let x=-4.3;x<4.5;x+=.43)box(g,.024,.82,.028,x,.48,-2.552,m.edge,.006);
  for(const x of [-3.65,3.65]){box(g,1.7,2.18,.18,x,2.03,-2.66,m.wall);for(let y=1.08;y<3;y+=.38)for(let j=0;j<3;j++)box(g,.5,.32,.05,x-.55+j*.55+(Math.round(y*10)%2)*.08,y,-2.55,m.wall,.035,'stone-block');}
- for(const x of [-4.48,4.48]){const wall=box(g,.17,3.1,5.4,x,1.55,0,m.wall,.025,'side-wall');wall.userData.cutaway=true;for(const z of [-2.48,-.5,2.48])box(g,.22,3.12,.2,x,1.56,z,m.wood);box(g,.19,.75,5.4,x,.4,0,m.wood);box(g,.25,.16,5.5,x,3.05,0,m.edge);}
+ const sides=new T.Group();sides.name='side-walls';g.add(sides);
+ for(const x of [-4.48,4.48]){const wall=box(sides,.17,3.1,5.4,x,1.55,0,m.wall,.025,'side-wall');wall.userData.cutaway=true;for(const z of [-2.48,-.5,2.48])box(sides,.22,3.12,.2,x,1.56,z,m.wood);box(sides,.19,.75,5.4,x,.4,0,m.wood);box(sides,.25,.16,5.5,x,3.05,0,m.edge);}
  for(const y of [.98,2.9])box(g,5.8,.13,.18,0,y,-2.6,m.dark);for(let x=-2.86;x<3;x+=1.43){box(g,.085,1.95,.12,x,1.95,-2.59,m.green);}
  for(let x=-2.72;x<2.8;x+=.27)for(const y of [1.1,2.77]){box(g,.16,.025,.075,x,y,-2.56,m.green,.003);box(g,.026,.14,.075,x-.068,y+(y>2?-.057:.057),-2.56,m.green,.003);}
  box(g,9.28,.22,.24,0,3.09,-2.6,m.edge);for(const x of [-2.86,2.86])box(g,.14,3,.18,x,1.5,-2.52,m.wood);

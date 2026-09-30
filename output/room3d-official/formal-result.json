@@ -1,0 +1,18 @@
+{
+  "scene": {
+    "ready": "true",
+    "actors": [
+      {
+        "ready": "true",
+        "kind": "动画"
+      }
+    ],
+    "models": 8
+  },
+  "editor": {
+    "frame": true,
+    "ready": "true",
+    "visible": true,
+    "bridge": true
+  }
+}

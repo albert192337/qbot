@@ -1,0 +1,1 @@
+const path=require('node:path');require('vite').build({root:path.resolve('app/src/renderer'),base:'./',build:{outDir:path.resolve('app/out/renderer'),emptyOutDir:false,rollupOptions:{input:{tea3d:path.resolve('app/src/renderer/tea3d/index.html')}}}}).catch(e=>{console.error(e);process.exitCode=1;});

@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
+  appearances:{preview:id=>ipcRenderer.invoke('appearance:preview',id),foot:(x,y,size)=>ipcRenderer.send('appearance:foot',{x,y,size}),onFoot:cb=>{const fn=(_e:unknown,p:{x:number;y:number;size:number})=>cb(p);ipcRenderer.on('appearance:foot',fn);return()=>ipcRenderer.removeListener('appearance:foot',fn);}},
   relationships: {
     get: () => ipcRenderer.invoke('relationships:get'),
     save: (from,to,settings) => ipcRenderer.invoke('relationships:save',from,to,settings),
@@ -131,6 +132,9 @@ const api: QBotApi = {
     },
   },
   room: {
+    get3d: () => ipcRenderer.invoke('room:get3d'),
+    save3d: state => ipcRenderer.invoke('room:save3d',state),
+    on3dChanged: cb => { const fn=(_e:unknown,state:import('../shared/room3d').Room3dState)=>cb(state);ipcRenderer.on('room:3dChanged',fn);return ()=>ipcRenderer.removeListener('room:3dChanged',fn); },
     openTea3d: () => ipcRenderer.send('room:openTea3d'),
     openDecorEditor: () => ipcRenderer.send('room:openDecorEditor'),
     openHome: () => ipcRenderer.send('room:openHome'),

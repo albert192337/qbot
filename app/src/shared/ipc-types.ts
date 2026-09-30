@@ -28,6 +28,8 @@ export interface CharacterMeta {
 export interface CloudAccount { connected: boolean; unlimited?: boolean; credits: number; providers: ImageProvider[] }
 
 export interface Settings {
+  /** 房间渲染方式，未设置时使用 3D。 */
+  roomRenderMode?: '2d' | '3d';
   socialPoses?: Record<string, string>;
   socialLastRoom?: CreateRoomInput;
   generationMode?: 'cloud' | 'local';
@@ -443,6 +445,7 @@ export type CraftResult =
   | { ok: false; error: string };
 
 export interface QBotApi {
+  appearances:{preview(id:string):Promise<void>;foot(x:number,y:number,size:number):void;onFoot(cb:(p:{x:number;y:number;size:number})=>void):()=>void};
   desktop: {
     openMenu(): void;
     get(): Promise<import('./desktop-visibility').DesktopVisibility>;
@@ -637,6 +640,9 @@ export interface QBotApi {
     onError(cb: (msg: string) => void): () => void;
   };
   room: {
+    get3d(): Promise<import('./room3d').Room3dState | null>;
+    save3d(state: import('./room3d').Room3dState): Promise<import('./room3d').Room3dState>;
+    on3dChanged(cb: (state: import('./room3d').Room3dState) => void): () => void;
     /** Open the separate 3D tea room specimen. */
     openTea3d(): void;
     /** Open the local room decoration editor. */

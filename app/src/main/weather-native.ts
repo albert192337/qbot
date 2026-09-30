@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process';
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import type { Rectangle } from 'electron';
 import { WEATHER_FADE_MS } from '../shared/weather';
 import { WEATHER_NATIVE_SOURCE } from './weather-native-source';
@@ -9,13 +11,16 @@ export interface NativeWeatherHost {
   handle: string;
 }
 
-export function startNativeWeather(bounds: Rectangle, directory: string, onLost: () => void, preview = false): Promise<NativeWeatherHost> {
+export async function startNativeWeather(bounds: Rectangle, directory: string, onLost: () => void, preview = false): Promise<NativeWeatherHost> {
   if (![bounds.x,bounds.y,bounds.width,bounds.height].every(Number.isSafeInteger)) return Promise.reject(new Error('Invalid screen bounds'));
   const script = `$ErrorActionPreference='Stop'\n$ProgressPreference='SilentlyContinue'\n[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)\n` +
     `Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing -TypeDefinition @'\n${WEATHER_NATIVE_SOURCE}\n'@\n` +
     `[WeatherNative]::Run(${process.pid},${bounds.x},${bounds.y},${bounds.width},${bounds.height},[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer.from(directory).toString('base64')}')),$${preview},${WEATHER_FADE_MS})`;
+  // The animated compositor exceeds Windows' command-line length limit when base64 encoded.
+  const scriptFile=path.join(directory,'weather-host.ps1');
+  await writeFile(scriptFile,'\uFEFF'+script,'utf8');
   return new Promise((resolve, reject) => {
-    const child = spawn('powershell.exe', ['-NoProfile','-NoLogo','-NonInteractive','-STA','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')], {
+    const child = spawn('powershell.exe', ['-NoProfile','-NoLogo','-NonInteractive','-STA','-ExecutionPolicy','Bypass','-File',scriptFile], {
       windowsHide: true, stdio: ['pipe','pipe','pipe'],
     });
     let disposed=false, ready=false, buffer='', errors='', id=0;

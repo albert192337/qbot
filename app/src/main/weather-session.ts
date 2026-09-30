@@ -1,7 +1,7 @@
-import type { WeatherKind } from '../shared/weather';
+import type { VisualWeatherKind } from '../shared/weather';
 
 export interface WeatherSurface {
-  transition(kind: WeatherKind | null): Promise<void>;
+  transition(kind: VisualWeatherKind | null): Promise<void>;
   dispose(): void;
 }
 
@@ -11,12 +11,12 @@ export class WeatherSession {
   private queue: Promise<void> = Promise.resolve();
   private generation = 0;
   private pending = 0;
-  current: WeatherKind | null = null;
+  current: VisualWeatherKind | null = null;
   get busy(): boolean { return this.pending > 0; }
 
   constructor(private readonly create: () => Promise<WeatherSurface>) {}
 
-  change(kind: WeatherKind | null): Promise<void> {
+  change(kind: VisualWeatherKind | null): Promise<void> {
     const generation = this.generation;
     this.pending++;
     const work = this.queue.then(async () => {

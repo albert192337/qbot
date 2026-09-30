@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {mkdtempSync} from 'node:fs';import {tmpdir} from 'node:os';import path from 'node:path';import {randomUUID} from 'node:crypto';
+import {Gardens} from '../rooms/garden.mjs';
+const now=Date.UTC(2026,8,29,8),contacts={people:{owner:{nickname:'owner'},other:{nickname:'other'}},areFriends:()=>true};
+const file=path.join(mkdtempSync(path.join(tmpdir(),'qbot-appearance-server-')),'gardens.json');let db=new Gardens(file,contacts,()=>now);
+const get=actor=>db.handle('owner',{action:'get',actor}).state;
+const act=(command,operation=`${now}-${randomUUID()}`)=>db.handle('owner',{action:'act',actor:'one',command,operation});
+get('one');get('two');db.ensure('other','foreign');db.ensure('owner').state.coins=20000;
+const purchase=`${now}-${randomUUID()}`;act({type:'buyAppearance',item:'petal-steps'},purchase);act({type:'buyAppearance',item:'petal-steps'},purchase);assert.equal(get('one').coins,16000);
+act({type:'equipAppearance',item:'petal-steps',actor:'one'});act({type:'equipAppearance',item:'petal-steps',actor:'two'});assert.equal(get('one').economy.appearances.equipped['petal-steps'],'two');
+assert.throws(()=>act({type:'equipAppearance',item:'petal-steps',actor:'foreign'}),/自己的|自己已有/);
+assert.equal(db.ensure('other').state.economy.appearances.owned['petal-steps'],undefined);
+db=new Gardens(file,contacts,()=>now);act({type:'buyAppearance',item:'petal-steps'},purchase);assert.equal(get('one').coins,16000);assert.equal(get('one').economy.appearances.equipped['petal-steps'],'two');
+act({type:'equipAppearance',item:'petal-steps',actor:null});assert.deepEqual(get('one').economy.appearances.equipped,{});
+console.log('PASS appearance server: replay-safe purchase, own-account equipment, exclusive transfer, restart and unequip');

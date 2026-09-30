@@ -31,6 +31,7 @@ export async function setNetworkGarden(enable:boolean):Promise<void>{if(getRehea
 export async function networkAction(command:GardenCommand):Promise<GardenResult>{
   const s=await getSettings(),file=pendingFile();
   await gardenRequest({action:'get',actor:s.activeCharacter});
+  if(command.type==='equipAppearance'&&command.actor){const registered=await gardenRequest({action:'get',actor:command.actor});if(!registered.ok)throw Error(String(registered.error));}
   const realm=gardenRealm();
   let pending=await readPending();
   if(pending&&(pending.realm!==realm||pending.actor!==(s.activeCharacter??undefined)||JSON.stringify(pending.command)!==JSON.stringify(command)))throw Error('上一次联机操作尚未确认，请切回原角色并重试该操作后继续');

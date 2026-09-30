@@ -1,3 +1,4 @@
+import {renderAppearanceShop} from './appearance-shop';
 import { renderCharacterHeader } from './character-header';
 import { renderCapsule,renderSocialGuide,renderSocialWeather,renderSocialTravel } from './social-economy';
 import type { CharacterMeta } from '../../shared/ipc-types';
@@ -53,7 +54,7 @@ let previewPlotCount: number | null = null;
 const previewSpecimens=new Map<number,{species:'strawberry'|'pineapple';traits:Trait[]}>();
 function previewSpecimen(index:number){
     if(!previewSpecimens.has(index)){
-        const colors:Trait[]=['purple','golden','jade','frost'];
+        const colors:Trait[]=['purple','golden','jade','frost','crystal','rainbow','nebula'];
         const forms:Trait[]=['giant','twin','shiny'];
         const traits:Trait[]=[colors[Math.floor(Math.random()*colors.length)],forms[Math.floor(Math.random()*forms.length)]];
         if(!traits.includes('shiny')&&Math.random()<.5)traits.push('shiny');
@@ -545,7 +546,7 @@ function render(): void {
     const lifeContext={state,act,go,refresh:()=>refresh(true),notice,busy,plantArt};
     if(state.life?.pending&&page!=='sprays')content.append(button('继续处理喷雾结果',()=>go('sprays'),'primary'));
     if(state.economy&&(page==='plots'||page==='bag'))renderSocialGuide(content,state,act,go);
-    if(page==='capsule')renderCapsule(content,state,act);
+    if(page==='capsule'){renderAppearanceShop(content,state,act);renderCapsule(content,state,act);}
     else if(page==='notebook'&&state.v3)renderNotebook(content,state,act,go);
     else if(page==='daily'||page==='shop'){
         const tabs=el('nav',undefined,'tabs shop-tabs');tabs.setAttribute('aria-label','商店分类');

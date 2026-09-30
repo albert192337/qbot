@@ -20,6 +20,8 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          'appearance-preview': resolve(__dirname, 'src/renderer/appearance-preview/index.html'),
+          'appearance-overlay': resolve(__dirname, 'src/renderer/appearance-overlay/index.html'),
           tea3d: resolve(__dirname, 'src/renderer/tea3d/index.html'),
           'spine-preview': resolve(__dirname, 'src/renderer/spine-preview/index.html'),
           'pet-hint': resolve(__dirname, 'src/renderer/pet-hint/index.html'),

@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "checks": [
+    "embedded 3D default",
+    "persisted layout and walls",
+    "active character and peers",
+    "hidden members",
+    "live saved edits",
+    "2D/3D switch preserves separate saves",
+    "reopen restores 3D",
+    "invalid state rejected"
+  ],
+  "errors": []
+}

@@ -1,0 +1,21 @@
+{
+  "pid": 29232,
+  "name": "@qbot/app",
+  "path": "C:\\Users\\beta\\Documents\\Codex\\2026-08-25\\github-albert192337-qbot\\app",
+  "windows": [
+    {
+      "id": 2,
+      "title": "听雨茶室 · 房间装扮",
+      "url": "file:///C:/Users/beta/Documents/Codex/2026-08-25/github-albert192337-qbot/app/out/renderer/tea3d/index.html?desktop=1&live=1",
+      "visible": true,
+      "dirty": false
+    },
+    {
+      "id": 1,
+      "title": "QBot Pet",
+      "url": "file:///C:/Users/beta/Documents/Codex/2026-08-25/github-albert192337-qbot/app/out/renderer/pet/index.html",
+      "visible": false,
+      "dirty": false
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { createFarmArt } from './farm-art';
 import { gardenSceneLayout } from '../../shared/garden-scene-layout';
 
 const urls = {
@@ -15,10 +16,11 @@ export function createFarmScene(onLayout, onError) {
   element.setAttribute('aria-label', '立体花园');
   const renderer = new T.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' });
   renderer.setClearColor(0, 0); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-  renderer.outputColorSpace = T.SRGBColorSpace; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25;
+  renderer.outputColorSpace = T.SRGBColorSpace; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   renderer.domElement.className = 'farm-canvas'; element.append(renderer.domElement);
   const scene = new T.Scene(), world = new T.Group(); scene.add(world);
-  scene.add(new T.HemisphereLight('#fffce5', '#adc39b', 2.1));
+  const art = createFarmArt();
+  scene.add(new T.HemisphereLight('#fffce5', '#829476', 1.6));
   const sun = new T.DirectionalLight('#fff3da', 2.5); sun.position.set(-3, 9, 6); scene.add(sun);
   const camera = new T.PerspectiveCamera(34, 1, .05, 150);
   const models = new Map(), loads = new Map(), textures = new Map();
@@ -45,7 +47,7 @@ export function createFarmScene(onLayout, onError) {
   const terrainGeometries=new Set();
   function mesh(g, m, parent = world) { const o = new T.Mesh(g, m); parent.add(o); return o; }
   function slab(x, y, z, w, h, d, m, parent = world) { const o = mesh(box, m, parent); o.position.set(x, y, z); o.scale.set(w, h, d); return o; }
-  const grass = material('#93bb73'), edge = material('#b29467'), soil = material('#947052'), path = material('#e7d3a7');
+  const grass = art.groundMaterial('grass'), edge = material('#827155'), soil = art.groundMaterial('soil');
   const soilRim=material('#795941'),furrow=material('#805d43'),crumb=material('#b08b66');
   const flowerPetals=[material('#fff5d8'),material('#ecc7c0')],flowerCenter=material('#e9bd58');
   const greens = [material('#91bf8c'), material('#b4d5a2'), material('#719e78')];
@@ -104,6 +106,26 @@ export function createFarmScene(onLayout, onError) {
       if (species === 'pineapple' && o.material.name !== 'pineapple-crown') {
         if (tint) { o.material.map = null; o.material.color.set(tint); }
       }
+      const rainbow=traits.some(t=>['rainbow','prism','nebula'].includes(t));
+      const icy=traits.some(t=>['crystal','frost','dew'].includes(t));
+      if ((rainbow||icy||traits.includes('golden')) && (species==='strawberry'||(species==='pineapple'&&o.material.name!=='pineapple-crown'))) {
+        const previous=o.material.onBeforeCompile;
+        o.material.roughness=icy?.2:.3; o.material.metalness=traits.includes('golden')?.55:.18;
+        o.material.onBeforeCompile=shader=>{
+          previous(shader);
+          shader.vertexShader='varying vec3 fruitPoint;\n'+shader.vertexShader;
+          shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nfruitPoint=position;');
+          shader.fragmentShader='varying vec3 fruitPoint;\n'+shader.fragmentShader;
+          const mask=species==='strawberry'?'fruitMask':'1.0';
+          shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
+            float sheen=pow(1.0-abs(dot(normalize(vNormal),normalize(vViewPosition))),2.0);
+            vec3 spectrum=0.58+0.42*cos(fruitPoint.y*9.0+fruitPoint.x*5.0+vec3(0.0,2.1,4.2));
+            diffuseColor.rgb=mix(diffuseColor.rgb,${rainbow?'spectrum':'vec3(0.64,0.86,0.98)'},${mask}*${rainbow?'.8':'.18'});
+            diffuseColor.rgb+=${mask}*sheen*vec3(0.22,0.18,0.26);
+          `);
+        };
+        o.material.customProgramCacheKey=()=>`farm-special-${species}-${rainbow}-${icy}`;
+      }
     });
     const bounds = new T.Box3().setFromObject(object), center = bounds.getCenter(new T.Vector3()), dimensions = bounds.getSize(new T.Vector3());
     const factor = Math.min(size / dimensions.y, (traits.includes('giant')?1.02:.86) / Math.max(dimensions.x, dimensions.z));
@@ -147,11 +169,9 @@ export function createFarmScene(onLayout, onError) {
       bloom(side*(layout.width/2-.27),layout.depth/2-.43,i);
       bloom(side*(layout.width/2-.45),-layout.depth/2+.3,i+1);
     }
-    // Sandy lanes belong to the shared terrain, rather than separate trays.
-    for (let x = -layout.width / 2 + 2.75; x < layout.width / 2 - .4; x += 2.75) slab(x - .125, .084, 0, .48, .02, layout.depth - .25, path);
-    for (let z = -layout.depth / 2 + 2.75; z < layout.depth / 2 - .4; z += 2.75) slab(0, .084, z - .125, layout.width - .25, .02, .48, path);
+    art.paths(world, layout);
     layout.cells.forEach((cell, n) => {
-      const p = plots[n], m = soil.clone(); cropMaterials.add(m); tileMaterials.set(p.index, m);
+      const p = plots[n], m = soil.clone(); m.onBeforeCompile=soil.onBeforeCompile; m.customProgramCacheKey=soil.customProgramCacheKey; cropMaterials.add(m); tileMaterials.set(p.index, m);
       const rim=mesh(soilPatch,soilRim);rim.position.set(cell.x,.058,cell.z);rim.scale.set(1.035,.9,1.035);rim.userData.plotIndex=p.index;
       const plotMesh=mesh(soilPatch,m);plotMesh.position.set(cell.x,.082,cell.z);plotMesh.userData.plotIndex=p.index;
       for(let k=0;k<3;k++){const o=mesh(leaf,crumb);o.position.set(cell.x+[-.31,.32,.27][k],.158,cell.z+[.28,.25,-.3][k]);o.scale.set(.022+k*.007,.012,.018+k*.004);o.rotation.y=k;}
@@ -161,9 +181,11 @@ export function createFarmScene(onLayout, onError) {
       }
       shadow(cell.x, cell.z, .4);
       const crop = new T.Group(); crop.userData.plotIndex=p.index; crop.position.set(cell.x, .16, cell.z); world.add(crop);
-      if (p.stage === 'hidden' || !urls[p.species]) { fallback(crop, p, version); return; }
+      if (p.stage === 'hidden') { sprout(crop,true); art.effects(crop,[],true); return; }
+      if (!urls[p.species]) { fallback(crop, p, version); return; }
       if (p.stage !== 'ripe') { sprout(crop, p.stage === 'young'); return; }
       crop.userData.species = p.species;
+      art.effects(crop,p.traits);
       load(p.species).then(template => {
         if (disposed || version !== revision) return;
         const fruit = specimen(template, p.traits.includes('giant') ? 1.2 : .98, p.traits, p.species);
@@ -174,7 +196,8 @@ export function createFarmScene(onLayout, onError) {
           const twin=specimen(template,.74,p.traits,p.species);if(p.species==='strawberry'){twin.scale.multiplyScalar(.48);twin.position.y+=.27;}else twin.scale.multiplyScalar(.7);
           twin.position.x+=.23;twin.position.z+=.07;crop.add(twin);
         }
-        element.dataset.models = String(world.children.filter(o => o.userData.species && o.children.length).length);
+        crop.userData.modelReady = true;
+        element.dataset.models = String(world.children.filter(o => o.userData.modelReady).length);
         if (p.species === 'pineapple') { const leaves = new T.Group(); leaves.scale.set(.7, .45, .7); sprout(leaves, true); crop.add(leaves); }
         requestPaint();
       }).catch(() => { if (!disposed && version === revision) { element.dataset.assetFallback = 'true'; fallback(crop, p, version); } });
@@ -222,7 +245,7 @@ export function createFarmScene(onLayout, onError) {
       b.style.cssText = `left:${minX}px;top:${minY}px;width:${maxX-minX}px;height:${maxY-minY}px;z-index:${Math.round(maxY)};`;
       const center=project(cell.x,.15,cell.z);b.dataset.screenX=String(x+center.x);b.dataset.screenY=String(y+center.y);
       b.classList.toggle('selected', plots[n].index === selected);
-      tileMaterials.get(plots[n].index)?.color.set(plots[n].index === selected ? '#b58a60' : '#947052');
+      tileMaterials.get(plots[n].index)?.color.set(plots[n].index === selected ? '#ffe1a8' : '#ffffff');
       const foot = project(cell.x + .63, .15, cell.z + .4);
       placements.push({ index: plots[n].index, x: Math.max(0, Math.min(innerWidth, x + foot.x)), y: Math.max(0, Math.min(innerHeight, y + foot.y)) });
     });
@@ -272,7 +295,7 @@ export function createFarmScene(onLayout, onError) {
       models.forEach(disposeModel); textures.forEach(p => p.then(t => t.dispose()).catch(() => {}));
       cropMaterials.forEach(m => m.dispose()); materials.forEach(m => m.dispose()); geometries.forEach(g => g.dispose());
       terrainGeometries.forEach(g=>g.dispose());
-      renderer.dispose(); renderer.forceContextLoss(); element.remove();
+      art.dispose(); renderer.dispose(); renderer.forceContextLoss(); element.remove();
     },
   };
 }

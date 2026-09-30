@@ -1,3 +1,5 @@
+import { getRoom3d, saveRoom3d } from './room3d-store';
+import { setRoomRenderMode } from './windows';
 import { workIdleMilliseconds } from './work-input';
 import { openTea3dPreview } from './tea3d-preview';
 import { registerRoomPetMenu } from './rooms/room-pet-menu';
@@ -6,6 +8,7 @@ import {registerDesktopOverlays} from './desktop-overlays';
 import {registerPetHints} from './pet-hint';
 import { saveResourceAnnotation, saveScenePools } from './resource-settings';
 import { registerSocialIpc } from './social-ipc';
+import { registerAppearances } from './appearances';
 import { registerRelationshipsIpc } from './relationships-ipc';
 import { moveRoomPetWindow } from './windows';
 import { imageChoices, selectedImage, saveCover } from './character-images';
@@ -81,6 +84,7 @@ export function registerIpc(): void {
   registerPetHints();
   registerDesktopOverlays((id,kind)=>id===getPetWindow()?.webContents.id||(kind==='speech'&&id===getBubbleWindow()?.webContents.id)||(kind==='cultivation'&&isGardenStrip(id)));
   registerSocialIpc();
+  registerAppearances();
   registerRelationshipsIpc();
   ipcMain.handle('behavior:getIdlePlan',(_ev,id:string)=>getIdlePlan(id));
   ipcMain.handle('memory:retry', async () => {
@@ -229,6 +233,8 @@ export function registerIpc(): void {
 
   // ── room ───────────────────────────────────────────────
   // 旧的小房间调用兼容到统一联机空间；房间场景由联机空间内的展示模式控制。
+  ipcMain.handle('room:get3d',()=>getRoom3d());
+  ipcMain.handle('room:save3d',async (_ev,state)=>{const saved=await saveRoom3d(state);sendToWindows('room:3dChanged',saved);return saved;});
   ipcMain.on('room:open', () => createLoungeWindow());
   ipcMain.on('room:openDecorEditor', () => createConsoleWindow('furnish'));
   ipcMain.on('room:openTea3d', () => openTea3dPreview());
@@ -280,7 +286,9 @@ export function registerIpc(): void {
   // ── settings ───────────────────────────────────────────
   ipcMain.handle('settings:get', () => getSettings());
   ipcMain.handle('settings:set', async (_ev, patch) => {
+    if(patch?.roomRenderMode!==undefined&&!['2d','3d'].includes(patch.roomRenderMode))throw new Error('房间模式无效');
     const next = await setSettings(patch);
+    if(patch?.roomRenderMode)setRoomRenderMode(patch.roomRenderMode);
     if (typeof patch?.petScale === 'number') setPetScale(patch.petScale); // 实时生效
     if (typeof patch?.foregroundObservationEnabled === 'boolean') {
       setForegroundObservationEnabled(patch.foregroundObservationEnabled);
@@ -296,9 +304,8 @@ export function registerIpc(): void {
   // （原 studio:open / market:open 两条 IPC 是死代码，合并改造）
   ipcMain.on('ui:openNursery', (_ev, create?: boolean) => createNurseryWindow(create === true));
   ipcMain.handle('ui:returnToDesktop', async () => {
-    if (getRoomsStatus().phase === 'in-room') await setRoomDisplayMode('desktop');
-    else closeRoomWindow();
-    getPetWindow()?.showInactive();
+    if (getRoomsStatus().phase === 'in-room') await setRoomDisplayMode('room');
+    else openRoomWindow('QBot 我的小屋');
   });
   ipcMain.on('ui:openConsole', (_ev, pane?: ConsolePane) => createConsoleWindow(pane));
   ipcMain.handle('market:list', () => listSkins());

@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "characters": [
+    "Spine 张起灵",
+    "Spine 吴邪",
+    "张起灵",
+    "小青",
+    "小白狗 · 表情包"
+  ],
+  "checks": [
+    "portal opens, character emerges, portal closes",
+    "Spine walk footfalls emit petals at skeleton foot positions",
+    "blue fire follows movement and fades",
+    "native pointer drag",
+    "bounded transient lifetime",
+    "mode switch cancellation",
+    "reduced motion",
+    "character switch",
+    "dark and light backgrounds",
+    "760px layout",
+    "hidden rendering pause"
+  ],
+  "errors": []
+}

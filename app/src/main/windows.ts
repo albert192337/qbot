@@ -1,3 +1,4 @@
+import { installRoom3dHitTest } from './tea3d-desktop';
 /** 窗口管理：桌宠透明置顶窗 + 孵化常规窗 + 小房间窗 + dock 显隐协调 */
 import { BrowserWindow, app, screen, shell } from 'electron';
 import { trackDesktopWindow, allowDesktopWindow, desktopQuiet, desktopHidden, desktopSnapshot, onDesktopVisibilityChanged, windowPeeking, setPairedMember } from './desktop-visibility';
@@ -46,6 +47,10 @@ let beforeVisit: { x: number; y: number } | null = null;
 let roomWindowBoundsChanged: (() => void) | null = null;
 let roomWindowClosed: (() => void) | null = null;
 let roomSizePreset: RoomSizePreset = 'small';
+let roomRenderMode: '2d'|'3d'='3d';
+export function setRoomRenderMode(mode: '2d'|'3d'): void {const next=mode==='2d'?'2d':'3d';if(next===roomRenderMode)return;roomRenderMode=next;if(roomWindow&&!roomWindow.isDestroyed()){setRoomSizePreset(roomSizePreset);loadRoomScene(roomWindow);}}
+function loadRoomScene(win:BrowserWindow):void {win.setIgnoreMouseEvents(false);if(roomRenderMode==='3d')load(win,'tea3d',{desktop:'1',live:'1'});else load(win,'online-room');}
+function roomHeight(width:number):number{return Math.ceil(width*(roomRenderMode==='3d'?.62:.295));}
 
 /**
  * 摆放固定尺寸的透明窗，**每次都重申权威尺寸**。
@@ -95,7 +100,7 @@ export function setPetScale(scale: number): void {
   syncBubbleBounds();
 }
 
-type RendererPage = 'social' | 'pet' | 'online-room' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat' | 'sign';
+type RendererPage = 'tea3d' | 'social' | 'pet' | 'online-room' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat' | 'sign';
 
 let chatWindow: BrowserWindow | null = null;
 const desktopWindowGroup = () => [petWindow, desktopSign?.getWindow() ?? null, bubbleWindow, chatWindow];
@@ -200,6 +205,7 @@ export function broadcastCharacterActivated(meta: CharacterMeta): void {
   }
   activePlayables = ids;
   const pet = petWindow && !petWindow.isDestroyed() ? petWindow : createPetWindow();
+  if(!roomWindow&&!desktopHidden())openRoomWindow('QBot 我的小屋');
   pet.webContents.send('characters:activated', meta);
   if(nurseryWindow&&!nurseryWindow.isDestroyed())nurseryWindow.webContents.send('characters:activated',meta);
   if(consoleWindow&&!consoleWindow.isDestroyed())consoleWindow.webContents.send('characters:activated',meta);
@@ -512,7 +518,7 @@ export function setPetVisitMode(enter: boolean, partner?: string): void {
 
 export function moveRoomWindow(x: number, y: number): void {
   const s = roomSize();
-  moveFixedSize(roomWindow, x, y, { width: s, height: Math.ceil(s*.295) });
+  moveFixedSize(roomWindow, x, y, { width: s, height: roomHeight(s) });
   roomWindowBoundsChanged?.();
 }
 
@@ -544,7 +550,7 @@ export function setRoomSizePreset(preset: RoomSizePreset): RoomSizePreset {
   const current = roomWindow.getBounds();
   const display = screen.getDisplayMatching(current);
   const size = roomSize(display);
-  const height = Math.ceil(size * .295);
+  const height = roomHeight(size);
   const x = Math.max(
     display.workArea.x,
     Math.min(
@@ -575,7 +581,7 @@ export function openRoomWindow(title: string): BrowserWindow {
   const display = screen.getPrimaryDisplay();
 
   const size = roomSize(display);
-  const height = Math.ceil(size * .295);
+  const height = roomHeight(size);
   const { workArea } = display;
   roomWindow = new BrowserWindow({
     show:false,
@@ -609,7 +615,8 @@ export function openRoomWindow(title: string): BrowserWindow {
     if (process.platform === 'darwin' && !consoleWindow && !nurseryWindow && !loungeWindow) app.dock?.hide();
   });
   roomWindow.on('move', () => roomWindowBoundsChanged?.());
-  load(roomWindow, 'online-room');
+  installRoom3dHitTest(roomWindow,()=>roomRenderMode==='3d');
+  loadRoomScene(roomWindow);
   return roomWindow;
 }
 

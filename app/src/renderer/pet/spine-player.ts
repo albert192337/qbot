@@ -75,6 +75,13 @@ export class SpinePlayer {
     if(this.ready)this.select();this.schedule();
   }
   setExpression(value:SpineExpression|null){this.expression=value;}
+  /** Read-only pose for scene effects; UV uses the same fixed camera as rendering. */
+  getSceneFeet(){
+    if(!this.ready)return null;
+    const entry=this.state.getCurrent(0);
+    const point=(name:string)=>{const b=this.sk.findBone(name);return b?{x:(b.worldX+310)/620,y:(550-b.worldY)/620}:null;};
+    return {left:point('foot_L'),right:point('foot_R'),time:entry?.trackTime??0,duration:entry?.animationEnd??1,action:this.action};
+  }
   /** Stable skeleton-space anchors in the fixed 620-unit canvas projection (top-left UV).
    * Scene adapters can align a pelvis to furniture without resizing by animated alpha bounds. */
   getSceneAnchor(kind:'seat'|'floor'):{x:number;y:number}|null {

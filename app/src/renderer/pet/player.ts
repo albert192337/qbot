@@ -147,6 +147,7 @@ export class Player {
   }
 
   setSpineExpression(expression:SpineExpression|null):void {this.spine?.setExpression(expression);}
+  getSceneFeet(){return this.current?null:this.spine?.getSceneFeet()??null;}
 
   /** 硬切到指定动作（同动作重复调用 = 从头重播） */
   play(action: PlayableId): void {

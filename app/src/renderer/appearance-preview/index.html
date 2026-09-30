@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>月蚀 · 外观试衣间</title></head>
+<body>
+<header><a class="wordmark">QBOT <span>ATELIER</span></a><div class="header-right"><span class="preview-badge">外观试作</span><label>试穿角色<select id="character" aria-label="试穿角色"></select></label></div></header>
+<main>
+  <aside><span class="eyebrow">COLLECTION 001 / 月蚀</span><h1>留下一点<br>不寻常。</h1><p class="intro">一道光，一径落花，<br>还有转身时未熄的蓝焰。</p>
+    <nav aria-label="外观效果">
+      <button class="effect active" data-effect="portal" aria-pressed="true"><span class="number">01</span><span><strong>月蚀之门</strong><small>裂隙微亮，从暗处走来</small></span><i>↗</i></button>
+      <button class="effect" data-effect="footprints" aria-pressed="false"><span class="number">02</span><span><strong>步生花</strong><small>落脚成花，花瓣随步轻扬</small></span><i>↗</i></button>
+      <button class="effect" data-effect="echo" aria-pressed="false"><span class="number">03</span><span><strong>苍蓝幽焰</strong><small>苍蓝火舌，随拖动卷起</small></span><i>↗</i></button>
+    </nav>
+    <div class="palette"><span></span><span></span><span></span><span></span><p>雾银 · 月白 · 灰紫</p></div>
+    <p class="aside-note">独立试穿，不改变正式角色与存档。</p>
+  </aside>
+  <section class="showroom" aria-label="外观动态预览">
+    <div class="scene-top"><span id="scene-label">01 — 月蚀之门</span><button id="backdrop" aria-label="切换明暗背景">浅色背景 ◐</button></div>
+    <div id="viewport"><div id="scene"></div><div class="scene-caption"><span id="hint">一道裂隙，短暂相逢。</span></div></div>
+    <div class="scene-bottom"><div><span class="live-dot"></span><span id="status" role="status">正在准备角色…</span></div><button id="replay" disabled>再次入场 <span>↗</span></button></div>
+  </section>
+</main>
+<footer><span>月蚀 / 外观动作样板</span><span>入场 · 足迹 · 拖拽残影</span><label><input type="checkbox" id="reduced"> 减少动态效果</label></footer>
+<script type="module" src="./main.ts"></script>
+</body></html>

@@ -118,6 +118,7 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
     return serial(async () => {
         try {
             const settings=await getSettings();
+            if(command?.type==='equipAppearance'&&command.actor!==null&&!await (await import('../characters')).getCharacter(command.actor))throw Error('请选择本机已有的角色');
             if(getRehearsal()){const rehearsal=getRehearsal()!;rehearsal.initializeOwn((await load()).state);const result=rehearsal.act(command,settings.activeCharacter??undefined);for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');return result;}
             if(settings.gardenOnline){
                 if(command?.type==='box')return {ok:false,error:'陪伴开箱已退役，请到家具商店看看'};
@@ -132,6 +133,7 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
             applyWeatherMutations(state,Date.now());
             enableV3(state,Date.now());
             ensureLife(state,Date.now(),rng,settings.activeCharacter??undefined);
+            if(command.type==='equipAppearance'&&command.actor)ensureLife(state,Date.now(),rng,command.actor);
             const result = transition(state, command, Date.now(), rng, { musicPlaying: getMusicStatus().playing, actor:settings.activeCharacter??undefined });
             const summary=gardenJournalSummary(state,result.state,command,result.reveal);
             if(summary){const at=Date.now(),actor=participant??(await getSettings()).activeCharacter??'default';result.state.journalEvents=[...(result.state.journalEvents??[]).filter(e=>at-e.at<7*86400000),{at,actor,summary:summary.slice(0,500)}].slice(-300);}

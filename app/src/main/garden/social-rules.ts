@@ -3,6 +3,7 @@ import { gardenDay,dailyRandom } from '../../shared/garden-life';
 import { SPECIES, type GardenState, type GardenCommand, type GardenReveal, type Trait } from '../../shared/garden';
 import { geneSlots, recordGarden, v3Value,weekKey } from '../../shared/garden-v3';
 import type { Random } from './rules';
+import {appearance} from '../../shared/appearances';
 
 export function enableSocialEconomy(s:GardenState,now:number):boolean {
   if(s.economy){const before=JSON.stringify(s.economy);refreshSocial(s,now);return before!==JSON.stringify(s.economy);}
@@ -17,6 +18,7 @@ export function enableSocialEconomy(s:GardenState,now:number):boolean {
 }
 export function refreshSocial(s:GardenState,now:number):void {
   const e=s.economy;if(!e)return;const day=Math.max(e.day,gardenDay(now));
+  e.appearances??={owned:{},equipped:{}};
   if(e.capsuleRevision!==2){
     for(const id of RETIRED_FURNITURE)delete e.furniture[id];
     if(e.furnitureReservation&&RETIRED_FURNITURE.includes(e.furnitureReservation.item))delete e.furnitureReservation;
@@ -40,6 +42,22 @@ export function socialTransition(s:GardenState,c:GardenCommand,now:number,rng:Ra
   const e=s.economy;if(!e)return {handled:false};refreshSocial(s,now);
   const reveal=(title:string,message:string):{handled:true;reveal:GardenReveal}=>({handled:true,reveal:{title,message}});
   switch(c.type){
+    case 'buyAppearance':{
+      const item=appearance(c.item);if(!item)throw Error('外观不存在');
+      const inventory=e.appearances!;if(inventory.owned[item.id])throw Error('已经拥有这件外观');
+      if(s.coins<item.price)throw Error('花园币不足');
+      s.coins-=item.price;inventory.owned[item.id]=true;
+      recordGarden(s,now,'appearance',`解锁${item.name}`);
+      return reveal('新外观已入收藏',`${item.name}可装配给一位自己的角色。`);
+    }
+    case 'equipAppearance':{
+      const item=appearance(c.item),inventory=e.appearances!;
+      if(!item||!inventory.owned[item.id])throw Error('请先获得这件外观');
+      if(c.actor!==null&&(typeof c.actor!=='string'||!Object.hasOwn(s.life!.characters,c.actor)))throw Error('请选择自己已有的角色');
+      // A single item -> actor mapping makes reassignment atomic and exclusive.
+      if(c.actor===null)delete inventory.equipped[item.id];else inventory.equipped[item.id]=c.actor;
+      return reveal(c.actor?'外观已装配':'外观已卸下',c.actor?`${item.name}已转交给所选角色，同时只供一位角色使用。`:`${item.name}已放回收藏。`);
+    }
     case 'travelExperience':case 'travelNext':throw Error('新版旅行请先选目的地和同行角色，再出发');
     case 'tripStart':{
       const t=e.travel!;
@@ -116,14 +134,16 @@ export function socialTransition(s:GardenState,c:GardenCommand,now:number,rng:Ra
         const roll=rng.random();let tier:'common'|'rare'|'epic'=roll<.70?'common':roll<.95?'rare':'epic';
         if(e.epicMisses>=CAPSULE.epicPity-1)tier='epic';else if(e.rareMisses>=CAPSULE.rarePity-1&&tier==='common')tier='rare';
         const pool=CAPSULE_POOL.filter(x=>x.tier===tier);let pick=rng.random()*100;const item=pool.find(x=>(pick-=x.weight)<0)??pool[pool.length-1];
-        if(item.kind==='furniture'){e.furniture[item.item]=(e.furniture[item.item]??0)+item.count;recordGarden(s,now,'furniture',`扭蛋机带回${item.name}`);}
+        let duplicateTokens:number|undefined;
+        if(item.kind==='appearance'){const cosmetic=appearance(item.item)!;if(e.appearances!.owned[cosmetic.id]){duplicateTokens=cosmetic.duplicateTokens;e.tokens+=duplicateTokens;}else e.appearances!.owned[cosmetic.id]=true;}
+        else if(item.kind==='furniture'){e.furniture[item.item]=(e.furniture[item.item]??0)+item.count;recordGarden(s,now,'furniture',`扭蛋机带回${item.name}`);}
         else if(item.kind==='seed'){for(let n=0;n<item.count;n++)s.seeds.push({id:rng.id(),species:item.item as keyof typeof CROPS,genes:[],bred:false});}
         else s.fertilizers[item.item as keyof typeof s.fertilizers]=(s.fertilizers[item.item as keyof typeof s.fertilizers]??0)+item.count;
         e.rareMisses=tier==='common'?e.rareMisses+1:0;e.epicMisses=tier==='epic'?0:e.epicMisses+1;e.draws++;
-        names.push(`${item.name} ×${item.count}`);rewards.push({...item});
+        names.push(`${item.name} ×${item.count}${duplicateTokens?`（重复转换 ${duplicateTokens} 代币）`:''}`);rewards.push({...item,...(duplicateTokens?{duplicateTokens}:{})});
       }
       e.lastCapsule={id:rng.id(),at:now,rewards};
-      return reveal('扭蛋打开了',names.join('、')+' · 已收入背包与家具收藏。');
+      return reveal('扭蛋打开了',names.join('、')+' · 已收入背包与收藏。');
     }
     case 'socialWish':{
       if(!Object.hasOwn(SOCIAL_WISHES,c.kind)||e.wishClaims.includes(c.kind)||e.wishClaims.length>=2)throw Error('今日心愿奖励已领取');
@@ -151,6 +171,7 @@ export function socialTransition(s:GardenState,c:GardenCommand,now:number,rng:Ra
 export function validateSocial(s:GardenState):void {
   const e=s.economy;if(!e)return;
   const n=(x:unknown)=>Number.isSafeInteger(x)&&Number(x)>=0;
+  if(e.appearances){const a=e.appearances;if(!a.owned||!a.equipped||Object.entries(a.owned).some(([id,v])=>!appearance(id)||v!==true)||Object.entries(a.equipped).some(([id,actor])=>!appearance(id)||!a.owned[id as keyof typeof a.owned]||typeof actor!=='string'||!Object.hasOwn(s.life?.characters??{},actor)))throw Error('外观收藏或装配记录损坏');}
   if(e.version!==4||!e.furniture||!e.purchases||!e.tutorial||!Array.isArray(e.notifications)||!Array.isArray(e.weatherHistory)||!Array.isArray(e.wishClaims)||!e.wishBaseline||!n(e.day)||!n(e.tokens)||!n(e.draws)||!n(e.rareMisses)||e.rareMisses>=10||!n(e.epicMisses)||e.epicMisses>=20||Object.values(e.furniture).some(x=>!n(x)))throw Error('新版社交经济存档损坏');
   if(e.furnitureReservation&&(!n(e.furnitureReservation.price)||e.furnitureReservation.price===0||!n(e.furnitureReservation.expiresAt)||(!FURNITURE_SHOP.some(x=>x.id===e.furnitureReservation!.item)&&!RETIRED_FURNITURE.includes(e.furnitureReservation.item))||typeof e.furnitureReservation.owner!=='string'))throw Error('家具预留记录损坏');
   if(e.wishes&&(!Array.isArray(e.wishes)||e.wishes.length>2||e.wishes.some(w=>!w||!Object.hasOwn(SOCIAL_WISHES,w.kind)||typeof w.id!=='string'||typeof w.label!=='string'||typeof w.done!=='boolean'||!n(w.createdAt))))throw Error('社交心愿记录损坏');

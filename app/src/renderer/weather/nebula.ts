@@ -1,0 +1,94 @@
+/** Deterministic cloud textures, baked once; only the layers move each frame. */
+const W = 1280, H = 800;
+function noise(x: number, y: number): number {
+  const hash = (a: number, b: number) => {
+    let n = Math.imul(a, 374761393) + Math.imul(b, 668265263);
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+  };
+  const ix = Math.floor(x), iy = Math.floor(y);
+  let u = x - ix, v = y - iy;
+  u = u * u * (3 - 2 * u); v = v * v * (3 - 2 * v);
+  return (hash(ix, iy) * (1 - u) + hash(ix + 1, iy) * u) * (1 - v)
+    + (hash(ix, iy + 1) * (1 - u) + hash(ix + 1, iy + 1) * u) * v;
+}
+function fbm(x: number, y: number): number {
+  let sum = 0, amplitude = .52;
+  for (let i = 0; i < 6; i++) { sum += noise(x, y) * amplitude; x = x * 2.03 + 13.7; y = y * 2.03 + 7.1; amplitude *= .49; }
+  return sum;
+}
+function canvas() { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; }
+let textures: HTMLCanvasElement[] | undefined;
+export function nebulaLayers(): HTMLCanvasElement[] {
+  if (textures) return textures;
+  const base = canvas(), cloud = canvas(), stars = canvas();
+  const b = base.getContext('2d')!, c = cloud.getContext('2d')!, s = stars.getContext('2d')!;
+  const backdrop = b.createLinearGradient(0, 0, W * .5, H);
+  backdrop.addColorStop(0, '#151741'); backdrop.addColorStop(.5, '#343476'); backdrop.addColorStop(1, '#5366a7');
+  b.fillStyle = backdrop; b.fillRect(0, 0, W, H);
+  const data = c.createImageData(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const u = x / W, v = y / H;
+    const warp = fbm(u * 3.3 + 6, v * 3.3);
+    const n = fbm(u * 5 + warp * 2.5, v * 4 + warp * 2);
+    // A broken, curling river of light, with empty indigo pockets between filaments.
+    const river = Math.exp(-Math.pow((v - (.24 + .23 * Math.sin(u * 7 - .8)) - (warp - .5) * .9) / .22, 2));
+    const ridge = Math.pow(Math.max(0, 1 - Math.abs(n - .49) * 12), 5);
+    const density = Math.min(1, Math.max(0, (n - .27) * 1.6) * (.4 + river) + ridge * river * .23);
+    const light = Math.pow(density, 1.8), pink = .5 + .5 * Math.sin(u * 10 + v * 3);
+    const i = (y * W + x) * 4;
+    data.data[i] = 98 + light * 150 + pink * 36;
+    data.data[i + 1] = 105 + light * 151 - pink * 16;
+    data.data[i + 2] = 203 + light * 52;
+    data.data[i + 3] = Math.min(245, density * 340);
+  }
+  c.putImageData(data, 0, 0);
+  let seed = 90329;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  for (let i = 0; i < 1500; i++) {
+    const x = random() * W, y = random() * H, r = random();
+    s.fillStyle = `rgba(231,235,255,${.16 + r * .62})`;
+    s.beginPath(); s.arc(x, y, .25 + r * r * 1.05, 0, Math.PI * 2); s.fill();
+  }
+  const glow = (x: number, y: number, radius: number) => {
+    const g = s.createRadialGradient(x, y, 0, x, y, radius);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(.08, '#e7edff'); g.addColorStop(.2, '#adbfff90'); g.addColorStop(1, '#a0baff00');
+    s.fillStyle = g; s.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    s.strokeStyle = '#d8edff80'; s.lineWidth = .7;
+    s.beginPath(); s.moveTo(x - radius * .55, y); s.lineTo(x + radius * .55, y);
+    s.moveTo(x, y - radius * .7); s.lineTo(x, y + radius * .7); s.stroke();
+  };
+  for (const points of [ [[.62,.56],[.65,.4],[.71,.32],[.77,.4],[.84,.34]], [[.2,.65],[.25,.61],[.28,.48],[.35,.54]] ]) {
+    s.strokeStyle = '#bfd3ff38'; s.lineWidth = .8; s.beginPath();
+    points.forEach(([x,y],i) => { if(i===0)s.moveTo(x*W,y*H);else s.lineTo(x*W,y*H); }); s.stroke();
+    points.forEach(([x,y]) => glow(x*W,y*H,18));
+  }
+  for(let i=0;i<20;i++)glow(random()*W,random()*H,5+random()*7);
+  textures = [base, cloud, stars]; return textures;
+}
+export function drawNebula(ctx: CanvasRenderingContext2D, width: number, height: number, seconds: number) {
+  const [base, cloud, stars] = nebulaLayers();
+  ctx.globalAlpha = 1; ctx.drawImage(base, 0, 0, width, height);
+  const dx = Math.sin(seconds / 19) * width * .009, dy = Math.sin(seconds / 27) * height * .008;
+  ctx.drawImage(cloud, -width*.035+dx, -height*.035+dy, width*1.07, height*1.07);
+  ctx.globalAlpha = .76 + .15 * Math.sin(seconds / 4 + 1);
+  ctx.drawImage(stars, 0, 0, width, height); ctx.globalAlpha = 1;
+}
+export function createNebulaScene(root: HTMLElement) {
+  const element = document.createElement('section'); element.className = 'scene nebula';
+  const canvas = document.createElement('canvas'); element.append(canvas); root.append(element);
+  const ctx = canvas.getContext('2d')!, motion = matchMedia('(prefers-reduced-motion: reduce)');
+  let frame = 0, last = -Infinity; const start = performance.now();
+  const resize = () => { canvas.width = Math.min(innerWidth * devicePixelRatio, 1920); canvas.height = Math.round(canvas.width * innerHeight / innerWidth); };
+  const draw = (now: number) => {
+    frame = 0;
+    if (!document.hidden) {
+      if (now - last >= 50) { drawNebula(ctx, canvas.width, canvas.height, motion.matches ? 0 : (now-start)/1000); last = now; }
+      if (!motion.matches) frame = requestAnimationFrame(draw);
+    }
+  };
+  const resume = () => { cancelAnimationFrame(frame); last = -Infinity; draw(performance.now()); };
+  const onResize = () => { resize(); resume(); };
+  resize(); drawNebula(ctx, canvas.width, canvas.height, 0); resume(); window.addEventListener('resize', onResize); document.addEventListener('visibilitychange', resume); motion.addEventListener('change', resume);
+  return { element, dispose() { cancelAnimationFrame(frame); window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', resume); motion.removeEventListener('change', resume); element.remove(); } };
+}

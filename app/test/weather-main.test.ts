@@ -12,6 +12,20 @@ vi.mock('../src/main/weather-surface', () => ({createBitmapWeatherSurface: mocke
 import { changeWeatherTest, stopWeatherTest, weatherTestMenu, showScheduledWeather, weatherPreview } from '../src/main/weather';
 import { powerMonitor, screen } from 'electron';
 import { WEATHER_TEST_MS } from '../src/shared/weather';
+import { beginGardenWeatherTest, endGardenWeatherTest } from '../src/main/garden/service';
+it('previews nebula without applying garden mutations and restores at expiry',async()=>{
+  vi.mocked(beginGardenWeatherTest).mockClear();vi.mocked(endGardenWeatherTest).mockClear();
+  await changeWeatherTest('nebula');
+  expect(weatherPreview()).toBe('nebula');
+  expect(beginGardenWeatherTest).not.toHaveBeenCalled();
+  expect(endGardenWeatherTest).toHaveBeenCalled();
+  await showScheduledWeather('aurora',Date.now()+60000);
+  expect(weatherPreview()).toBe('nebula');
+  expect(mocked.transition).toHaveBeenLastCalledWith('nebula');
+  await vi.advanceTimersByTimeAsync(WEATHER_TEST_MS);
+  expect(mocked.transition).toHaveBeenLastCalledWith(null);
+  expect(mocked.dispose).toHaveBeenCalledTimes(1);
+});
 beforeEach(() => {
   vi.useFakeTimers(); mocked.dispose.mockClear();mocked.transition.mockReset().mockResolvedValue(undefined);
   mocked.create.mockReset().mockImplementation(async (_display, lost) => {mocked.lost=lost;return {transition:mocked.transition,dispose:mocked.dispose};});

@@ -5,6 +5,7 @@ import type {GardenVisit} from '../../shared/garden-life';
 import {cultivationRemaining} from '../../shared/garden';
 import { gardenWeatherStatus } from '../../shared/garden-weather-status';
 import { startGardenWeatherClock } from './weather-clock';
+import { weatherPreview } from '../weather';
 import { app, BrowserWindow, ipcMain, screen, powerMonitor } from 'electron';
 import path from 'node:path';
 import { getGarden, gardenAction } from './service';
@@ -203,7 +204,7 @@ export function registerGardenIpc(): void {
     ipcMain.handle('garden:journalStatus', async () => (await import('./journal-service')).journalStatus());
     ipcMain.handle('garden:rewriteDiary', async (_ev,request) => (await import('./journal-service')).rewriteDiary(request));
     ipcMain.handle('garden:generateMoment', async (_ev,requestId) => (await import('./journal-service')).generateMoment(requestId));
-    ipcMain.handle('garden:weather', async () => gardenWeatherStatus(await getGarden()));
+    ipcMain.handle('garden:weather', async () => ({...gardenWeatherStatus(await getGarden()),preview:weatherPreview()}));
     startGardenWeatherClock();
     powerMonitor.on('suspend',()=>stopPerformance());
     ipcMain.handle('garden:get', async (ev) => {

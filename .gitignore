@@ -31,6 +31,10 @@ steam_appid.txt
 output/deploy-tools/
 output/**/profile/
 output/tea3d/preview-ready.json
+output/appearance-preview/native-profile/
+output/appearance-preview/shop-trial/
+output/appearance-preview/*.pid
+output/appearance-preview/preview-ready.json
 output/work-mode/trial-profile/
 output/perch-diagnosis/ffmpeg*.exe
 output/perch-diagnosis/ffmpeg*.gz
