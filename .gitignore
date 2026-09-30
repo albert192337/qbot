@@ -42,3 +42,6 @@ output/perch-diagnosis/ffmpeg*.gz
 # Python 临时字节码
 __pycache__/
 *.py[cod]
+
+# Temporary appearance deployment bundle
+output/appearance-release.tgz

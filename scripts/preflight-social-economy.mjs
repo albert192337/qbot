@@ -13,6 +13,8 @@ for(const [id,row] of Object.entries(before.people)){
   const result=gardens.handle(id,{action:'get'}),after=result.state;
   assert.equal(after.economy.version,4);
   assert.equal(after.coins,row.state.coins);
+  for(const key of ['tokens','draws','rareMisses','epicMisses']) if(row.state.economy?.[key]!==undefined) assert.deepEqual(after.economy[key],row.state.economy[key]);
+  assert.deepEqual(after.economy.appearances,row.state.economy?.appearances??{owned:{},equipped:{}});
   const oldSeeds=new Set(row.state.seeds.map(x=>x.id));
   assert.ok(row.state.seeds.every(x=>after.seeds.some(y=>y.id===x.id)));
   const extra=after.seeds.filter(x=>!oldSeeds.has(x.id));

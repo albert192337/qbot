@@ -8,5 +8,6 @@ try{
  const result=await request({t:'garden:request',action:'get',actor:'economy-release-check'});
  assert.equal(result.ok,true);assert.equal(result.state.economy.version,4);assert.equal(result.state.economy.capsuleRevision,2);assert.equal(result.state.economy.tokens,0);
  assert.ok(Array.isArray(result.state.economy.wishes));assert.ok(result.state.economy.travel);
+ assert.deepEqual(result.state.economy.appearances,{owned:{},equipped:{}});
  console.log(JSON.stringify({ok:true,economyVersion:4,capsuleRevision:2,wishes:result.state.economy.wishes.length,travel:true,noPurchasesOrTopups:true}));
 }finally{socket.close();}

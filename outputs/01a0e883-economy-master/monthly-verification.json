@@ -1,0 +1,35 @@
+{
+  "tests": [
+    {
+      "months": 0,
+      "draws": 39,
+      "dust": 148,
+      "firstExchange": "90天内未达到",
+      "spend": 0
+    },
+    {
+      "months": 1,
+      "draws": 46,
+      "dust": 162,
+      "firstExchange": 84,
+      "spend": 30
+    },
+    {
+      "months": 2,
+      "draws": 53,
+      "dust": 176,
+      "firstExchange": 77,
+      "spend": 60
+    },
+    {
+      "months": 3,
+      "draws": 60,
+      "dust": 190,
+      "firstExchange": 70,
+      "spend": 90
+    }
+  ],
+  "errors": "{\"kind\":\"notice\",\"message\":\"Cell search matched 0 entries.\"}",
+  "baselineUnchanged": true,
+  "nativeExcelVerified": false
+}
