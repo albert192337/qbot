@@ -6,7 +6,7 @@ const terrain=(x,z)=>.1+.1*Math.sin(x*.65)+.055*Math.cos(z+x*.4);
 /** Real ground geometry with segmented painted plants. No GLB/model identity substitution. */
 export function createHybridScene(host,onLayout,onError){
  const renderer=new T.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
- renderer.setClearColor(0,0);renderer.setPixelRatio(Math.min(devicePixelRatio,1.25));renderer.outputColorSpace=T.SRGBColorSpace;
+ renderer.setClearColor(0,0);renderer.setPixelRatio(1);renderer.outputColorSpace=T.SRGBColorSpace;
  renderer.domElement.className='hybrid-canvas';host.append(renderer.domElement);
  const scene=new T.Scene(),camera=new T.OrthographicCamera(-10,10,4.6,-.7,.1,160);
  scene.add(new T.HemisphereLight('#fff5df','#91a76b',2));const sun=new T.DirectionalLight('#fff4d9',2);sun.position.set(-6,10,5);scene.add(sun);

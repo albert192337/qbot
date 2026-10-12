@@ -18,7 +18,7 @@ export async function openHybridGarden(area:Rectangle,onError:(message:string)=>
   const bounds={x:area.x,y:area.y+area.height-height,width:area.width,height};
   const physical=screen.dipToScreenRect(null,bounds);
   const win=new BrowserWindow({...bounds,show:false,transparent:true,frame:false,focusable:false,skipTaskbar:true,hasShadow:false,backgroundColor:'#00000000',title:'QBot Garden Desktop Renderer',webPreferences:{preload:path.join(__dirname,'../preload/index.js'),contextIsolation:true,sandbox:false,offscreen:true,backgroundThrottling:false}});
-  renderer=win;win.webContents.setFrameRate(18);
+  renderer=win;win.webContents.setFrameRate(12);
   let directory:string|undefined,local:GardenDesktopHost|undefined;
   const fail=(e:unknown)=>{if(current!==generation)return;console.error('[garden-desktop]',e);closeHybridGarden();onError('桌面草地暂时无法显示，可切回原版。');};
   win.on('closed',()=>{local?.dispose();if(directory)void cleanup(directory).catch(()=>{});if(renderer===win){renderer=null;host=null;generation++;}});

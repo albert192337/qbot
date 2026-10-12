@@ -1,0 +1,88 @@
+{
+  "pid": 62440,
+  "pet": {
+    "x": 1795,
+    "y": 896,
+    "width": 183,
+    "height": 183
+  },
+  "panel": {
+    "x": 1713,
+    "y": 509,
+    "width": 304,
+    "height": 380
+  },
+  "gardenReadMs": [
+    2,
+    1,
+    2
+  ],
+  "layout": {
+    "title": "花园",
+    "seeds": 3,
+    "overflow": false,
+    "scrollHeight": 314,
+    "viewportHeight": 314,
+    "canvases": 0
+  },
+  "metrics": [
+    {
+      "pid": 62440,
+      "type": "Browser",
+      "cpu": 2.0501001854177883,
+      "workingSetMB": 224,
+      "privateMB": 146
+    },
+    {
+      "pid": 39848,
+      "type": "GPU",
+      "cpu": 0.5546742953753736,
+      "workingSetMB": 267,
+      "privateMB": 373
+    },
+    {
+      "pid": 64192,
+      "type": "Utility",
+      "cpu": 0.020658886261859327,
+      "workingSetMB": 103,
+      "privateMB": 13
+    },
+    {
+      "pid": 23900,
+      "type": "Tab",
+      "cpu": 0.11965888861668608,
+      "workingSetMB": 180,
+      "privateMB": 98
+    },
+    {
+      "pid": 37804,
+      "type": "Tab",
+      "cpu": 0.31402382645892324,
+      "workingSetMB": 314,
+      "privateMB": 79
+    },
+    {
+      "pid": 64036,
+      "type": "Tab",
+      "cpu": 0.014882076088866292,
+      "workingSetMB": 137,
+      "privateMB": 47
+    },
+    {
+      "pid": 41932,
+      "type": "Tab",
+      "cpu": 0.004735105724942195,
+      "workingSetMB": 123,
+      "privateMB": 39
+    },
+    {
+      "pid": 51916,
+      "type": "Tab",
+      "cpu": 0.08587297105402389,
+      "workingSetMB": 163,
+      "privateMB": 52
+    }
+  ],
+  "totalWorkingSetMB": 1511,
+  "totalPrivateMB": 847
+}

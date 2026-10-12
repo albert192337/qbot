@@ -33,3 +33,8 @@
 .c-ui .c-space.c-panel{position:relative;background:transparent;border:0;border-radius:0;box-shadow:none;overflow:visible}
 .c-ui .c-space .c-header{position:absolute;z-index:5;top:0;right:0;width:300px;height:68px;border:2px solid #594235;border-bottom:0;border-radius:23px 23px 0 0;background:#fff9ef;padding:14px 12px;gap:6px}
 .c-ui .c-space .c-header h1{font-size:17px}.c-ui .c-space .c-header button{padding:3px}.c-ui .c-space .c-header svg{width:21px;height:21px}.c-ui .c-space .c-frame{background:transparent}
+
+@media(max-width:380px){
+ .c-ui{font-size:12px}.c-ui svg{width:20px;height:20px}.c-ui .c-header{padding:12px 12px 8px;gap:6px}.c-ui .c-header h1,.c-ui .c-header:has(.c-weather) h1{font-size:16px}.c-ui .c-header button{padding:3px}.c-ui .c-header:has(.c-weather){padding:12px 9px 8px;gap:3px}.c-ui .c-weather svg{width:18px;height:18px}.c-ui .c-weather small{font-size:10px}
+ .c-ui .c-tabs{margin:0 12px;gap:3px;padding-bottom:7px}.c-ui .c-tabs button{gap:4px;font-size:12px;padding:8px 0}.c-ui .c-tabs svg{width:18px;height:18px}.c-ui .c-content{padding:12px}.c-ui .c-content.c-embedded{padding:0}.c-ui .c-row{padding:12px 3px;gap:9px}.c-ui .c-row>svg:first-child{width:26px;height:26px}.c-ui .c-room-card{margin:12px 0 5px;padding:15px 10px}.c-ui small{font-size:11px}.c-ui .c-grid{gap:10px}.c-ui .c-app{padding:12px 4px}
+}

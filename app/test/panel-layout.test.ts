@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { panelBounds, isDesktopPanelPage } from '../src/shared/panel-layout';
+import { panelBounds, compactPanelSize, isDesktopPanelPage } from '../src/shared/panel-layout';
 describe('desktop panel anchoring',()=>{
+ it('keeps a small pet panel compact with a readable minimum and a bounded maximum',()=>{
+  expect(compactPanelSize(184)).toEqual({width:304,height:380});
+  expect(compactPanelSize(100)).toEqual({width:280,height:350});
+  expect(compactPanelSize(500)).toEqual({width:380,height:475});
+ });
  it('opens below when it fits and above at the bottom without moving the pet',()=>{
   const area={x:0,y:0,width:1920,height:1080},pet={x:500,y:50,width:360,height:360};
   expect(panelBounds(pet,area,{width:420,height:560}).y).toBe(418);

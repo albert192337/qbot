@@ -4,7 +4,7 @@ import { BrowserWindow, ipcMain, screen } from 'electron';
 import path from 'node:path';
 import { getPetWindow } from './windows';
 import { allowDesktopWindow, trackDesktopWindow } from './desktop-visibility';
-import { panelBounds, isDesktopPanelPage, type DesktopPanelPage } from '../shared/panel-layout';
+import { panelBounds, compactPanelSize, isDesktopPanelPage, type DesktopPanelPage } from '../shared/panel-layout';
 
 let panel: BrowserWindow | null = null;
 let current: DesktopPanelPage = 'menu';
@@ -13,7 +13,7 @@ function place(): void {
   const pet = getPetWindow()?.getBounds();
   const area = pet ? screen.getDisplayMatching(pet).workArea : screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const bounds=panelBounds(pet ?? {x:area.x+area.width/2,y:area.y,width:0,height:0}, area,
-    current === 'room' ? {width:1000,height:640} : {width:420,height:560});
+    current === 'room' ? {width:1000,height:640} : compactPanelSize(pet?.width ?? 200));
   if(current==='garden'&&area.width>=920)bounds.x=Math.max(bounds.x,area.x+500);
   const old=fixedWindowSize(panel);
   moveFixedSize(panel,bounds.x,bounds.y,{width:bounds.width,height:bounds.height},old?.width!==bounds.width||old?.height!==bounds.height);

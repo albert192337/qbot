@@ -1,4 +1,9 @@
 type Rect = { x: number; y: number; width: number; height: number };
+/** Match the approved compact panel to the pet, rather than a fixed large window. */
+export function compactPanelSize(petWidth: number): {width:number;height:number} {
+  const width = Math.round(Math.max(280, Math.min(380, petWidth * 1.65)));
+  return {width, height:Math.round(width * 1.25)};
+}
 /** Anchor without moving the pet. Coordinates are DIP, including negative monitors. */
 export function panelBounds(pet: Rect, area: Rect, size: {width:number;height:number}): Rect {
   const width = Math.min(size.width, area.width), height = Math.min(size.height, area.height);

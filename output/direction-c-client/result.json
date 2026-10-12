@@ -6,9 +6,11 @@
     "furniture ghost does not consume inventory; Escape cancels",
     "edit reclaim and Finish persist through existing room API",
     "choose seed in compact panel then click 3D plot uses real transition",
+    "small empty plot keeps compact seed grid without extra canvases or horizontal overflow",
     "friend scene selection cannot mutate own plants; return restores own garden",
     "history expansion, emoji insertion, public hidden outside room",
     "switching current actor clears prior chat",
+    "stalled first load times out and retry restores shop",
     "production native panel resizes and hidden garden stays closed on pet movement"
   ],
   "errors": []

@@ -1,4 +1,5 @@
 import '../ui/embedded-bridge';
+import { withTimeout } from '../../shared/timeout';
 import { uiIcon } from '../ui/icons';
 import {renderAppearanceShop} from './appearance-shop';
 import { renderCharacterHeader } from './character-header';
@@ -109,6 +110,7 @@ function showWeather(status:GardenWeatherStatus):void {
 }
 async function refreshWeather(){if(state?.v3||weatherFetching||page!=='weather')return;weatherFetching=true;try{weatherStatus=await api.weather();weatherReceivedAt=Date.now();if(page==='weather'&&!state?.v3)showWeather(weatherStatus);}catch{if(page==='weather'&&!state?.v3)root.textContent='天气暂时无法读取，稍后自动重试。';}finally{weatherFetching=false;}}
 let state: GardenState | undefined, busy = false, fetching = false, signature = '', parentId: string | null = null;
+let loadError='';
 let buyMode = false, sellMode = false;
 let characters: CharacterMeta[] = [], draggingFruit = false, switchingActor = false;
 let actorRevision = 0;
@@ -216,8 +218,8 @@ function art(sp: Species, ts: Trait[] = [], ratio = 1, mode: 'fruit'|'plant'|'se
         box.append(other);
     }
     attachMutationEffects(box, img.src, shown, quality === 'gold' && (mode !== 'plant' || ratio >= 1));
-    if(render3d&&sp==='strawberry'&&(mode!=='plant'||ratio>=1))mountStrawberry3D(box,{mode,ratio,traits:shown,regrowing});
-    if(render3d&&sp==='pineapple'&&(mode!=='plant'||ratio>=1))mountPineapple3D(box,{mode,ratio,traits:shown});
+    if(!compact&&render3d&&sp==='strawberry'&&(mode!=='plant'||ratio>=1))mountStrawberry3D(box,{mode,ratio,traits:shown,regrowing});
+    if(!compact&&render3d&&sp==='pineapple'&&(mode!=='plant'||ratio>=1))mountPineapple3D(box,{mode,ratio,traits:shown});
     return box;
 }
 function produceArt(p: Produce): HTMLElement { return art(p.species, p.traits, 1, 'fruit', false, fruitQuality(p.traits,p)); }
@@ -313,9 +315,10 @@ async function refresh(force = false): Promise<void> {
     if (fetching || switchingActor || draggingFruit)
         return;
     fetching = true;
+    loadError='';
     const revision = actorRevision;
     try {
-        const next = await api.get();
+        const next = await withTimeout(()=>api.get(),10000,'花园读取超时');
         if (revision !== actorRevision || switchingActor) return;
         const key = JSON.stringify(next);
         const unveiled=state?.plots.find(p=>p&&needsReveal(p)&&next.plots.some(n=>n?.id===p.id&&n.revealed));
@@ -327,7 +330,8 @@ async function refresh(force = false): Promise<void> {
         }
     }
     catch (e) {
-        notice(e instanceof Error ? e.message : String(e));
+        if (!state) { loadError=e instanceof Error?e.message:String(e);render(); }
+        else notice(e instanceof Error ? e.message : String(e));
     }
     finally {
         fetching = false;
@@ -562,7 +566,9 @@ function render(): void {
     if(page==='weather'){if(weatherStatus)showWeather(weatherStatus);else root.textContent='正在读取天气…';void refreshWeather();return;}
     document.body.classList.toggle('travel-mode', !strip && (page === 'travel' || page === 'moments'));
     if (!state) {
-        root.textContent = '正在打开花园…';
+        root.replaceChildren();
+        if(loadError){const error=el('section',undefined,'garden-load-error');error.append(el('p',loadError),button('重试',()=>{void refresh(true);render();}));root.append(error);}
+        else root.textContent = '正在打开花园…';
         return;
     }
     if (strip) {
@@ -660,6 +666,7 @@ function renderPlots(host: HTMLElement): void {
     const p = state!.plots[index];
     if (!p && index >= unlockedPlots(state!)) { host.append(el('p', `新版花园使用四块土地，已有作物可以继续收获。`)); return; }
     if (!p) {
+        if(compact){host.append(el('h2',`${index+1}号土地`));renderCompactSeeds(host,index);return;}
         host.append(el('h2', `给 ${index + 1} 号土地选一粒种子`), el('p', state!.v3?'每轮幼苗期可施肥一次，再生后重新选择。':'每株只施肥一次，覆盖全部采摘。', 'muted'));
         const grid = el('div', undefined, 'grid');
         groupSeeds(state!.seeds).forEach(({ seed, count }) => grid.append(seedCard(seed, index, count)));
@@ -1021,6 +1028,16 @@ function positionQuest(): void {
 window.addEventListener('pagehide',()=>farmScene?.dispose(),{once:true});
 
 let bagTab='seeds';
+function renderCompactSeeds(host:HTMLElement,plot?:number):void {
+ const grid=el('div',undefined,'companion-seeds');
+ for(const {seed,count} of groupSeeds(state!.seeds)){
+   const b=button('',()=>{if(plot!==undefined){void act({type:'plant',plot,seed:seed.id});return;}selectedSeed=selectedSeed===seed.id?null:seed.id;api.selectSeed(selectedSeed);render();});
+   b.append(art(seed.species,seed.genes,1,'seed'),el('strong',SPECIES[seed.species].name),el('small','×'+count));b.className='companion-seed';
+   b.setAttribute('aria-pressed',String(selectedSeed===seed.id));b.title=SPECIES[seed.species].name;
+   b.disabled=busy||(render3d&&!supportsGarden3D(seed.species));if(render3d&&!supportsGarden3D(seed.species))b.title+=' · 手绘／桌边模式';grid.append(b);
+ }
+ host.append(grid);if(!state!.seeds.length)host.append(button('商店',()=>api.open('shop')));
+}
 function renderCompact():void {
  if(!state)return;
  const nav=el('nav',undefined,'companion-nav');
@@ -1031,9 +1048,7 @@ function renderCompact():void {
  if(page==='bag'||page==='plots'){
    const tabs=el('nav',undefined,'companion-subnav');for(const [id,label] of [['seeds','种子'],['produce','收获'],['supplies','道具']])tabs.append(button(label,()=>{bagTab=id;render();},bagTab===id?'active':''));content.append(tabs);
    if(bagTab==='seeds'){
-     const grid=el('div',undefined,'companion-seeds');
-     for(const {seed,count} of groupSeeds(state.seeds)){const b=button('',()=>{selectedSeed=selectedSeed===seed.id?null:seed.id;api.selectSeed(selectedSeed);render();});b.append(art(seed.species,seed.genes,1,'seed'),el('strong',SPECIES[seed.species].name),el('small','×'+count));b.className='companion-seed';b.setAttribute('aria-pressed',String(selectedSeed===seed.id));b.title=SPECIES[seed.species].name;b.disabled=busy||(render3d&&!supportsGarden3D(seed.species));if(render3d&&!supportsGarden3D(seed.species))b.title+=' · 手绘／桌边模式';grid.append(b);}content.append(grid);
-     if(!state.seeds.length)content.append(button('商店',()=>api.open('shop')));
+     renderCompactSeeds(content);
    }else{renderBag(content);content.classList.add('bag-'+bagTab);}
  } else if(page==='book')renderBook(content);
  else if(page==='friends')renderFriends(content,ctx);

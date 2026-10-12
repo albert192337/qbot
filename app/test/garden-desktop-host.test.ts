@@ -1,0 +1,21 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {EventEmitter} from 'node:events';
+import type {NativeImage} from 'electron';
+const mock=vi.hoisted(()=>({child:undefined as any}));
+vi.mock('node:fs/promises',()=>({writeFile:vi.fn(async()=>{})}));
+vi.mock('node:child_process',()=>({spawn:()=>mock.child}));
+afterEach(()=>vi.useRealTimers());
+it('coalesces busy frames before encoding and still sends the last reduced-motion frame',async()=>{
+ vi.useFakeTimers();
+ const child=Object.assign(new EventEmitter(),{stdin:Object.assign(new EventEmitter(),{write:vi.fn(),end:vi.fn()}),stdout:new EventEmitter(),stderr:new EventEmitter(),kill:vi.fn()});mock.child=child;
+ const {startGardenDesktop}=await import('../src/main/garden/desktop-host');
+ const started=startGardenDesktop({x:0,y:0,width:3840,height:880},'unused',()=>{},()=>{});
+ await Promise.resolve();child.stdout.emit('data','{"ready":true,"handle":"1"}\n');const host=await started;
+ const image=()=>{const reduced={toPNG:vi.fn(()=>Buffer.from('png'))};return {reduced,isEmpty:()=>false,getSize:()=>({width:3840,height:880}),resize:vi.fn(()=>reduced),toPNG:vi.fn()};};
+ const first=image(),middle=image(),last=image();host.send(first as unknown as NativeImage);host.send(middle as unknown as NativeImage);host.send(last as unknown as NativeImage);
+ expect(first.resize).toHaveBeenCalledWith({width:1920,quality:'good'});expect(first.reduced.toPNG).toHaveBeenCalledTimes(1);
+ expect(middle.resize).not.toHaveBeenCalled();expect(last.resize).not.toHaveBeenCalled();
+ child.stdout.emit('data','{"frame":1}\n');expect(last.reduced.toPNG).toHaveBeenCalledTimes(1);expect(middle.resize).not.toHaveBeenCalled();
+ child.stdout.emit('data','{"frame":2}\n');expect(host.frames).toBe(2);host.dispose();host.send(image() as unknown as NativeImage);expect(child.stdin.write).toHaveBeenCalledTimes(2);
+ await vi.runOnlyPendingTimersAsync();
+});

@@ -12,10 +12,10 @@ app.whenReady().then(async()=>{let win,strip;const errors=[],checks=[];try{
  fs.mkdirSync(out,{recursive:true});session.defaultSession.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(_,cb)=>cb({cancel:true}));
  const {initialGarden,transition}=require('../app/src/main/garden/rules.ts');let id=0;const rng={id:()=>`fixture-${++id}`,random:()=>.5};let garden=initialGarden(Date.now(),rng),settings={voiceEnabled:true,gardenRenderMode:'3d'};
  const {gardenWeather}=require('../app/src/shared/garden-weather.ts');
- let historyActor='current',roomState=null,roomSaves=0,chatExpanded=false,roomStatus={phase:'off'},opened='',closed=0,seed=null;
+ let historyActor='current',roomState=null,roomSaves=0,chatExpanded=false,roomStatus={phase:'off'},opened='',closed=0,seed=null,gardenUnavailable=false;
  const broadcast=(channel,value)=>BrowserWindow.getAllWindows().forEach(w=>w.webContents.send(channel,value));
  const handlers={
- 'garden:get':()=>garden,'garden:weather':()=>gardenWeather(),
+ 'garden:get':()=>gardenUnavailable?new Promise(()=>{}):garden,'garden:weather':()=>gardenWeather(),
  'garden:act':(_e,command)=>{try{const result=transition(garden,command,Date.now(),rng);garden=result.state;broadcast('garden:changed');return {ok:true,...result};}catch(e){return {ok:false,error:e.message};}},
  'garden:showVisit':(_e,owner)=>{broadcast('garden:sceneVisit',owner?{owner,name:'阿圆',plots:[null,garden.plots[0]],plotCount:2,offers:[],day:0,visibility:'friends',actorLevel:1,landOpen:true,shopOpen:false}:null);},
  'garden:visit':(_e,owner)=>({owner,name:'阿圆',plots:[null,garden.plots[0]],plotCount:2,offers:[],day:0,visibility:'friends',actorLevel:1,landOpen:true,shopOpen:false}),'garden:journalStatus':()=>({enabled:false,configured:false}),
@@ -56,7 +56,11 @@ app.whenReady().then(async()=>{let win,strip;const errors=[],checks=[];try{
  await child(`document.querySelector('.companion-seed[title="草莓"]').click()`);await until(()=>Promise.resolve(!!seed),'selected seed IPC');const count=garden.seeds.length;
  strip=make(1000,720);await strip.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'strip'}});await until(()=>strip.webContents.executeJavaScript(`!!document.querySelector('.farm-plot')`),'3D garden');strip.webContents.send('garden:seed',seed);await wait(100);
  await strip.webContents.executeJavaScript(`document.querySelector('.farm-plot').click()`);await until(()=>Promise.resolve(garden.seeds.length===count-1),'actual plant command');assert.ok(garden.plots[0]);checks.push('choose seed in compact panel then click 3D plot uses real transition');
- await until(()=>child(`document.body.innerText.includes('×1')`),'bag updates actual quantity');await shot('garden');
+ await until(()=>child(`document.body.innerText.includes('×1')`),'bag updates actual quantity');
+ win.setContentSize(304,380);win.webContents.send('garden:page','plot:1');await until(()=>child(`document.querySelector('h2')?.textContent==='2号土地'`),'compact empty plot');
+ assert.equal(await child(`document.querySelectorAll('.seed-card,.batch-sow,canvas').length`),0);
+ assert.ok(await child(`document.querySelectorAll('.companion-seed').length>0`));
+ assert.equal(await child(`document.documentElement.scrollWidth>innerWidth`),false);await shot('garden');checks.push('small empty plot keeps compact seed grid without extra canvases or horizontal overflow');
  const ownCount=await strip.webContents.executeJavaScript(`document.querySelectorAll('.farm-plot').length`);const own=JSON.stringify(garden.plots);win.webContents.send('garden:page','visit:ABCDEFGHIJKL');await until(()=>strip.webContents.executeJavaScript(`document.querySelectorAll('.farm-plot').length===2`),'friend garden replaces scene');
  await strip.webContents.executeJavaScript(`document.querySelector('.farm-plot[data-plot="1"]').click()`);await until(()=>child(`document.querySelector('.spatial-visit .card')!==null`),'friend plot contextual operations');assert.equal(JSON.stringify(garden.plots),own);
  win.webContents.send('garden:page','bag');await until(()=>strip.webContents.executeJavaScript(`document.querySelectorAll('.farm-plot').length===${ownCount}`),'return own scene');checks.push('friend scene selection cannot mutate own plants; return restores own garden');strip.destroy();strip=null;
@@ -65,10 +69,13 @@ app.whenReady().then(async()=>{let win,strip;const errors=[],checks=[];try{
  roomStatus={phase:'in-room'};win.webContents.send('rooms:status',roomStatus);await wait(100);assert.equal(await js(`document.querySelector('#public-chat').hidden`),false);await js(`document.querySelector('#history-toggle').click()`);await wait(100);await shot('chat');
  historyActor='other';win.webContents.send('characters:activated',{dirId:'other',manifest:{name:'另一个角色'}});await until(()=>js(`document.querySelector('#history').innerText===''`),'character history isolated');checks.push('switching current actor clears prior chat');
 
+ gardenUnavailable=true;await load('garden',{view:'shop'});await until(()=>js(`document.querySelector('.garden-load-error button')?.textContent==='重试'`),'stalled initial garden read exposes retry');
+ gardenUnavailable=false;await js(`document.querySelector('.garden-load-error button').click()`);await until(()=>js(`document.querySelector('#app').textContent.includes('今日小店')`),'retry recovers existing shop');checks.push('stalled first load times out and retry restores shop');
+
  // Exercise the production native panel owner, including fixed-size resizing and hidden lifecycle.
  const {build}=require('node:module').createRequire(require.resolve('vite'))('esbuild');
  const bundle=path.join(root,'app/out/main/direction-c-window-qa.cjs');
- globalThis.panelQa={pet:new BrowserWindow({width:260,height:260,show:false}),shown:0,hidden:0};
+ globalThis.panelQa={pet:new BrowserWindow({width:184,height:184,show:false}),shown:0,hidden:0};
  await build({entryPoints:[path.join(root,'app/src/main/desktop-panel.ts')],outfile:bundle,bundle:true,platform:'node',external:['electron'],plugins:[{name:'panel-qa',setup(b){
   b.onResolve({filter:/windows$|desktop-visibility$/},a=>path.basename(a.importer)==='desktop-panel.ts'?{path:a.path,namespace:'panel-qa'}:undefined);
   b.onLoad({filter:/.*/,namespace:'panel-qa'},a=>({contents:a.path==='./windows'?'export const getPetWindow=()=>globalThis.panelQa.pet;':a.path==='./garden/windows'?'export const showGardenWorkspace=()=>{globalThis.panelQa.shown++};export const closeGardenWorkspace=()=>{globalThis.panelQa.hidden++};':'export const allowDesktopWindow=()=>{};export const trackDesktopWindow=()=>{};',loader:'js'}));
@@ -77,7 +84,7 @@ app.whenReady().then(async()=>{let win,strip;const errors=[],checks=[];try{
  const before=new Set(BrowserWindow.getAllWindows());owner.openDesktopPanel('menu');
  const native=BrowserWindow.getAllWindows().find(w=>!before.has(w));
  await until(()=>Promise.resolve(native.isVisible()),'native small window ready');
- const small=native.getBounds();assert.ok(Math.abs(small.width-420)<=2);
+ const small=native.getBounds();assert.ok(Math.abs(small.width-304)<=3);assert.ok(Math.abs(small.height-380)<=4);
  owner.openDesktopPanel('room');await until(()=>Promise.resolve(native.getBounds().width>small.width+100),'native room resize while not resizable');
  assert.equal(native.isResizable(),false);
  owner.openDesktopPanel('garden');await until(()=>Promise.resolve(globalThis.panelQa.shown>0),'garden workspace starts');
