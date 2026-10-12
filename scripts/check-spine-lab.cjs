@@ -3,7 +3,7 @@ const { _electron }=require(process.env.PLAYWRIGHT_MODULE||'C:/Users/beta/.cache
 const path=require('node:path'),fs=require('node:fs/promises'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=path.join(root,'output/spine-lab',process.env.SPINE_LAB_CAPTURE||'');
 (async()=>{
- const app=await _electron.launch({executablePath:require('../app/node_modules/electron'),args:[path.join(__dirname,'spine-lab-window.cjs')]});
+ const app=await _electron.launch({executablePath:require('electron'),args:[path.join(__dirname,'spine-lab-window.cjs')]});
  try{
   await fs.mkdir(out,{recursive:true});
   const page=await app.firstWindow(),errors=[];page.on('pageerror',e=>errors.push(e.message));

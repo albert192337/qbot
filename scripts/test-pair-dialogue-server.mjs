@@ -13,13 +13,13 @@ const dir=await mkdtemp(path.join(tmpdir(),'qbot-pair-dialogue-'));
 const proc=spawn(process.execPath,[process.env.QBOT_PAIR_SERVER || 'rooms/server.mjs'],{windowsHide:true,env:{...process.env,HOST:'127.0.0.1',PORT:String(port),DATA_DIR:dir,QBOT_COMPANIONS:'0'},stdio:['ignore','pipe','pipe']});
 let logs='';proc.stdout.on('data',b=>logs+=b);proc.stderr.on('data',b=>logs+=b);
 const clients=[];
-async function client(name){
+async function client(name,extra={}){
   const ws=new WebSocket(`ws://127.0.0.1:${port}`),frames=[],pending=new Map();let n=0;
   ws.addEventListener('message',e=>{const f=JSON.parse(e.data);frames.push(f);pending.get(f.requestId)?.(f);});
   await new Promise((r,j)=>{ws.addEventListener('open',r);ws.addEventListener('error',j);});
   const req=f=>new Promise((resolve,reject)=>{const requestId=String(++n),timer=setTimeout(()=>reject(Error('request timeout')),4000);pending.set(requestId,v=>{clearTimeout(timer);pending.delete(requestId);resolve(v);});ws.send(JSON.stringify({...f,requestId}));});
-  const hello=await req({t:'hello',protoVer:2,nickname:name,pairDialogue:1});
-  const c={ws,frames,req,id:hello.memberId};clients.push(c);return c;
+  const hello=await req({t:'hello',protoVer:2,nickname:name,pairDialogue:1,...extra});
+  const c={ws,frames,req,id:hello.memberId,hello};clients.push(c);return c;
 }
 try{
   await until(()=>logs.includes('listening'));const a=await client('甲'),b=await client('乙');
@@ -53,7 +53,18 @@ try{
   a.ws.send(JSON.stringify({t:'leave'}));await a.req({t:'join',roomId:room.roomId});await delay(4700);
   assert.equal(a.frames.filter(f=>f.t==='garden:interaction').length,1);
   assert.equal(b.frames.filter(f=>f.t==='garden:interaction').length,1);
+  const unsupported=await a.req({t:'garden:request',action:'pair:invite',target:b.id,kind:'fight',actor:a.id});
+  assert.equal(unsupported.ok,false);assert.match(unsupported.error,/更新客户端/);
+  const c=await client('新版甲',{pairEffects:1,pairDialogue:0}),d=await client('新版乙',{pairEffects:1,pairDialogue:0});
+  assert.equal(c.hello.pairEffects,1);
+  const fightRoom=await c.req({t:'create',name:'图标打闹测试',kind:'idle',capacity:3,listed:false});
+  for(const peer of [c,d]){await peer.req({t:'join',roomId:fightRoom.roomId});await peer.req({t:'garden:request',action:'get',actor:peer.id});}
+  const fight=await c.req({t:'garden:request',action:'pair:invite',target:d.id,kind:'fight',actor:c.id});assert.equal(fight.ok,true);
+  assert.equal((await d.req({t:'garden:request',action:'pair:answer',id:fight.invitation,accept:true,actor:d.id})).ok,true);
+  await until(()=>[c,d].every(peer=>peer.frames.some(f=>f.t==='garden:interaction'&&f.kind==='fight')));
+  for(const peer of [c,d]){const frame=peer.frames.find(f=>f.t==='garden:interaction'&&f.kind==='fight');assert.equal(frame.effect,'icon-throw');assert.equal(frame.lines.length,3);assert.equal(frame.session,fight.invitation);}
   console.log('PASS: accepted invite, separate persona owners, forged response rejected, coherent dialogue shared to both roles, leave/rejoin cancels late beats');
+  console.log('PASS: old clients cannot receive icon fight; capable peers accept and share icon effects');
 }catch(e){console.error(logs);throw e;}finally{
   for(const c of clients)c.ws.close();proc.kill();await new Promise(r=>proc.once('exit',r));
   assert.equal(path.dirname(path.resolve(dir)),path.resolve(tmpdir()));assert.ok(path.basename(dir).startsWith('qbot-pair-dialogue-'));await rm(dir,{recursive:true,force:true});

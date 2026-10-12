@@ -1,0 +1,16 @@
+{
+  "status": "pass",
+  "reviewer": "assistant_review",
+  "automatedVisionApi": false,
+  "assetHash": "0773305ca5b84159dd06cbda7185cb7d28ae9bdb1176cff8235ac2f6104e83f6",
+  "evidence": [
+    "all-poses-round3.jpg",
+    "joint-details-round3.jpg"
+  ],
+  "scope": "Seven actions, eight samples each; reviewed contact sheet and six enlarged joint poses. No obvious reversed elbow, collapsed shin or detached sandal in these samples. Rebuilt JSON identical. Not exhaustive or user art approval.",
+  "limitations": [
+    "Manual landmark profile",
+    "Core mesh area is not alpha silhouette",
+    "No independent visual review API"
+  ]
+}

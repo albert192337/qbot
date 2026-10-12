@@ -1,4 +1,7 @@
 import { getSettings } from '../config';
+import { behaviorAudit } from '../behavior-audit';
+import { BEHAVIOR_POLICY, policyBlock, type BehaviorAudit } from '../../shared/behavior-catalog';
+import type { ConversationLine } from '../conversation-memory';
 import { playJournalWriting } from '../journal-animation';
 import { getCharacter } from '../characters';
 import { conversationFor } from '../conversation-memory';
@@ -77,15 +80,32 @@ export function todayGardenFacts(state:GardenState,now:number) {
   };
 }
 let momentTask:Promise<JournalResult<DailyMoment>>|undefined;
-export function generateMoment(requestId:string):Promise<JournalResult<DailyMoment>> {
+export function generateMoment(requestId:string,source:'auto'|'user'='user'):Promise<JournalResult<DailyMoment>> {
   if(momentTask)return Promise.resolve({ok:false,error:'正在写今日朋友圈，请稍候'});
-  momentTask=doGenerateMoment(requestId).catch((e):JournalResult<DailyMoment>=>({ok:false,error:e instanceof Error?e.message:'生成失败，请重试'})).finally(()=>{momentTask=undefined;});
+  momentTask=doGenerateMoment(requestId,source).catch((e):JournalResult<DailyMoment>=>({ok:false,error:e instanceof Error?e.message:'生成失败，请重试'})).finally(()=>{momentTask=undefined;});
   return momentTask;
 }
-async function doGenerateMoment(requestId:string):Promise<JournalResult<DailyMoment>> {
+export function hasNewMomentFacts(state:GardenState,actor:string,chats:ConversationLine[],now:number):boolean {
+  const last=Math.max(0,...(state.travel?.moments??[]).filter(m=>m.actor===actor).map(m=>m.at));
+  const fresh=(at:number)=>at>last&&at<=now&&localDay(at)===localDay(now);
+  return chats.some(c=>c.role==='user'&&c.source==='chat'&&fresh(c.at)) ||
+    (state.journalEvents??[]).some(e=>e.actor===actor&&fresh(e.at)) ||
+    (state.travel?.posts??[]).some(p=>p.actor===actor&&fresh(p.at));
+}
+async function doGenerateMoment(requestId:string,source:'auto'|'user'):Promise<JournalResult<DailyMoment>> {
   if(typeof requestId!=='string'||!/^[a-zA-Z0-9-]{8,80}$/.test(requestId))throw Error('生成请求无效');
   const who=await identity(),now=Date.now(),day=localDay(now),state=await getGarden();
   const existing=state.travel?.moments?.find(m=>m.id===requestId&&m.actor===who.actor);if(existing)return {ok:true,value:existing};
+  const posts=(state.travel?.moments??[]).filter(m=>m.actor===who.actor);
+  if(posts.filter(m=>m.day===day).length>=BEHAVIOR_POLICY.moment.dailyLimit)throw Error('今日朋友圈已达 3 条上限');
+  if(posts.some(m=>now-m.at<BEHAVIOR_POLICY.moment.cooldownMs))throw Error('朋友圈至少间隔 4 小时');
+  if(source==='auto'&&!hasNewMomentFacts(state,who.actor,conversationFor(who.actor,now),now))throw Error('暂无新的今日经历');
+  const event:BehaviorAudit={id:requestId,at:now,actor:who.actor,behavior:'moment',source,outcome:'reserved',reason:source==='auto'?'有新的今日经历，自主写游戏内朋友圈':'用户手动写游戏内朋友圈'};
+  await behaviorAudit.update(events=>{
+    const block=policyBlock(events,who.actor,'moment',now);if(block)throw Error(`朋友圈${block}（每天最多 3 次生成，间隔 4 小时）`);
+    events.push(event);
+  });
+  try {
   const store=await initUserMemory(),revision=store.revision;
   const memories=store.candidates(who.actor).filter(m=>m.status==='active'&&m.proactive&&m.visible&&m.certainty==='explicit'&&(!m.expiresAt||m.expiresAt>now));
   const chats=conversationFor(who.actor,now).filter(c=>c.at<=now&&localDay(c.at)===day&&c.source==='chat').slice(-30).map(c=>({时间:new Date(c.at).toLocaleTimeString('zh-CN'),说话者:c.role==='user'?'用户':'桌宠（旧生成内容，不是用户事实）',内容:c.text.slice(0,800)}));
@@ -107,7 +127,7 @@ async function doGenerateMoment(requestId:string):Promise<JournalResult<DailyMom
     text=(await chatComplete({apiKey:who.settings.arkApiKey!,messages:[{role:'system',content:prompt+'\n'+JOURNAL_FACT_BOUNDARY},{role:'user',content:JSON.stringify(records)}],onTrace:(stage,detail)=>{if(store.revision===revision)void updateBrainCall(trace,stage,{},detail);}})).trim();
   }catch{if(store.revision===revision)await updateBrainCall(trace,'朋友圈生成失败');throw Error('朋友圈生成失败，请稍后重试');}
   const latest=await identity();
-  if(store.revision!==revision||latest.actor!==who.actor||journalPrompt('dailyMomentPrompt',latest.settings.dailyMomentPrompt)!==prompt)throw Error('角色、记忆或提示词已更新，请重新生成');
+  if(store.revision!==revision||latest.actor!==who.actor||latest.name!==who.name||latest.persona!==who.persona||latest.settings.arkApiKey!==who.settings.arkApiKey||localDay(Date.now())!==day||journalPrompt('dailyMomentPrompt',latest.settings.dailyMomentPrompt)!==prompt)throw Error('角色、记忆、日期或提示词已更新，请重新生成');
   if(!text)throw Error('模型没有返回正文，请重试');
   const moment:DailyMoment={id:requestId,at:now,day,actor:who.actor,name:who.name,text:text.slice(0,1500),liked:false};
   await updateGardenJournal(state=>{
@@ -115,5 +135,10 @@ async function doGenerateMoment(requestId:string):Promise<JournalResult<DailyMom
     const t=state.travel??=initialTravel(now);t.moments??=[];
     if(!t.moments.some(m=>m.id===moment.id))t.moments.push(moment);
   });
+  await behaviorAudit.append({...event,at:Date.now(),outcome:'completed',reason:'游戏内朋友圈已保存'});
   await updateBrainCall(trace,'朋友圈已保存');return {ok:true,value:moment};
+  } catch(error) {
+    await behaviorAudit.append({...event,at:Date.now(),outcome:'failed',reason:error instanceof Error?error.message:'朋友圈写作失败'});
+    throw error;
+  }
 }

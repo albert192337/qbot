@@ -1,0 +1,59 @@
+/* Final prototype direction: match the existing floating desktop and chat. */
+#stage>.panel{--paper:#FFF9EF;--surface:#F7EDDE;--muted:#EBDCC7;--border:#C8AD8C;--ink:#4B352B;--secondary:#897260;--accent:#F0E0C6;font-family:'Microsoft YaHei','PingFang SC',sans-serif;color:var(--ink);background:#FFF9EF;border:2px solid #594235;border-radius:16px 13px 15px 12px;box-shadow:0 3px 0 #59423540;padding:16px}
+#stage>.panel.large{padding:22px;border-radius:18px 15px 17px 14px}
+#stage>.panel.phone{border:2px solid #594235;border-radius:28px;padding:15px;background:#FFF9EF;box-shadow:0 3px 0 #59423540}
+#stage>.panel .panel-header h1{font-size:18px;line-height:26px;font-weight:650;color:#4B352B}
+#stage>.panel .panel-header>.unified-icon{width:21px;height:21px}
+#stage>.panel .panel-header .icon-button{background:transparent;border:0;box-shadow:none}
+#stage>.panel .phone-status{font-size:12px;color:#594235;margin-bottom:3px}
+#stage>.panel .phone-status .island{background:#594235;height:5px;width:52px}
+#stage>.panel .homebar{background:#594235;height:4px;min-height:4px;border:0;box-shadow:none;padding:0}
+#stage>.panel button{font-family:inherit;color:#594235;font-weight:600;background:#FFF9EF;border:1px solid #C6AA86;border-radius:8px;box-shadow:0 1px 0 #59423515}
+#stage>.panel button:hover{background:#F5E7D2;border-color:#A38564}
+#stage>.panel button:active{transform:translateY(1px);box-shadow:none}
+#stage>.panel button.selected{background:#F0E0C6;color:#4B352B;border-color:#594235;box-shadow:0 2px 0 #59423525}
+#stage>.panel button:disabled{opacity:.45;box-shadow:none}
+#stage>.panel .icon-button{border:0;background:transparent;box-shadow:none;color:#594235}
+#stage>.panel .icon-button:hover{background:#F0E0C655}
+#stage>.panel .body{gap:12px;scrollbar-color:#B69C7C66 transparent}
+#stage>.panel .text{font-size:14px;line-height:23px;color:#4B352B;font-weight:400}
+#stage>.panel .text.heading{font-size:18px;line-height:27px;font-weight:650}
+#stage>.panel .text.title{font-size:26px;line-height:35px;font-weight:650}
+#stage>.panel .text.caption,#stage>.panel .meta{font-size:12px;line-height:19px;color:#897260;font-weight:400}
+#stage>.panel .row{background:#FBF3E6;border:1px solid #DAC6AE;border-radius:10px;padding:10px;min-height:54px}
+#stage>.panel .row.clickable:hover{background:#F4E5CE}
+#stage>.panel .row .label{font-size:14px;line-height:21px;font-weight:600}
+#stage>.panel .row .act{font-size:13px;padding:5px 10px;min-height:32px}
+#stage>.panel .row>.unified-icon{width:27px;height:27px}
+#stage>.panel .grid{gap:10px}
+#stage>.panel .card{background:#FBF4E9;border:1px solid #D7BFA1;border-radius:12px 10px 11px 9px;box-shadow:0 2px 0 #59423513;padding:10px;gap:6px;font-weight:400}
+#stage>.panel .card.selected{background:#F0E0C6;border:2px solid #594235;padding:9px}
+#stage>.panel .card .label{font-size:13px;font-weight:600;line-height:20px;color:#4B352B}
+#stage>.panel .card .meta{font-size:12px;font-weight:400}
+#stage>.panel .card .unified-icon{width:40px;height:40px}
+#stage>.panel.phone .card{border:0;background:transparent;box-shadow:none;align-items:center;padding:8px;gap:11px}
+#stage>.panel.phone .card:hover{background:#F0E0C64D}
+#stage>.panel.phone .card .unified-icon{width:46px;height:46px;margin-top:3px;filter:drop-shadow(0 1px 0 #FFFFFF)}
+#stage>.panel.phone .card .label{align-self:center;text-align:center;font-size:12px;font-weight:500}
+#stage>.panel input,#stage>.panel textarea{background:#FFFCF6;border:1px solid #BDA083;border-radius:8px;color:#4B352B;font-family:inherit;font-size:14px;line-height:22px;padding:8px 10px}
+#stage>.panel input::placeholder,#stage>.panel textarea::placeholder{color:#A28C7D}
+#stage>.panel .input-wrap label{font-size:12px;color:#897260}
+#stage>.panel .track{background:#EBDCC7;height:7px;border:1px solid #C6AA864D}
+#stage>.panel .track>div{background:#98B598}
+#stage>.panel .scene{background:#EEE7D7;border:1px solid #C8B59C;border-radius:12px}
+#stage>.panel .wall{background:#FAF4E8;border:1px solid #C8B59C80}
+#stage>.panel .floor{background:#E5D4B9;border-top:1px solid #BDA083}
+#stage>.panel .room-obj{border:0;background:transparent;box-shadow:none}
+#stage>.panel .room-obj:hover{background:#FFF9EF40}
+#stage>.panel .plot{background:#EDF0DF;border:1px solid #9CAE8D80;border-radius:10px;box-shadow:0 2px 0 #59423515}
+#stage>.panel .plot .unified-icon{width:42px;height:42px}
+#stage>.panel .plot:hover{background:#E2EACA}
+#stage>.panel .buttons>[role=switch],#stage>.panel .row>[role=switch]{min-width:44px;font-size:12px}
+#stage>.panel button:focus-visible,#stage>.panel input:focus-visible,#stage>.panel textarea:focus-visible{outline:2px solid #9C7A56;outline-offset:2px}
+#stage>.panel .scene-icon{stroke-width:.5}#stage>.panel .scene-icon *{stroke-width:inherit}
+#stage>.panel .panel-header-actions{display:flex;align-items:center;gap:2px;margin-right:-6px}
+#stage>.panel .panel-header-actions .icon-button{position:relative;flex:none;width:28px;height:28px;min-height:28px;padding:3px}
+#stage>.panel .panel-header-actions .is-off::after{content:'';position:absolute;left:4px;top:13px;width:21px;height:2px;background:#594235;transform:rotate(45deg);box-shadow:0 -1px 0 #FFF9EF;border-radius:2px;pointer-events:none}
+#stage>.panel .panel-navigation{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;flex:none}
+#stage>.panel .panel-navigation button{display:flex;align-items:center;justify-content:center;gap:5px;min-width:0;min-height:40px;padding:6px 4px;font-size:13px;line-height:20px;white-space:nowrap}
+#stage>.panel .panel-navigation .unified-icon{width:18px;height:18px;flex:none}

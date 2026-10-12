@@ -2,13 +2,29 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {PairInteraction} from '../src/renderer/pet/pair-interaction';
 import type {CharacterMeta} from '../src/shared/ipc-types';
 class Node {
- id='';className='';textContent='';title='';dataset:Record<string,string>={};style:Record<string,string>={};
+ children:Node[]=[];clientHeight=600;clientWidth=720;offsetHeight=50;offsetWidth=160;hidden=false;
+ get firstElementChild(){return this.children[0];}
+ id='';className='';textContent='';title='';dataset:Record<string,string>={};style={setProperty:vi.fn()} as Record<string,any>;
  classList={add:vi.fn(),remove:vi.fn(),toggle:vi.fn()};
- append(..._nodes:unknown[]){} setAttribute(){} replaceChildren(){} remove(){}
+ append(...nodes:Node[]){this.children.push(...nodes);} setAttribute(){} replaceChildren(){this.children=[];} remove(){}
 }
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals()});
+it('ends without media events and releases a handoff that never acknowledged',async()=>{
+ vi.useFakeTimers();vi.stubGlobal('document',{body:new Node(),createElement:()=>new Node()});vi.stubGlobal('window',{qbot:{}});
+ const meta={dirId:'a',manifest:{name:'A',actions:{idle:{webm:'a',status:'done'}}}} as unknown as CharacterMeta;
+ const callbacks={start:vi.fn(()=>new Promise<void>(()=>{})),play:vi.fn(),replay:vi.fn(),rest:vi.fn(),end:vi.fn()};
+ const pair=new PairInteraction(callbacks);pair.start(meta,{...meta,dirId:'b'},'tea');
+ await vi.advanceTimersByTimeAsync(46000);expect(pair.isActive()).toBe(false);expect(callbacks.end).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
+});
+it('all beats stop naturally even when a broken player never emits ended',async()=>{
+ vi.useFakeTimers();vi.stubGlobal('document',{body:new Node(),createElement:()=>new Node()});vi.stubGlobal('window',{qbot:{}});
+ const meta={dirId:'a',manifest:{name:'A',actions:{idle:{webm:'a',status:'done'}}}} as unknown as CharacterMeta;
+ const callbacks={start:vi.fn(),play:vi.fn(),replay:vi.fn(),rest:vi.fn(),end:vi.fn()};
+ const pair=new PairInteraction(callbacks);pair.start(meta,{...meta,dirId:'b'},'fight');
+ await vi.advanceTimersByTimeAsync(46000);expect(callbacks.play).toHaveBeenCalledTimes(3);expect(pair.isActive()).toBe(false);expect(vi.getTimerCount()).toBe(0);
+});
 it('repeats short clips, keeps a finished actor moving, and advances after both complete at a clip boundary',async()=>{
- vi.useFakeTimers();vi.setSystemTime(0);vi.stubGlobal('document',{body:new Node(),createElement:()=>new Node()});
+ vi.useFakeTimers();vi.setSystemTime(0);vi.stubGlobal('document',{body:new Node(),createElement:()=>new Node()});vi.stubGlobal('window',{qbot:{}});
  const clip={status:'done',webm:'x.webm',durationSec:1};
  const meta={dirId:'a',manifest:{name:'A',actions:{idle:clip,talk_happy:clip,tea:clip}}} as unknown as CharacterMeta;
  const callbacks={start:vi.fn(),play:vi.fn(),replay:vi.fn(),rest:vi.fn(),end:vi.fn()};
@@ -24,7 +40,7 @@ it('repeats short clips, keeps a finished actor moving, and advances after both 
  vi.advanceTimersByTime(90000);pair.ended('host');expect(callbacks.play).toHaveBeenCalledTimes(2);expect(vi.getTimerCount()).toBe(0);
 });
 it('conceals the exit until resize acknowledges and cancels a stale return when a new interaction starts',async()=>{
- vi.useFakeTimers();vi.setSystemTime(0);const body=new Node();vi.stubGlobal('document',{body,createElement:()=>new Node()});
+ vi.useFakeTimers();vi.setSystemTime(0);const body=new Node();vi.stubGlobal('document',{body,createElement:()=>new Node()});vi.stubGlobal('window',{qbot:{}});
  const clip={status:'done',webm:'x.webm',durationSec:1};
  const meta={dirId:'a',manifest:{name:'A',actions:{idle:clip,talk_happy:clip}}} as unknown as CharacterMeta;
  let acknowledge!:()=>void;

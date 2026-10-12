@@ -40,7 +40,7 @@ import { pairWindowBounds } from '../src/main/pet-geometry';
 it('keeps the pair inside a narrow negative-coordinate display and preserves a stable authoritative size',()=>{
  const area={x:-800,y:0,width:800,height:600};
  const b=pairWindowBounds(2,{x:-100,y:500},area);
- expect(b).toEqual({x:-800,y:200,width:800,height:400});
+ expect(b).toEqual({x:-720,y:0,width:720,height:600});
  for(let i=0;i<50;i++)expect(pairWindowBounds(2,b,area)).toEqual(b);
- expect(pairWindowBounds(1,{x:1800,y:800},{x:0,y:0,width:1920,height:1080})).toEqual({x:1200,y:720,width:720,height:360});
+ expect(pairWindowBounds(1,{x:1800,y:800},{x:0,y:0,width:1920,height:1080})).toEqual({x:1200,y:480,width:720,height:600});
 });

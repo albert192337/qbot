@@ -1,0 +1,21 @@
+{
+  "pid": 58168,
+  "helperPid": 13660,
+  "bounds": {
+    "x": 0,
+    "y": 1648,
+    "width": 3840,
+    "height": 440
+  },
+  "physical": {
+    "x": 0,
+    "y": 1648,
+    "width": 3840,
+    "height": 440
+  },
+  "ready": true,
+  "ordered": true,
+  "handle": "789452",
+  "parent": "65998",
+  "icons": "66004"
+}

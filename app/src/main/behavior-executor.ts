@@ -25,7 +25,7 @@ import { showBubbleWindow } from './windows';
 import { validateScript, type BehaviorScript, type BehaviorStep } from '../shared/behavior-dsl';
 import { setBehaviorExecutor } from './behavior-rules';
 import { updateBrainCall } from './brain-log';
-import { rememberConversation, shouldPauseAutomatic, lastUserAt, conversationFor, automaticSpeechBudget } from './conversation-memory';
+import { rememberConversation, shouldPauseAutomatic, isInputActive, lastUserAt, conversationFor, automaticSpeechBudget } from './conversation-memory';
 
 /** 当前正在执行的行为（null = 空闲） */
 let current: {
@@ -40,6 +40,8 @@ let current: {
 const queue: BehaviorScript[] = [];
 /** 队列最大长度（防止堆积） */
 const MAX_QUEUE = 3;
+let auditStep:(script:BehaviorScript,step:BehaviorStep)=>void=()=>{};
+export function setBehaviorAudit(callback:typeof auditStep):void{auditStep=callback;}
 
 /** 启动执行器（注册到 behavior-rules）。
  *  静态 import 安全：behavior-rules 不反向依赖本模块（execute 回调靠 setter 注入） */
@@ -113,6 +115,9 @@ function interruptCurrent(): void {
 
 /** 运行整个脚本 */
 async function runScript(script: BehaviorScript): Promise<void> {
+  if(script.meta.id==='llm-interaction'&&script.meta.characterId&&(isInputActive(script.meta.characterId)||lastUserAt(script.meta.characterId)!==script.meta.conversationAt)){
+    void updateBrainCall(script.meta.traceId,'取消过时的互动回应：用户开始聊天');runNextFromQueue();return;
+  }
   if (script.meta.id === 'llm-brain' && script.meta.characterId && (shouldPauseAutomatic(script.meta.characterId) || lastUserAt(script.meta.characterId) !== script.meta.conversationAt)) {
     void updateBrainCall(script.meta.traceId, '取消排队的主动回应：用户正在聊天');
     runNextFromQueue();
@@ -193,6 +198,7 @@ async function executeStep(step: BehaviorStep): Promise<void> {
 
     switch (step.op) {
       case 'play': {
+        auditStep(current.script,step);
         // 发 IPC 给 pet 窗口播放动作
         sendToWindows('behavior:action', {
           action: step.action,
@@ -222,11 +228,12 @@ async function executeStep(step: BehaviorStep): Promise<void> {
         const deliver = () => {
           if (current !== run || run!.interrupted || run!.finishStep !== resolve || win.isDestroyed()) return;
           const meta = run!.script.meta;
-          if (meta.id === 'llm-brain' && meta.characterId && (shouldPauseAutomatic(meta.characterId) || lastUserAt(meta.characterId) !== meta.conversationAt)) {
+          if ((meta.id === 'llm-brain'||meta.id==='llm-interaction') && meta.characterId && ((meta.id==='llm-interaction'?isInputActive(meta.characterId):shouldPauseAutomatic(meta.characterId)) || lastUserAt(meta.characterId) !== meta.conversationAt)) {
             void updateBrainCall(meta.traceId, '取消过时台词：用户已开始新的对话');
             resolve(); return;
           }
           win.webContents.send('behavior:say', msg);
+          auditStep(run!.script,step);
           if (run!.script.meta.source === 'llm' && run!.script.meta.characterId) {
             rememberConversation(run!.script.meta.characterId, { at: Date.now(), role: 'assistant', source: run!.script.meta.id === 'llm-chat' ? 'chat' : 'auto', text: step.text, ...(step.expression === 'thought' ? { expression: step.expression } : {}) });
           }
@@ -243,6 +250,7 @@ async function executeStep(step: BehaviorStep): Promise<void> {
       }
 
       case 'sign': {
+        auditStep(current.script,step);
         // 举牌/收牌
         if (step.text === null) clearPetMessage();
         else leavePetMessage(step.text, current.script.meta.characterId);

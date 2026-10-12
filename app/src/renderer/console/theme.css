@@ -145,3 +145,7 @@ input[type=checkbox],input[type=radio],input[type=range] {accent-color:var(--acc
   .context-character select {max-width:150px;}
   .studio-body {padding:20px 18px 32px;}
 }
+
+/* Approved direction C. Shared colors also cover advanced, preserved tools. */
+:root{--primary:#e7d3ae;--accent:#708467;--primary-hover:#efdfc5;--on-primary:#4b352b;--accent-ink:#4b352b;--ink:#4b352b;--tertiary:#594235;--on-surface:#4b352b;--sub:#967e68;--secondary:#967e68;--muted:#967e68;--bg:#fff9ef;--neutral:#fff9ef;--card:#fff9ef;--surface:#f4eddf;--border:#dfcbb0;--line:#dfcbb0;--border-strong:#594235;--field:#fffcf7;--mint:#e9edda;--yellow:#e7d3ae;--radius-sm:8px;--radius-md:12px;--radius-lg:18px;--font-ui:'Microsoft YaHei','PingFang SC',sans-serif}
+#sidebar{background:#f4eddf}.brand-mark{background:#e5dac1;color:#594235;box-shadow:none;transform:none;border:1.5px solid #594235}.brand small{display:none}.side-item.active{background:#e9edda;box-shadow:none}button.primary,.btn.primary{border:1px solid #b69972;box-shadow:0 2px 0 #5942351a}#contextbar{background:#fff9ef}.subnav-tab.active{background:transparent;border-radius:0;border-bottom:3px solid #a6bf9b}

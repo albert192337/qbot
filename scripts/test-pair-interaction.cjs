@@ -5,9 +5,9 @@ const root=path.resolve(__dirname,'..'), preset=path.join(root,'app/resources/pr
 app.setPath('userData',path.join(root,'.superpowers/pair-qa-data'));
 protocol.registerSchemesAsPrivileged([{scheme:'qbot-asset',privileges:{stream:true,supportFetchAPI:true}}]);
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
-const {buildSync}=require('node:module').createRequire(require.resolve('../app/node_modules/vite'))('esbuild');
+const {buildSync}=require('node:module').createRequire(require.resolve('vite'))('esbuild');
 const visibilityBundle=path.join(root,'.superpowers/pair-visibility.cjs');
-buildSync({entryPoints:[path.join(root,'app/src/main/desktop-visibility.ts')],outfile:visibilityBundle,bundle:true,platform:'node',external:['electron']});
+buildSync({stdin:{contents:"export * from './app/src/main/desktop-visibility';export * from './app/src/main/pet-geometry';",resolveDir:root},outfile:visibilityBundle,bundle:true,platform:'node',external:['electron']});
 let win;
 app.whenReady().then(async()=>{try{
  const visibility=require(visibilityBundle);visibility.registerDesktopVisibility();
@@ -27,13 +27,15 @@ app.whenReady().then(async()=>{try{
  guest.manifest.stickerLibrary={version:1,referenceId:'st_heart',scenes:{},items:[{id:'st_heart',name:'比心、开心',tags:['开心'],enabled:true,raw:''},{id:'st_tea',name:'喝茶',tags:[],enabled:true,raw:''}]};
  // Ensure selection tests the guest's independent sticker inventory.
  delete guest.manifest.actions.tea; delete guest.manifest.actions.talk_happy;
- let active=host, delayList=0, realGuestDir=null;
- protocol.handle('qbot-asset',async req=>{const base=new URL(req.url).hostname==='guest'&&realGuestDir?realGuestDir:preset; const p=path.resolve(base,decodeURIComponent(new URL(req.url).pathname).replace(/^\//,''));
+ let active=host, delayList=0, realGuestDir=null,realHostDir=null;
+ let layoutScale=1,layoutArea={x:0,y:0,width:1920,height:1080},longCaptions=false;
+ protocol.handle('qbot-asset',async req=>{const base=new URL(req.url).hostname==='guest'?(realGuestDir??preset):(realHostDir??preset); const p=path.resolve(base,decodeURIComponent(new URL(req.url).pathname).replace(/^\//,''));
   if(!p.startsWith(base+path.sep))return new Response(null,{status:403});
-  return new Response(await fs.readFile(p),{headers:{'Content-Type':p.endsWith('.webm')?'video/webm':'image/png'}});
+  try{return new Response(await fs.readFile(p),{headers:{'Content-Type':p.endsWith('.webm')?'video/webm':p.endsWith('.json')?'application/json':'image/png'}});}catch{return new Response(null,{status:404});}
  });
  const relationshipRecords=[];
  const handlers={
+ 'autonomy:get':()=>null,'autonomy:icons':()=>[],
  'relationships:recordLocal':(_event,hostId,guestId,kind,session)=>relationshipRecords.push({hostId,guestId,kind,session}),
  'overlays:get':()=>({revision:0,winner:null}),
  'social:contacts':()=>({available:false,invitations:[],people:[]}),
@@ -42,7 +44,7 @@ app.whenReady().then(async()=>{try{
  'behavior:getIdlePlan':()=>null,'settings:get':()=>({voiceEnabled:false,talkFrequency:'quiet',freeMode:true}),
  'progress:get':()=>({points:0,boxes:0,inventory:{},idleMs:0}), 'characters:getActive':()=>active,
  'characters:list':async()=>{await wait(delayList);return [host,guest]},
- 'characters:pairDialogue':async(_event,_guestId,kind)=>kind==='chat'?['书里有个有趣的故事。','讲给我听听呀。','慢慢说给你听。']:['先歇一会儿吧。','好呀，我陪着你。'],
+ 'characters:pairDialogue':async(_event,_guestId,kind)=>longCaptions?Array(3).fill('嘿嘿，玩得超有意思，我们把桌面图标都归回原位好不好呀～下次再一起喝茶聊天，分享今天遇见的趣事吧！'.repeat(2)):kind==='chat'?['书里有个有趣的故事。','讲给我听听呀。','慢慢说给你听。']:['先歇一会儿吧。','好呀，我陪着你。'],
  'agent:getStatus':()=>({activity:'idle',sessions:0}), 'meeting:getStatus':()=>({inMeeting:false}), 'music:getStatus':()=>({playing:false})};
  for(const [key,fn] of Object.entries(handlers))ipcMain.handle(key,fn);
  win=new BrowserWindow({width:360,height:360,frame:false,transparent:true,show:false,webPreferences:{preload:path.join(root,'app/out/preload/index.js'),offscreen:true,backgroundThrottling:false}});
@@ -54,7 +56,7 @@ app.whenReady().then(async()=>{try{
    assert.equal(await win.webContents.executeJavaScript(`getComputedStyle(document.querySelector('#stage')).opacity`),'0','native resize must be hidden');
    await wait(120);concealedResizes++;
   }
-  win.setBounds({width:enter?720:360,height:360});
+  win.setBounds(enter?visibility.pairWindowBounds(layoutScale,{x:0,y:0},layoutArea):{width:360,height:360});
  });
  const evaluate=s=>win.webContents.executeJavaScript(s);
  const until=async(fn,msg)=>{for(let i=0;i<120;i++){if(await fn())return;await wait(100)}throw Error(msg)};
@@ -62,6 +64,74 @@ app.whenReady().then(async()=>{try{
  const end=async()=>{win.webContents.send('pet:menuCommand',{type:'pairEnd'});await until(()=>evaluate(`!document.querySelector('#pair-interaction')&&!document.body.classList.contains('pair-returning')&&!document.body.classList.contains('pair-arriving')`),'pair did not stop');};
  await win.loadFile(path.join(root,'app/out/renderer/pet/index.html'));
  await until(()=>evaluate(`document.querySelector('#stage video')?.currentTime>0`),'host playback');
+ if(process.argv.includes('--presence-only')){
+  const out=path.join(root,'output/presence');await fs.mkdir(out,{recursive:true});
+  const events=[];ipcMain.on('pet:presenceReport',(_e,actor,kind,action,outcome)=>events.push({actor,kind,action,outcome}));
+  const signal=s=>win.webContents.send('pet:presence',{actor:active.dirId,...s});
+  const visibleAction=()=>evaluate(`(()=>{const c=document.querySelector('#stage canvas[data-ready=true]');if(c&&c.style.display!=='none')return c.dataset.action;return [...document.querySelectorAll('#stage video')].find(v=>v.style.visibility==='visible')?.src.split('/').pop().split('?')[0].replace('.webm','')})()`);
+  host.manifest.scenePools={idle:['tea']};win.webContents.send('characters:activated',host);
+  await until(async()=>await visibleAction()==='tea','initial quiet activity');
+  const chat=new BrowserWindow({width:380,height:110,frame:false,transparent:true,show:false,webPreferences:{preload:path.join(root,'app/out/preload/index.js'),offscreen:true,backgroundThrottling:false}});
+  ipcMain.on('pet:inputAttention',(ev,active)=>{if(ev.sender===chat.webContents)signal({kind:'attention',active});});
+  ipcMain.handle('petChat:send',()=>({ok:false,error:'测试离线失败'}));
+  await chat.loadFile(path.join(root,'app/out/renderer/chat/index.html'));
+  // Actual input/composition listeners and preload; host focus itself is validated by runtime tests.
+  await chat.webContents.executeJavaScript(`document.hasFocus=()=>true;document.querySelector('#message').value='我在输入';document.querySelector('#message').dispatchEvent(new Event('input'))`);
+  await until(()=>evaluate(`document.querySelector('#stage').dataset.presence==='attention'`),'typing attention');
+  await until(async()=>await visibleAction()==='idle','attention bypasses quiet activity pool');
+  await fs.writeFile(path.join(out,'listening.png'),(await win.webContents.capturePage()).toPNG());
+  await chat.webContents.executeJavaScript(`window.dispatchEvent(new Event('blur'));document.hasFocus=()=>false;true`);
+  await until(async()=>await visibleAction()==='tea','blur resumes same activity');
+  // A generated reply temporarily overrides attention, then resumes the original activity.
+  signal({kind:'attention',active:true});await until(()=>evaluate(`document.querySelector('#stage').dataset.presence==='attention'`),'waiting for reply');
+  win.webContents.send('behavior:action',{action:'talk_happy',loops:1,preview:true,traceId:'isolated-chat'});signal({kind:'attention',active:false});
+  await until(async()=>await visibleAction()==='talk_happy','reply plays');
+  await until(async()=>await visibleAction()==='tea','reply finished and resumes');
+  for(const kind of ['return','visitor']){signal({kind});await until(()=>evaluate(`document.querySelector('#stage').dataset.presence===${JSON.stringify(kind)}`),kind+' notices');await until(async()=>await visibleAction()==='tea'&&await evaluate(`!document.querySelector('#stage').dataset.presence`),kind+' resumes');}
+  await start('tea');await end();await until(async()=>await visibleAction()==='tea','pair resumes previous activity');
+  signal({kind:'attention',active:true});await until(()=>evaluate(`!!document.querySelector('#stage').dataset.presence`),'attention before command');
+  win.webContents.send('pet:menuCommand',{type:'play',action:'sleep'});signal({kind:'attention',active:false});await until(async()=>await visibleAction()==='sleep','new command wins');
+  signal({actor:'other',kind:'attention',active:true});await wait(100);assert.equal(await evaluate(`!!document.querySelector('#stage').dataset.presence`),false,'wrong character ignored');
+  // Character change and hiding cancel rather than replaying old activity later.
+  win.webContents.send('characters:activated',host);await until(async()=>await visibleAction()==='tea','reset host');
+  signal({kind:'attention',active:true});await until(()=>evaluate(`!!document.querySelector('#stage').dataset.presence`),'before hiding');visibility.setDesktopHidden(true);await until(()=>evaluate(`!document.querySelector('#stage').dataset.presence`),'hidden cancels');visibility.setDesktopHidden(false);
+  realHostDir=path.join(root,'app/resources/presets/spine-wuxie');active={dirId:'host',manifest:JSON.parse(await fs.readFile(path.join(realHostDir,'manifest.json'),'utf8'))};active.manifest.scenePools={idle:['tea']};win.webContents.send('characters:activated',active);
+  await until(()=>evaluate(`document.querySelector('#stage canvas')?.dataset.ready==='true'&&document.querySelector('#stage canvas')?.dataset.action==='tea'`),'Spine activity');
+  signal({kind:'attention',active:true});await until(()=>evaluate(`document.querySelector('#stage').dataset.presence==='attention'`),'Spine attention');signal({kind:'attention',active:false});await until(()=>evaluate(`document.querySelector('#stage canvas')?.dataset.action==='tea'`),'Spine resume');
+  await fs.writeFile(path.join(out,'spine-resumed.png'),(await win.webContents.capturePage()).toPNG());
+  assert.ok(events.some(e=>e.kind==='resume'&&e.action==='tea'));assert.ok(events.some(e=>e.kind==='visitor'&&e.outcome==='started'));
+  await fs.writeFile(path.join(out,'result.json'),JSON.stringify({ok:true,events,checks:['actual input listener','listen action distinct from idle plan','blur resumes','reply resumes','return greeting','visitor greeting','pair resumes','new command wins','hidden cancels','Spine resume']},null,2));
+  chat.destroy();console.log('PASS: typing attention, return/visitor greetings, interrupted activity resumption, reply/pair completion, command priority and Spine');app.exit(0);return;
+ }
+ if(process.argv.includes('--layout-only')){
+  const out=path.join(root,'output/pair-layout');await fs.mkdir(out,{recursive:true});longCaptions=true;
+  const results=[];
+  const check=async label=>{
+   await wait(200);
+   const g=await evaluate(`(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};return {host:rect('#stage'),guest:rect('#visitor-stage'),caption:rect('.pair-caption:not([hidden])'),toolbar:rect('.pair-toolbar'),width:innerWidth,height:innerHeight}})()`);
+   assert.ok(g.caption.bottom+5<=Math.min(g.host.y,g.guest.y),label+': bubble avoids both full actor rectangles');
+   assert.ok(g.toolbar.bottom+5<=g.caption.y,label+': controls above speech');
+   for(const r of [g.host,g.guest,g.caption,g.toolbar])assert.ok(r.x>=-1&&r.y>=-1&&r.right<=g.width+1&&r.bottom<=g.height+1,label+': all content contained');
+   results.push({label,...g});return g;
+  };
+  for(const [label,scale,area] of [
+   ['normal',1,{x:0,y:0,width:1920,height:1080}],
+   ['small',.5,{x:0,y:0,width:1920,height:1080}],
+   ['narrow-display',2,{x:0,y:0,width:800,height:600}],
+   ['short-display',1,{x:0,y:0,width:640,height:400}],
+  ]){
+   layoutScale=scale;layoutArea=area;await start('fight');await check(label);
+   await wait(300);await fs.writeFile(path.join(out,label+'.png'),(await win.webContents.capturePage()).toPNG());
+   const target=await evaluate(`(()=>{const r=[...document.querySelectorAll('.pair-toolbar button')].find(b=>b.textContent==='换边').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`);
+   win.webContents.sendInputEvent({type:'mouseDown',button:'left',...target,clickCount:1});win.webContents.sendInputEvent({type:'mouseUp',button:'left',...target,clickCount:1});
+   await until(()=>evaluate(`document.body.classList.contains('pair-swapped')`),'native swap');await check(label+'-swapped');
+   await evaluate(`[...document.querySelectorAll('.pair-toolbar button')].find(b=>b.textContent==='结束').click()`);
+   await until(()=>evaluate(`!document.querySelector('#pair-interaction')&&!document.body.classList.contains('pair-returning')`),'end button');
+   assert.ok(Math.abs(win.getBounds().height-360)<=2,'solo height restored');
+  }
+  await fs.writeFile(path.join(out,'result.json'),JSON.stringify({ok:true,results},null,2));
+  console.log('PASS: long speech avoids both actors; controls above speech; normal/small/narrow/short display, swap and exit');app.exit(0);return;
+ }
  if(process.env.QBOT_QA_RELATIONSHIPS_ONLY==='1'){
   await start('tea');await until(()=>relationshipRecords.length===1,'first local award');
   assert.deepEqual([relationshipRecords[0].hostId,relationshipRecords[0].guestId,relationshipRecords[0].kind],['host','guest','tea']);
@@ -162,7 +232,7 @@ app.whenReady().then(async()=>{try{
  win.webContents.sendInputEvent({type:'mouseMove',x:drag.x+45,y:drag.y,button:'left'});await wait(60);
  win.webContents.sendInputEvent({type:'mouseUp',x:drag.x+45,y:drag.y,button:'left',clickCount:1});
  await until(()=>evaluate(`!document.querySelector('#pair-interaction')`),'drag interruption');
- await start('tea');win.setBounds({width:360,height:180});await wait(200);
+ await start('tea');win.setBounds({width:360,height:420});await wait(200);
  const controls=await evaluate(`Array.from(document.querySelectorAll('.pair-toolbar button')).map(b=>{const r=b.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})`);
  assert.ok(controls.every(Boolean),'toolbar fits small pet');await end();
  await start('heart');win.webContents.send('garden:performance','tea');await wait(200);

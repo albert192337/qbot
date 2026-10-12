@@ -102,7 +102,7 @@ export class SpinePlayer {
   private schedule(){if(!this.frame&&!this.disposed&&!this.suspended&&this.ready)this.frame=requestAnimationFrame(this.tick);}
   private tick=(now:number)=>{
     this.frame=0;if(this.disposed||this.suspended)return;
-    const dt=this.last?Math.min((now-this.last)/1000,.05):0;this.last=now;
+    const dt=this.last?Math.max(0,Math.min((now-this.last)/1000,.05)):0;this.last=now;
     if(!document.hidden){this.render(dt);}
     this.schedule();
   };

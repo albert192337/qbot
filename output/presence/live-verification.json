@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-11T16:12:33.176Z",
+  "pid": 62868,
+  "inputHandler": true,
+  "reportHandler": true,
+  "renderer": {
+    "input": true,
+    "signal": true,
+    "style": true
+  }
+}

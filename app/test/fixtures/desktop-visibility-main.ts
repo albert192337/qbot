@@ -24,8 +24,46 @@ app.whenReady().then(async()=>{try{
  registerIpc();Rooms.setLoungePush(Windows.pushToLounge);wireRoomPetDisplay();
  const pet=Windows.createPetWindow();Windows.setPetScale(1);Windows.broadcastCharacterActivated((await getCharacter('host'))!);
  let capturedMenu:Menu|undefined;Menu.prototype.popup=function(){capturedMenu=this;};
- async function chooseVisibility(label:string){capturedMenu=undefined;await js(pet,"document.querySelector('.hud-hide').click()");await until(()=>!!capturedMenu,'visibility menu');const item=capturedMenu!.items.find(i=>i.label===label);assert.ok(item, label);(item.click as ()=>void)();}
+ async function chooseVisibility(label:string,source=pet){capturedMenu=undefined;await js(source,"window.qbot.desktop.openMenu()");await until(()=>!!capturedMenu,'visibility menu');const item=capturedMenu!.items.find(i=>i.label===label);assert.ok(item, label);assert.equal(item.enabled,true,label+' enabled');(item.click as ()=>void)();}
  await until(()=>js(pet,'!!document.querySelector(".hud-hide")&&!document.body.classList.contains("desktop-loading")'),'host toolbar');
+ if(process.env.QBOT_QA_ROOM_MENU==='1'){
+   for(const mode of ['3d','2d'] as const){
+     Windows.setRoomRenderMode(mode);
+     const room=Windows.getRoomWindow()??Windows.openRoomWindow('QBot 我的小屋');
+     await until(()=>room.isVisible()&&!room.webContents.isLoading(),'local '+mode+' room');
+     assert.equal(Rooms.getRoomsCache().room,null);
+     await chooseVisibility('只隐藏房间（保留角色）',room);
+     await until(()=>!Windows.isRoomOpen()&&pet.isVisible(),'local '+mode+' pet restored');
+     assert.equal(Visibility.desktopHidden(),false);
+     await until(()=>js(pet,'[...document.querySelectorAll("video")].some(v=>!v.paused&&v.currentTime>0)'),'local pet playback');
+     await writeFile(path.join(output,'local-'+mode+'-pet.png'),(await pet.webContents.capturePage()).toPNG());
+     await chooseVisibility('显示房间背景');
+     await until(()=>Windows.getRoomWindow()?.isVisible()&&!pet.isVisible(),'local '+mode+' background restored');
+     const restored=Windows.getRoomWindow()!;
+     await until(()=>!restored.webContents.isLoading(),'restored room loaded');
+     assert.ok(restored.webContents.getURL().includes(mode==='3d'?'/tea3d/':'/online-room/'));
+     // Global hide/restore must retain the local room so its menu still says "hide room".
+     await chooseVisibility('隐藏全部角色',restored);
+     await until(()=>Visibility.desktopHidden()&&!restored.isVisible()&&pet.isVisible(),'hide all from local room');
+     await chooseVisibility('显示全部角色');
+     await until(()=>!Visibility.desktopHidden()&&restored.isVisible()&&!pet.isVisible(),'restore local room');
+     await chooseVisibility('只隐藏房间（保留角色）',restored);
+     await until(()=>!Windows.isRoomOpen()&&pet.isVisible(),'hide local room again');
+   }
+   await Rooms.startTestRoom();await Rooms.inviteTestGuest('guest');await setRoomDisplayMode('room');
+   const room=Windows.getRoomWindow()!;
+   await until(()=>room.isVisible()&&!room.webContents.isLoading(),'online room');
+   const roomId=Rooms.getRoomsCache().room!.roomId;
+   await chooseVisibility('只隐藏房间（保留角色）',room);
+   await until(()=>!Windows.isRoomOpen()&&pet.isVisible()&&Windows.getRoomPetWindow('test:guest')?.isVisible(),'online actors restored');
+   assert.equal(Rooms.getRoomsCache().room!.roomId,roomId);
+   await chooseVisibility('显示房间背景');
+   await until(()=>Windows.getRoomWindow()?.isVisible()&&!pet.isVisible(),'online background restored');
+   assert.equal(Rooms.getRoomsCache().room!.roomId,roomId);
+   assert.equal(Windows.getRoomPetWindow('test:guest'),null);
+   console.log('PASS: local 3D/2D enabled menu, hide/restore/repeat, pet playback, global visibility, online membership and peer restoration.');
+   app.exit(0);return;
+ }
  const area=screen.getDisplayMatching(pet.getBounds()).workArea;Windows.movePetWindow(area.x+80,area.y+180);
  await until(()=>BrowserWindow.getAllWindows().some(w=>w.webContents.getURL().includes('/pet-hint/')&&w.isVisible()),'exterior wish');
  const hint=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('/pet-hint/'))!;

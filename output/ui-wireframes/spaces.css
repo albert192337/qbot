@@ -1,0 +1,62 @@
+.space-open>.work-window{display:none}
+.space-view{position:absolute;left:55px;top:210px;width:710px;height:545px;background:#F8F4EA;border:2px solid #655342;border-radius:17px 14px 16px 13px;box-shadow:0 3px 0 #59423530;overflow:hidden;color:#594235}
+.space-view-header{height:48px;padding:9px 16px;display:flex;align-items:center;gap:9px;border-bottom:1px solid #DDD3C0;background:#FFF9EF;font-size:14px;font-weight:600}
+.space-view-header small{font-size:10px;font-weight:400;color:#9B8D78;letter-spacing:1px}
+.space-camera{display:flex;gap:3px;margin-left:auto}
+.space-camera button,.space-placement-tools button{background:transparent;border:0;box-shadow:none;min-width:28px;width:28px;height:28px;min-height:28px;padding:4px;display:grid;place-items:center}
+.space-camera .unified-icon,.space-placement-tools .unified-icon{width:19px;height:19px}
+.space-viewport{position:relative;width:100%;height:calc(100% - 48px);overflow:hidden}
+.space-viewport canvas{display:block;width:100%;height:100%;touch-action:none}
+.space-overlay{position:absolute;inset:0;pointer-events:none}
+.space-hotspot{pointer-events:auto;position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;min-width:28px;min-height:28px;padding:4px 7px;border:1px solid #B8A58A;background:#FFF9EFDE;color:#65513E;border-radius:14px;font-size:10px;font-variant-numeric:tabular-nums;box-shadow:0 2px 0 #59423515}
+.space-hotspot:hover{background:#FFF9EF;box-shadow:0 0 0 3px #A6B58B66}
+.space-hotspot .unified-icon{width:16px;height:16px}
+.space-hotspot.selected,.space-hotspot.plant-ready{background:#E4EDCF;border-color:#819661;box-shadow:0 0 0 3px #95AB7240}
+.space-hotspot.plant-ready{width:43px;height:36px;justify-content:center}
+.space-object-tools{position:absolute;transform:translate(-50%,-100%);display:flex;gap:4px;padding:4px;background:#FFF9EF;border:1px solid #AE9778;border-radius:10px;pointer-events:auto;box-shadow:0 3px 6px #59423520}
+.space-object-tools button{background:transparent;border:0;width:31px;height:31px;min-width:31px;min-height:31px;padding:5px}
+.space-object-tools svg{width:20px;height:20px}
+.space-placement-tools{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:10px;padding:5px 10px;border:1px solid #BAA990;border-radius:9px;background:#FFF9EFED}
+#stage.space-open>.panel.space-panel{left:804px;top:402px!important;width:360px;height:438px;max-height:438px;transform:none;padding:17px;gap:13px}
+#stage.native-lower.space-open>.panel.space-panel{top:145px!important}
+#stage.native-lower .space-view{top:145px}
+.direction-c.c-detail #stage.space-open>.panel.space-panel{left:804px;top:402px!important;transform:none}
+.space-panel .panel-header{gap:5px;flex:none}
+#stage>.space-panel .panel-header h1{font-size:17px;line-height:26px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#stage>.space-panel .panel-header .icon-button{width:25px;min-width:25px;height:28px;min-height:28px;padding:4px}
+#stage>.space-panel .panel-header .icon-button svg{width:19px;height:19px}
+.space-weather{display:flex;align-items:center;gap:4px;margin-left:auto;flex:none;padding:3px 4px;border:0;background:transparent;min-height:28px;color:#8D7E69;cursor:default}
+.space-weather .unified-icon{width:20px;height:20px;opacity:.68}
+.space-weather-time{font-size:11px;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.space-weather.active-weather{color:#657F5E}
+.space-weather.active-weather .unified-icon{opacity:1}
+#stage>.space-panel .space-edit{display:flex;align-items:center;gap:4px;padding:4px 7px;font-size:11px;min-height:28px;white-space:nowrap}
+.space-edit svg{width:15px;height:15px}
+#stage>.space-panel .panel-navigation{gap:3px;flex:none}
+#stage>.space-panel .room-categories{grid-template-columns:repeat(5,minmax(0,1fr))}
+#stage>.space-panel .room-categories button{gap:3px;font-size:11px}
+#stage>.space-panel .room-categories svg{width:16px;height:16px}
+.space-tabs{display:flex;gap:16px;align-items:center;flex:none}
+#stage>.space-panel .space-tabs button{display:flex;align-items:center;gap:4px;background:transparent;border:0;box-shadow:none;color:#9A8772;padding:3px 0;min-height:26px;border-radius:0;font-size:12px;font-weight:400}
+#stage>.space-panel .space-tabs button.selected{color:#594235;border-bottom:2px solid #ADBE94;font-weight:600}
+.space-tabs svg{width:14px;height:14px}
+.space-inventory{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;flex:none}
+#stage>.space-panel .space-item{display:flex;flex-direction:column;position:relative;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:111px;padding:12px 4px 7px;background:#F4ECDC;border:1px solid transparent;border-radius:10px 8px 11px 8px;box-shadow:none;font-size:11px;font-weight:500}
+#stage>.space-panel .space-item.selected{border:1px solid #7C9467;background:#E9EEDB;box-shadow:inset 0 0 0 1px #7C946730}
+.space-item>.unified-icon{width:35px;height:35px}
+.space-item-name{font-size:11px;white-space:nowrap}
+.space-count{font-size:10px;font-weight:400;color:#9A836A}
+.space-subheading{font-size:12px;line-height:20px;color:#93816C;margin:0}
+.space-selection{display:flex;align-items:center;gap:7px;padding:8px 0;border-top:1px solid #E4D9C5;margin-top:3px;flex:none;font-size:12px}
+.space-selection>svg{width:19px;height:19px}
+.space-selection>.icon-button{margin-left:auto}
+.space-context{padding-top:10px;border-top:1px solid #E0D5C2;flex:none}
+.space-context h2{font-size:14px;margin:0 0 3px}
+.space-context .buttons{margin-top:10px}
+.space-context button{display:flex;align-items:center;justify-content:center;gap:6px}
+.space-context button svg{width:17px;height:17px}
+#stage>.space-panel .space-friend{display:flex;align-items:center;gap:10px;padding:15px 2px;border:0;border-radius:0;border-bottom:1px solid #E4D9C7;box-shadow:none;background:transparent;text-align:left;min-height:62px;font-size:13px}
+.space-friend>svg{width:25px;height:25px}
+.space-friend>svg:last-child{width:17px;height:17px;margin-left:auto}
+.space-friend small{font-size:10px;color:#8D9D73;font-weight:400}
+.space-error{padding:30px;font-size:13px}

@@ -1,0 +1,3833 @@
+{
+  "assetHash": "0773305ca5b84159dd06cbda7185cb7d28ae9bdb1176cff8235ac2f6104e83f6",
+  "skin": "sakura",
+  "samples": 56,
+  "landmarkSource": "assistant-reviewed normalized profile, not independent API detection",
+  "geometry": [
+    {
+      "action": "ship_spine_idle",
+      "time": 0,
+      "slot": "右手_1无袖",
+      "evidence": "0-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -7.910000141674311,
+      "actualAngle": -7.309537617160858,
+      "angleError": 0.6004625245134321,
+      "lengthRatios": [
+        0.9890810213670175,
+        1.0142472639678557
+      ],
+      "normalizedResidual": 0.006660821017160516,
+      "lowerSegmentAreaRatio": 0.9868242437433632
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0,
+      "slot": "左手_1无袖",
+      "evidence": "0-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.2699999327527074,
+      "actualAngle": 2.4927251337875527,
+      "angleError": 0.7772747989652089,
+      "lengthRatios": [
+        1.0006215447012017,
+        0.998803232828643
+      ],
+      "normalizedResidual": 0.0033625855564104732,
+      "lowerSegmentAreaRatio": 0.9975871197566328
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0,
+      "slot": "腿右",
+      "evidence": "0-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 2.370053328983734,
+      "actualAngle": 0.9535836506583866,
+      "angleError": 1.4164696783253703,
+      "lengthRatios": [
+        0.9870393714717326,
+        1.02761325346531
+      ],
+      "normalizedResidual": 0.010593039558774973,
+      "lowerSegmentAreaRatio": 0.9694551836286777
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0,
+      "slot": "腿左",
+      "evidence": "0-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.104218034589074,
+      "actualAngle": 5.905220358987748,
+      "angleError": 4.198997675601277,
+      "lengthRatios": [
+        0.9955904194658578,
+        0.9922964143046469
+      ],
+      "normalizedResidual": 0.016159798306778213,
+      "lowerSegmentAreaRatio": 0.9469457823493739
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0.4000000059604645,
+      "slot": "右手_1无袖",
+      "evidence": "0-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -8.209859087231345,
+      "actualAngle": -7.568149581126597,
+      "angleError": 0.641709506104803,
+      "lengthRatios": [
+        0.988864093548122,
+        1.0144602362267041
+      ],
+      "normalizedResidual": 0.006827830102278068,
+      "lowerSegmentAreaRatio": 0.9862566627286646
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0.4000000059604645,
+      "slot": "左手_1无袖",
+      "evidence": "0-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.63718655081408,
+      "actualAngle": 2.810352052660958,
+      "angleError": 0.8268344981531754,
+      "lengthRatios": [
+        1.0009665924265707,
+        0.9982792015860021
+      ],
+      "normalizedResidual": 0.003606245381830007,
+      "lowerSegmentAreaRatio": 0.997284656054949
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0.4000000059604645,
+      "slot": "腿右",
+      "evidence": "0-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 2.069492647331456,
+      "actualAngle": 0.72025372119835,
+      "angleError": 1.3492389261331255,
+      "lengthRatios": [
+        0.9872583019594086,
+        1.0269278136716162
+      ],
+      "normalizedResidual": 0.010347422207038657,
+      "lowerSegmentAreaRatio": 0.9847908716674627
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0.4000000059604645,
+      "slot": "腿左",
+      "evidence": "0-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 8.976782510053054,
+      "actualAngle": 4.996027362875778,
+      "angleError": 3.9807551471773195,
+      "lengthRatios": [
+        0.9950250477383505,
+        0.9950735213319275
+      ],
+      "normalizedResidual": 0.015483806034193004,
+      "lowerSegmentAreaRatio": 0.9655734830058303
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0.800000011920929,
+      "slot": "右手_1无袖",
+      "evidence": "0-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -8.800000548275024,
+      "actualAngle": -8.077185135390055,
+      "angleError": 0.7228154128849837,
+      "lengthRatios": [
+        0.9884333592622153,
+        1.0148732749230476
+      ],
+      "normalizedResidual": 0.007162199992349611,
+      "lowerSegmentAreaRatio": 0.9851250634931445
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0.800000011920929,
+      "slot": "左手_1无袖",
+      "evidence": "0-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 4.369999817493926,
+      "actualAngle": 3.444500929323283,
+      "angleError": 0.9254988881706367,
+      "lengthRatios": [
+        1.0016482250483385,
+        0.9972261503335658
+      ],
+      "normalizedResidual": 0.00411452350262794,
+      "lowerSegmentAreaRatio": 0.9966623451893474
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0.800000011920929,
+      "slot": "腿右",
+      "evidence": "0-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 1.0895597474266043,
+      "actualAngle": -0.07893666689237713,
+      "angleError": 1.1684964143189518,
+      "lengthRatios": [
+        0.9877649255178229,
+        1.0253910450624901
+      ],
+      "normalizedResidual": 0.009753010015111434,
+      "lowerSegmentAreaRatio": 0.9988966295467978
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 0.800000011920929,
+      "slot": "腿左",
+      "evidence": "0-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.773465796137836,
+      "actualAngle": 2.343354612794676,
+      "angleError": 3.430111183343115,
+      "lengthRatios": [
+        0.9936112585475527,
+        1.0018034804474392
+      ],
+      "normalizedResidual": 0.013985453514990193,
+      "lowerSegmentAreaRatio": 0.9890418219934027
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 1.2000000178813934,
+      "slot": "右手_1无袖",
+      "evidence": "0-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -8.44102954333102,
+      "actualAngle": -7.767576355803608,
+      "angleError": 0.673453187527457,
+      "lengthRatios": [
+        0.9886958154358522,
+        1.0146232461648643
+      ],
+      "normalizedResidual": 0.006958013338525286,
+      "lowerSegmentAreaRatio": 0.9858155512058939
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 1.2000000178813934,
+      "slot": "左手_1无袖",
+      "evidence": "0-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.924244843196928,
+      "actualAngle": 3.058742067484959,
+      "angleError": 0.8655027757120024,
+      "lengthRatios": [
+        1.0012346817178033,
+        0.997868022581805
+      ],
+      "normalizedResidual": 0.003802196543618195,
+      "lowerSegmentAreaRatio": 0.9970439668884538
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 1.2000000178813934,
+      "slot": "腿右",
+      "evidence": "0-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 0.5528308574353206,
+      "actualAngle": -0.5402187746339726,
+      "angleError": 1.0930496320693237,
+      "lengthRatios": [
+        0.9877503541091709,
+        1.0254901152527276
+      ],
+      "normalizedResidual": 0.009667065257869725,
+      "lowerSegmentAreaRatio": 0.9827525128422538
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 1.2000000178813934,
+      "slot": "腿左",
+      "evidence": "0-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.460491946980772,
+      "actualAngle": 0.3746009820974799,
+      "angleError": 3.0858909648833333,
+      "lengthRatios": [
+        0.9920892263870635,
+        1.0076477398543107
+      ],
+      "normalizedResidual": 0.013354907052569863,
+      "lowerSegmentAreaRatio": 0.9802029401666563
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 1.600000023841858,
+      "slot": "右手_1无袖",
+      "evidence": "0-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -7.945050122782223,
+      "actualAngle": -7.33979345561789,
+      "angleError": 0.6052566671643262,
+      "lengthRatios": [
+        0.9890557409781401,
+        1.0142722677390568
+      ],
+      "normalizedResidual": 0.006680212593976427,
+      "lowerSegmentAreaRatio": 0.9867583012497171
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 1.600000023841858,
+      "slot": "左手_1无袖",
+      "evidence": "0-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.3083584240383233,
+      "actualAngle": 2.5259053468024746,
+      "angleError": 0.7824530772358003,
+      "lengthRatios": [
+        1.000657693352817,
+        0.9987484740676241
+      ],
+      "normalizedResidual": 0.0033875359272217648,
+      "lowerSegmentAreaRatio": 0.9975561635956378
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 1.600000023841858,
+      "slot": "腿右",
+      "evidence": "0-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 0.48640323292113624,
+      "actualAngle": -0.6046911100409688,
+      "angleError": 1.0910943429621511,
+      "lengthRatios": [
+        0.9868827970513482,
+        1.0283765804243719
+      ],
+      "normalizedResidual": 0.010271342071265784,
+      "lowerSegmentAreaRatio": 0.9700659461642913
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 1.600000023841858,
+      "slot": "腿左",
+      "evidence": "0-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 2.832236411779777,
+      "actualAngle": -0.17109072484144475,
+      "angleError": 3.0033271366212375,
+      "lengthRatios": [
+        0.99072469747899,
+        1.0121396045959894
+      ],
+      "normalizedResidual": 0.013506303333309162,
+      "lowerSegmentAreaRatio": 0.9686978496802577
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.0000000298023224,
+      "slot": "右手_1无袖",
+      "evidence": "0-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -8.209858938929539,
+      "actualAngle": -7.568149508214752,
+      "angleError": 0.6417094307147408,
+      "lengthRatios": [
+        0.9888641002665647,
+        1.0144602402716427
+      ],
+      "normalizedResidual": 0.006827863899412706,
+      "lowerSegmentAreaRatio": 0.9862564587238386
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.0000000298023224,
+      "slot": "左手_1无袖",
+      "evidence": "0-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.637186352449539,
+      "actualAngle": 2.810408340392839,
+      "angleError": 0.8267780120567068,
+      "lengthRatios": [
+        1.000966541816134,
+        0.9982797021138713
+      ],
+      "normalizedResidual": 0.0036060829751473583,
+      "lowerSegmentAreaRatio": 0.9972849309913117
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.0000000298023224,
+      "slot": "腿右",
+      "evidence": "0-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 0.6482461648125877,
+      "actualAngle": -0.45598402265460614,
+      "angleError": 1.1042301874672376,
+      "lengthRatios": [
+        0.9871244542326595,
+        1.0275488138923816
+      ],
+      "normalizedResidual": 0.010113375927956213,
+      "lowerSegmentAreaRatio": 0.9853670908711607
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.0000000298023224,
+      "slot": "腿左",
+      "evidence": "0-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.5888926959152516,
+      "actualAngle": 0.4930655302846012,
+      "angleError": 3.0958271656306806,
+      "lengthRatios": [
+        0.9915008127843897,
+        1.0093744844286576
+      ],
+      "normalizedResidual": 0.013495357094971159,
+      "lowerSegmentAreaRatio": 0.9816666690637966
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.400000035762787,
+      "slot": "右手_1无袖",
+      "evidence": "0-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -8.800000525471262,
+      "actualAngle": -8.077183265001501,
+      "angleError": 0.7228172604698102,
+      "lengthRatios": [
+        0.9884332464491079,
+        1.0148732749230476
+      ],
+      "normalizedResidual": 0.007162231693507397,
+      "lowerSegmentAreaRatio": 0.9851250033895894
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.400000035762787,
+      "slot": "左手_1无袖",
+      "evidence": "0-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 4.369999789177573,
+      "actualAngle": 3.4445019311509784,
+      "angleError": 0.9254978580265742,
+      "lengthRatios": [
+        1.0016484312699543,
+        0.997226106660019
+      ],
+      "normalizedResidual": 0.00411462717663307,
+      "lowerSegmentAreaRatio": 0.9966625527160256
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.400000035762787,
+      "slot": "腿右",
+      "evidence": "0-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 1.2139812320665715,
+      "actualAngle": 0.024364896115904654,
+      "angleError": 1.1896163359506318,
+      "lengthRatios": [
+        0.9877414212371846,
+        1.0254533503751095
+      ],
+      "normalizedResidual": 0.009797703861599543,
+      "lowerSegmentAreaRatio": 0.9989709855536762
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.400000035762787,
+      "slot": "腿左",
+      "evidence": "0-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.865540220433333,
+      "actualAngle": 2.421187999731397,
+      "angleError": 3.444352220701944,
+      "lengthRatios": [
+        0.9936035169205033,
+        1.0017606384867686
+      ],
+      "normalizedResidual": 0.014023793762139983,
+      "lowerSegmentAreaRatio": 0.9889345653396325
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.8000000417232513,
+      "slot": "右手_1无袖",
+      "evidence": "0-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -8.354999718098064,
+      "actualAngle": -7.693341818912351,
+      "angleError": 0.6616578991856841,
+      "lengthRatios": [
+        0.9887587180089222,
+        1.0145626621724857
+      ],
+      "normalizedResidual": 0.006909430804653964,
+      "lowerSegmentAreaRatio": 0.9859802088894853
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.8000000417232513,
+      "slot": "左手_1无袖",
+      "evidence": "0-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.8199996923983806,
+      "actualAngle": 2.968576099130916,
+      "angleError": 0.851423593267441,
+      "lengthRatios": [
+        1.0011377079953252,
+        0.9980175625014155
+      ],
+      "normalizedResidual": 0.003730308713064073,
+      "lowerSegmentAreaRatio": 0.9971321307263008
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.8000000417232513,
+      "slot": "腿右",
+      "evidence": "0-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 1.9812113236082511,
+      "actualAngle": 0.6452739473261638,
+      "angleError": 1.3359373762821178,
+      "lengthRatios": [
+        0.9875655259059769,
+        1.0259213301106926
+      ],
+      "normalizedResidual": 0.010126239262560816,
+      "lowerSegmentAreaRatio": 0.9834343169640685
+    },
+    {
+      "action": "ship_spine_idle",
+      "time": 2.8000000417232513,
+      "slot": "腿左",
+      "evidence": "0-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 8.721729135605264,
+      "actualAngle": 4.7781268868946185,
+      "angleError": 3.94360224871059,
+      "lengthRatios": [
+        0.9952472344550145,
+        0.994705747420342
+      ],
+      "normalizedResidual": 0.015387078087434268,
+      "lowerSegmentAreaRatio": 0.9651693011035508
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0,
+      "slot": "右手_1无袖",
+      "evidence": "1-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -4.85000012876483,
+      "actualAngle": -4.670679565665023,
+      "angleError": 0.17932056309985,
+      "lengthRatios": [
+        0.9912198627759216,
+        1.0119460885850273
+      ],
+      "normalizedResidual": 0.005113117554947247,
+      "lowerSegmentAreaRatio": 0.9923371637304523
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0,
+      "slot": "左手_1无袖",
+      "evidence": "1-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.440000015000462,
+      "actualAngle": 4.370834578137554,
+      "angleError": 1.0691654368629315,
+      "lengthRatios": [
+        1.0026267969059897,
+        0.9956681335685021
+      ],
+      "normalizedResidual": 0.004893786691207813,
+      "lowerSegmentAreaRatio": 0.995708274488427
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0,
+      "slot": "腿右",
+      "evidence": "1-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 7.682940205142471,
+      "actualAngle": 5.485353873483745,
+      "angleError": 2.1975863316587265,
+      "lengthRatios": [
+        0.9971668485176116,
+        0.9976982676188502
+      ],
+      "normalizedResidual": 0.0086558506152115,
+      "lowerSegmentAreaRatio": 1.0433832805211458
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0,
+      "slot": "腿左",
+      "evidence": "1-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 0.5564617343802115,
+      "actualAngle": -1.9101728587083333,
+      "angleError": 2.4666345930885427,
+      "lengthRatios": [
+        0.9914600845435257,
+        1.0105067483150008
+      ],
+      "normalizedResidual": 0.011814747647974414,
+      "lowerSegmentAreaRatio": 1.0511700976154474
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.16666249930858612,
+      "slot": "右手_1无袖",
+      "evidence": "1-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -5.686167644257593,
+      "actualAngle": -5.391717789420876,
+      "angleError": 0.29444985483667097,
+      "lengthRatios": [
+        0.9906491001144659,
+        1.0125973944343403
+      ],
+      "normalizedResidual": 0.0055007377996920265,
+      "lowerSegmentAreaRatio": 0.9908815043809855
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.16666249930858612,
+      "slot": "左手_1无袖",
+      "evidence": "1-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.794202089973066,
+      "actualAngle": 4.677650498289444,
+      "angleError": 1.116551591683674,
+      "lengthRatios": [
+        1.0029462414704313,
+        0.9951472622771773
+      ],
+      "normalizedResidual": 0.005158235140509978,
+      "lowerSegmentAreaRatio": 0.9953803713493656
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.16666249930858612,
+      "slot": "腿右",
+      "evidence": "1-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 18.22907182385671,
+      "actualAngle": 14.332916648791443,
+      "angleError": 3.896155175065246,
+      "lengthRatios": [
+        0.9955942415793777,
+        0.9910375277182619
+      ],
+      "normalizedResidual": 0.01486491220586128,
+      "lowerSegmentAreaRatio": 0.9815263998001705
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.16666249930858612,
+      "slot": "腿左",
+      "evidence": "1-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 0.638212788161076,
+      "actualAngle": -1.8338183994357755,
+      "angleError": 2.4720311875968264,
+      "lengthRatios": [
+        0.9914634099181371,
+        1.0104735231998874
+      ],
+      "normalizedResidual": 0.011818545115686684,
+      "lowerSegmentAreaRatio": 1.0543309741106093
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.33332499861717224,
+      "slot": "右手_1无袖",
+      "evidence": "1-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -7.196366440183275,
+      "actualAngle": -6.694151736672112,
+      "angleError": 0.5022147035111857,
+      "lengthRatios": [
+        0.9895918101000486,
+        1.0137312136809045
+      ],
+      "normalizedResidual": 0.00627203996942393,
+      "lowerSegmentAreaRatio": 0.9881553942766893
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.33332499861717224,
+      "slot": "左手_1无袖",
+      "evidence": "1-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 6.403833918359792,
+      "actualAngle": 5.205727075368793,
+      "angleError": 1.1981068429910238,
+      "lengthRatios": [
+        1.0034906921187887,
+        0.994244752022303
+      ],
+      "normalizedResidual": 0.005619444779376112,
+      "lowerSegmentAreaRatio": 0.9948026827774864
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.33332499861717224,
+      "slot": "腿右",
+      "evidence": "1-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 29.019635548423242,
+      "actualAngle": 23.444372546153133,
+      "angleError": 5.575263002270162,
+      "lengthRatios": [
+        0.991344872311393,
+        0.9835340545783917
+      ],
+      "normalizedResidual": 0.02081372617713024,
+      "lowerSegmentAreaRatio": 0.9586830983509512
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.33332499861717224,
+      "slot": "腿左",
+      "evidence": "1-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -3.5627427778554255,
+      "actualAngle": -5.306101363724568,
+      "angleError": 1.7433585858691458,
+      "lengthRatios": [
+        0.9885601704841378,
+        1.019514794957248
+      ],
+      "normalizedResidual": 0.011379983555610628,
+      "lowerSegmentAreaRatio": 1.0714371215223233
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.49998749792575836,
+      "slot": "右手_1无袖",
+      "evidence": "1-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -4.596775616444795,
+      "actualAngle": -4.452298326092621,
+      "angleError": 0.14447729035214252,
+      "lengthRatios": [
+        0.9913907189029764,
+        1.0117456555511748
+      ],
+      "normalizedResidual": 0.005002637911700041,
+      "lowerSegmentAreaRatio": 0.9927699755171058
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.49998749792575836,
+      "slot": "左手_1无袖",
+      "evidence": "1-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.116698879881624,
+      "actualAngle": 4.090889690038294,
+      "angleError": 1.0258091898433577,
+      "lengthRatios": [
+        1.002333260767829,
+        0.996141234363609
+      ],
+      "normalizedResidual": 0.004654793137950417,
+      "lowerSegmentAreaRatio": 0.9960020591525843
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.49998749792575836,
+      "slot": "腿右",
+      "evidence": "1-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 22.197381764898942,
+      "actualAngle": 17.70607439430498,
+      "angleError": 4.491307370593972,
+      "lengthRatios": [
+        0.9949292997187547,
+        0.9869794006728666
+      ],
+      "normalizedResidual": 0.017100207771119466,
+      "lowerSegmentAreaRatio": 0.982178105653
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.49998749792575836,
+      "slot": "腿左",
+      "evidence": "1-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -4.463691609408279,
+      "actualAngle": -6.123844383625671,
+      "angleError": 1.6601527742174085,
+      "lengthRatios": [
+        0.9875000175412606,
+        1.0227888779695908
+      ],
+      "normalizedResidual": 0.011864166295779435,
+      "lowerSegmentAreaRatio": 1.0378063597378444
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.6666499972343445,
+      "slot": "右手_1无袖",
+      "evidence": "1-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -1.5973572806537197,
+      "actualAngle": -1.8652947138760652,
+      "angleError": 0.26793743322230057,
+      "lengthRatios": [
+        0.993341160680205,
+        1.0092521255396063
+      ],
+      "normalizedResidual": 0.0040424106228488365,
+      "lowerSegmentAreaRatio": 0.9976241210719268
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.6666499972343445,
+      "slot": "左手_1无袖",
+      "evidence": "1-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.631597337042323,
+      "actualAngle": 2.8055397266824054,
+      "angleError": 0.8260576103599533,
+      "lengthRatios": [
+        1.0009614160857816,
+        0.9982873823233565
+      ],
+      "normalizedResidual": 0.00360233136493074,
+      "lowerSegmentAreaRatio": 0.9972893289719555
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.6666499972343445,
+      "slot": "腿右",
+      "evidence": "1-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.614905530356585,
+      "actualAngle": 3.7211896834265246,
+      "angleError": 1.8937158469300357,
+      "lengthRatios": [
+        0.9957821680421421,
+        1.0019578013586088
+      ],
+      "normalizedResidual": 0.007758453959289001,
+      "lowerSegmentAreaRatio": 1.0226444751107762
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.6666499972343445,
+      "slot": "腿左",
+      "evidence": "1-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -2.1106121596507545,
+      "actualAngle": -4.250930078299192,
+      "angleError": 2.1403179186484067,
+      "lengthRatios": [
+        0.9903949776673133,
+        1.0140746607063031
+      ],
+      "normalizedResidual": 0.011532275079285673,
+      "lowerSegmentAreaRatio": 1.0119481002654576
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.8333124965429306,
+      "slot": "右手_1无袖",
+      "evidence": "1-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -2.3502453519142947,
+      "actualAngle": -2.514717274585333,
+      "angleError": 0.16447192267105493,
+      "lengthRatios": [
+        0.9928645933668668,
+        1.0098979164775326
+      ],
+      "normalizedResidual": 0.004210795639985329,
+      "lowerSegmentAreaRatio": 0.9964536262061198
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.8333124965429306,
+      "slot": "左手_1无袖",
+      "evidence": "1-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 4.004374826498178,
+      "actualAngle": 3.1280733768362046,
+      "angleError": 0.8763014496619235,
+      "lengthRatios": [
+        1.001309419880409,
+        0.9977529039456542
+      ],
+      "normalizedResidual": 0.0038577120649923146,
+      "lowerSegmentAreaRatio": 0.9969760067420562
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.8333124965429306,
+      "slot": "腿右",
+      "evidence": "1-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -0.7081765811118224,
+      "actualAngle": -1.558443706774509,
+      "angleError": 0.85026712566264,
+      "lengthRatios": [
+        0.9914170424546107,
+        1.0146387400773127
+      ],
+      "normalizedResidual": 0.00687785381467128,
+      "lowerSegmentAreaRatio": 1.0349417431049186
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.8333124965429306,
+      "slot": "腿左",
+      "evidence": "1-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.609630884313964,
+      "actualAngle": 6.3701468316405885,
+      "angleError": 4.239484052673333,
+      "lengthRatios": [
+        1.0000013904008167,
+        0.9806942813860986
+      ],
+      "normalizedResidual": 0.016856438935609074,
+      "lowerSegmentAreaRatio": 0.9609887486119015
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.9999749958515167,
+      "slot": "右手_1无袖",
+      "evidence": "1-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -6.152867105208576,
+      "actualAngle": -5.794170936553471,
+      "angleError": 0.3586961686551149,
+      "lengthRatios": [
+        0.9903260795156722,
+        1.0129537224916456
+      ],
+      "normalizedResidual": 0.005730438906607869,
+      "lowerSegmentAreaRatio": 0.9900527835240016
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.9999749958515167,
+      "slot": "左手_1无袖",
+      "evidence": "1-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.887166164256736,
+      "actualAngle": 4.758150882702859,
+      "angleError": 1.1290152815538477,
+      "lengthRatios": [
+        1.0030295621246967,
+        0.9950102959530284
+      ],
+      "normalizedResidual": 0.00522816575270152,
+      "lowerSegmentAreaRatio": 0.9952936003281658
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.9999749958515167,
+      "slot": "腿右",
+      "evidence": "1-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 1.1967763420541282,
+      "actualAngle": 0.04888515029430402,
+      "angleError": 1.147891191759868,
+      "lengthRatios": [
+        0.987949282886853,
+        1.0247734358402751
+      ],
+      "normalizedResidual": 0.009587492563256606,
+      "lowerSegmentAreaRatio": 1.040851176226936
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 0.9999749958515167,
+      "slot": "腿左",
+      "evidence": "1-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 20.341048584845677,
+      "actualAngle": 14.829324785960027,
+      "angleError": 5.511723798885669,
+      "lengthRatios": [
+        1.004903543079246,
+        0.9555856933253702
+      ],
+      "normalizedResidual": 0.022983301461007744,
+      "lowerSegmentAreaRatio": 0.9779851487897251
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 1.1666374951601028,
+      "slot": "右手_1无袖",
+      "evidence": "1-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -7.046042409992697,
+      "actualAngle": -6.5644592480296104,
+      "angleError": 0.4815831619630444,
+      "lengthRatios": [
+        0.9896985832913516,
+        1.0136207936129737
+      ],
+      "normalizedResidual": 0.006191895638376616,
+      "lowerSegmentAreaRatio": 0.9884325996761021
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 1.1666374951601028,
+      "slot": "左手_1无袖",
+      "evidence": "1-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 6.348270825227202,
+      "actualAngle": 5.157632566200793,
+      "angleError": 1.1906382590264002,
+      "lengthRatios": [
+        1.0034412750518145,
+        0.9943274851141762
+      ],
+      "normalizedResidual": 0.005577127603798126,
+      "lowerSegmentAreaRatio": 0.9948564167909187
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 1.1666374951601028,
+      "slot": "腿右",
+      "evidence": "1-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.911489140889406,
+      "actualAngle": 3.97876813898891,
+      "angleError": 1.9327210019005179,
+      "lengthRatios": [
+        0.9918384526846638,
+        1.0117370467234486
+      ],
+      "normalizedResidual": 0.008996736823122636,
+      "lowerSegmentAreaRatio": 1.0426354858543392
+    },
+    {
+      "action": "ship_spine_walk",
+      "time": 1.1666374951601028,
+      "slot": "腿左",
+      "evidence": "1-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.040803249287913,
+      "actualAngle": 5.928839269618095,
+      "angleError": 4.111963979669781,
+      "lengthRatios": [
+        0.9950475555682732,
+        0.9939551208050729
+      ],
+      "normalizedResidual": 0.015825995929456847,
+      "lowerSegmentAreaRatio": 0.9777070451057769
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0,
+      "slot": "右手_1无袖",
+      "evidence": "2-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -45.55000122147223,
+      "actualAngle": -40.02915028183028,
+      "angleError": 5.520850939641946,
+      "lengthRatios": [
+        0.951082830267911,
+        1.0301934096769216
+      ],
+      "normalizedResidual": 0.03222344580208187,
+      "lowerSegmentAreaRatio": 0.855271284862746
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0,
+      "slot": "左手_1无袖",
+      "evidence": "2-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -57.319997836200685,
+      "actualAngle": -50.628002599464345,
+      "angleError": 6.691995236736375,
+      "lengthRatios": [
+        0.9227321591605739,
+        1.0388829315616597
+      ],
+      "normalizedResidual": 0.04540663321903407,
+      "lowerSegmentAreaRatio": 0.9484967835671997
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0,
+      "slot": "腿右",
+      "evidence": "2-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 47.311906488043846,
+      "actualAngle": 39.319350522709065,
+      "angleError": 7.992555965334759,
+      "lengthRatios": [
+        0.9896469304980684,
+        0.9406300242434749
+      ],
+      "normalizedResidual": 0.03226474678133708,
+      "lowerSegmentAreaRatio": 0.7920675048623174
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0,
+      "slot": "腿左",
+      "evidence": "2-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 17.046717799730157,
+      "actualAngle": 11.970169138862227,
+      "angleError": 5.076548660867957,
+      "lengthRatios": [
+        1.0034903617991275,
+        0.9641357738042456
+      ],
+      "normalizedResidual": 0.020751187191662513,
+      "lowerSegmentAreaRatio": 0.9818243092976312
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.10000000149011612,
+      "slot": "右手_1无袖",
+      "evidence": "2-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -48.78000084630882,
+      "actualAngle": -42.87256813629091,
+      "angleError": 5.907432710017929,
+      "lengthRatios": [
+        0.9472087250775846,
+        1.0306194909967572
+      ],
+      "normalizedResidual": 0.034535666939327116,
+      "lowerSegmentAreaRatio": 0.8460924576566842
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.10000000149011612,
+      "slot": "左手_1无袖",
+      "evidence": "2-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -56.11999685603371,
+      "actualAngle": -49.56132073418787,
+      "angleError": 6.558676121845792,
+      "lengthRatios": [
+        0.9248201374068505,
+        1.0376122432617858
+      ],
+      "normalizedResidual": 0.04415215274535918,
+      "lowerSegmentAreaRatio": 0.9618872133614781
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.10000000149011612,
+      "slot": "腿右",
+      "evidence": "2-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 57.70213001603702,
+      "actualAngle": 48.49573458760387,
+      "angleError": 9.206395428433098,
+      "lengthRatios": [
+        0.983805039096123,
+        0.9194769122688511
+      ],
+      "normalizedResidual": 0.03748207190253757,
+      "lowerSegmentAreaRatio": 0.7598479330716018
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.10000000149011612,
+      "slot": "腿左",
+      "evidence": "2-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -6.553960339859184,
+      "actualAngle": -8.022885470052087,
+      "angleError": 1.468925130192929,
+      "lengthRatios": [
+        0.9965256673969004,
+        0.9985987522426027
+      ],
+      "normalizedResidual": 0.007607419053285805,
+      "lowerSegmentAreaRatio": 1.0872895701003873
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.20000000298023224,
+      "slot": "右手_1无袖",
+      "evidence": "2-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -45.54291288064337,
+      "actualAngle": -40.0233486481644,
+      "angleError": 5.519564232478956,
+      "lengthRatios": [
+        0.9511021058843508,
+        1.030159827590087
+      ],
+      "normalizedResidual": 0.03221151453712199,
+      "lowerSegmentAreaRatio": 0.8555008372629606
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.20000000298023224,
+      "slot": "左手_1无袖",
+      "evidence": "2-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -57.318682393209166,
+      "actualAngle": -50.62616935921294,
+      "angleError": 6.6925130339961925,
+      "lengthRatios": [
+        0.9227242398497754,
+        1.038919205888103
+      ],
+      "normalizedResidual": 0.04541487424350719,
+      "lowerSegmentAreaRatio": 0.9482427523586726
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.20000000298023224,
+      "slot": "腿右",
+      "evidence": "2-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 56.65211852753434,
+      "actualAngle": 48.369526865952984,
+      "angleError": 8.282591661581364,
+      "lengthRatios": [
+        0.9964935021083579,
+        0.9053500321157131
+      ],
+      "normalizedResidual": 0.04190272404678065,
+      "lowerSegmentAreaRatio": 0.8320750004983456
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.20000000298023224,
+      "slot": "腿左",
+      "evidence": "2-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -2.9319723097217043,
+      "actualAngle": -4.983004140663302,
+      "angleError": 2.0510318309416107,
+      "lengthRatios": [
+        0.9955341809212854,
+        1.0005572765242736
+      ],
+      "normalizedResidual": 0.009727882396595422,
+      "lowerSegmentAreaRatio": 1.0431078168047152
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.30000000447034836,
+      "slot": "右手_1无袖",
+      "evidence": "2-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -38.680001071037715,
+      "actualAngle": -34.007086361072815,
+      "angleError": 4.672914709964857,
+      "lengthRatios": [
+        0.9593949884866979,
+        1.0283058913044525
+      ],
+      "normalizedResidual": 0.027215017662134976,
+      "lowerSegmentAreaRatio": 0.8740822244108954
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.30000000447034836,
+      "slot": "左手_1无袖",
+      "evidence": "2-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -59.86000126043962,
+      "actualAngle": -52.88061417887746,
+      "angleError": 6.9793870815622086,
+      "lengthRatios": [
+        0.9183974622429644,
+        1.0416865892696323
+      ],
+      "normalizedResidual": 0.048104895754177326,
+      "lowerSegmentAreaRatio": 0.9192970080695922
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.30000000447034836,
+      "slot": "腿右",
+      "evidence": "2-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 28.024311336047756,
+      "actualAngle": 22.727892922499887,
+      "angleError": 5.296418413547826,
+      "lengthRatios": [
+        1.001699025748016,
+        0.9634654846619123
+      ],
+      "normalizedResidual": 0.022447453475650758,
+      "lowerSegmentAreaRatio": 0.85943833394435
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.30000000447034836,
+      "slot": "腿左",
+      "evidence": "2-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 19.60257215931052,
+      "actualAngle": 13.69800752614408,
+      "angleError": 5.9045646331663875,
+      "lengthRatios": [
+        1.0052693370347023,
+        0.9535447276425709
+      ],
+      "normalizedResidual": 0.024352972980924727,
+      "lowerSegmentAreaRatio": 0.8062448621462063
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.4000000059604645,
+      "slot": "右手_1无袖",
+      "evidence": "2-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -31.817087605047146,
+      "actualAngle": -28.019748046456428,
+      "angleError": 3.797339558590693,
+      "lengthRatios": [
+        0.9676184113155905,
+        1.0253179002349173
+      ],
+      "normalizedResidual": 0.022143489539948692,
+      "lowerSegmentAreaRatio": 0.9163232658969523
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.4000000059604645,
+      "slot": "左手_1无袖",
+      "evidence": "2-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -62.401317892016884,
+      "actualAngle": -55.12931581919329,
+      "angleError": 7.272002072823625,
+      "lengthRatios": [
+        0.9142392807347792,
+        1.0444520438152862
+      ],
+      "normalizedResidual": 0.05081091003278083,
+      "lowerSegmentAreaRatio": 0.8903394920363277
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.4000000059604645,
+      "slot": "腿右",
+      "evidence": "2-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 24.66549648372836,
+      "actualAngle": 20.121902729096323,
+      "angleError": 4.54359375463207,
+      "lengthRatios": [
+        1.012656864034843,
+        0.9548364099343638
+      ],
+      "normalizedResidual": 0.022934466841952734,
+      "lowerSegmentAreaRatio": 1.0771594064797088
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.4000000059604645,
+      "slot": "腿左",
+      "evidence": "2-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 48.62812230369173,
+      "actualAngle": 39.38264867233786,
+      "angleError": 9.245473631353889,
+      "lengthRatios": [
+        1.0132283930446269,
+        0.8434658354325801
+      ],
+      "normalizedResidual": 0.04755767614025607,
+      "lowerSegmentAreaRatio": 0.6827777304378251
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.5000000074505806,
+      "slot": "右手_1无袖",
+      "evidence": "2-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -28.579999123763393,
+      "actualAngle": -25.204193389350152,
+      "angleError": 3.375805734413234,
+      "lengthRatios": [
+        0.9714310023053473,
+        1.023538237455235
+      ],
+      "normalizedResidual": 0.019731625231190052,
+      "lowerSegmentAreaRatio": 0.9372762020154464
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.5000000074505806,
+      "slot": "左手_1无袖",
+      "evidence": "2-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -63.60000072374093,
+      "actualAngle": -56.18741016187589,
+      "angleError": 7.412590561865045,
+      "lengthRatios": [
+        0.9123403036570138,
+        1.0457573331190215
+      ],
+      "normalizedResidual": 0.05209239215159611,
+      "lowerSegmentAreaRatio": 0.8766816298369816
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.5000000074505806,
+      "slot": "腿右",
+      "evidence": "2-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 0.236681846013663,
+      "actualAngle": -0.8357767378255586,
+      "angleError": 1.0724585838391931,
+      "lengthRatios": [
+        0.9981919454822747,
+        0.998483032025255
+      ],
+      "normalizedResidual": 0.004517022610017535,
+      "lowerSegmentAreaRatio": 0.9996976073070896
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.5000000074505806,
+      "slot": "腿左",
+      "evidence": "2-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 56.11867400756601,
+      "actualAngle": 47.03831501667198,
+      "angleError": 9.08035899089407,
+      "lengthRatios": [
+        1.0199701100867102,
+        0.8053719025442859
+      ],
+      "normalizedResidual": 0.05759997798177016,
+      "lowerSegmentAreaRatio": 0.6841104639160133
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.6000000089406967,
+      "slot": "右手_1无袖",
+      "evidence": "2-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -31.893728685033924,
+      "actualAngle": -28.086536608455475,
+      "angleError": 3.807192076578417,
+      "lengthRatios": [
+        0.9675270726888737,
+        1.02535887771783
+      ],
+      "normalizedResidual": 0.0222006217783049,
+      "lowerSegmentAreaRatio": 0.9158099382742184
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.6000000089406967,
+      "slot": "左手_1无袖",
+      "evidence": "2-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -62.37396841592184,
+      "actualAngle": -55.105213121818096,
+      "angleError": 7.268755294103698,
+      "lengthRatios": [
+        0.9142839201809132,
+        1.0444181645790156
+      ],
+      "normalizedResidual": 0.050780795995293705,
+      "lowerSegmentAreaRatio": 0.8906735990166215
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.6000000089406967,
+      "slot": "腿右",
+      "evidence": "2-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 2.686719715815512,
+      "actualAngle": 1.2828863702355533,
+      "angleError": 1.403833345579983,
+      "lengthRatios": [
+        0.9971378502581186,
+        1.000110176802165
+      ],
+      "normalizedResidual": 0.005848805752019907,
+      "lowerSegmentAreaRatio": 1.050768321088414
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.6000000089406967,
+      "slot": "腿左",
+      "evidence": "2-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 45.27873081823302,
+      "actualAngle": 36.894856163132935,
+      "angleError": 8.383874655100044,
+      "lengthRatios": [
+        1.0386341766905742,
+        0.8381693392012188
+      ],
+      "normalizedResidual": 0.05896579528203339,
+      "lowerSegmentAreaRatio": 0.7493000419589518
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.7000000104308128,
+      "slot": "右手_1无袖",
+      "evidence": "2-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -38.903274632828776,
+      "actualAngle": -34.20221774016368,
+      "angleError": 4.701056892665065,
+      "lengthRatios": [
+        0.9591216449099841,
+        1.0283944194607522
+      ],
+      "normalizedResidual": 0.027381149964098142,
+      "lowerSegmentAreaRatio": 0.8734354733131794
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.7000000104308128,
+      "slot": "左手_1无袖",
+      "evidence": "2-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -59.78023176782971,
+      "actualAngle": -52.81026890801859,
+      "angleError": 6.969962859811176,
+      "lengthRatios": [
+        0.9185344649320984,
+        1.0415841775763661
+      ],
+      "normalizedResidual": 0.048016142764171516,
+      "lowerSegmentAreaRatio": 0.9203110849953842
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.7000000104308128,
+      "slot": "腿右",
+      "evidence": "2-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 19.746644169083286,
+      "actualAngle": 15.61031798467391,
+      "angleError": 4.136326184409427,
+      "lengthRatios": [
+        0.9981797140623693,
+        0.983259204228751
+      ],
+      "normalizedResidual": 0.016189292637337375,
+      "lowerSegmentAreaRatio": 0.928869208113761
+    },
+    {
+      "action": "ship_spine_run",
+      "time": 0.7000000104308128,
+      "slot": "腿左",
+      "evidence": "2-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 19.289560220408763,
+      "actualAngle": 13.698348034372735,
+      "angleError": 5.591212186036046,
+      "lengthRatios": [
+        1.0155857676822213,
+        0.9383619672142961
+      ],
+      "normalizedResidual": 0.02755919648158555,
+      "lowerSegmentAreaRatio": 0.8870778489536382
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0,
+      "slot": "右手_1无袖",
+      "evidence": "3-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -7.910000141674311,
+      "actualAngle": -7.309537617160858,
+      "angleError": 0.6004625245134321,
+      "lengthRatios": [
+        0.9890810213670175,
+        1.0142472639678557
+      ],
+      "normalizedResidual": 0.006660821017160516,
+      "lowerSegmentAreaRatio": 0.9868242437433632
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0,
+      "slot": "左手_1无袖",
+      "evidence": "3-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.2699999327527074,
+      "actualAngle": 2.492681104190267,
+      "angleError": 0.7773188285624428,
+      "lengthRatios": [
+        1.0006216254781555,
+        0.998802967072744
+      ],
+      "normalizedResidual": 0.0033626780868597802,
+      "lowerSegmentAreaRatio": 0.9975878198033069
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0,
+      "slot": "腿右",
+      "evidence": "3-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 2.370053328983734,
+      "actualAngle": 0.9535836506583866,
+      "angleError": 1.4164696783253703,
+      "lengthRatios": [
+        0.9870393714717326,
+        1.02761325346531
+      ],
+      "normalizedResidual": 0.010593039558774973,
+      "lowerSegmentAreaRatio": 0.9694551836286777
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0,
+      "slot": "腿左",
+      "evidence": "3-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.104218034589074,
+      "actualAngle": 5.905220358987748,
+      "angleError": 4.198997675601277,
+      "lengthRatios": [
+        0.9955904194658578,
+        0.9922964143046469
+      ],
+      "normalizedResidual": 0.016159798306778213,
+      "lowerSegmentAreaRatio": 0.9469457823493739
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0.3333374857902527,
+      "slot": "右手_1无袖",
+      "evidence": "3-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -14.623140707028409,
+      "actualAngle": -13.102732220418577,
+      "angleError": 1.520408486609881,
+      "lengthRatios": [
+        0.9839276359399591,
+        1.0184786061220468
+      ],
+      "normalizedResidual": 0.010706204427383884,
+      "lowerSegmentAreaRatio": 0.9729813378391106
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0.3333374857902527,
+      "slot": "左手_1无袖",
+      "evidence": "3-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 9.470775380917363,
+      "actualAngle": 7.865734262833336,
+      "angleError": 1.6050411180840456,
+      "lengthRatios": [
+        1.0061274200789276,
+        0.989594940716159
+      ],
+      "normalizedResidual": 0.008004034915111837,
+      "lowerSegmentAreaRatio": 0.9916375438274657
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0.3333374857902527,
+      "slot": "腿右",
+      "evidence": "3-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.114284062798456,
+      "actualAngle": 1.5661461898783184,
+      "angleError": 1.5481378729201651,
+      "lengthRatios": [
+        0.9871087766865773,
+        1.0272104767610781
+      ],
+      "normalizedResidual": 0.01074146597156894,
+      "lowerSegmentAreaRatio": 0.966133621885038
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0.3333374857902527,
+      "slot": "腿左",
+      "evidence": "3-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 6.933570412923359,
+      "actualAngle": 3.207790399281454,
+      "angleError": 3.725780013641952,
+      "lengthRatios": [
+        0.9929670846025964,
+        1.0028116780798295
+      ],
+      "normalizedResidual": 0.014927715776845148,
+      "lowerSegmentAreaRatio": 0.941499657660964
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0.6666749715805054,
+      "slot": "右手_1无袖",
+      "evidence": "3-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -19.440001514917014,
+      "actualAngle": -17.26758103832186,
+      "angleError": 2.172420476595107,
+      "lengthRatios": [
+        0.9798673444437602,
+        1.0208045782082906
+      ],
+      "normalizedResidual": 0.013792006630261056,
+      "lowerSegmentAreaRatio": 0.9616544839655355
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0.6666749715805054,
+      "slot": "左手_1无袖",
+      "evidence": "3-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 13.919999805242364,
+      "actualAngle": 11.7355382677383,
+      "angleError": 2.184461537504035,
+      "lengthRatios": [
+        1.009638608282056,
+        0.9825392453802124
+      ],
+      "normalizedResidual": 0.011542821288005474,
+      "lowerSegmentAreaRatio": 0.9862917820789825
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0.6666749715805054,
+      "slot": "腿右",
+      "evidence": "3-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.7601547565432867,
+      "actualAngle": 2.1205032363450176,
+      "angleError": 1.6396515201982993,
+      "lengthRatios": [
+        0.9875060737093333,
+        1.0256895457186332
+      ],
+      "normalizedResidual": 0.010626296914046398,
+      "lowerSegmentAreaRatio": 0.9847707530515415
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 0.6666749715805054,
+      "slot": "腿左",
+      "evidence": "3-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.961561940914873,
+      "actualAngle": 0.7758243140786567,
+      "angleError": 3.1857376268362714,
+      "lengthRatios": [
+        0.9914122868071966,
+        1.0094775374207903
+      ],
+      "normalizedResidual": 0.01376482073850325,
+      "lowerSegmentAreaRatio": 0.9685104055067939
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.000012457370758,
+      "slot": "右手_1无袖",
+      "evidence": "3-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -19.440001157651114,
+      "actualAngle": -17.267537774812176,
+      "angleError": 2.1724633828389415,
+      "lengthRatios": [
+        0.9798674631409052,
+        1.0208041733333837
+      ],
+      "normalizedResidual": 0.013791998811638813,
+      "lowerSegmentAreaRatio": 0.9616545030295957
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.000012457370758,
+      "slot": "左手_1无袖",
+      "evidence": "3-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 13.919999976572427,
+      "actualAngle": 11.735493715172453,
+      "angleError": 2.1845062613999744,
+      "lengthRatios": [
+        1.0096388409038333,
+        0.9825390303318368
+      ],
+      "normalizedResidual": 0.011542958663500712,
+      "lowerSegmentAreaRatio": 0.9862920558295134
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.000012457370758,
+      "slot": "腿右",
+      "evidence": "3-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 6.615873904078716,
+      "actualAngle": 4.441222519630657,
+      "angleError": 2.1746513844481115,
+      "lengthRatios": [
+        0.9879462495727024,
+        1.0230346834130353
+      ],
+      "normalizedResidual": 0.011347405419047584,
+      "lowerSegmentAreaRatio": 0.9392236222719197
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.000012457370758,
+      "slot": "腿左",
+      "evidence": "3-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 6.226236324778078,
+      "actualAngle": 2.5815129746810634,
+      "angleError": 3.644723350097024,
+      "lengthRatios": [
+        0.9906123704671309,
+        1.0107888885163232
+      ],
+      "normalizedResidual": 0.015093774892497452,
+      "lowerSegmentAreaRatio": 0.9268279367047002
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.3333499431610107,
+      "slot": "右手_1无袖",
+      "evidence": "3-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -19.440001523363154,
+      "actualAngle": -17.267574308346102,
+      "angleError": 2.1724272150170236,
+      "lengthRatios": [
+        0.9798671712855485,
+        1.0208046090023362
+      ],
+      "normalizedResidual": 0.013792036043305457,
+      "lowerSegmentAreaRatio": 0.9616547105219333
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.3333499431610107,
+      "slot": "左手_1无袖",
+      "evidence": "3-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 13.919999784057199,
+      "actualAngle": 11.735537476623767,
+      "angleError": 2.1844623074334777,
+      "lengthRatios": [
+        1.0096385953859461,
+        0.9825392783244568
+      ],
+      "normalizedResidual": 0.01154279264546286,
+      "lowerSegmentAreaRatio": 0.986292056958983
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.3333499431610107,
+      "slot": "腿右",
+      "evidence": "3-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.750464099165792,
+      "actualAngle": 3.7705660389421243,
+      "angleError": 1.979898060223718,
+      "lengthRatios": [
+        0.9886992492514496,
+        1.0210378538564575
+      ],
+      "normalizedResidual": 0.010559520397579859,
+      "lowerSegmentAreaRatio": 0.9799512752242014
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.3333499431610107,
+      "slot": "腿左",
+      "evidence": "3-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.514899571468929,
+      "actualAngle": 2.114661988831509,
+      "angleError": 3.4002375826373736,
+      "lengthRatios": [
+        0.9895761418415312,
+        1.0147123649604008
+      ],
+      "normalizedResidual": 0.014650469763819963,
+      "lowerSegmentAreaRatio": 0.9754385226950394
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.6666874289512634,
+      "slot": "右手_1无袖",
+      "evidence": "3-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -19.440001227428237,
+      "actualAngle": -17.267559754567614,
+      "angleError": 2.172441472860669,
+      "lengthRatios": [
+        0.9798675689231383,
+        1.0208041377317199
+      ],
+      "normalizedResidual": 0.013791986717754333,
+      "lowerSegmentAreaRatio": 0.9616542483600524
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.6666874289512634,
+      "slot": "左手_1无袖",
+      "evidence": "3-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 13.919999958379387,
+      "actualAngle": 11.735502330953322,
+      "angleError": 2.184497627426026,
+      "lengthRatios": [
+        1.0096388624010073,
+        0.9825391971490516
+      ],
+      "normalizedResidual": 0.011542891130002515,
+      "lowerSegmentAreaRatio": 0.9862919668304824
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.6666874289512634,
+      "slot": "腿右",
+      "evidence": "3-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.3205464285499406,
+      "actualAngle": 1.7264432415550461,
+      "angleError": 1.5941031869948574,
+      "lengthRatios": [
+        0.9871685802452892,
+        1.026955761405393
+      ],
+      "normalizedResidual": 0.01077770538132088,
+      "lowerSegmentAreaRatio": 0.9561643848805425
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 1.6666874289512634,
+      "slot": "腿左",
+      "evidence": "3-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.8105096723948226,
+      "actualAngle": 0.5837201237321559,
+      "angleError": 3.226789548662623,
+      "lengthRatios": [
+        0.9906768718971176,
+        1.011905373885992
+      ],
+      "normalizedResidual": 0.014107380984286438,
+      "lowerSegmentAreaRatio": 0.9412096398947692
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 2.000024914741516,
+      "slot": "右手_1无袖",
+      "evidence": "3-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -18.239738114623925,
+      "actualAngle": -16.228875144763418,
+      "angleError": 2.0108629698604545,
+      "lengthRatios": [
+        0.9809058959177615,
+        1.020281299087172
+      ],
+      "normalizedResidual": 0.013017084524044275,
+      "lowerSegmentAreaRatio": 0.9645807631126424
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 2.000024914741516,
+      "slot": "左手_1无袖",
+      "evidence": "3-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 12.811345436711257,
+      "actualAngle": 10.76987673851668,
+      "angleError": 2.041468698194535,
+      "lengthRatios": [
+        1.008799290386717,
+        0.9843301525889016
+      ],
+      "normalizedResidual": 0.010657300945689606,
+      "lowerSegmentAreaRatio": 0.9877060519072112
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 2.000024914741516,
+      "slot": "腿右",
+      "evidence": "3-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 1.7670018473551854,
+      "actualAngle": 0.4433788186319395,
+      "angleError": 1.3236230287232047,
+      "lengthRatios": [
+        0.9869527082375408,
+        1.0280143228188285
+      ],
+      "normalizedResidual": 0.01052613831349404,
+      "lowerSegmentAreaRatio": 0.958717970140205
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 2.000024914741516,
+      "slot": "腿左",
+      "evidence": "3-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 2.298637250350672,
+      "actualAngle": -0.693791114899814,
+      "angleError": 2.9924283652504755,
+      "lengthRatios": [
+        0.9907791724033121,
+        1.0121963754627694
+      ],
+      "normalizedResidual": 0.013554307652287512,
+      "lowerSegmentAreaRatio": 0.9420894851523489
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 2.333362400531769,
+      "slot": "右手_1无袖",
+      "evidence": "3-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -11.968411533629942,
+      "actualAngle": -10.810702926372661,
+      "angleError": 1.157708607257291,
+      "lengthRatios": [
+        0.9860385296945581,
+        1.016941565266116
+      ],
+      "normalizedResidual": 0.009050040332210293,
+      "lowerSegmentAreaRatio": 0.9787349952782329
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 2.333362400531769,
+      "slot": "左手_1无袖",
+      "evidence": "3-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 7.018661948496867,
+      "actualAngle": 5.738548860966782,
+      "angleError": 1.2801130875301396,
+      "lengthRatios": [
+        1.0040330487275666,
+        0.9933273470762494
+      ],
+      "normalizedResidual": 0.006090142159205447,
+      "lowerSegmentAreaRatio": 0.9942030338908452
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 2.333362400531769,
+      "slot": "腿右",
+      "evidence": "3-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 2.9537442382281647,
+      "actualAngle": 1.4375123594436812,
+      "angleError": 1.516231878784538,
+      "lengthRatios": [
+        0.9870666146361109,
+        1.0273928019136498
+      ],
+      "normalizedResidual": 0.010719281973994728,
+      "lowerSegmentAreaRatio": 0.9702812582497314
+    },
+    {
+      "action": "town_face_xinxi",
+      "time": 2.333362400531769,
+      "slot": "腿左",
+      "evidence": "3-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 5.497251514711698,
+      "actualAngle": 2.0296461686187737,
+      "angleError": 3.4676053460929097,
+      "lengthRatios": [
+        0.992546818530512,
+        1.0051160169572049
+      ],
+      "normalizedResidual": 0.014292315510250666,
+      "lowerSegmentAreaRatio": 0.95468898270372
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0,
+      "slot": "右手_1无袖",
+      "evidence": "4-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -69.87999903117718,
+      "actualAngle": -62.23770084640334,
+      "angleError": 7.642298184773836,
+      "lengthRatios": [
+        0.9267017779171445,
+        1.0082382317040284
+      ],
+      "normalizedResidual": 0.04505227530131838,
+      "lowerSegmentAreaRatio": 0.9030013939638668
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0,
+      "slot": "左手_1无袖",
+      "evidence": "4-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -78.58000400125238,
+      "actualAngle": -71.46160512756637,
+      "angleError": 7.118398873686033,
+      "lengthRatios": [
+        1.0126230028471663,
+        0.8644644642030931
+      ],
+      "normalizedResidual": 0.05940930605719673,
+      "lowerSegmentAreaRatio": 0.9092250633543826
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0,
+      "slot": "腿右",
+      "evidence": "4-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.23529061572331,
+      "actualAngle": 31.825140577879928,
+      "angleError": 6.410150037843323,
+      "lengthRatios": [
+        0.9978814199369651,
+        0.9515194095807255
+      ],
+      "normalizedResidual": 0.027681490982403623,
+      "lowerSegmentAreaRatio": 1.0174569563919644
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0,
+      "slot": "腿左",
+      "evidence": "4-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 37.89365348387307,
+      "actualAngle": 30.860288719207464,
+      "angleError": 7.0333647646656345,
+      "lengthRatios": [
+        1.0202346765404227,
+        0.8989285889741334
+      ],
+      "normalizedResidual": 0.039765446604705365,
+      "lowerSegmentAreaRatio": 1.1263227664492934
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0.4000000059604645,
+      "slot": "右手_1无袖",
+      "evidence": "4-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -69.87999903117718,
+      "actualAngle": -62.23769912269535,
+      "angleError": 7.642299908481846,
+      "lengthRatios": [
+        0.9267017653132188,
+        1.0082382292383687
+      ],
+      "normalizedResidual": 0.045052278780775445,
+      "lowerSegmentAreaRatio": 0.9030013788279783
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0.4000000059604645,
+      "slot": "左手_1无袖",
+      "evidence": "4-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -78.58000400125238,
+      "actualAngle": -71.4616148513737,
+      "angleError": 7.118389149878681,
+      "lengthRatios": [
+        1.012623087505453,
+        0.8644651745912789
+      ],
+      "normalizedResidual": 0.05940930053597869,
+      "lowerSegmentAreaRatio": 0.9092253926673791
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0.4000000059604645,
+      "slot": "腿右",
+      "evidence": "4-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.23529061572331,
+      "actualAngle": 31.825140577879928,
+      "angleError": 6.410150037843323,
+      "lengthRatios": [
+        0.9978814199369651,
+        0.9515194095807255
+      ],
+      "normalizedResidual": 0.027681490982403623,
+      "lowerSegmentAreaRatio": 1.0174569563919644
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0.4000000059604645,
+      "slot": "腿左",
+      "evidence": "4-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 37.89365348387307,
+      "actualAngle": 30.860288719207464,
+      "angleError": 7.0333647646656345,
+      "lengthRatios": [
+        1.0202346765404227,
+        0.8989285889741334
+      ],
+      "normalizedResidual": 0.039765446604705365,
+      "lowerSegmentAreaRatio": 1.1263227664492934
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0.800000011920929,
+      "slot": "右手_1无袖",
+      "evidence": "4-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -69.87999903117718,
+      "actualAngle": -62.23769695172658,
+      "angleError": 7.642302079450587,
+      "lengthRatios": [
+        0.9267017575965287,
+        1.0082382254140856
+      ],
+      "normalizedResidual": 0.045052286992734315,
+      "lowerSegmentAreaRatio": 0.903001386083597
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0.800000011920929,
+      "slot": "左手_1无袖",
+      "evidence": "4-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -78.58000400125238,
+      "actualAngle": -71.46161491789915,
+      "angleError": 7.118389083353236,
+      "lengthRatios": [
+        1.0126230962524345,
+        0.8644651745912807
+      ],
+      "normalizedResidual": 0.05940929535187402,
+      "lowerSegmentAreaRatio": 0.9092253906783521
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0.800000011920929,
+      "slot": "腿右",
+      "evidence": "4-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.23529061572331,
+      "actualAngle": 31.825140577879928,
+      "angleError": 6.410150037843323,
+      "lengthRatios": [
+        0.9978814199369651,
+        0.9515194095807255
+      ],
+      "normalizedResidual": 0.027681490982403623,
+      "lowerSegmentAreaRatio": 1.0174569563919644
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 0.800000011920929,
+      "slot": "腿左",
+      "evidence": "4-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 37.89365348387307,
+      "actualAngle": 30.860288719207464,
+      "angleError": 7.0333647646656345,
+      "lengthRatios": [
+        1.0202346765404227,
+        0.8989285889741334
+      ],
+      "normalizedResidual": 0.039765446604705365,
+      "lowerSegmentAreaRatio": 1.1263227664492934
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 1.2000000178813934,
+      "slot": "右手_1无袖",
+      "evidence": "4-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -69.87999903117718,
+      "actualAngle": -62.23769741821556,
+      "angleError": 7.64230161296166,
+      "lengthRatios": [
+        0.9267017485937254,
+        1.0082382271752672
+      ],
+      "normalizedResidual": 0.045052288018301384,
+      "lowerSegmentAreaRatio": 0.9030013685703998
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 1.2000000178813934,
+      "slot": "左手_1无袖",
+      "evidence": "4-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -78.58000400125238,
+      "actualAngle": -71.4616147617093,
+      "angleError": 7.118389239543035,
+      "lengthRatios": [
+        1.012623072198235,
+        0.8644651745136717
+      ],
+      "normalizedResidual": 0.05940928983065884,
+      "lowerSegmentAreaRatio": 0.90922538302479
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 1.2000000178813934,
+      "slot": "腿右",
+      "evidence": "4-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.23529061572331,
+      "actualAngle": 31.825140577879928,
+      "angleError": 6.410150037843323,
+      "lengthRatios": [
+        0.9978814199369651,
+        0.9515194095807255
+      ],
+      "normalizedResidual": 0.027681490982403623,
+      "lowerSegmentAreaRatio": 1.0174569563919644
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 1.2000000178813934,
+      "slot": "腿左",
+      "evidence": "4-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 37.89365348387307,
+      "actualAngle": 30.860288719207464,
+      "angleError": 7.0333647646656345,
+      "lengthRatios": [
+        1.0202346765404227,
+        0.8989285889741334
+      ],
+      "normalizedResidual": 0.039765446604705365,
+      "lowerSegmentAreaRatio": 1.1263227664492934
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 1.600000023841858,
+      "slot": "右手_1无袖",
+      "evidence": "4-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -69.87999903117718,
+      "actualAngle": -62.237699600984335,
+      "angleError": 7.642299430192793,
+      "lengthRatios": [
+        0.9267017485937254,
+        1.0082382317040266
+      ],
+      "normalizedResidual": 0.04505228290914466,
+      "lowerSegmentAreaRatio": 0.9030013603735026
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 1.600000023841858,
+      "slot": "左手_1无袖",
+      "evidence": "4-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -78.58000400125238,
+      "actualAngle": -71.46161522464163,
+      "angleError": 7.1183887766108,
+      "lengthRatios": [
+        1.0126231028126709,
+        0.8644651738462309
+      ],
+      "normalizedResidual": 0.059409283119234234,
+      "lowerSegmentAreaRatio": 0.909225423935985
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 1.600000023841858,
+      "slot": "腿右",
+      "evidence": "4-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.23529061572331,
+      "actualAngle": 31.825140577879928,
+      "angleError": 6.410150037843323,
+      "lengthRatios": [
+        0.9978814199369651,
+        0.9515194095807255
+      ],
+      "normalizedResidual": 0.027681490982403623,
+      "lowerSegmentAreaRatio": 1.0174569563919644
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 1.600000023841858,
+      "slot": "腿左",
+      "evidence": "4-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 37.89365348387307,
+      "actualAngle": 30.860288719207464,
+      "angleError": 7.0333647646656345,
+      "lengthRatios": [
+        1.0202346765404227,
+        0.8989285889741334
+      ],
+      "normalizedResidual": 0.039765446604705365,
+      "lowerSegmentAreaRatio": 1.1263227664492934
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.0000000298023224,
+      "slot": "右手_1无袖",
+      "evidence": "4-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -69.87999903117718,
+      "actualAngle": -62.23769741821556,
+      "angleError": 7.64230161296166,
+      "lengthRatios": [
+        0.9267017485937254,
+        1.0082382271752672
+      ],
+      "normalizedResidual": 0.045052288018301384,
+      "lowerSegmentAreaRatio": 0.9030013685703998
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.0000000298023224,
+      "slot": "左手_1无袖",
+      "evidence": "4-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -78.58000400125238,
+      "actualAngle": -71.4616147617093,
+      "angleError": 7.118389239543035,
+      "lengthRatios": [
+        1.012623072198235,
+        0.8644651745136717
+      ],
+      "normalizedResidual": 0.05940928983065884,
+      "lowerSegmentAreaRatio": 0.90922538302479
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.0000000298023224,
+      "slot": "腿右",
+      "evidence": "4-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.23529061572331,
+      "actualAngle": 31.825140577879928,
+      "angleError": 6.410150037843323,
+      "lengthRatios": [
+        0.9978814199369651,
+        0.9515194095807255
+      ],
+      "normalizedResidual": 0.027681490982403623,
+      "lowerSegmentAreaRatio": 1.0174569563919644
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.0000000298023224,
+      "slot": "腿左",
+      "evidence": "4-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 37.89365348387307,
+      "actualAngle": 30.860288719207464,
+      "angleError": 7.0333647646656345,
+      "lengthRatios": [
+        1.0202346765404227,
+        0.8989285889741334
+      ],
+      "normalizedResidual": 0.039765446604705365,
+      "lowerSegmentAreaRatio": 1.1263227664492934
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.400000035762787,
+      "slot": "右手_1无袖",
+      "evidence": "4-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -69.87999903117718,
+      "actualAngle": -62.23769695172658,
+      "angleError": 7.642302079450587,
+      "lengthRatios": [
+        0.9267017575965287,
+        1.0082382254140856
+      ],
+      "normalizedResidual": 0.045052286992734315,
+      "lowerSegmentAreaRatio": 0.903001386083597
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.400000035762787,
+      "slot": "左手_1无袖",
+      "evidence": "4-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -78.58000400125238,
+      "actualAngle": -71.46161491789915,
+      "angleError": 7.118389083353236,
+      "lengthRatios": [
+        1.0126230962524345,
+        0.8644651745912807
+      ],
+      "normalizedResidual": 0.05940929535187402,
+      "lowerSegmentAreaRatio": 0.9092253906783521
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.400000035762787,
+      "slot": "腿右",
+      "evidence": "4-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.23529061572331,
+      "actualAngle": 31.825140577879928,
+      "angleError": 6.410150037843323,
+      "lengthRatios": [
+        0.9978814199369651,
+        0.9515194095807255
+      ],
+      "normalizedResidual": 0.027681490982403623,
+      "lowerSegmentAreaRatio": 1.0174569563919644
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.400000035762787,
+      "slot": "腿左",
+      "evidence": "4-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 37.89365348387307,
+      "actualAngle": 30.860288719207464,
+      "angleError": 7.0333647646656345,
+      "lengthRatios": [
+        1.0202346765404227,
+        0.8989285889741334
+      ],
+      "normalizedResidual": 0.039765446604705365,
+      "lowerSegmentAreaRatio": 1.1263227664492934
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.8000000417232513,
+      "slot": "右手_1无袖",
+      "evidence": "4-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -69.87999903117718,
+      "actualAngle": -62.23769912269535,
+      "angleError": 7.642299908481846,
+      "lengthRatios": [
+        0.9267017653132188,
+        1.0082382292383687
+      ],
+      "normalizedResidual": 0.045052278780775445,
+      "lowerSegmentAreaRatio": 0.9030013788279783
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.8000000417232513,
+      "slot": "左手_1无袖",
+      "evidence": "4-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -78.58000400125238,
+      "actualAngle": -71.4616148513737,
+      "angleError": 7.118389149878681,
+      "lengthRatios": [
+        1.012623087505453,
+        0.8644651745912789
+      ],
+      "normalizedResidual": 0.05940930053597869,
+      "lowerSegmentAreaRatio": 0.9092253926673791
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.8000000417232513,
+      "slot": "腿右",
+      "evidence": "4-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.23529061572331,
+      "actualAngle": 31.825140577879928,
+      "angleError": 6.410150037843323,
+      "lengthRatios": [
+        0.9978814199369651,
+        0.9515194095807255
+      ],
+      "normalizedResidual": 0.027681490982403623,
+      "lowerSegmentAreaRatio": 1.0174569563919644
+    },
+    {
+      "action": "ship_spine_sleep_cute",
+      "time": 2.8000000417232513,
+      "slot": "腿左",
+      "evidence": "4-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 37.89365348387307,
+      "actualAngle": 30.860288719207464,
+      "angleError": 7.0333647646656345,
+      "lengthRatios": [
+        1.0202346765404227,
+        0.8989285889741334
+      ],
+      "normalizedResidual": 0.039765446604705365,
+      "lowerSegmentAreaRatio": 1.1263227664492934
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0,
+      "slot": "右手_1无袖",
+      "evidence": "5-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -35.41000112765332,
+      "actualAngle": -31.17670073876811,
+      "angleError": 4.2333003888852545,
+      "lengthRatios": [
+        0.9645953419772543,
+        1.0241211976645097
+      ],
+      "normalizedResidual": 0.024149266199546295,
+      "lowerSegmentAreaRatio": 0.9169021118632119
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0,
+      "slot": "左手_1无袖",
+      "evidence": "5-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -27.350001414613658,
+      "actualAngle": -24.00708981576105,
+      "angleError": 3.342911598852652,
+      "lengthRatios": [
+        0.9649574982184166,
+        1.0310999744189082
+      ],
+      "normalizedResidual": 0.02226008639043096,
+      "lowerSegmentAreaRatio": 0.999814589383439
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0,
+      "slot": "腿右",
+      "evidence": "5-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.34245255696514,
+      "actualAngle": 32.062999950077135,
+      "angleError": 6.279452606887958,
+      "lengthRatios": [
+        1.014767739907243,
+        0.9304685168584305
+      ],
+      "normalizedResidual": 0.03394500529341909,
+      "lowerSegmentAreaRatio": 0.996817245150192
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0,
+      "slot": "腿左",
+      "evidence": "5-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 57.01197205211938,
+      "actualAngle": 48.69582791961134,
+      "angleError": 8.316144132508043,
+      "lengthRatios": [
+        1.0163478915076973,
+        0.8494135907305553
+      ],
+      "normalizedResidual": 0.053160224488356396,
+      "lowerSegmentAreaRatio": 1.0692069372169721
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0.4000000059604645,
+      "slot": "右手_1无袖",
+      "evidence": "5-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -49.84470234099672,
+      "actualAngle": -43.96700208859739,
+      "angleError": 5.877700252399336,
+      "lengthRatios": [
+        0.9490932166332587,
+        1.0212276730711498
+      ],
+      "normalizedResidual": 0.03325279675066295,
+      "lowerSegmentAreaRatio": 0.9101670544203482
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0.4000000059604645,
+      "slot": "左手_1无袖",
+      "evidence": "5-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -45.367237021262596,
+      "actualAngle": -39.88182617603964,
+      "angleError": 5.485410845222987,
+      "lengthRatios": [
+        0.9399670717972824,
+        1.0380654088158987
+      ],
+      "normalizedResidual": 0.03621592136297745,
+      "lowerSegmentAreaRatio": 0.9801926617945304
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0.4000000059604645,
+      "slot": "腿右",
+      "evidence": "5-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.93902059353447,
+      "actualAngle": 32.595686384967856,
+      "angleError": 6.343334208566603,
+      "lengthRatios": [
+        1.0147096558737663,
+        0.9295180378572507
+      ],
+      "normalizedResidual": 0.034374433374281844,
+      "lowerSegmentAreaRatio": 1.0009805215840732
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0.4000000059604645,
+      "slot": "腿左",
+      "evidence": "5-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 50.08399306651814,
+      "actualAngle": 42.12746959058732,
+      "angleError": 7.956523475930794,
+      "lengthRatios": [
+        1.019824919691836,
+        0.8675169207860884
+      ],
+      "normalizedResidual": 0.049091296641699166,
+      "lowerSegmentAreaRatio": 1.1061453836921997
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0.800000011920929,
+      "slot": "右手_1无袖",
+      "evidence": "5-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -55.853509348492295,
+      "actualAngle": -49.37542611629192,
+      "angleError": 6.478083232200333,
+      "lengthRatios": [
+        0.9423896382246081,
+        1.0183961765589067
+      ],
+      "normalizedResidual": 0.03690971131778401,
+      "lowerSegmentAreaRatio": 0.9099134891704163
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0.800000011920929,
+      "slot": "左手_1无袖",
+      "evidence": "5-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -52.65253908504553,
+      "actualAngle": -46.41996821467113,
+      "angleError": 6.2325708703743885,
+      "lengthRatios": [
+        0.9296779605841362,
+        1.038137515732573
+      ],
+      "normalizedResidual": 0.04163157409676046,
+      "lowerSegmentAreaRatio": 0.9682807007670922
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0.800000011920929,
+      "slot": "腿右",
+      "evidence": "5-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 39.12853531878593,
+      "actualAngle": 32.765422840902616,
+      "angleError": 6.3631124778833055,
+      "lengthRatios": [
+        1.0149639315219554,
+        0.9289869199836642
+      ],
+      "normalizedResidual": 0.03461463191603258,
+      "lowerSegmentAreaRatio": 1.0033911184101807
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 0.800000011920929,
+      "slot": "腿左",
+      "evidence": "5-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 42.27834400786982,
+      "actualAngle": 34.836936350032595,
+      "angleError": 7.441407657837203,
+      "lengthRatios": [
+        1.021452002836062,
+        0.8860106082553085
+      ],
+      "normalizedResidual": 0.043815898308683536,
+      "lowerSegmentAreaRatio": 1.1010419764407275
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 1.2000000178813934,
+      "slot": "右手_1无袖",
+      "evidence": "5-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -55.555205561158594,
+      "actualAngle": -49.10558365096175,
+      "angleError": 6.449621910196811,
+      "lengthRatios": [
+        0.94272424583104,
+        1.0185585158887642
+      ],
+      "normalizedResidual": 0.036730349452806545,
+      "lowerSegmentAreaRatio": 0.9099642363568358
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 1.2000000178813934,
+      "slot": "左手_1无袖",
+      "evidence": "5-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -52.35520876165767,
+      "actualAngle": -46.151555862992836,
+      "angleError": 6.203652898664814,
+      "lengthRatios": [
+        0.9300961234795324,
+        1.038166054935667
+      ],
+      "normalizedResidual": 0.041413656437951044,
+      "lowerSegmentAreaRatio": 0.968807748795521
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 1.2000000178813934,
+      "slot": "腿右",
+      "evidence": "5-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.274437077850834,
+      "actualAngle": 32.00465163739748,
+      "angleError": 6.269785440453347,
+      "lengthRatios": [
+        1.0156201821949715,
+        0.9298758332248093
+      ],
+      "normalizedResidual": 0.03421150366712091,
+      "lowerSegmentAreaRatio": 1.0005780174027288
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 1.2000000178813934,
+      "slot": "腿左",
+      "evidence": "5-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 45.70705676367124,
+      "actualAngle": 38.039125683584736,
+      "angleError": 7.667931080086532,
+      "lengthRatios": [
+        1.022033950365127,
+        0.8773664471000135
+      ],
+      "normalizedResidual": 0.04668545956583645,
+      "lowerSegmentAreaRatio": 1.1140835875834327
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 1.600000023841858,
+      "slot": "右手_1无袖",
+      "evidence": "5-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -62.057462779508285,
+      "actualAngle": -55.02094559226324,
+      "angleError": 7.036517187245067,
+      "lengthRatios": [
+        0.9354240252695519,
+        1.0145016932961954
+      ],
+      "normalizedResidual": 0.04058417852541745,
+      "lowerSegmentAreaRatio": 0.9079375119563938
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 1.600000023841858,
+      "slot": "左手_1无袖",
+      "evidence": "5-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -55.24111981775013,
+      "actualAngle": -48.7631837260704,
+      "angleError": 6.47793609167968,
+      "lengthRatios": [
+        0.9260471427436787,
+        1.0377792398050432
+      ],
+      "normalizedResidual": 0.04351701960353832,
+      "lowerSegmentAreaRatio": 0.9635492893066628
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 1.600000023841858,
+      "slot": "腿右",
+      "evidence": "5-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 37.53708788927132,
+      "actualAngle": 31.34824119448003,
+      "angleError": 6.188846694791323,
+      "lengthRatios": [
+        1.015657241093265,
+        0.9310731310702947
+      ],
+      "normalizedResidual": 0.033666379183548555,
+      "lowerSegmentAreaRatio": 0.9962700599268218
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 1.600000023841858,
+      "slot": "腿左",
+      "evidence": "5-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 49.139762123594316,
+      "actualAngle": 41.220936834333955,
+      "angleError": 7.918825289260326,
+      "lengthRatios": [
+        1.0204699062372458,
+        0.8687645885966601
+      ],
+      "normalizedResidual": 0.04875094811451445,
+      "lowerSegmentAreaRatio": 1.0927600446986063
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.0000000298023224,
+      "slot": "右手_1无袖",
+      "evidence": "5-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -76.81341991089955,
+      "actualAngle": -68.73411441256108,
+      "angleError": 8.079305498338499,
+      "lengthRatios": [
+        0.9191521583290747,
+        1.0014924102902771
+      ],
+      "normalizedResidual": 0.048841771662239415,
+      "lowerSegmentAreaRatio": 0.8964163642796248
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.0000000298023224,
+      "slot": "左手_1无袖",
+      "evidence": "5-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -61.90871686301752,
+      "actualAngle": -54.85178897894335,
+      "angleError": 7.0569278840741845,
+      "lengthRatios": [
+        0.9168308472657882,
+        1.0359356602820151
+      ],
+      "normalizedResidual": 0.04826988407491339,
+      "lowerSegmentAreaRatio": 0.950255195321318
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.0000000298023224,
+      "slot": "腿右",
+      "evidence": "5-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.40677879345352,
+      "actualAngle": 32.122351416390856,
+      "angleError": 6.284427377062684,
+      "lengthRatios": [
+        1.0153977726233794,
+        0.9298405286084865
+      ],
+      "normalizedResidual": 0.03422803689809559,
+      "lowerSegmentAreaRatio": 1.0005867040750636
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.0000000298023224,
+      "slot": "腿左",
+      "evidence": "5-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 45.740674631012,
+      "actualAngle": 38.070568040624224,
+      "angleError": 7.670106590387832,
+      "lengthRatios": [
+        1.0218925831813883,
+        0.8774241420786908
+      ],
+      "normalizedResidual": 0.04663649819429304,
+      "lowerSegmentAreaRatio": 1.114515789666089
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.400000035762787,
+      "slot": "右手_1无袖",
+      "evidence": "5-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -78.99338328720002,
+      "actualAngle": -70.7972183344363,
+      "angleError": 8.196164952763752,
+      "lengthRatios": [
+        0.9168332155426244,
+        0.9991518459681956
+      ],
+      "normalizedResidual": 0.04999759274899056,
+      "lowerSegmentAreaRatio": 0.8939316396072502
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.400000035762787,
+      "slot": "左手_1无袖",
+      "evidence": "5-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -62.634307003410015,
+      "actualAngle": -55.51919966230808,
+      "angleError": 7.115107341101975,
+      "lengthRatios": [
+        0.9158438647529343,
+        1.0356553733027802
+      ],
+      "normalizedResidual": 0.04877758496295309,
+      "lowerSegmentAreaRatio": 0.948717328019457
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.400000035762787,
+      "slot": "腿右",
+      "evidence": "5-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 39.299676066165716,
+      "actualAngle": 32.91779709537642,
+      "angleError": 6.38187897078933,
+      "lengthRatios": [
+        1.0148001175639454,
+        0.9288308321016966
+      ],
+      "normalizedResidual": 0.034684157010556785,
+      "lowerSegmentAreaRatio": 1.0036506069311955
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.400000035762787,
+      "slot": "腿左",
+      "evidence": "5-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 42.51948956622324,
+      "actualAngle": 35.05733912542074,
+      "angleError": 7.462150440802475,
+      "lengthRatios": [
+        1.0211641618513398,
+        0.8856562707195303
+      ],
+      "normalizedResidual": 0.04385817702603758,
+      "lowerSegmentAreaRatio": 1.1005681669200085
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.8000000417232513,
+      "slot": "右手_1无袖",
+      "evidence": "5-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -78.40638430838354,
+      "actualAngle": -70.24068382353857,
+      "angleError": 8.165700484844933,
+      "lengthRatios": [
+        0.9174545851804267,
+        0.9997919589228305
+      ],
+      "normalizedResidual": 0.04968812284656496,
+      "lowerSegmentAreaRatio": 0.8946197350715088
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.8000000417232513,
+      "slot": "左手_1无袖",
+      "evidence": "5-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -61.360363463245704,
+      "actualAngle": -54.34804793481355,
+      "angleError": 7.012315528432168,
+      "lengthRatios": [
+        0.9175793873223372,
+        1.0361376416619041
+      ],
+      "normalizedResidual": 0.04788494447739652,
+      "lowerSegmentAreaRatio": 0.951406312022962
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.8000000417232513,
+      "slot": "腿右",
+      "evidence": "5-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 38.9767836403021,
+      "actualAngle": 32.629053170151835,
+      "angleError": 6.347730470150282,
+      "lengthRatios": [
+        1.0148421133458914,
+        0.9293346172494077
+      ],
+      "normalizedResidual": 0.03445573662329558,
+      "lowerSegmentAreaRatio": 1.0012084795373397
+    },
+    {
+      "action": "town_post_player_taketea",
+      "time": 2.8000000417232513,
+      "slot": "腿左",
+      "evidence": "5-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 50.26795485320616,
+      "actualAngle": 42.301379768132065,
+      "angleError": 7.966575085074055,
+      "lengthRatios": [
+        1.019779976477707,
+        0.8670680177857462
+      ],
+      "normalizedResidual": 0.04921739848664379,
+      "lowerSegmentAreaRatio": 1.1061341725008844
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 0,
+      "slot": "右手_1无袖",
+      "evidence": "6-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -1.844099168259381e-14,
+      "actualAngle": -0.4870929769359062,
+      "angleError": 0.4870929769358554,
+      "lengthRatios": [
+        0.9943235285037518,
+        1.0078377725106062
+      ],
+      "normalizedResidual": 0.0038921645205956205,
+      "lowerSegmentAreaRatio": 1.0000001851901348
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 0,
+      "slot": "左手_1无袖",
+      "evidence": "6-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 41.74999946948997,
+      "actualAngle": 36.446542033286654,
+      "angleError": 5.303457436203303,
+      "lengthRatios": [
+        1.02231299348493,
+        0.9323658943268927
+      ],
+      "normalizedResidual": 0.033472360660816505,
+      "lowerSegmentAreaRatio": 0.9349398472663482
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 0,
+      "slot": "腿右",
+      "evidence": "6-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -7.161657771162927,
+      "actualAngle": -7.089117242817321,
+      "angleError": 0.07254052834559843,
+      "lengthRatios": [
+        0.9956870383871478,
+        1.0034277697046108
+      ],
+      "normalizedResidual": 0.002879213107882958,
+      "lowerSegmentAreaRatio": 0.9708961147926305
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 0,
+      "slot": "腿左",
+      "evidence": "6-0.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -4.380981845477628,
+      "actualAngle": -6.4264070574426,
+      "angleError": 2.0454252119649254,
+      "lengthRatios": [
+        0.998343832999692,
+        0.9949408139788267
+      ],
+      "normalizedResidual": 0.00954766150574124,
+      "lowerSegmentAreaRatio": 0.9928454846978719
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 0.574999988079071,
+      "slot": "右手_1无袖",
+      "evidence": "6-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -5.5322975290488397e-14,
+      "actualAngle": -0.48706988654929523,
+      "angleError": 0.48706988654919314,
+      "lengthRatios": [
+        0.9943236475752337,
+        1.0078378283934686
+      ],
+      "normalizedResidual": 0.0038920385197429687,
+      "lowerSegmentAreaRatio": 1.0000003055731999
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 0.574999988079071,
+      "slot": "左手_1无袖",
+      "evidence": "6-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 39.41679129925056,
+      "actualAngle": 34.32975891827021,
+      "angleError": 5.087032380980304,
+      "lengthRatios": [
+        1.0219014319382576,
+        0.9368287031566386
+      ],
+      "normalizedResidual": 0.03168558955828644,
+      "lowerSegmentAreaRatio": 0.9402703437485468
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 0.574999988079071,
+      "slot": "腿右",
+      "evidence": "6-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.718811577138858,
+      "actualAngle": 7.968027271757319,
+      "angleError": 2.7507843053815577,
+      "lengthRatios": [
+        0.9988385992212524,
+        0.9918269674848097
+      ],
+      "normalizedResidual": 0.010775657003706146,
+      "lowerSegmentAreaRatio": 0.9550595270517827
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 0.574999988079071,
+      "slot": "腿左",
+      "evidence": "6-1.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.687273264605116,
+      "actualAngle": 6.388559558964129,
+      "angleError": 4.298713705641035,
+      "lengthRatios": [
+        1.0068582144939664,
+        0.9667395539159175
+      ],
+      "normalizedResidual": 0.018878723346859687,
+      "lowerSegmentAreaRatio": 0.9532869993298162
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 1.149999976158142,
+      "slot": "右手_1无袖",
+      "evidence": "6-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -2.7661487497327203e-14,
+      "actualAngle": -0.4871019587196419,
+      "angleError": 0.4871019587195633,
+      "lengthRatios": [
+        0.9943237626635042,
+        1.0078376839584477
+      ],
+      "normalizedResidual": 0.0038921423506082043,
+      "lowerSegmentAreaRatio": 1.0000000467254366
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 1.149999976158142,
+      "slot": "左手_1无袖",
+      "evidence": "6-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 45.64114677983627,
+      "actualAngle": 39.99969349185968,
+      "angleError": 5.64145328797656,
+      "lengthRatios": [
+        1.022725708071102,
+        0.9248873495222736
+      ],
+      "normalizedResidual": 0.036422183025343856,
+      "lowerSegmentAreaRatio": 0.9305292961721151
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 1.149999976158142,
+      "slot": "腿右",
+      "evidence": "6-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -5.807893696552574,
+      "actualAngle": -5.832918631411342,
+      "angleError": 0.02502493485872037,
+      "lengthRatios": [
+        0.9887613394601328,
+        1.0213800306635656
+      ],
+      "normalizedResidual": 0.007929393945139687,
+      "lowerSegmentAreaRatio": 0.9942946837944645
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 1.149999976158142,
+      "slot": "腿左",
+      "evidence": "6-2.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 0.09368689697601454,
+      "actualAngle": -2.761191210301188,
+      "angleError": 2.854878107277159,
+      "lengthRatios": [
+        0.9854214210187163,
+        1.0317107716055713
+      ],
+      "normalizedResidual": 0.015622652580431358,
+      "lowerSegmentAreaRatio": 0.8449122167828758
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 1.7249999642372131,
+      "slot": "右手_1无袖",
+      "evidence": "6-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -6.146997262078982e-14,
+      "actualAngle": -0.4870751738939502,
+      "angleError": 0.4870751738939134,
+      "lengthRatios": [
+        0.9943234152099002,
+        1.0078379640534951
+      ],
+      "normalizedResidual": 0.003892114658358007,
+      "lowerSegmentAreaRatio": 1.0000005373861929
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 1.7249999642372131,
+      "slot": "左手_1无袖",
+      "evidence": "6-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 50.383242800158285,
+      "actualAngle": 44.37138171494178,
+      "angleError": 6.0118610852165375,
+      "lengthRatios": [
+        1.0227633909362355,
+        0.9157530140344186
+      ],
+      "normalizedResidual": 0.03996119211132716,
+      "lowerSegmentAreaRatio": 0.9310756594878945
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 1.7249999642372131,
+      "slot": "腿右",
+      "evidence": "6-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 14.441131226969203,
+      "actualAngle": 10.13340817897715,
+      "angleError": 4.307723047991999,
+      "lengthRatios": [
+        0.9792921319115006,
+        1.053950341570356
+      ],
+      "normalizedResidual": 0.019545325190589703,
+      "lowerSegmentAreaRatio": 0.6200064906277414
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 1.7249999642372131,
+      "slot": "腿左",
+      "evidence": "6-3.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.108671912753298,
+      "actualAngle": 5.615874401729943,
+      "angleError": 4.492797511023355,
+      "lengthRatios": [
+        0.9843232596841062,
+        1.033886047417382
+      ],
+      "normalizedResidual": 0.01846005339234196,
+      "lowerSegmentAreaRatio": 0.8695169441138947
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 2.299999952316284,
+      "slot": "右手_1无袖",
+      "evidence": "6-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 6.146997218267733e-14,
+      "actualAngle": -0.4870804863696016,
+      "angleError": 0.4870804863696776,
+      "lengthRatios": [
+        0.9943235979432615,
+        1.0078376683602102
+      ],
+      "normalizedResidual": 0.003892051808199509,
+      "lowerSegmentAreaRatio": 1.000000090994843
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 2.299999952316284,
+      "slot": "左手_1无袖",
+      "evidence": "6-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 50.68389016137307,
+      "actualAngle": 44.65008567727459,
+      "angleError": 6.033804484098482,
+      "lengthRatios": [
+        1.0227497589028771,
+        0.9151740698614458
+      ],
+      "normalizedResidual": 0.04018385043940816,
+      "lowerSegmentAreaRatio": 0.9310696418122256
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 2.299999952316284,
+      "slot": "腿右",
+      "evidence": "6-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 3.603847630921599,
+      "actualAngle": 1.8878014144411877,
+      "angleError": 1.7160462164804358,
+      "lengthRatios": [
+        0.9767375999976043,
+        1.0745391043299255
+      ],
+      "normalizedResidual": 0.01870220606273233,
+      "lowerSegmentAreaRatio": 0.9340150539619436
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 2.299999952316284,
+      "slot": "腿左",
+      "evidence": "6-4.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 12.91015364553834,
+      "actualAngle": 7.199055295829085,
+      "angleError": 5.711098349709232,
+      "lengthRatios": [
+        0.987615808668456,
+        1.0166695809846744
+      ],
+      "normalizedResidual": 0.020414785747679985,
+      "lowerSegmentAreaRatio": 0.6675722012253821
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 2.8749999403953552,
+      "slot": "右手_1无袖",
+      "evidence": "6-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -9.276149821989774,
+      "actualAngle": -8.487866170128582,
+      "angleError": 0.7882836518612066,
+      "lengthRatios": [
+        0.9880824214145961,
+        1.015200270708594
+      ],
+      "normalizedResidual": 0.0074368875871322045,
+      "lowerSegmentAreaRatio": 0.9841993384635223
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 2.8749999403953552,
+      "slot": "左手_1无袖",
+      "evidence": "6-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 32.66141713982467,
+      "actualAngle": 28.254854874958333,
+      "angleError": 4.406562264866352,
+      "lengthRatios": [
+        1.0200199309682556,
+        0.9495846419775222
+      ],
+      "normalizedResidual": 0.026442690520708387,
+      "lowerSegmentAreaRatio": 0.9547610172348563
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 2.8749999403953552,
+      "slot": "腿右",
+      "evidence": "6-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 11.586595548222661,
+      "actualAngle": 8.423779495473099,
+      "angleError": 3.1628160527495766,
+      "lengthRatios": [
+        0.988171820307836,
+        1.018666886367305
+      ],
+      "normalizedResidual": 0.013432104483531585,
+      "lowerSegmentAreaRatio": 0.8219926282862087
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 2.8749999403953552,
+      "slot": "腿左",
+      "evidence": "6-5.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 11.473625592042582,
+      "actualAngle": 6.717641411846036,
+      "angleError": 4.755984180196492,
+      "lengthRatios": [
+        0.9987356434602596,
+        0.9819069330593007
+      ],
+      "normalizedResidual": 0.01844520157457328,
+      "lowerSegmentAreaRatio": 0.8272244372008267
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 3.4499999284744263,
+      "slot": "右手_1无袖",
+      "evidence": "6-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -14.81820393176014,
+      "actualAngle": -13.271219059245022,
+      "angleError": 1.5469848725151678,
+      "lengthRatios": [
+        0.9837688890229385,
+        1.0185845506486118
+      ],
+      "normalizedResidual": 0.010829576191161552,
+      "lowerSegmentAreaRatio": 0.9725451767032872
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 3.4499999284744263,
+      "slot": "左手_1无袖",
+      "evidence": "6-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 23.161850350694834,
+      "actualAngle": 19.829379039253165,
+      "angleError": 3.3324713114416227,
+      "lengthRatios": [
+        1.015679621295557,
+        0.966851816213975
+      ],
+      "normalizedResidual": 0.01893289366786263,
+      "lowerSegmentAreaRatio": 0.9724682989216193
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 3.4499999284744263,
+      "slot": "腿右",
+      "evidence": "6-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.509336668876434,
+      "actualAngle": 7.8044141363714195,
+      "angleError": 2.7049225325050656,
+      "lengthRatios": [
+        0.998176852866109,
+        0.9934052021429748
+      ],
+      "normalizedResidual": 0.010550333763033293,
+      "lowerSegmentAreaRatio": 0.9708248893800787
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 3.4499999284744263,
+      "slot": "腿左",
+      "evidence": "6-6.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.599065006636051,
+      "actualAngle": 6.308309607268815,
+      "angleError": 4.290755399367185,
+      "lengthRatios": [
+        1.0046265600749622,
+        0.9709306991319249
+      ],
+      "normalizedResidual": 0.018179111465132243,
+      "lowerSegmentAreaRatio": 0.9471986907543823
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 4.024999916553497,
+      "slot": "右手_1无袖",
+      "evidence": "6-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": -14.859818513866346,
+      "actualAngle": -13.307160941750903,
+      "angleError": 1.5526575721154359,
+      "lengthRatios": [
+        0.9837350223415315,
+        1.018606970071111
+      ],
+      "normalizedResidual": 0.01085589388136907,
+      "lowerSegmentAreaRatio": 0.972451468922921
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 4.024999916553497,
+      "slot": "左手_1无袖",
+      "evidence": "6-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 23.559525608584085,
+      "actualAngle": 20.17969386788396,
+      "angleError": 3.379831740700183,
+      "lengthRatios": [
+        1.0159001261291714,
+        0.9661497500738834
+      ],
+      "normalizedResidual": 0.019249884313060087,
+      "lowerSegmentAreaRatio": 0.9717957239876345
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 4.024999916553497,
+      "slot": "腿右",
+      "evidence": "6-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.522546315054765,
+      "actualAngle": 7.80565935894103,
+      "angleError": 2.71688695611374,
+      "lengthRatios": [
+        0.9974781882121844,
+        0.9948801345203203
+      ],
+      "normalizedResidual": 0.01056416336725909,
+      "lowerSegmentAreaRatio": 0.9651081128639685
+    },
+    {
+      "action": "town_shuangren_tietie01",
+      "time": 4.024999916553497,
+      "slot": "腿左",
+      "evidence": "6-7.png",
+      "status": "pass",
+      "issues": [],
+      "expectedAngle": 10.61393467940224,
+      "actualAngle": 6.3066250479757695,
+      "angleError": 4.307309631426506,
+      "lengthRatios": [
+        1.003859438926869,
+        0.9723651485621141
+      ],
+      "normalizedResidual": 0.018028479917240766,
+      "lowerSegmentAreaRatio": 0.940434372381119
+    }
+  ],
+  "status": "candidate_pass",
+  "visual": {
+    "status": "pass",
+    "reviewer": "assistant_review",
+    "automatedVisionApi": false,
+    "assetHash": "0773305ca5b84159dd06cbda7185cb7d28ae9bdb1176cff8235ac2f6104e83f6",
+    "evidence": [
+      "all-poses-round3.jpg",
+      "joint-details-round3.jpg"
+    ],
+    "scope": "Seven actions, eight samples each; reviewed contact sheet and six enlarged joint poses. No obvious reversed elbow, collapsed shin or detached sandal in these samples. Rebuilt JSON identical. Not exhaustive or user art approval.",
+    "limitations": [
+      "Manual landmark profile",
+      "Core mesh area is not alpha silhouette",
+      "No independent visual review API"
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "provider": "seedream",
+  "model": "doubao-seedream-5.0-lite",
+  "stage": "parts2",
+  "endpoint": "https://ark.cn-beijing.volces.com/api/plan/v3",
+  "reference": "target-v1.png (user approved)",
+  "attempts": [
+    {
+      "startedAt": "2026-10-11T13:20:46.676Z",
+      "status": 200,
+      "requestId": "02179172484635139b5b0f4b57789945865e795386c35305161f3",
+      "usage": {
+        "generated_images": 1,
+        "output_tokens": 16384,
+        "total_tokens": 16384
+      },
+      "returnedModel": "doubao-seedream-5.0-lite",
+      "errorCode": null,
+      "completedAt": "2026-10-11T13:21:37.245Z"
+    }
+  ],
+  "billing": "Plan endpoint; response usage is not a monetary invoice",
+  "manualSteps": [
+    "Assistant authored identity/prompt and selected existing proportion reference"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "dispatches": 1,
+  "photos": 1,
+  "results": [
+    {
+      "id": "22d4b59f-c34f-4c5c-aa71-19b09f984e48",
+      "outcome": "started"
+    },
+    {
+      "id": "22d4b59f-c34f-4c5c-aa71-19b09f984e48",
+      "outcome": "started"
+    },
+    {
+      "id": "22d4b59f-c34f-4c5c-aa71-19b09f984e48",
+      "outcome": "completed"
+    }
+  ],
+  "profile": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\qbot-autonomy-ui-KeGoZ6",
+  "checks": [
+    "approval before action",
+    "double click once",
+    "exterior placement",
+    "video/sticker complete",
+    "icon toss and return",
+    "photo capture once",
+    "cancel during generation",
+    "Spine complete"
+  ]
+}

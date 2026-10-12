@@ -1,0 +1,20 @@
+{
+  "pid": 51356,
+  "visible": true,
+  "url": "file:///F:/dev/qbot/app/out/renderer/panel/index.html?page=menu",
+  "ui": {
+    "title": "菜单",
+    "tabs": [
+      "多人",
+      "任务",
+      "角色",
+      "设置"
+    ],
+    "controls": [
+      "返回",
+      "显示／隐藏",
+      "取消静音",
+      "关闭"
+    ]
+  }
+}

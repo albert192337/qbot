@@ -1,0 +1,8 @@
+{
+  "manual": true,
+  "head": "v1",
+  "torso": "v2",
+  "arms": "v1 complete arm, opposite arm mirrored",
+  "legs": "v1 single legs",
+  "background": "local magenta chroma removal; not native transparency"
+}

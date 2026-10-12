@@ -1,0 +1,20 @@
+html.companion-room,html.companion-room body{background:#fff9ef;color:#4b352b;font:14px/1.5 'Microsoft YaHei','PingFang SC',sans-serif;height:100%;min-height:0}
+html.companion-room body{display:grid;grid-template-columns:minmax(0,1fr) 270px;grid-template-rows:minmax(0,1fr);gap:0;overflow:hidden}
+.companion-room header,.companion-room .guests,.companion-room .room-label,.companion-room .bottom-help,.companion-room #desktop-bar{display:none!important}
+.companion-room main{grid-column:1;grid-row:1;background:transparent;border:0;min-height:0;position:relative}.companion-room #stage{position:absolute;inset:0}
+.companion-room footer{grid-column:2;grid-row:1;overflow:auto;border:0;border-left:1px solid #dfcbb0;background:#fff9ef;padding:18px 14px}
+.companion-room .shelf-head{margin-bottom:18px}.companion-room .shelf-head h2{font:700 16px 'Microsoft YaHei',sans-serif;color:#4b352b}.companion-room .shelf-head span,.companion-room .shelf-head label,.companion-room #reset{display:none}
+.companion-room #shelf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;overflow:visible}
+.companion-room .item{width:100%;min-width:0;height:113px;background:#f3eedf;border:1px solid transparent;border-radius:12px;color:#4b352b;box-shadow:none;padding:4px 3px 9px}
+.companion-room .item[aria-pressed=true]{border:2px solid #7c9475;background:#e8edda}.companion-room .item img{width:100%;height:72px}.companion-room .item em{font-size:10px;color:#967e68}.companion-room .item span{white-space:normal;font-size:11px}
+.companion-room button{color:#594235;background:#fff9ef;border:1px solid #ccb492;border-radius:8px;font-family:inherit}.companion-room button:focus-visible{outline:2px solid #594235;outline-offset:2px}
+.companion-room .viewbar{top:10px;left:12px;right:12px;transform:none;justify-content:flex-start;background:transparent;border:0;flex-wrap:wrap;max-width:none}.companion-room .viewbar [data-view],.companion-room #walls,.companion-room #front,.companion-room .viewbar>span{display:none}.companion-room #companion-edit{background:#f0e0c6;margin-right:auto;padding:7px 18px}.companion-room .viewbar button{font-size:12px;padding:7px 10px}
+.companion-room #selection{top:auto;bottom:20px;left:50%;right:auto;transform:translateX(-50%);width:auto;min-width:160px;max-height:180px;background:#fff9efed;border:1px solid #594235;padding:10px 14px;border-radius:12px;color:#4b352b}
+.companion-room #selection h2{font-size:13px;color:#4b352b;margin:0 0 8px}.companion-room #selection [hidden]{display:none!important}.companion-room #selection .hint,.companion-room #selected-info{display:none}.companion-room #status{bottom:8px;color:#a34435;background:#fff9efe8;font-size:12px;padding:3px 8px}.companion-room #status:empty{display:none}
+@media(max-width:700px){html.companion-room body{grid-template-columns:minmax(0,1fr) 180px}.companion-room footer{padding:12px 8px}.companion-room #shelf{grid-template-columns:1fr}}
+
+.companion-room .item[hidden]{display:none!important}
+
+html.companion-room,html.companion-room body{background:transparent!important}
+html.companion-room body{grid-template-columns:minmax(0,1fr) 300px}
+.companion-room footer{margin-top:68px;border:2px solid #594235;border-top:0;border-radius:0 0 23px 23px;box-shadow:0 4px 0 #59423535;background:#fff9ef;padding-top:12px;margin-bottom:5px}

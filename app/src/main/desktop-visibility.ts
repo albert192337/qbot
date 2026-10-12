@@ -123,13 +123,20 @@ export function registerDesktopVisibility(): void {
     try {
       const display = await import('./rooms/room-pet-display');
       const rooms = await import('./rooms/rooms');
+      const windows = await import('./windows');
       if (win.isDestroyed()) return;
       const hasRoom = !!rooms.getRoomsCache().room;
-      const roomVisible = display.getRoomDisplayMode() === 'room';
+      // Local homes share the room window, but have no online-room cache or display mode.
+      const roomVisible = hasRoom ? display.getRoomDisplayMode() === 'room' : windows.isRoomOpen();
       Menu.buildFromTemplate([
         { label: hidden ? '显示全部角色' : '隐藏全部角色', click: () => setDesktopHidden(!hidden) },
-        { label: roomVisible ? '只隐藏房间（保留角色）' : '显示房间背景', enabled: hasRoom,
-          click: () => { void display.setRoomDisplayMode(roomVisible ? 'desktop' : 'room').catch(error => console.error('[desktop:menu] room display switch failed', error)); } },
+        { label: roomVisible ? '只隐藏房间（保留角色）' : '显示房间背景',
+          click: () => {
+            if (hasRoom) {
+              void display.setRoomDisplayMode(roomVisible ? 'desktop' : 'room').catch(error => console.error('[desktop:menu] room display switch failed', error));
+            } else if (roomVisible) windows.closeRoomWindow();
+            else windows.openRoomWindow('QBot 我的小屋');
+          } },
       ]).popup({ window: win });
     } catch (error) { console.error('[desktop:menu]', error); }
   });

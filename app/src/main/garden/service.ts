@@ -1,4 +1,5 @@
 import {getRehearsal} from './local-rehearsal';
+import { initialTravel } from '../../shared/travel';
 import { supportsGarden3D } from '../../shared/garden-render';
 import { applyWeatherMutations } from './weather-rules';
 import { prepareTravelMemory, writeTravelDiary } from './travel-memory';
@@ -27,6 +28,11 @@ interface RecordFile {
 }
 let cache: RecordFile | undefined;
 let queue: Promise<unknown> = Promise.resolve();
+function withLocalMoments(state:GardenState,local:GardenState):GardenState {
+    const moments=local.travel?.moments;
+    if(moments?.length){state.travel??=initialTravel(Date.now());state.travel.moments=[...new Map([...(state.travel.moments??[]),...moments].map(m=>[m.id,m])).values()];}
+    return state;
+}
 const rng = { random: () => Math.random(), id: randomUUID };
 const file = () => path.join(app.getPath('userData'), 'garden-demo.json');
 function serial<T>(job: () => Promise<T>): Promise<T> {
@@ -90,7 +96,10 @@ export function getGarden(): Promise<GardenState> {
     return serial(async () => {
         const settings=await getSettings();
         if(getRehearsal()){const rehearsal=getRehearsal()!;rehearsal.initializeOwn((await load()).state);return rehearsal.get(settings.activeCharacter??undefined);}
-        if(settings.gardenOnline)return (await import('./network')).networkGarden();
+        if(settings.gardenOnline){
+            const remote=await (await import('./network')).networkGarden();
+            return withLocalMoments(remote,await recover());
+        }
         const state = structuredClone(await recover());
         const oldPlots=JSON.stringify(state.plots);
         const now=Date.now();
@@ -118,6 +127,15 @@ export function gardenAction(command: GardenCommand): Promise<GardenResult> {
     return serial(async () => {
         try {
             const settings=await getSettings();
+            if(command?.type==='travelMomentLike'){
+                const local=structuredClone(await recover()),moment=local.travel?.moments?.find(m=>m.id===command.id);
+                if(moment){
+                    const visible=settings.gardenOnline?await (await import('./network')).networkGarden():local;
+                    moment.liked=!moment.liked;await save({state:local});
+                    for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');
+                    return {ok:true,state:withLocalMoments(visible,local)};
+                }
+            }
             if(command?.type==='equipAppearance'&&command.actor!==null&&!await (await import('../characters')).getCharacter(command.actor))throw Error('请选择本机已有的角色');
             if(getRehearsal()){const rehearsal=getRehearsal()!;rehearsal.initializeOwn((await load()).state);const result=rehearsal.act(command,settings.activeCharacter??undefined);for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');return result;}
             if(settings.gardenOnline){

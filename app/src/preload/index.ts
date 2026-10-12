@@ -4,6 +4,13 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
+  panel: {
+    ignoreMouse: ignore => ipcRenderer.send('panel:ignore',ignore),
+    open: page => ipcRenderer.send('panel:open',page),
+    navigate: page => ipcRenderer.send('panel:navigate',page),
+    close: () => ipcRenderer.send('panel:close'),
+    onPage: cb => {const fn=(_e:unknown,page:import('../shared/panel-layout').DesktopPanelPage)=>cb(page);ipcRenderer.on('panel:page',fn);return()=>ipcRenderer.removeListener('panel:page',fn);},
+  },
   appearances:{preview:id=>ipcRenderer.invoke('appearance:preview',id),foot:(x,y,size)=>ipcRenderer.send('appearance:foot',{x,y,size}),onFoot:cb=>{const fn=(_e:unknown,p:{x:number;y:number;size:number})=>cb(p);ipcRenderer.on('appearance:foot',fn);return()=>ipcRenderer.removeListener('appearance:foot',fn);}},
   relationships: {
     get: () => ipcRenderer.invoke('relationships:get'),
@@ -28,6 +35,18 @@ const api: QBotApi = {
       return()=>{alive=false;ipcRenderer.removeListener('desktop:changed',fn);};
     },
   },
+  autonomy: {
+    get:()=>ipcRenderer.invoke('autonomy:get'),
+    answer:(id,accept)=>ipcRenderer.invoke('autonomy:answer',id,accept),
+    log:()=>ipcRenderer.invoke('autonomy:log'),
+    ready:(actor,ready,commandReady)=>ipcRenderer.send('autonomy:ready',actor,ready,commandReady),
+    result:(id,outcome,reason)=>ipcRenderer.send('autonomy:result',id,outcome,reason),
+    icons:()=>ipcRenderer.invoke('autonomy:icons'),
+    photo:()=>ipcRenderer.invoke('autonomy:photo'),
+    openPhotos:()=>ipcRenderer.invoke('autonomy:openPhotos'),
+    observed:(actor,action,trigger)=>ipcRenderer.send('autonomy:observed',actor,action,trigger),
+    onProposal:cb=>{const fn=(_e:unknown,p:import('../shared/behavior-catalog').BehaviorProposal|null)=>cb(p);ipcRenderer.on('autonomy:proposal',fn);return()=>ipcRenderer.removeListener('autonomy:proposal',fn);},
+  },
   overlays: {
     hint:value=>ipcRenderer.send('hint:set',value),
     onHint:cb=>{const fn=(_e:unknown,value:import('../shared/pet-hint').PetHint)=>cb(value);ipcRenderer.on('hint:changed',fn);return()=>ipcRenderer.removeListener('hint:changed',fn);},
@@ -50,6 +69,13 @@ const api: QBotApi = {
     edit: (command, character) => ipcRenderer.invoke('memory:edit', command, character),
   },
   garden: {
+    onWorkspace: cb => {const fn=(_e:unknown,value:boolean)=>cb(value);ipcRenderer.on('garden:workspace',fn);return()=>ipcRenderer.removeListener('garden:workspace',fn);},
+    showVisit: owner => ipcRenderer.invoke('garden:showVisit',owner),
+    onVisit: cb => {const fn=(_e:unknown,visit:import('../shared/garden-life').GardenVisit|null)=>cb(visit);ipcRenderer.on('garden:sceneVisit',fn);return()=>ipcRenderer.removeListener('garden:sceneVisit',fn);},
+    focusPlot: index => ipcRenderer.send('garden:focusPlot',index),
+    onFocusPlot: cb => {const fn=(_e:unknown,index:number)=>cb(index);ipcRenderer.on('garden:focusPlot',fn);return()=>ipcRenderer.removeListener('garden:focusPlot',fn);},
+    selectSeed: seed => ipcRenderer.send('garden:selectSeed',seed),
+    onSeed: cb => {const fn=(_e:unknown,seed:string|null)=>cb(seed);ipcRenderer.on('garden:seed',fn);return()=>ipcRenderer.removeListener('garden:seed',fn);},
     interact:(target,kind)=>ipcRenderer.invoke('garden:interact',target,kind),
     answerInteraction:(id,accept,response)=>ipcRenderer.invoke('garden:answerInteraction',id,accept,response),
     onInteraction:cb=>{const fn=(_e:unknown,event:Parameters<typeof cb>[0])=>cb(event);ipcRenderer.on('garden:interaction',fn);return()=>ipcRenderer.removeListener('garden:interaction',fn);},
@@ -72,6 +98,9 @@ const api: QBotApi = {
     drag: (phase, x, y) => ipcRenderer.send('garden:drag', phase, x, y),
     scenePlacement: placement => ipcRenderer.send('garden:scenePlacement', placement),
     open: page => ipcRenderer.send('garden:open', page),
+    desktopFailed: message => ipcRenderer.send('garden:desktopFailed',message),
+    onDesktopPointer: cb => {const fn=(_e:unknown,p:Parameters<typeof cb>[0])=>cb(p);ipcRenderer.on('garden:desktopPointer',fn);return()=>ipcRenderer.removeListener('garden:desktopPointer',fn);},
+    onDesktopStatus: cb => {const fn=(_e:unknown,message:string)=>cb(message);ipcRenderer.on('garden:desktopStatus',fn);return()=>ipcRenderer.removeListener('garden:desktopStatus',fn);},
     ignoreMouse: ignore => ipcRenderer.send('garden:ignore', ignore),
     onAnchor: cb => { const fn = (_ev: unknown, anchor: Parameters<typeof cb>[0]) => cb(anchor); ipcRenderer.on('garden:anchor', fn); return () => ipcRenderer.removeListener('garden:anchor', fn); },
     onChanged: cb => { const fn = () => cb(); ipcRenderer.on('garden:changed', fn); return () => ipcRenderer.removeListener('garden:changed', fn); },
@@ -383,10 +412,17 @@ const api: QBotApi = {
       return () => ipcRenderer.removeListener('agent:message', listener);
     },
   },
+  presence: {
+    input: active=>ipcRenderer.send('pet:inputAttention',active),
+    onSignal: cb=>{const fn=(_e:unknown,signal:import('../shared/pet-presence').PresenceSignal)=>cb(signal);ipcRenderer.on('pet:presence',fn);return ()=>ipcRenderer.removeListener('pet:presence',fn);},
+    report: (actor,kind,action,outcome)=>ipcRenderer.send('pet:presenceReport',actor,kind,action,outcome),
+  },
   bubble: {
     reportBounds: bounds => ipcRenderer.send('bubble:bounds', bounds),
     ignoreMouse: ignore => ipcRenderer.send('bubble:ignoreMouse', ignore),
     onReward: cb => { const fn = (_ev: unknown, items: import('../shared/garden').GardenRewardItem[]) => cb(items); ipcRenderer.on('bubble:reward', fn); return () => ipcRenderer.removeListener('bubble:reward', fn); },
+    resizeChat: expanded => ipcRenderer.send('petChat:resize',expanded),
+    history: () => ipcRenderer.invoke('petChat:history'),
     openChat: () => ipcRenderer.send('petChat:open'),
     closeChat: () => ipcRenderer.send('petChat:close'),
     sendChat: (text) => ipcRenderer.invoke('petChat:send', text),

@@ -1,1 +1,3 @@
 .hud-weather.weather-special{filter:drop-shadow(0 0 4px #bfdfff);background:#243f5b55;border-radius:50%}
+
+.hud-garden{position:relative}.hud-weather-overlay{position:absolute;right:-4px;top:-7px;width:17px;height:17px;pointer-events:none}.hud-weather-overlay svg{width:100%!important;height:100%!important}.hud-weather-overlay[hidden]{display:none}

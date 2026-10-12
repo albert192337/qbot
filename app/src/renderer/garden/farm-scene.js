@@ -5,6 +5,7 @@ import { createFarmArt } from './farm-art';
 import { gardenSceneLayout } from '../../shared/garden-scene-layout';
 
 const urls = {
+  ground: new URL('./assets/models/grass-tile.glb', import.meta.url).href,
   pineapple: new URL('./assets/models/pineapple.glb', import.meta.url).href,
   strawberry: new URL('./assets/models/strawberry-tripo.glb', import.meta.url).href,
   base: new URL('./assets/models/strawberry-base.glb', import.meta.url).href,
@@ -43,6 +44,7 @@ export function createFarmScene(onLayout, onError) {
     }
     const g=new T.ExtrudeGeometry(shape,{depth:h,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.018,bevelThickness:.018,curveSegments:12});g.rotateX(-Math.PI/2);return g;
   }
+  const plotPlane=geometry(new T.PlaneGeometry(.91,.91));
   const soilPatch=geometry(patchGeometry(.91,.91,.055));
   const terrainGeometries=new Set();
   function mesh(g, m, parent = world) { const o = new T.Mesh(g, m); parent.add(o); return o; }
@@ -52,7 +54,7 @@ export function createFarmScene(onLayout, onError) {
   const flowerPetals=[material('#fff5d8'),material('#ecc7c0')],flowerCenter=material('#e9bd58');
   const greens = [material('#91bf8c'), material('#b4d5a2'), material('#719e78')];
   const shadowMaterial = new T.MeshBasicMaterial({ color: '#36452b', transparent: true, opacity: .12, depthWrite: false }); materials.add(shadowMaterial);
-  function shadow(x, z, size) { const o = mesh(disk, shadowMaterial); o.rotation.x = -Math.PI / 2; o.position.set(x, .145, z); o.scale.set(size, size * .68, 1); }
+  function shadow(x, z, size) { const o = mesh(disk, shadowMaterial); o.rotation.x = -Math.PI / 2; o.position.set(x, .163, z); o.scale.set(size, size * .68, 1); }
   function sprout(parent, young) {
     const count = young ? 6 : 2;
     for (let i = 0; i < count; i++) {
@@ -151,6 +153,15 @@ export function createFarmScene(onLayout, onError) {
     element.dataset.models='0';
     layout = gardenSceneLayout(plots.map(p => p.index));
     const terrain=(w,d,h,y,m)=>{const g=patchGeometry(w,d,h,5);terrainGeometries.add(g);const o=mesh(g,m);o.position.y=y;};
+    const hasGround=models.has('ground');
+    element.dataset.groundModel=hasGround?'ready':'fallback';
+    if(hasGround){
+      const beds=Math.max(1,Math.ceil(plots.length/4)),columns=Math.min(3,Math.ceil(Math.sqrt(beds))),rows=Math.ceil(beds/columns);
+      for(let bed=0;bed<beds;bed++){
+        const ground=models.get('ground').clone(true);ground.scale.set(2.5,1,2.5);
+        ground.position.set((bed%columns-(columns-1)/2)*2.75,0,(Math.floor(bed/columns)-(rows-1)/2)*2.75);world.add(ground);
+      }
+    }else{
     terrain(layout.width,layout.depth,.11,-.1,edge);
     terrain(layout.width+.015,layout.depth+.015,.075,-.005,grass);
     // Small leafy clusters, with open space between them, rather than a picket rim.
@@ -169,18 +180,23 @@ export function createFarmScene(onLayout, onError) {
       bloom(side*(layout.width/2-.27),layout.depth/2-.43,i);
       bloom(side*(layout.width/2-.45),-layout.depth/2+.3,i+1);
     }
+    }
     art.paths(world, layout);
     layout.cells.forEach((cell, n) => {
-      const p = plots[n], m = soil.clone(); m.onBeforeCompile=soil.onBeforeCompile; m.customProgramCacheKey=soil.customProgramCacheKey; cropMaterials.add(m); tileMaterials.set(p.index, m);
+      const p = plots[n], m = hasGround?new T.MeshBasicMaterial({color:'#ffe1a8',transparent:true,opacity:0,depthWrite:false,side:T.DoubleSide}):soil.clone(); if(!hasGround){m.onBeforeCompile=soil.onBeforeCompile; m.customProgramCacheKey=soil.customProgramCacheKey;} cropMaterials.add(m); tileMaterials.set(p.index, m);
+      if(hasGround){const hit=mesh(plotPlane,m);hit.rotation.x=-Math.PI/2;hit.position.set(cell.x,.163,cell.z);hit.userData.plotIndex=p.index;}
+      else{
       const rim=mesh(soilPatch,soilRim);rim.position.set(cell.x,.058,cell.z);rim.scale.set(1.035,.9,1.035);rim.userData.plotIndex=p.index;
       const plotMesh=mesh(soilPatch,m);plotMesh.position.set(cell.x,.082,cell.z);plotMesh.userData.plotIndex=p.index;
       for(let k=0;k<3;k++){const o=mesh(leaf,crumb);o.position.set(cell.x+[-.31,.32,.27][k],.158,cell.z+[.28,.25,-.3][k]);o.scale.set(.022+k*.007,.012,.018+k*.004);o.rotation.y=k;}
+      }
       if (p.stage === 'empty') {
+        if(hasGround)return;
         for (let k = 0; k < 3; k++){const o=mesh(leaf,furrow);o.position.set(cell.x+(k-1)*.015,.15,cell.z+(k-1)*.22);o.scale.set(.3,.014,.026);o.rotation.y=(k-1)*.025;}
         return;
       }
       shadow(cell.x, cell.z, .4);
-      const crop = new T.Group(); crop.userData.plotIndex=p.index; crop.position.set(cell.x, .16, cell.z); world.add(crop);
+      const crop = new T.Group(); crop.userData.plotIndex=p.index; crop.position.set(cell.x, .17, cell.z); world.add(crop);
       if (p.stage === 'hidden') { sprout(crop,true); art.effects(crop,[],true); return; }
       if (!urls[p.species]) { fallback(crop, p, version); return; }
       if (p.stage !== 'ripe') { sprout(crop, p.stage === 'young'); return; }
@@ -245,7 +261,7 @@ export function createFarmScene(onLayout, onError) {
       b.style.cssText = `left:${minX}px;top:${minY}px;width:${maxX-minX}px;height:${maxY-minY}px;z-index:${Math.round(maxY)};`;
       const center=project(cell.x,.15,cell.z);b.dataset.screenX=String(x+center.x);b.dataset.screenY=String(y+center.y);
       b.classList.toggle('selected', plots[n].index === selected);
-      tileMaterials.get(plots[n].index)?.color.set(plots[n].index === selected ? '#ffe1a8' : '#ffffff');
+      const tile=tileMaterials.get(plots[n].index);if(tile?.isMeshBasicMaterial)tile.opacity=plots[n].index===selected ? .25 : 0;else tile?.color.set(plots[n].index === selected ? '#ffe1a8' : '#ffffff');
       const foot = project(cell.x + .63, .15, cell.z + .4);
       placements.push({ index: plots[n].index, x: Math.max(0, Math.min(innerWidth, x + foot.x)), y: Math.max(0, Math.min(innerHeight, y + foot.y)) });
     });
@@ -277,6 +293,7 @@ export function createFarmScene(onLayout, onError) {
   document.addEventListener('visibilitychange', visible); window.addEventListener('resize', requestPaint);
   renderer.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); element.dataset.sceneReady = 'false'; if(!disposed)onError('3D 画面暂时不可用，可切回手绘后重试。'); });
   renderer.domElement.addEventListener('webglcontextrestored', requestPaint);
+  load('ground').then(()=>{if(!disposed)rebuild();}).catch(()=>{if(!disposed){element.dataset.groundModel='fallback';requestPaint();}});
   return {
     element,
     update(next, controls, selection) {

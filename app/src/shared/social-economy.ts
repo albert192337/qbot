@@ -1,3 +1,4 @@
+import { HALLOWEEN_FURNITURE } from './halloween-furniture';
 import type { Species, Trait } from './garden';
 import { dailyRandom } from './garden-life';
 import { V3_WEATHER, type V3Weather } from './garden-v3';
@@ -25,7 +26,7 @@ export const RETIRED_FURNITURE=['lantern','plant','fan','clock','teapot','painti
 export type CapsuleTier='common'|'rare'|'epic';
 export interface CapsuleReward {id:string;kind:'seed'|'fertilizer'|'furniture'|'appearance';item:string;name:string;count:number;tier:CapsuleTier;weight:number;duplicateTokens?:number}
 /** Weights are conditional within a tier; every tier sums to 100. */
-export const CAPSULE_POOL:CapsuleReward[]=[
+export const APPEARANCE_CAPSULE_POOL:CapsuleReward[]=[
  {id:'strawberry-pack',kind:'seed',item:'strawberry',name:'草莓种子',count:3,tier:'common',weight:25},
  {id:'flower-pack',kind:'seed',item:'tulip',name:'郁金香种子',count:2,tier:'common',weight:20},
  {id:'berry-pack',kind:'seed',item:'blueberry',name:'蓝莓种子',count:2,tier:'common',weight:15},
@@ -42,8 +43,25 @@ export const CAPSULE_POOL:CapsuleReward[]=[
  {id:'cloud-fountain',kind:'furniture',item:'cloud-fountain',name:'云朵叠泉',count:1,tier:'epic',weight:40},
  {id:'eclipse-portal',kind:'appearance',item:'eclipse-portal',name:'月蚀之门',count:1,tier:'epic',weight:20},
 ];
+/** Keep previous pools intact for clients connected to an older service. */
+export const CAPSULE_POOL:CapsuleReward[]=[
+ ...APPEARANCE_CAPSULE_POOL.map(x=>({...x,weight:x.id==='speed-pack'?25:x.id==='apple-pack'||x.id==='pineapple-pack'?15:x.id==='moon-terrarium'||x.id==='cloud-fountain'?25:x.weight})),
+ ...HALLOWEEN_FURNITURE.map(x=>({...x,kind:'furniture' as const,item:x.id,count:1})),
+];
+export type CapsuleMachine='2d'|'3d';
+export const CAPSULE_3D_POOL:CapsuleReward[]=[
+ ...APPEARANCE_CAPSULE_POOL.filter(x=>x.kind!=='furniture'),
+ ...HALLOWEEN_FURNITURE.map(x=>({...x,kind:'furniture' as const,item:x.id,count:1,weight:({'halloween-candles':6,'halloween-books':4,'halloween-lantern':18,'halloween-pumpkins':12,'halloween-fireplace':28,'halloween-chandelier':26,'halloween-cauldron':26})[x.id]})),
+];
+export interface CapsuleResult {id:string;at:number;machine?:CapsuleMachine;rewards:CapsuleReward[]}
+export interface CapsuleProgress {rareMisses:number;epicMisses:number;draws:number;lastCapsule?:CapsuleResult}
+export function capsulePoolFor(e:{capsuleMachineRevision?:number;furniture3dRevision?:number;appearances?:unknown},machine:CapsuleMachine='2d'):CapsuleReward[]{
+ if(machine==='3d')return e.capsuleMachineRevision===1?CAPSULE_3D_POOL:[];
+ if(e.capsuleMachineRevision===1)return APPEARANCE_CAPSULE_POOL;
+ return e.furniture3dRevision===1?CAPSULE_POOL:e.appearances?APPEARANCE_CAPSULE_POOL:LEGACY_CAPSULE_POOL;
+}
 /** Older servers have not yet enabled appearances; display their actual historical odds. */
-export const LEGACY_CAPSULE_POOL:CapsuleReward[]=CAPSULE_POOL.filter(x=>x.kind!=='appearance').map(x=>({...x,weight:x.id==='speed3-pack'?30:x.tier==='epic'?50:x.weight}));
+export const LEGACY_CAPSULE_POOL:CapsuleReward[]=APPEARANCE_CAPSULE_POOL.filter(x=>x.kind!=='appearance').map(x=>({...x,weight:x.id==='speed3-pack'?30:x.tier==='epic'?50:x.weight}));
 export function furnitureOffers(owner:string,day:number) {
   const rand=dailyRandom(`furniture-v4:${owner}:${day}`);
   const basic=FURNITURE_SHOP.filter(x=>x.tier==='common');
@@ -71,7 +89,8 @@ export interface SocialWish {id:string;kind:'harvest'|'visit'|'furniture'|'breed
 export interface SharedWeather {id:string;kind:V3Weather;start:number;end:number;source:string;room:string;acceptedAt:number}
 export interface SocialEconomy {
   appearances?:import('./appearances').AppearanceInventory;
-  capsuleRevision?:2;lastCapsule?:{id:string;at:number;rewards:CapsuleReward[]};
+  furniture3dRevision?:1; capsuleRevision?:2;lastCapsule?:CapsuleResult;
+  capsuleMachineRevision?:1;capsule3d?:CapsuleProgress;lastCapsule2d?:CapsuleResult;
   version:4; furniture:Record<string,number>; day:number; purchases:Record<string,number>; rareBought:number;
   furnitureReservation?:{owner:string;item:string;price:number;expiresAt:number};
   tokens:number; topUpDay:number; rareMisses:number; epicMisses:number; draws:number;
@@ -85,7 +104,7 @@ export interface SocialEconomy {
 export type SocialCommand =
   {type:'buyAppearance';item:string} | {type:'equipAppearance';item:string;actor:string|null} |
   {type:'socialStarter'} | {type:'tutorialSpeed';plot:number} |
-  {type:'buyFurniture';owner:string;item:string} | {type:'reserveFurniture';owner:string;item:string} | {type:'capsuleTopUp'} | {type:'capsuleDraw';count:1|10} |
+  {type:'buyFurniture';owner:string;item:string} | {type:'reserveFurniture';owner:string;item:string} | {type:'capsuleTopUp'} | {type:'capsuleDraw'|'capsuleDraw3d';count:1|10} |
   {type:'socialWish';kind:'harvest'|'visit'|'furniture'|'breed'|'feed'} | {type:'readMutations'} |
   {type:'rerollSocialWish';id:string} |
   {type:'shareWeather';source:string} | {type:'leaveWeather'} |

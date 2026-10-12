@@ -1,0 +1,23 @@
+{
+  "full": [
+    717,
+    78,
+    961,
+    417
+  ],
+  "head": [
+    717,
+    78,
+    961,
+    296
+  ],
+  "torso": [
+    790,
+    282,
+    864,
+    367
+  ],
+  "centralChinY": 296,
+  "headTopToChinFraction": 0.6430678466076696,
+  "headWidthOverTorsoWidth": 3.2972972972972974
+}

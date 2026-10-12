@@ -576,8 +576,9 @@ const handlers = {
     ws.avatarHash = typeof f.avatarHash === 'string' ? f.avatarHash.slice(0, 32) : undefined;
     ws.hello = true;
     ws.pairDialogue = f.pairDialogue === 1 ? 1 : 0;
+    ws.pairEffects = f.pairEffects === 1 ? 1 : 0;
     ws.companionChat = f.companionChat === 1 ? 1 : 0;
-    send(ws, {t:'hello:ack', social:1, contacts:1, garden:1, petting:2, memberId:ws.memberId, contactToken:identity.token, serverTime:Date.now()});
+    send(ws, {t:'hello:ack', social:1, contacts:1, garden:1, petting:2, pairEffects:1, memberId:ws.memberId, contactToken:identity.token, serverTime:Date.now()});
     notifyContacts();
   },
   'contacts:get'(ws, f) { if (typeof f.character === 'string' && contacts.people[ws.memberId].character !== clampText(f.character,32)) { contacts.transaction(()=>{contacts.people[ws.memberId].character=clampText(f.character,32);}); notifyContacts(); } ws.contactsSubscribed = true; send(ws, {t:'contacts:snapshot', ...contactSnapshot(ws)}); },
@@ -1043,6 +1044,7 @@ function handleGardenInteraction(ws,f){
   if(f.action==='pair:invite'){
     const kind=gardenCore.PAIR_INTERACTIONS.find(k=>k.id===f.kind),peer=peerFor(f.target);
     if(!kind||!ws.roomId||!peer||peer===ws)throw Error('请邀请同一房间内的在线玩家');
+    if(f.kind==='fight'&&(ws.pairEffects!==1||!peer.companion&&peer.pairEffects!==1))throw Error('双方需要更新客户端才能玩图标打闹');
     if(pairBusy.get(ws.memberId)>now||pairBusy.get(peer.memberId)>now)throw Error('正在互动，请稍后再试');
     if(checkChatLimit(ws,`pair:${f.target}:${f.kind}`))throw Error('邀请太快了，请稍后再试');
     if([...pairInvites.values()].filter(i=>i.from===ws.memberId).length>=5)throw Error('请等待之前的邀请回复');

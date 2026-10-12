@@ -1,0 +1,6 @@
+/* Silent attention cues also work when a character only has an idle expression. */
+#stage[data-presence=attention]{animation:presence-listen .45s ease-out both}
+#stage[data-presence=return],#stage[data-presence=visitor]{animation:presence-greet .7s ease-in-out both}
+@keyframes presence-listen{0%{translate:0 0}60%{translate:0 -4px}100%{translate:0 -2px}}
+@keyframes presence-greet{0%,100%{rotate:0deg}30%{rotate:-2deg}65%{rotate:2deg}}
+@media(prefers-reduced-motion:reduce){#stage[data-presence]{animation:none}}

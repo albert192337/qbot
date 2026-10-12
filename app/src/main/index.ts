@@ -27,6 +27,7 @@ import { emitEvent, flush as flushPerception, setForegroundObservationEnabled, s
 import { loadBuiltinRules, setAvailableActionsGetter, wireBehaviorTriggers, stopBehaviorScheduler } from './behavior-rules';
 import { startBehaviorExecutor, execute as executeBehavior } from './behavior-executor';
 import { setBrainExecutor, wireBrain } from './brain-llm';
+import { behaviorAudit } from './behavior-audit';
 
 /** qbot-asset 响应的 Content-Type（漏了类型 Chromium 会拒绝解码 <video>） */
 const ASSET_MIME: Record<string, string> = {
@@ -181,6 +182,8 @@ app.whenReady().then(async () => {
   await loadBuiltinRules(); // 内置规则包
   wireBehaviorTriggers(); // 订阅感知事件流 → 规则 trigger 边沿
   wireBrain(); // 自由模式 LLM 脑（内部按 settings.freeMode + arkApiKey 自行门控）
+  (await import('./autonomy')).wireAutonomy();
+  (await import('./pet-presence')).wirePetPresence();
   // 启动即上桌：优先上次激活的角色，否则第一只可用角色
   const settings = await getSettings();
   if (!settings.onboardingSeen) {
@@ -234,7 +237,7 @@ app.on('before-quit', (ev) => {
   // progress 是玩法数据（点数/箱子/库存），不能丢防抖窗口里最后那笔 →
   // 拦一次退出等落盘完再真退。写失败 flushProgress 内部已吞，不会卡住退出
   ev.preventDefault();
-  void Promise.all([flushProgress(), flushPerception(), flushUserMemory()]).finally(() => {
+  void Promise.all([flushProgress(), flushPerception(), flushUserMemory(),behaviorAudit.flush()]).finally(() => {
     quitFlushed = true;
     app.quit();
   });

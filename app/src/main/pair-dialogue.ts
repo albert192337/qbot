@@ -11,8 +11,10 @@ export interface PairLineContext {
   partnerPersona?: string;
   history: string[];
   intent?: string;
+  relationship?: unknown;
 }
 const scenes: Record<PairKind, string> = {
+  fight: '友好地互抛桌面图标的图片副本，只是游戏打闹，不伤害、不触碰或删除真实文件，最后和好收场',
   heart: '送出并接收一颗友好的小心心，不擅自确立恋爱关系',
   tea: '邀请喝茶、接茶并陪伴小坐，围绕茶和休息交谈',
   chat: '自然闲聊，回应前一句，最后轻轻收尾',
@@ -36,6 +38,7 @@ export async function writePairLine(apiKey: string | undefined, context: PairLin
         total: pairBeats(context.kind).length, role: pairBeats(context.kind)[context.step].speaker === 'host' ? '发起者' : '接收者',
         character: { name: context.voice.name.slice(0, 80), persona: context.voice.persona?.slice(0, 4000) },
         partner: { name: context.partner.slice(0, 80), persona: context.partnerPersona?.slice(0, 4000) }, action: context.intent,
+        relationship:context.relationship,
         previousLines: context.history.slice(0, 3).map(line => line.slice(0, 120)) }) },
     ];
     await updateBrainCall(traceId, '按人设生成互动台词', { input: { model: BRAIN_MODEL, messages } });
@@ -49,11 +52,11 @@ export async function writePairLine(apiKey: string | undefined, context: PairLin
   finally { if (deadline) clearTimeout(deadline); }
 }
 
-export async function writePairDialogue(apiKey: string | undefined, kind: PairKind, host: PairVoice, guest: PairVoice): Promise<string[]> {
+export async function writePairDialogue(apiKey: string | undefined, kind: PairKind, host: PairVoice, guest: PairVoice, relationships?:{host:unknown;guest:unknown}): Promise<string[]> {
   const lines: string[] = [];
   for (const [step, beat] of pairBeats(kind).entries()) {
     lines.push(await writePairLine(apiKey, { kind, step, voice: beat.speaker === 'host' ? host : guest,
-      partner: beat.speaker === 'host' ? guest.name : host.name, partnerPersona: beat.speaker === 'host' ? guest.persona : host.persona, history: lines, intent: beat[beat.speaker] }) ?? beat.caption);
+      partner: beat.speaker === 'host' ? guest.name : host.name, partnerPersona: beat.speaker === 'host' ? guest.persona : host.persona, history: lines, intent: beat[beat.speaker],relationship:relationships?.[beat.speaker] }) ?? beat.caption);
   }
   return lines;
 }

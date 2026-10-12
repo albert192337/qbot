@@ -1,0 +1,41 @@
+{
+  "ok": true,
+  "checks": [
+    "2d: simulated harvest and repeat-click guard; beginner, grown, pointer click, mutation",
+    "hybrid: simulated harvest and repeat-click guard; beginner, grown, pointer click, mutation, orbit and recenter",
+    "3d: simulated harvest and repeat-click guard; beginner, grown, pointer click, mutation, orbit and recenter",
+    "wind off settles without continuous rendering; interaction wakes it",
+    "native canvas behind Explorer icons; hidden renderer; frames delivered; work-area anchoring; state sync; close; plants fit",
+    "repeated switches release old geometry",
+    "680 × 640 layout"
+  ],
+  "assets": {
+    "bell": {
+      "alpha": 0.6674017887121882,
+      "width": 887,
+      "height": 1356
+    },
+    "mushroom": {
+      "alpha": 0.6334583549545699,
+      "width": 910,
+      "height": 1311
+    },
+    "berry": {
+      "alpha": 0.561475534934831,
+      "width": 983,
+      "height": 1247
+    },
+    "sprout": {
+      "alpha": 0.8602272727272727,
+      "width": 180,
+      "height": 220
+    }
+  },
+  "resources": {
+    "geometries": 259,
+    "textures": 4,
+    "calls": 259
+  },
+  "errors": [],
+  "scope": "Isolated visual prototype, no production garden save or economy. 3D forms are procedural prototypes; no paid modeling calls."
+}

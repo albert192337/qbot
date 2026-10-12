@@ -13,7 +13,7 @@ export function renderAppearanceShop(host:HTMLElement,s:GardenState,act:(c:Garde
     const inventory=s.economy.appearances,owned=!!inventory?.owned[item.id],actor=inventory?.equipped[item.id];
     const card=el('article','','appearance-card');card.dataset.appearance=item.id;
     card.append(appearanceThumbnail(item.id),el('small',`${item.tier==='epic'?'史诗':'稀有'} · ${item.slot==='entrance'?'入场动画':'行走足迹'}`),el('h3',item.name),el('p',item.description));
-    card.append(button('试穿效果',()=>window.qbot.appearances.preview(item.id)));
+
     const status=el('p',owned?(actor?'已装配，正在读取角色…':'已收藏 · 尚未装配'):`${item.price} 花园币`,'appearance-status');card.append(status);
     if(!owned)card.append(button(`购买 ${item.name} · ${item.price} 花园币`,()=>act({type:'buyAppearance',item:item.id}),s.coins<item.price));
     else {

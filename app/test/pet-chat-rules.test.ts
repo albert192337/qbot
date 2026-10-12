@@ -10,7 +10,7 @@ describe('主动聊天', () => {
   });
   it('解析失败不伪造嗯或成功', () => {
     expect(parseChatReply('服务器异常', [])).toBeNull();
-    expect(parseChatReply('{"do":false,"say":[]}', [])).toBeNull();
+    expect(parseChatReply('{"do":false,"say":[]}', [])).toMatchObject({lines:[],say:[]});
   });
   it('输入和最近对话作为消息传递，动作取当前角色', () => {
     const input = { personaName: '阿呱', availableIntents: ['newDance'], actionDescriptions: [{ id: 'newDance', description: '新舞蹈' }] } as BrainInput;

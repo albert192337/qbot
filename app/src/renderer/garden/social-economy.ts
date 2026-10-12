@@ -60,7 +60,14 @@ export function renderSocialTravel(host:HTMLElement,s:GardenState,characters:Cha
       if(!travel?.tutorialDone)card.append(btn('初次短途 · 60 金币 / 10分钟',()=>act({type:'tripStart',city:city as TripCity,actors:[...selected],tutorial:true}),s.coins<60));grid.append(card);
     }host.append(grid);
   }
-  host.append(el('h3','旅行手账'));for(const trip of [...(travel?.history??[])].reverse().slice(0,12))host.append(el('p',`${new Date(trip.claimedAt).toLocaleDateString()} · ${SOCIAL_TRIPS[trip.city].name} · ${trip.actors.map(id=>characters.find(c=>c.dirId===id)?.manifest.name??'旅行伙伴').join('、')} · 带回一包地区植物种子${trip.tutorial?'（初次短途不计家具累计次数）':''}`));
+
+}
+export function renderTripHistory(host:HTMLElement,s:GardenState,characters:CharacterMeta[]){
+ const travel=s.economy?.travel;if(!travel)return;
+ for(const trip of [...(travel.history??[])].reverse()){
+  const card=el('article','','moment-card');const image=document.createElement('img');image.src=tripArt[trip.city];image.alt=SOCIAL_TRIPS[trip.city].name;image.style.cssText='width:100%;max-height:160px;object-fit:cover;border-radius:12px';
+  card.append(el('h3',SOCIAL_TRIPS[trip.city].name),image,el('p',trip.actors.map(id=>characters.find(c=>c.dirId===id)?.manifest.name??'旅行伙伴').join('、')),el('small',new Date(trip.claimedAt).toLocaleDateString()));host.append(card);
+ }
 }
 export function renderSocialWeather(host:HTMLElement,s:GardenState,act:Act){
   if(!s.economy)return;const native=nativeSocialWeather(Date.now(),s.life?.owner??'local'),w=s.economy.weather;

@@ -11,6 +11,11 @@ it('uses the same realm and hourly calendar as the garden, including hour bounda
       const s = gardenWeatherStatus(state, hour * 3600000 + 3599999);
       expect(s.hourly?.current.kind).toBe(hourlyWeather(hour, realm));
       expect(s.hourly?.next).toEqual(gardenWeatherStatus(state, (hour + 1) * 3600000).hourly?.current);
+      const special = s.hourly!.nextSpecial!;
+      expect(special.kind).not.toBe('sunny');
+      expect(special.kind).toBe(hourlyWeather(special.start / 3600000, realm));
+      expect(special.start).toBeGreaterThan(s.now);
+      for (let h = hour + 1; h < special.start / 3600000; h++) expect(hourlyWeather(h, realm)).toBe('sunny');
       expect(weatherName(s.hourly!.current.kind)).toBeTruthy();
       expect(weatherIcon(s.hourly!.current.kind)).not.toContain('undefined');
     }

@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "checks": [
+    "menu tabs, actual friend count, mute, market on character root",
+    "room defaults to visit, existing furniture is not selected or moved",
+    "furniture ghost does not consume inventory; Escape cancels",
+    "edit reclaim and Finish persist through existing room API",
+    "choose seed in compact panel then click 3D plot uses real transition",
+    "friend scene selection cannot mutate own plants; return restores own garden",
+    "history expansion, emoji insertion, public hidden outside room",
+    "switching current actor clears prior chat",
+    "production native panel resizes and hidden garden stays closed on pet movement"
+  ],
+  "errors": []
+}

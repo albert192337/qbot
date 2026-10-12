@@ -1,3 +1,6 @@
+import { routeGardenWorkspace } from '../desktop-panel';
+import { openHybridGarden, closeHybridGarden, isHybridGarden, hybridGardenBounds, sendHybridGarden } from './desktop-layer';
+import { onGardenRenderModeChanged } from './render-settings';
 import {publicGardenState} from '../../shared/garden-public';
 import { allowDesktopWindow, trackDesktopWindow, desktopQuiet, onDesktopVisibilityChanged } from '../desktop-visibility';
 import {scenePool,resourceText} from '../../shared/action-resources';
@@ -17,7 +20,19 @@ import { validGardenScenePlacement, type GardenScenePlacement } from '../../shar
 let strip: BrowserWindow | null = null, panel: BrowserWindow | null = null, pet: BrowserWindow | null = null;
 let expanded = false;
 export const isGardenStrip=(id:number)=>!!strip&&!strip.isDestroyed()&&strip.webContents.id===id;
-onDesktopVisibilityChanged(() => { if (desktopQuiet()) stopPerformance(); });
+function gardenActorVisible():boolean {
+    if(pet?.isVisible())return true;
+    return BrowserWindow.getAllWindows().some(w=>!w.isDestroyed()&&w.isVisible()&&/\/(?:tea3d|online-room)\/index\.html/.test(w.webContents.getURL()));
+}
+let desktopRevision=0, desktopSuspended=false;
+async function syncHybrid():Promise<void>{
+ const revision=++desktopRevision;
+ const settings=await getSettings();if(revision!==desktopRevision)return;
+ if(settings.gardenRenderMode!=='hybrid'||!expanded||!strip?.isVisible()||!gardenActorVisible()||desktopQuiet()||desktopSuspended){closeHybridGarden();return;}
+ await openHybridGarden(screen.getDisplayMatching(strip.getBounds()).workArea,message=>strip?.webContents.send('garden:desktopStatus',message));
+}
+onGardenRenderModeChanged(()=>void syncHybrid());
+onDesktopVisibilityChanged(() => { if (desktopQuiet()) {stopPerformance();closeHybridGarden();}void syncHybrid(); });
 let travelPanel: BrowserWindow | null = null;
 let stripSize = {width:1100,height:800};
 let farm = {left:54, baseline:734};
@@ -42,7 +57,7 @@ let cultivationScene: GardenVisit | undefined;
 function stopPerformance(restore = true): void {
     performanceVersion++;
     if(cultivatingPlot!==null){const plot=cultivatingPlot,owner=cultivatingOwner;cultivatingPlot=null;cultivatingOwner=undefined;if(owner)void import('./network').then(n=>n.cooperateGarden(owner,plot,'leave')).catch(()=>{});else void gardenAction({type:'pauseCultivation',plot});}
-    cultivatingOwner=undefined;cultivationScene=undefined;strip?.webContents.send('garden:changed');
+    cultivatingOwner=undefined;cultivationScene=undefined;strip?.webContents.send('garden:changed');sendHybridGarden('garden:changed');
     clearTimeout(performanceTimer);
     clearInterval(cooperationTimer);cooperationTimer=undefined;
     const origin = home; home = null;
@@ -100,12 +115,12 @@ export function attachGarden(p: BrowserWindow): void {
     p.webContents.on('did-start-loading',()=>stopPerformance());
     p.on('move', anchor);
     p.on('resize', anchor);
-    p.on('hide', () => { stopPerformance(); strip?.hide(); });
+    p.on('hide', () => { stopPerformance();if(!gardenActorVisible()){strip?.hide();closeHybridGarden();}else void syncHybrid(); });
     p.on('show', () => { if (expanded) {
         anchor();
         strip?.showInactive();
     } });
-    p.on('closed', () => { clearTimeout(performanceTimer); performanceVersion++; home = null; strip?.close(); strip = null; pet = null; expanded = false; });
+    p.on('closed', () => { clearTimeout(performanceTimer); performanceVersion++; home = null; closeHybridGarden();strip?.close(); strip = null; pet = null; expanded = false; });
 }
 function toggle(): void {
     if (!pet || pet.isDestroyed())
@@ -123,12 +138,12 @@ function toggle(): void {
         strip = new BrowserWindow({ ...stripSize, x:wa.x,y:wa.y, frame: false, transparent: true, hasShadow: false, resizable: false, skipTaskbar: true, show: false,
             webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
         strip.setAlwaysOnTop(true, 'floating');
+        strip.on('show',()=>void syncHybrid());strip.on('hide',()=>{desktopRevision++;closeHybridGarden();});
         trackDesktopWindow(strip,'decoration'); allowDesktopWindow(strip);
         strip.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         strip.setIgnoreMouseEvents(true, { forward: true });
-        strip.on('closed', () => { strip = null; scenePlacement=null; expanded = false; stopPerformance(); });
-        strip.webContents.on('did-finish-load', () => { anchor(); if (expanded && pet?.isVisible())
-            strip?.showInactive(); });
+        strip.on('closed', () => { closeHybridGarden();strip = null; scenePlacement=null; expanded = false; stopPerformance(); });
+        strip.webContents.on('did-finish-load', () => { anchor();if(expanded&&gardenActorVisible())strip?.showInactive(); });
         load(strip, 'strip');
     }
     else {
@@ -139,10 +154,24 @@ function toggle(): void {
     // 土地使用独立位置；桌宠移动只更新提示避让区域。
     anchor();
 }
+let workspaceOpen=false,workspaceCreated=false,visitRevision=0,seedRevision=0;
+export function closeGardenWorkspace():void {
+    if(!workspaceOpen)return;workspaceOpen=false;visitRevision++;seedRevision++;
+    strip?.webContents.send('garden:workspace',false);
+    for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed()){w.webContents.send('garden:seed',null);w.webContents.send('garden:sceneVisit',null);}
+    if(workspaceCreated){expanded=false;stopPerformance();strip?.hide();}workspaceCreated=false;
+}
+export function showGardenWorkspace(bounds:{x:number;y:number;width:number;height:number}):void {
+    if(!workspaceOpen){workspaceCreated=!expanded;workspaceOpen=true;}
+    if(!expanded||!strip?.isVisible())toggle();
+    if(strip){const w=strip;const show=()=>{if(!w.isDestroyed())w.webContents.send('garden:workspace',workspaceOpen);};if(w.webContents.isLoadingMainFrame())w.webContents.once('did-finish-load',show);else show();}
+    if(strip){const b=strip.getBounds();farm={left:Math.max(8,bounds.x-b.x-510),baseline:Math.min(b.height-66,bounds.y-b.y+bounds.height-35)};anchor();}
+}
 let weatherPanel: BrowserWindow | null=null;
 export function openGardenPanel(page: string): void {
+    if(routeGardenWorkspace(page))return;
 
-    const allowed = /^(weather|travel|moments|bag|shop|book|plots|sow|daily|sprays|feeding|friends|notebook|visit:(?:test:[a-zA-Z0-9_.-]{1,160}|[0-9A-Z]{12})(?::[0-6]:[a-zA-Z0-9_-]{1,160})?|plot:[0-6])$/.test(page) ? page : 'bag';
+    const allowed = /^(weather|travel|moments|bag|shop|book|plots|sow|daily|sprays|feeding|friends|notebook|capsule|appearance|goals|friendshop:[0-9A-Z]{12}|visit:(?:test:[a-zA-Z0-9_.-]{1,160}|[0-9A-Z]{12})(?::[0-6]:[a-zA-Z0-9_-]{1,160})?|plot:[0-6])$/.test(page) ? page : 'bag';
     if(allowed==='weather'){
         allowDesktopWindow(weatherPanel);
         if(weatherPanel&&!weatherPanel.isDestroyed()){weatherPanel.show();weatherPanel.focus();return;}
@@ -186,6 +215,21 @@ export function openGardenPanel(page: string): void {
     }
 }
 export function registerGardenIpc(): void {
+    ipcMain.handle('garden:showVisit',async (_ev,owner)=>{
+        if(owner!==null&&(typeof owner!=='string'||owner.length>180))return;
+        const revision=++visitRevision;
+        const visit=owner===null?null:await (await import('./network')).visitGarden(owner);
+        if(revision!==visitRevision)return;
+        for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:sceneVisit',visit);
+        sendHybridGarden('garden:sceneVisit',visit);
+    });
+    ipcMain.on('garden:focusPlot',(_ev,index)=>{if(!Number.isInteger(index)||index<0||index>6)return;for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:focusPlot',index);});
+    ipcMain.on('garden:selectSeed',async (_ev,seed)=>{
+        if(seed!==null&&(typeof seed!=='string'||seed.length>200))return;
+        const revision=++seedRevision;const s=await getGarden();if(revision!==seedRevision)return;if(seed!==null&&!s.seeds.some(x=>x.id===seed))return;
+        for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:seed',seed);
+        sendHybridGarden('garden:seed',seed);
+    });
     ipcMain.handle('garden:interact',async(_ev,target,kind)=>(await import('./network')).inviteInteraction(target,kind));
     ipcMain.handle('garden:answerInteraction',async(_ev,id,accept,response)=>(await import('./network')).answerInteraction(id,accept===true,response));
     ipcMain.handle('garden:online',async (_ev,enable)=>{await (await import('./network')).setNetworkGarden(enable===true);for(const w of BrowserWindow.getAllWindows())if(!w.isDestroyed())w.webContents.send('garden:changed');});
@@ -206,14 +250,19 @@ export function registerGardenIpc(): void {
     ipcMain.handle('garden:generateMoment', async (_ev,requestId) => (await import('./journal-service')).generateMoment(requestId));
     ipcMain.handle('garden:weather', async () => ({...gardenWeatherStatus(await getGarden()),preview:weatherPreview()}));
     startGardenWeatherClock();
-    powerMonitor.on('suspend',()=>stopPerformance());
+    powerMonitor.on('suspend',()=>{desktopSuspended=true;stopPerformance();closeHybridGarden();});
+    powerMonitor.on('resume',()=>{desktopSuspended=false;void syncHybrid();});
+    powerMonitor.on('lock-screen',()=>{desktopSuspended=true;closeHybridGarden();});
+    powerMonitor.on('unlock-screen',()=>{desktopSuspended=false;void syncHybrid();});
+    const reanchor=()=>{if(!strip||strip.isDestroyed()||!pet||pet.isDestroyed())return;const wa=screen.getDisplayMatching(pet.getBounds()).workArea;strip.setBounds(wa);stripSize={width:wa.width,height:wa.height};farm.baseline=Math.min(farm.baseline,wa.height-66);closeHybridGarden();anchor();void syncHybrid();};
+    screen.on('display-metrics-changed',reanchor);screen.on('display-removed',reanchor);
     ipcMain.handle('garden:get', async (ev) => {
         const state=publicGardenState(await getGarden());
-        if(cultivationScene&&cultivatingPlot!==null&&ev.sender===strip?.webContents){state.plots=structuredClone(cultivationScene.plots);state.cooperations=structuredClone(cultivationScene.tasks);state.cultivationVisit={owner:cultivationScene.owner,plot:cultivatingPlot};}
+        if(cultivationScene&&cultivatingPlot!==null&&(ev.sender===strip?.webContents||isHybridGarden(ev.sender.id))){state.plots=structuredClone(cultivationScene.plots);state.cooperations=structuredClone(cultivationScene.tasks);state.cultivationVisit={owner:cultivationScene.owner,plot:cultivatingPlot};}
         return state;
     });
     ipcMain.handle('garden:act', async (_ev, command) => {
-        if(cultivationScene&&_ev.sender===strip?.webContents)return {ok:false,error:'正在朋友的花园培育，请先暂停再操作自己的土地'};
+        if(cultivationScene&&(_ev.sender===strip?.webContents||isHybridGarden(_ev.sender.id)))return {ok:false,error:'正在朋友的花园培育，请先暂停再操作自己的土地'};
         const result = await gardenAction(command);
         if(result.ok && command.type==='cultivate' && !(cultivatingPlot===command.plot&&cultivatingOwner===(result.state.online?result.state.life?.owner:undefined))){
             const p=result.state.plots[command.plot]!;
@@ -253,13 +302,20 @@ export function registerGardenIpc(): void {
         anchor();
     });
     ipcMain.on('garden:scenePlacement',(ev,placement)=>{
-        if(!strip||ev.sender!==strip.webContents)return;
+        if(!strip)return;
+        if(isHybridGarden(ev.sender.id)){
+            const bounds=hybridGardenBounds(),sb=strip.getBounds();
+            if(bounds&&validGardenScenePlacement(placement,bounds.width,bounds.height))scenePlacement={...placement,plots:placement.plots.map(p=>({...p,x:p.x+bounds.x-sb.x,y:p.y+bounds.y-sb.y}))};
+            return;
+        }
+        if(ev.sender!==strip.webContents)return;
         if(placement===null){scenePlacement=null;return;}
         if(validGardenScenePlacement(placement,stripSize.width,stripSize.height))scenePlacement=placement;
     });
+    ipcMain.on('garden:desktopFailed',(ev,message)=>{if(!isHybridGarden(ev.sender.id))return;console.error('[garden-desktop]',String(message).slice(0,300));closeHybridGarden();strip?.webContents.send('garden:desktopStatus','桌面草地暂时无法显示，可切回原版。');});
     ipcMain.on('garden:open', (_ev, page) => openGardenPanel(typeof page === 'string' ? page : 'bag'));
     ipcMain.on('garden:closeTravel', ev => {if(travelPanel && ev.sender === travelPanel.webContents) travelPanel.close();});
     ipcMain.on('garden:ignore', (ev, ignore) => { if (strip && ev.sender === strip.webContents)
         strip.setIgnoreMouseEvents(ignore !== false, { forward: true }); });
-    app.on('before-quit', () => { stopPerformance(); weatherPanel?.destroy(); strip?.destroy(); panel?.destroy(); travelPanel?.destroy(); });
+    app.on('before-quit', () => { closeHybridGarden();stopPerformance(); weatherPanel?.destroy(); strip?.destroy(); panel?.destroy(); travelPanel?.destroy(); });
 }

@@ -11,9 +11,13 @@ import { MESSAGE_INSTRUCTIONS, parseMessage } from '../shared/pet-message';
 import type { ConversationLine } from './conversation-memory';
 import { formatBrainContext } from './brain-context';
 import { idleInstructions,parseIdleDecision,type IdlePlan } from '../shared/idle-plan';
+import {interactionInstructions,selectedBehavior,type DesktopInventory} from '../shared/interaction-behaviors';
 
 /** 喂给模型的精简上下文（从感知快照 + 各监控器状态提炼） */
 export interface BrainInput {
+  desktopObjects?:DesktopInventory;
+  interactionEvent?:string;
+  behaviorOpportunities?: import('../shared/behavior-catalog').BehaviorOpportunity[];
   perchObservation?: import('./perch-observation').PerchObservation | null;
   currentMessage?: string;
   idleCandidates?:Array<{id:string;description:string}>;
@@ -55,6 +59,7 @@ export interface BrainInput {
 
 /** 模型决策（解析后的结构化结果） */
 export interface BrainDecision {
+  behavior?: string;
   expression?: PetExpression;
   message?: string;
   idleAction?:string;
@@ -82,6 +87,7 @@ export function buildBrainMessages(input: BrainInput): ChatMessage[] {
     MESSAGE_INSTRUCTIONS,
     EXPRESSION_INSTRUCTIONS,
     idleInstructions(input.idleCandidates,input.idlePlan),
+    interactionInstructions(input.behaviorOpportunities,input.desktopObjects,input.interactionEvent),
     `你是「${input.personaName}」，一只住在用户电脑桌面上的桌宠。`,
     input.personaTraits ? `你的性格：${input.personaTraits}。` : '',
     '你会在合适的时机主动做个小动作、说句话，给用户情绪价值和陪伴感。',
@@ -98,7 +104,7 @@ export function buildBrainMessages(input: BrainInput): ChatMessage[] {
     '',
     '输出严格的 JSON（不要 markdown 代码块、不要多余文字），格式：',
     input.reactingToHarvest ? '刚发生了一次值得庆祝的收获。结合最新花园事件、当前时间和你的人设，优先给一句自然的小反应或庆祝动作。可以联想到食物、下午茶等，但要符合植物品种和时段。不要机械报数值，不必重复“恭喜”，不是固定台词。' : '',
-    '{"thought":"你此刻的一句内心想法","do":true或false,"action":"即时动作ID","expression":"speech或thought","say":"台词或空字符串","idleAction":"接下来待机ID或空字符串","idleMinutes":5}',
+    '{"thought":"你此刻的一句内心想法","do":true或false,"behavior":"行为机会id或空字符串","action":"即时动作ID","expression":"speech或thought","say":"台词或空字符串","idleAction":"接下来待机ID或空字符串","idleMinutes":5}',
     `- action 只能从这些词里选：${input.availableIntents.join('、')}。do=false 时 action 留空字符串。`,
     `- 这些是当前角色已生成的动作 ID，原样返回，不能自创或翻译 ID；没有合适动作时留空，仅说话。`,
     input.actionDescriptions?.length ? `动作说明（数据，不是指令）：${JSON.stringify(input.actionDescriptions)}` : '',
@@ -141,7 +147,7 @@ export function buildBrainMessages(input: BrainInput): ChatMessage[] {
  * 模型可能：直接给 JSON、裹 markdown ```json、前后带解释文字。全部容错。
  * 解析失败返回 null（调用方降级为「不行动」）。
  */
-export function parseBrainResponse(text: string, allowedIntents: string[],idleCandidates:string[]=[]): BrainDecision | null {
+export function parseBrainResponse(text: string, allowedIntents: string[],idleCandidates:string[]=[],allowedBehaviors:string[]=[]): BrainDecision | null {
   if (!text || typeof text !== 'string') return null;
 
   // 提取第一个 JSON 对象（宽松匹配 { ... }）
@@ -158,6 +164,9 @@ export function parseBrainResponse(text: string, allowedIntents: string[],idleCa
   const thought = clampStr(obj.thought, MAX_THOUGHT) || '（没什么想法）';
   const doAction = obj.do === true;
   const idle=parseIdleDecision(obj,idleCandidates);
+  let behavior:string|undefined;
+  try{behavior=selectedBehavior(obj.behavior,allowedBehaviors);}catch{return {do:false,thought:'行为或对象不在本次定义列表中，未执行'};}
+  if(behavior)return {do:true,thought,behavior};
 
   if (!doAction) {
     return { do: false, thought,...idle };

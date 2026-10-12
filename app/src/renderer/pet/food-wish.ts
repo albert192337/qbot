@@ -22,22 +22,31 @@ export function mountFoodWish():()=>void{
   const published=new Map<string,boolean>();
   let invitations:ContactSnapshot['invitations']=[],contactRevision=0,answering=false;
   const answered=new Set<string>();
+  let proposal:import('../../shared/behavior-catalog').BehaviorProposal|null=null,proposalRevision=0;
+  const proposed=()=>!quiet()&&!document.hidden&&!document.body.classList.contains('pair-mode')&&!document.body.classList.contains('garden-performing')&&proposal&&proposal.expiresAt>Date.now()?proposal:null;
   const invitation=()=>!quiet()&&!document.hidden&&!document.body.classList.contains('pair-mode')&&!document.body.classList.contains('garden-performing')?invitations.find(i=>i.pair&&i.expiresAt>Date.now()&&!answered.has(i.id)):undefined;
   const publish=(kind:'wish'|'interaction'|'speech',active:boolean)=>{if(published.get(kind)===active)return;published.set(kind,active);window.qbot.overlays.report(kind,active);};
   const syncPriority=()=>{
     if(disposed)return;
     const visible=(node:HTMLElement)=>!quiet()&&!document.hidden&&!node.hidden&&getComputedStyle(node).display!=='none'&&getComputedStyle(node).visibility!=='hidden';
-    const invite=invitation();
-    publish('wish',!invite&&visible(root));publish('interaction',!!invite||visible(effect));
+    const invite=invitation(),offer=proposed();
+    publish('wish',!invite&&!offer&&visible(root));publish('interaction',!!invite||!!offer||visible(effect));
     const node=visible(effect)?effect:visible(root)?open:null;
     const hint:PetHint|null=invite?{kind:'interaction',icon:'✉',text:`${invite.nickname} 邀请你${invite.pair!.label}`,invitation:{id:invite.id,expiresAt:invite.expiresAt}}:node?{kind:node===effect?'interaction':'wish',icon:node.querySelector('span')?.textContent??'',text:node.querySelector('small')?.textContent??'',title:node.title,experience:node===effect?experience:undefined}:null;
-    const key=JSON.stringify(hint);if(key!==lastHint){lastHint=key;window.qbot.overlays.hint(hint);}
+    const shown=offer&&!invite?{kind:'interaction' as const,icon:'💭',text:offer.opportunity.approvalText??`我想${offer.opportunity.label}。${offer.reason}`,title:offer.reason,invitation:{id:offer.id,expiresAt:offer.expiresAt,approval:true}}:hint;
+    const key=JSON.stringify(shown);if(key!==lastHint){lastHint=key;window.qbot.overlays.hint(shown);}
     publish('speech',!quiet()&&!document.hidden&&!!document.querySelector('#bubble.show'));
   };
   const overlayOff=window.qbot.overlays.onChanged(s=>{document.body.dataset.headOverlay=s.winner??'';syncPriority();});
   root.onpointerdown=e=>e.stopPropagation();open.onclick=()=>window.qbot.garden.open('feeding');close.onclick=()=>{hiddenKey=currentKey;until=0;root.hidden=true;if(actor){records[actor]={...(records[actor]??recordReminder(undefined,Date.now())),day:reminderDay(Date.now()),dismissed:true};save();}syncPriority();};
   const hintOff=window.qbot.overlays.onHintAction(action=>{
     if(typeof action==='string'){if(action==='dismiss')close.click();else {open.click();close.click();}return;}
+    const offer=proposed();
+    if(offer&&offer.id===action.invitationId&&!answering){
+      answering=true;proposal=null;syncPriority();
+      void window.qbot.autonomy.answer(offer.id,action.accept).catch(error=>console.error('行为申请处理失败',error)).finally(()=>{answering=false;syncPriority();});
+      return;
+    }
     const invite=invitation();if(answering||!invite||invite.id!==action.invitationId)return;
     answering=true;answered.add(invite.id);syncPriority();
     void window.qbot.garden.answerInteraction(invite.id,action.accept,invite.pair?.kind==='relay'?'happy':undefined).catch(error=>{
@@ -58,6 +67,9 @@ export function mountFoodWish():()=>void{
   const off=window.qbot.garden.onChanged(()=>void refresh());const settingsOff=window.qbot.settings.onChanged(()=>void refresh());
   let effectTimer:ReturnType<typeof setTimeout>|undefined;
   const effect=document.createElement('div');effect.id='network-interaction';effect.hidden=true;document.body.append(effect);
+  const proposalOff=window.qbot.autonomy?.onProposal(p=>{proposalRevision++;proposal=p;syncPriority();});
+  const initialProposalRevision=proposalRevision;
+  void window.qbot.autonomy?.get().then(p=>{if(!disposed&&proposalRevision===initialProposalRevision){proposal=p;syncPriority();}}).catch(()=>{});
   const contactsOff=window.qbot.social.onContacts(snapshot=>{contactRevision++;invitations=snapshot.available?snapshot.invitations:[];syncPriority();});
   const initialRevision=contactRevision;
   void window.qbot.social.contacts(false).then(snapshot=>{if(!disposed&&contactRevision===initialRevision){invitations=snapshot.available?snapshot.invitations:[];syncPriority();}}).catch(()=>{});
@@ -67,5 +79,5 @@ export function mountFoodWish():()=>void{
   const visibility=()=>{if(document.hidden){until=0;root.hidden=true;clearTimeout(effectTimer);experience=undefined;effectActive=false;effect.hidden=true;syncPriority();}else void refresh();};
   document.addEventListener('visibilitychange',visibility);
   const timer=setInterval(()=>{if(!document.hidden)void refresh();},60000);void refresh();
-  return ()=>{effects?.clear('star');disposed=true;version++;contactsOff();clearInterval(invitationTimer);observer.disconnect();document.removeEventListener('visibilitychange',visibility);overlayOff();hintOff();window.qbot.overlays.hint(null);for(const kind of ['wish','interaction','speech'] as const)window.qbot.overlays.report(kind,false);off();settingsOff();interactionOff();clearTimeout(effectTimer);clearTimeout(wishTimer);clearInterval(timer);root.remove();effect.remove();};
+  return ()=>{proposalOff?.();effects?.clear('star');disposed=true;version++;contactsOff();clearInterval(invitationTimer);observer.disconnect();document.removeEventListener('visibilitychange',visibility);overlayOff();hintOff();window.qbot.overlays.hint(null);for(const kind of ['wish','interaction','speech'] as const)window.qbot.overlays.report(kind,false);off();settingsOff();interactionOff();clearTimeout(effectTimer);clearTimeout(wishTimer);clearInterval(timer);root.remove();effect.remove();};
 }

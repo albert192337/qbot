@@ -2,7 +2,7 @@ import {renderFurnitureShop} from './social-economy';
 import {SPECIES,growthLabel,TRAITS,TIER_NAMES,traitSlot,needsReveal,canBreed,fruitQuality,type GardenState,type GardenCommand,type Produce,type Trait,type Plant} from '../../shared/garden';
 import {COOP_RULES,SPRAYS,DYE_COLORS,FOOD_ICONS,dailyOffers,nextGardenDay,sprayPool,coopRareChance,type SprayKind,type GardenVisit} from '../../shared/garden-life';
 import './life.css';
-type Context={state:GardenState;act:(c:GardenCommand)=>Promise<void>;go:(p:string)=>void;refresh:()=>Promise<void>;notice:(s:string)=>void;busy:boolean;plantArt:(p:Plant)=>HTMLElement};
+type Context={shopOnly?:boolean;spatial?:boolean;plot?:number;state:GardenState;act:(c:GardenCommand)=>Promise<void>;go:(p:string)=>void;refresh:()=>Promise<void>;notice:(s:string)=>void;busy:boolean;plantArt:(p:Plant)=>HTMLElement};
 const el=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',cls='')=>{const e=document.createElement(tag);e.textContent=text;e.className=cls;return e;};
 function btn(text:string,fn:()=>unknown,disabled=false){const b=el('button',text);b.disabled=disabled;b.onclick=()=>{const result=fn();if(result instanceof Promise)void result.catch(e=>alert(String(e)));};return b;}
 function card(title:string,description:string){const c=el('article','','card life-card');c.append(el('h3',title),el('p',description,'muted'));return c;}
@@ -100,13 +100,15 @@ export function renderVisit(host:HTMLElement,c:Context,address:string):void{
   const body=el('div');host.append(body);let fetching=false,joined:number|undefined;
   const draw=(v:GardenVisit)=>{
     if(!host.isConnected)return;joined=v.tasks?.find(t=>!t.done&&(t.members[c.state.life?.owner??'']?.seenAt??0)+15000>Date.now())?.plot;body.replaceChildren(el('h2',v.name+'的花园名片'),el('p',`${v.actorName??'当前角色'} · Lv.${v.actorLevel} · 土地${v.landOpen===false?'未开放':'可查看'} · 商店${v.shopOpen===false?'未开放':'可购物'}`,'muted'));
+    if(c.shopOnly){body.replaceChildren();renderDaily(body,c,owner,v);return;}
+    if(c.spatial){body.replaceChildren(el('h2',v.name));body.classList.add('spatial-visit');}
     if(v.companion&&v.friend&&c.state.online&&!c.state.rehearsal){const refresh=btn('↻ 刷新测试',async()=>{refresh.disabled=true;try{await c.act({type:'companionGardenRefresh',owner});await poll();}finally{refresh.disabled=false;}},c.busy);refresh.className='garden-test-refresh';refresh.title='刷新出可繁育的金色作物和待培育的神秘作物；保留正在进行的合作';body.append(refresh);}
-    body.append(el('p','待培育的作物可以直接帮忙；金色及以上、还有繁育次数的成熟作物可以向好友申请繁育。','muted'));
-    body.append(el('p',`今日还可领取 ${v.rewardsLeft??5} 次培育种子${v.rewardsLeft===0?'；仍可帮忙加速并留下共同记录':' · 普通种子或自带词条的神秘种子'}`));
+    if(!c.spatial)body.append(el('p','待培育的作物可以直接帮忙；金色及以上、还有繁育次数的成熟作物可以向好友申请繁育。','muted'));
+    if(!c.spatial)body.append(el('p',`今日还可领取 ${v.rewardsLeft??5} 次培育种子${v.rewardsLeft===0?'；仍可帮忙加速并留下共同记录':' · 普通种子或自带词条的神秘种子'}`));
     renderBreedRequests(body,c,owner);
     if(!c.state.online)body.append(el('p','你正在本地花园。进入联机花园后可购物和共同培育，本地收藏会保留。'),btn('进入联机花园',async()=>{await window.qbot.garden.online(true);await c.refresh();}));
     if(targetTask){const task=v.tasks?.find(t=>t.id===targetTask);if(task?.done){const done=card('这次共同培育已完成',task.fruit?badge(task.fruit):'果实已由主人收好');if(task.fruit)done.prepend(c.plantArt(task.fruit));done.append(el('p',`${Object.keys(task.members).length} 位伙伴留下了这段经历`),btn('领取我的助育奖励',async()=>{await window.qbot.garden.cooperate(owner,task.plot,'claim',undefined,task.id);await c.refresh();}));body.append(done);}else if(!v.plots.some(p=>p?.id===targetTask))body.append(el('p','这颗果实已不在地里，可以去朋友的花园看看近况。'));}
-    const grid=el('div','','grid');v.plots.forEach((p,i)=>{if(!p&&i>=(v.plotCount??Math.min(7,v.actorLevel+2)))return;if(targetTask&&p?.id!==targetTask)return;const item=card(`${i+1}号地 · ${p?FOOD_ICONS[p.species]+' '+SPECIES[p.species].name:'空土地'}`,p?needsReveal(p)?'？ ？ ？ · 培育后揭晓':p.traits.map(t=>TRAITS[t].name+'（'+TIER_NAMES[TRAITS[t].tier]+'）').join(' / ')||'原生':'还没有种下植物');if(p){item.prepend(c.plantArt(p));const t=v.tasks?.find(t=>t.plant===p.id);if(needsReveal(p)||t||c.state.economy&&p.readyAt>Date.now()){const active=Object.values(t?.members??{}).filter(m=>m.seenAt+15000>Date.now()).length;item.append(el('p',t?.done?'已经揭晓':`？ 可一起培育 · ${active} 人正在参与 · ${Math.ceil((t?.remaining??COOP_RULES.work)/(360*Math.max(1,Math.min(4,active))))} 秒${active?'':'（单人）'}`));
+    const grid=el('div','','grid');v.plots.forEach((p,i)=>{if(c.spatial&&c.plot!==i)return;if(!p&&i>=(v.plotCount??Math.min(7,v.actorLevel+2)))return;if(targetTask&&p?.id!==targetTask)return;const item=card(`${i+1}号地 · ${p?FOOD_ICONS[p.species]+' '+SPECIES[p.species].name:'空土地'}`,p?needsReveal(p)?'？ ？ ？ · 培育后揭晓':p.traits.map(t=>TRAITS[t].name+'（'+TIER_NAMES[TRAITS[t].tier]+'）').join(' / ')||'原生':'还没有种下植物');if(p){if(!c.spatial)item.prepend(c.plantArt(p));const t=v.tasks?.find(t=>t.plant===p.id);if(needsReveal(p)||t||c.state.economy&&p.readyAt>Date.now()){const active=Object.values(t?.members??{}).filter(m=>m.seenAt+15000>Date.now()).length;item.append(el('p',t?.done?'已经揭晓':`？ 可一起培育 · ${active} 人正在参与 · ${Math.ceil((t?.remaining??COOP_RULES.work)/(360*Math.max(1,Math.min(4,active))))} 秒${active?'':'（单人）'}`));
         const qualified=Object.values(t?.members??{}).filter(m=>m.seconds>=COOP_RULES.minSeconds&&m.work>=COOP_RULES.work*COOP_RULES.minContribution).length;item.append(el('small',`${qualified} 位已达标 · 奖励普通草莓种子 · 每天最多 3 次`));
         const me=t?.members[c.state.life?.owner??''],needSeconds=Math.max(0,COOP_RULES.minSeconds-(me?.seconds??0),(COOP_RULES.work*COOP_RULES.minContribution-(me?.work??0))/360),remainingSeconds=(t?.remaining??COOP_RULES.work)/(360*Math.max(1,active+(joined===i?0:1)));
         if(!t?.done)item.append(el('small',remainingSeconds<needSeconds?'剩余工作可能不足奖励资格，仍欢迎来陪伴':`再参与约 ${Math.ceil(needSeconds)} 秒可达个人奖励资格`),btn(joined===i?'暂停参与':'帮忙培育',async()=>{const action=joined===i?'leave':'join';const next=await window.qbot.garden.cooperate(owner,i,action);joined=action==='join'?i:undefined;draw(next);},!c.state.online));
@@ -116,7 +118,7 @@ export function renderVisit(host:HTMLElement,c:Context,address:string):void{
         const quality=fruitQuality(p.traits,p);item.append(el('small',`${TIER_NAMES[quality]}品质 · 剩余繁育 ${p.bred?0:['gold','rainbow'].includes(quality)?1:0} 次`));
         if(v.friend&&canBreed(p)&&!p.cultivation&&!c.state.rehearsal)item.append(btn('申请繁育',()=>requestFriendBreed(c,owner,p),c.busy||!c.state.online));
       }
-      }grid.append(item);});body.append(grid);if(c.state.online&&v.shopOpen!==false)renderDaily(body,c,owner,v);
+      }grid.append(item);});body.append(grid);if(c.state.online&&v.shopOpen!==false){if(c.spatial)body.append(btn('朋友的小店',()=>window.qbot.garden.open('friendshop:'+owner)));else renderDaily(body,c,owner,v);}
   };
   const poll=async()=>{if(fetching||document.hidden)return;fetching=true;try{draw(await window.qbot.garden.visit(owner,false,targetTask));}catch(e){body.replaceChildren(el('p',String(e)),btn('重试',()=>poll()));joined=undefined;}finally{fetching=false;}};
   void poll();const timer=setInterval(()=>{if(!host.isConnected){clearInterval(timer);if(joined!==undefined)void window.qbot.garden.cooperate(owner,joined,'leave').catch(()=>{});return;}void poll();},5000);

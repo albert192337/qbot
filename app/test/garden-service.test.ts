@@ -42,6 +42,13 @@ describe('garden transaction journal', () => {
         await writeFile(path.join(mock.dir,'config.json'),JSON.stringify({gardenOnline:false}));
         expect((await api.getGarden()).rehearsal).toBeUndefined();
     });
+    it('hybrid mode plants all painted species and display switches preserve stored assets',async()=>{
+        const api=await import('../src/main/garden/service');const state=await api.getGarden();const seed=state.seeds.find(s=>s.species==='lotus')!;
+        await writeFile(path.join(mock.dir,'config.json'),JSON.stringify({gardenRenderMode:'hybrid'}));
+        expect((await api.gardenAction({type:'plant',plot:0,seed:seed.id})).ok).toBe(true);
+        const after=await readFile(path.join(mock.dir,'garden-demo.json'),'utf8');
+        for(const mode of ['2d','3d','hybrid']){await writeFile(path.join(mock.dir,'config.json'),JSON.stringify({gardenRenderMode:mode}));await api.getGarden();expect(await readFile(path.join(mock.dir,'garden-demo.json'),'utf8')).toBe(after);}
+    });
     it('3D mode permits single and batch pineapple sowing',async()=>{
         let api=await import('../src/main/garden/service');const state=await api.getGarden();
         state.seeds.push({id:'pineapple-single',species:'pineapple',genes:[],bred:false},{id:'pineapple-batch',species:'pineapple',genes:[],bred:false});

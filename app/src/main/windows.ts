@@ -1,3 +1,5 @@
+import { panelBounds } from '../shared/panel-layout';
+import { sendToDesktopPanel } from './desktop-panel';
 import { installRoom3dHitTest } from './tea3d-desktop';
 /** 窗口管理：桌宠透明置顶窗 + 孵化常规窗 + 小房间窗 + dock 显隐协调 */
 import { BrowserWindow, app, screen, shell } from 'electron';
@@ -6,11 +8,12 @@ import path from 'node:path';
 import type { CharacterMeta, RoomSizePreset, RoomsDisplayMode } from '../shared/ipc-types';
 import { layoutRoomPets, layoutRoomScenePets, normalizeRoomSizePreset } from './rooms/rooms-rules';
 import { clampPetScale, petTargetSize, pairWindowBounds } from './pet-geometry';
+import {pairHeadroom} from '../shared/pair-layout';
 import { attachPetWindowRecovery } from './pet-window-recovery';
 import { aboveBubbleLayout } from './bubble-layout';
 import { createDesktopSign } from './desktop-sign';
 import { attachGarden } from './garden/windows';
-import { moveFixedSize } from './fixed-window';
+import { moveFixedSize, fixedWindowSize } from './fixed-window';
 import { attachPetWindowLayer, raisePetWindowGroup } from './pet-window-layer';
 
 const PET_SIZE = 360;
@@ -103,28 +106,23 @@ export function setPetScale(scale: number): void {
 type RendererPage = 'tea3d' | 'social' | 'pet' | 'online-room' | 'bubble' | 'console' | 'lounge' | 'nursery' | 'chat' | 'sign';
 
 let chatWindow: BrowserWindow | null = null;
+export const getPetChatWindow=()=>chatWindow;
 const desktopWindowGroup = () => [petWindow, desktopSign?.getWindow() ?? null, bubbleWindow, chatWindow];
 function syncChatBounds(): void {
   if (!chatWindow || chatWindow.isDestroyed() || !petWindow) return;
   const pet = petWindow.getBounds();
   const wa = screen.getDisplayMatching(pet).workArea;
-  const x = Math.max(wa.x, Math.min(pet.x + pet.width / 2 - 190, wa.x + wa.width - 380));
-  const y = Math.max(wa.y, Math.min(pet.y + pet.height + 6, wa.y + wa.height - 110));
-  moveFixedSize(chatWindow, x, y, {width:380,height:110});
+  const b=panelBounds(pet,wa,{width:380,height:chatExpanded?370:132});
+  moveFixedSize(chatWindow,b.x,b.y,{width:b.width,height:b.height},fixedWindowSize(chatWindow)?.height!==b.height);
 }
+let chatExpanded=false;
+export function resizePetChat(sender:number,expanded:boolean):void {if(chatWindow?.webContents.id!==sender)return;chatExpanded=expanded;syncChatBounds();}
 export function closePetChat(): void { chatWindow?.hide(); }
 export function openPetChat(): void {
   allowDesktopWindow(chatWindow);
   if (chatWindow?.isVisible()) { closePetChat(); return; }
-  if (petWindow) {
-    const pet = petWindow.getBounds();
-    const wa = screen.getDisplayMatching(pet).workArea;
-    if (pet.y + pet.height + 116 > wa.y + wa.height) {
-      movePetWindow(pet.x, Math.max(wa.y, wa.y + wa.height - pet.height - 116));
-    }
-  }
   if (!chatWindow || chatWindow.isDestroyed()) {
-    chatWindow = new BrowserWindow({ width: 380, height: 110, frame: false, transparent: true,
+    chatWindow = new BrowserWindow({ width: 380, height: 132, frame: false, transparent: true,
       resizable: false, hasShadow: false, skipTaskbar: true, show: false,
       webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false } });
     chatWindow.setAlwaysOnTop(true, 'floating');
@@ -187,6 +185,8 @@ export function syncBubbleBounds(): void {
 let activePlayables: string[] = [];
 
 export function broadcastCharacterActivated(meta: CharacterMeta): void {
+  sendToDesktopPanel('characters:activated',meta);
+  if(chatWindow&&!chatWindow.isDestroyed())chatWindow.webContents.send('characters:activated',meta);
   desktopSign?.setText(null);
   hideBubbleWindow(); // 旧角色的台词和思考状态不挂到新角色头上。
   // 主进程侧同步一份可用动作（行为引擎的动作解析要用；与 player.load 同口径：
@@ -506,7 +506,7 @@ export function setPetVisitMode(enter: boolean, partner?: string): void {
   const area = screen.getDisplayMatching(petWindow.getBounds()).workArea;
   if (enter) {
     beforeVisit = { x, y };
-    const b = pairWindowBounds(petScale, { x, y }, area);
+    const b = pairWindowBounds(petScale, { x, y:y-pairHeadroom(area.height) }, area);
     moveFixedSize(petWindow, b.x, b.y, b, true);
   } else {
     const origin = beforeVisit ?? { x, y }; beforeVisit = null;
@@ -653,6 +653,8 @@ export function getConsoleWindow(): BrowserWindow | null {
  * 新窗接入只改这一处。
  */
 export function sendToWindows(channel: string, payload: unknown): void {
+  sendToDesktopPanel(channel,payload);
+  if(chatWindow&&!chatWindow.isDestroyed())chatWindow.webContents.send(channel,payload);
   if (nurseryWindow && !nurseryWindow.isDestroyed()) nurseryWindow.webContents.send(channel, payload);
   getPetWindow()?.webContents.send(channel, payload);
   const room = getRoomWindow();

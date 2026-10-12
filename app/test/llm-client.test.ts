@@ -1,5 +1,12 @@
 import { expect, it, vi } from 'vitest';
 import { chatComplete } from '../src/main/llm-client';
+it('bounds a body that stalls after successful response headers',async()=>{
+ vi.useFakeTimers();
+ try{
+  const task=chatComplete({apiKey:'test',messages:[],timeoutMs:1000,fetchImpl:vi.fn(async()=>({text:()=>new Promise(()=>{}),ok:true,status:200})) as unknown as typeof fetch});
+  const check=expect(task).rejects.toThrow('response timeout');await vi.advanceTimersByTimeAsync(1000);await check;expect(vi.getTimerCount()).toBe(0);
+ }finally{vi.useRealTimers();}
+});
 it('single-frame vision is sent as an image part but never copied to request traces', async () => {
   const trace=vi.fn(), fetchImpl=vi.fn(async(_url:RequestInfo|URL,_init?:RequestInit)=>new Response(JSON.stringify({choices:[{message:{content:'画面描述'}}]})));
   await chatComplete({apiKey:'test',messages:[{role:'system',content:'只描述画面'}],imageUrl:'data:image/png;base64,private-frame',onTrace:trace,fetchImpl:fetchImpl as typeof fetch});

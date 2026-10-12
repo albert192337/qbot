@@ -1,0 +1,65 @@
+{
+  "source": "parts-v1.png",
+  "boxes": [
+    [
+      8,
+      111,
+      488,
+      526
+    ],
+    [
+      542,
+      222,
+      813,
+      527
+    ],
+    [
+      943,
+      209,
+      1062,
+      565
+    ],
+    [
+      153,
+      654,
+      276,
+      1011
+    ],
+    [
+      507,
+      698,
+      660,
+      1019
+    ],
+    [
+      918,
+      700,
+      1076,
+      1024
+    ],
+    [
+      174,
+      1154,
+      231,
+      1268
+    ],
+    [
+      544,
+      1154,
+      601,
+      1268
+    ],
+    [
+      912,
+      1208,
+      977,
+      1233
+    ]
+  ],
+  "mirroredParts": [],
+  "manual": [
+    "prompt and visual review",
+    "template placement and calibration"
+  ],
+  "background": "native alpha; connected-component extraction"
+}

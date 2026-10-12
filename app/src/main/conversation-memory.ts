@@ -1,6 +1,10 @@
 export interface ConversationLine { expression?: import('../shared/pet-expression').PetExpression; at: number; role: 'user' | 'assistant'; source: 'chat' | 'auto'; text: string }
 const memories = new Map<string, ConversationLine[]>();
 const chatting = new Set<string>();
+const chattingListeners = new Set<()=>void>();
+let inputAttentionUntil=0;
+export const onChattingChanged=(cb:()=>void)=>{chattingListeners.add(cb);return ()=>{chattingListeners.delete(cb);};};
+export function setInputAttention(until:number):void {inputAttentionUntil=until;}
 let revision = 0;
 export function conversationRevision(): number { return revision; }
 let persist: ((character: string, line: ConversationLine) => void) | undefined;
@@ -17,14 +21,15 @@ export function rememberConversation(character: string, line: ConversationLine):
 export function conversationFor(character: string, now = Date.now()): ConversationLine[] {
   return (memories.get(character) ?? []).filter(line => now - line.at < 86400000).map(line => ({ ...line }));
 }
-export function setChatting(character: string, active: boolean): void { if (active) chatting.add(character); else chatting.delete(character); }
+export function setChatting(character: string, active: boolean): void { if (active) chatting.add(character); else chatting.delete(character);for(const cb of chattingListeners)cb(); }
 export function isChatting(character:string):boolean {return chatting.has(character);}
+export function isInputActive(character:string,now=Date.now()):boolean{return chatting.has(character)||now<inputAttentionUntil;}
 export function lastUserAt(character: string): number | undefined {
   return conversationFor(character).filter(line => line.role === 'user').at(-1)?.at;
 }
 export function shouldPauseAutomatic(character: string, now = Date.now()): boolean {
   const last = conversationFor(character, now).filter(line => line.source === 'chat').at(-1)?.at;
-  return chatting.has(character) || (last !== undefined && now - last < 120000);
+  return now<inputAttentionUntil || chatting.has(character) || (last !== undefined && now - last < 120000);
 }
 
 /** 主动文字预算独立于动作/思考频率；用实际发送且持久化的记录恢复。 */

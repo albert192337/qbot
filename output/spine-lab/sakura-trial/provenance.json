@@ -1,0 +1,23 @@
+{
+  "character": "Sakura Haruno",
+  "provider": "built-in imagegen tool",
+  "officialRestApiUsed": false,
+  "independentVisionApiUsed": false,
+  "imageCalls": 3,
+  "totalGenerationSecondsApprox": 124.9,
+  "actualCharge": null,
+  "firstPassSuccess": false,
+  "targets": [
+    "target-v1.png",
+    "target-v2.png"
+  ],
+  "parts": "parts-v1.png",
+  "targetRevisionReason": "Shorten body to fit large-head skeleton",
+  "assemblyRounds": 3,
+  "manualSteps": [
+    "target review",
+    "joint landmark profile",
+    "visual review"
+  ],
+  "result": "candidate_pass"
+}

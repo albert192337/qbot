@@ -23,8 +23,10 @@ var server_entry_exports = {};
 __export(server_entry_exports, {
   AFFINITIES: () => AFFINITIES,
   AFFINITY_WEIGHTS: () => AFFINITY_WEIGHTS,
+  APPEARANCE_CAPSULE_POOL: () => APPEARANCE_CAPSULE_POOL,
   BREED_OILS: () => BREED_OILS,
   CAPSULE: () => CAPSULE,
+  CAPSULE_3D_POOL: () => CAPSULE_3D_POOL,
   CAPSULE_POOL: () => CAPSULE_POOL,
   CHARACTER_UNLOCKS: () => CHARACTER_UNLOCKS,
   CHARACTER_XP: () => CHARACTER_XP,
@@ -65,6 +67,7 @@ __export(server_entry_exports, {
   breedV3: () => breedV3,
   canBreed: () => canBreed,
   cappedTraits: () => cappedTraits,
+  capsulePoolFor: () => capsulePoolFor,
   characterLevel: () => characterLevel,
   choosePairAction: () => choosePairAction,
   conflicts: () => conflicts,
@@ -149,6 +152,17 @@ __export(server_entry_exports, {
   withSize: () => withSize
 });
 module.exports = __toCommonJS(server_entry_exports);
+
+// app/src/shared/halloween-furniture.ts
+var HALLOWEEN_FURNITURE = [
+  { id: "halloween-candles", name: "\u5E7D\u591C\u70DB\u53F0", tier: "common", weight: 3 },
+  { id: "halloween-books", name: "\u5973\u5DEB\u4E66\u5806", tier: "common", weight: 2 },
+  { id: "halloween-lantern", name: "\u5357\u74DC\u56DA\u706F", tier: "rare", weight: 6 },
+  { id: "halloween-pumpkins", name: "\u7B11\u8138\u5357\u74DC\u5806", tier: "rare", weight: 4 },
+  { id: "halloween-fireplace", name: "\u4E07\u5723\u58C1\u7089", tier: "epic", weight: 10 },
+  { id: "halloween-chandelier", name: "\u53E4\u5821\u70DB\u5149\u540A\u706F", tier: "epic", weight: 10 },
+  { id: "halloween-cauldron", name: "\u5973\u5DEB\u9B54\u836F\u9505", tier: "epic", weight: 10 }
+];
 
 // app/src/shared/garden-v3.ts
 var V3 = { version: 3, seedling: 0.8, lambda: 1.1, affinity: 0.25, affinityMax: 4, weatherPity: 12, rainbowPity: 32, cultivationMs: 18e4, weeklyBreeds: 90, breedPity: 9, hourIncome: 24, dayXp: 60 };
@@ -283,7 +297,7 @@ var FURNITURE_SHOP = [
   { id: "cloud-fountain", name: "\u4E91\u6735\u53E0\u6CC9", price: 9e3, tier: "epic" }
 ];
 var RETIRED_FURNITURE = ["lantern", "plant", "fan", "clock", "teapot", "painting", "calligraphy", "shelf", "window", "screen", "kyoto-lantern", "kyoto-screen", "paris-painting", "paris-clock", "island-plant", "island-window"];
-var CAPSULE_POOL = [
+var APPEARANCE_CAPSULE_POOL = [
   { id: "strawberry-pack", kind: "seed", item: "strawberry", name: "\u8349\u8393\u79CD\u5B50", count: 3, tier: "common", weight: 25 },
   { id: "flower-pack", kind: "seed", item: "tulip", name: "\u90C1\u91D1\u9999\u79CD\u5B50", count: 2, tier: "common", weight: 20 },
   { id: "berry-pack", kind: "seed", item: "blueberry", name: "\u84DD\u8393\u79CD\u5B50", count: 2, tier: "common", weight: 15 },
@@ -300,7 +314,20 @@ var CAPSULE_POOL = [
   { id: "cloud-fountain", kind: "furniture", item: "cloud-fountain", name: "\u4E91\u6735\u53E0\u6CC9", count: 1, tier: "epic", weight: 40 },
   { id: "eclipse-portal", kind: "appearance", item: "eclipse-portal", name: "\u6708\u8680\u4E4B\u95E8", count: 1, tier: "epic", weight: 20 }
 ];
-var LEGACY_CAPSULE_POOL = CAPSULE_POOL.filter((x) => x.kind !== "appearance").map((x) => ({ ...x, weight: x.id === "speed3-pack" ? 30 : x.tier === "epic" ? 50 : x.weight }));
+var CAPSULE_POOL = [
+  ...APPEARANCE_CAPSULE_POOL.map((x) => ({ ...x, weight: x.id === "speed-pack" ? 25 : x.id === "apple-pack" || x.id === "pineapple-pack" ? 15 : x.id === "moon-terrarium" || x.id === "cloud-fountain" ? 25 : x.weight })),
+  ...HALLOWEEN_FURNITURE.map((x) => ({ ...x, kind: "furniture", item: x.id, count: 1 }))
+];
+var CAPSULE_3D_POOL = [
+  ...APPEARANCE_CAPSULE_POOL.filter((x) => x.kind !== "furniture"),
+  ...HALLOWEEN_FURNITURE.map((x) => ({ ...x, kind: "furniture", item: x.id, count: 1, weight: { "halloween-candles": 6, "halloween-books": 4, "halloween-lantern": 18, "halloween-pumpkins": 12, "halloween-fireplace": 28, "halloween-chandelier": 26, "halloween-cauldron": 26 }[x.id] }))
+];
+function capsulePoolFor(e, machine = "2d") {
+  if (machine === "3d") return e.capsuleMachineRevision === 1 ? CAPSULE_3D_POOL : [];
+  if (e.capsuleMachineRevision === 1) return APPEARANCE_CAPSULE_POOL;
+  return e.furniture3dRevision === 1 ? CAPSULE_POOL : e.appearances ? APPEARANCE_CAPSULE_POOL : LEGACY_CAPSULE_POOL;
+}
+var LEGACY_CAPSULE_POOL = APPEARANCE_CAPSULE_POOL.filter((x) => x.kind !== "appearance").map((x) => ({ ...x, weight: x.id === "speed3-pack" ? 30 : x.tier === "epic" ? 50 : x.weight }));
 function furnitureOffers(owner, day) {
   const rand = dailyRandom(`furniture-v4:${owner}:${day}`);
   const basic = FURNITURE_SHOP.filter((x) => x.tier === "common");
@@ -605,6 +632,12 @@ function refreshSocial(s, now) {
   if (!e) return;
   const day = Math.max(e.day, gardenDay(now));
   e.appearances ??= { owned: {}, equipped: {} };
+  delete e.furniture3dRevision;
+  if (e.capsuleMachineRevision !== 1) {
+    if (e.lastCapsule) e.lastCapsule2d ??= e.lastCapsule;
+    e.capsuleMachineRevision = 1;
+  }
+  e.capsule3d ??= { rareMisses: 0, epicMisses: 0, draws: 0 };
   if (e.capsuleRevision !== 2) {
     for (const id of RETIRED_FURNITURE) delete e.furniture[id];
     if (e.furnitureReservation && RETIRED_FURNITURE.includes(e.furnitureReservation.item)) delete e.furnitureReservation;
@@ -764,8 +797,10 @@ function socialTransition(s, c, now, rng, shopOwner) {
       e.tokens += CAPSULE.topUp;
       return reveal("\u6A21\u62DF\u5145\u503C\u5B8C\u6210", `\u6D4B\u8BD5\u4EE3\u5E01 +${CAPSULE.topUp}\u3002\u6CA1\u6709\u771F\u5B9E\u4ED8\u6B3E\uFF0C\u6BCF\u5929\u53EF\u6D4B\u8BD5\u4E00\u6B21\u3002`);
     }
-    case "capsuleDraw": {
+    case "capsuleDraw":
+    case "capsuleDraw3d": {
       if (c.count !== 1 && c.count !== 10) throw Error("\u8BF7\u9009\u62E9\u5355\u62BD\u6216\u5341\u8FDE");
+      const machine = c.type === "capsuleDraw3d" ? "3d" : "2d", progress = machine === "3d" ? e.capsule3d : e;
       const cost = c.count * CAPSULE.cost;
       if (e.tokens < cost) throw Error("\u6D4B\u8BD5\u4EE3\u5E01\u4E0D\u8DB3\uFF0C\u53EF\u4F7F\u7528\u6A21\u62DF\u5145\u503C");
       const names = [], rewards = [];
@@ -773,9 +808,9 @@ function socialTransition(s, c, now, rng, shopOwner) {
       for (let i = 0; i < c.count; i++) {
         const roll = rng.random();
         let tier2 = roll < 0.7 ? "common" : roll < 0.95 ? "rare" : "epic";
-        if (e.epicMisses >= CAPSULE.epicPity - 1) tier2 = "epic";
-        else if (e.rareMisses >= CAPSULE.rarePity - 1 && tier2 === "common") tier2 = "rare";
-        const pool = CAPSULE_POOL.filter((x) => x.tier === tier2);
+        if (progress.epicMisses >= CAPSULE.epicPity - 1) tier2 = "epic";
+        else if (progress.rareMisses >= CAPSULE.rarePity - 1 && tier2 === "common") tier2 = "rare";
+        const pool = capsulePoolFor(e, machine).filter((x) => x.tier === tier2);
         let pick = rng.random() * 100;
         const item = pool.find((x) => (pick -= x.weight) < 0) ?? pool[pool.length - 1];
         let duplicateTokens;
@@ -791,13 +826,15 @@ function socialTransition(s, c, now, rng, shopOwner) {
         } else if (item.kind === "seed") {
           for (let n = 0; n < item.count; n++) s.seeds.push({ id: rng.id(), species: item.item, genes: [], bred: false });
         } else s.fertilizers[item.item] = (s.fertilizers[item.item] ?? 0) + item.count;
-        e.rareMisses = tier2 === "common" ? e.rareMisses + 1 : 0;
-        e.epicMisses = tier2 === "epic" ? 0 : e.epicMisses + 1;
-        e.draws++;
+        progress.rareMisses = tier2 === "common" ? progress.rareMisses + 1 : 0;
+        progress.epicMisses = tier2 === "epic" ? 0 : progress.epicMisses + 1;
+        progress.draws++;
         names.push(`${item.name} \xD7${item.count}${duplicateTokens ? `\uFF08\u91CD\u590D\u8F6C\u6362 ${duplicateTokens} \u4EE3\u5E01\uFF09` : ""}`);
         rewards.push({ ...item, ...duplicateTokens ? { duplicateTokens } : {} });
       }
-      e.lastCapsule = { id: rng.id(), at: now, rewards };
+      e.lastCapsule = { id: rng.id(), at: now, machine, rewards };
+      if (machine === "3d") e.capsule3d.lastCapsule = e.lastCapsule;
+      else e.lastCapsule2d = e.lastCapsule;
       return reveal("\u626D\u86CB\u6253\u5F00\u4E86", names.join("\u3001") + " \xB7 \u5DF2\u6536\u5165\u80CC\u5305\u4E0E\u6536\u85CF\u3002");
     }
     case "socialWish": {
@@ -843,6 +880,7 @@ function validateSocial(s) {
   const e = s.economy;
   if (!e) return;
   const n = (x) => Number.isSafeInteger(x) && Number(x) >= 0;
+  if (e.capsule3d && (!n(e.capsule3d.draws) || !n(e.capsule3d.rareMisses) || e.capsule3d.rareMisses >= 10 || !n(e.capsule3d.epicMisses) || e.capsule3d.epicMisses >= 20)) throw Error("3D \u626D\u86CB\u8BB0\u5F55\u635F\u574F");
   if (e.appearances) {
     const a = e.appearances;
     if (!a.owned || !a.equipped || Object.entries(a.owned).some(([id, v]) => !appearance(id) || v !== true) || Object.entries(a.equipped).some(([id, actor]) => !appearance(id) || !a.owned[id] || typeof actor !== "string" || !Object.hasOwn(s.life?.characters ?? {}, actor))) throw Error("\u5916\u89C2\u6536\u85CF\u6216\u88C5\u914D\u8BB0\u5F55\u635F\u574F");
@@ -2040,6 +2078,7 @@ var PAIR_INTERACTIONS = [
   { id: "tea", label: "\u8BF7\u559D\u8336" },
   { id: "chat", label: "\u4E00\u8D77\u804A\u5929" },
   { id: "wave", label: "\u6253\u62DB\u547C" },
+  { id: "fight", label: "\u56FE\u6807\u6253\u95F9" },
   { id: "flower", label: "\u9001\u4E00\u6735\u82B1" },
   { id: "photo", label: "\u5E76\u6392\u5408\u5F71" },
   { id: "relay", label: "\u8868\u60C5\u63A5\u529B" },
@@ -2048,6 +2087,7 @@ var PAIR_INTERACTIONS = [
 function pairActions(manifest) {
   const m = manifest;
   const all = [
+    ...Object.keys(m.spine?.actions ?? {}).map((id) => [id, { webm: "", status: "done" }]),
     ...Object.entries(m.actions),
     ...Object.entries(m.importedActions ?? {}),
     ...Object.entries(m.expressionActions ?? {}),
@@ -2097,6 +2137,12 @@ function choosePairAction(m, intent) {
 }
 function pairBeats(kind) {
   switch (kind) {
+    case "fight":
+      return [
+        { host: "wave", guest: "happy", effect: "icon-throw", speaker: "host", caption: "\u63A5\u4F4F\uFF01\u53EA\u662F\u56FE\u6807\u7684\u5F71\u5B50\u3002" },
+        { host: "happy", guest: "wave", effect: "icon-throw", speaker: "guest", caption: "\u8FD8\u7ED9\u4F60\uFF0C\u539F\u6765\u7684\u4E1C\u897F\u53EF\u6CA1\u52A8\u3002" },
+        { host: "happy", guest: "happy", effect: "celebrate", speaker: "host", caption: "\u597D\u5566\uFF0C\u4F11\u6218\uFF01" }
+      ];
     case "flower":
       return [{ host: "wave", guest: "listen", effect: "flower", speaker: "host", caption: "\u8FD9\u6735\u82B1\u9001\u7ED9\u4F60" }, { host: "happy", guest: "happy", effect: "flower", speaker: "guest", caption: "\u559C\u6B22\uFF01\u8C22\u8C22\u4F60\u5440" }];
     case "photo":
@@ -2176,8 +2222,10 @@ function cultivationSeed(fruit, participants, rng) {
 0 && (module.exports = {
   AFFINITIES,
   AFFINITY_WEIGHTS,
+  APPEARANCE_CAPSULE_POOL,
   BREED_OILS,
   CAPSULE,
+  CAPSULE_3D_POOL,
   CAPSULE_POOL,
   CHARACTER_UNLOCKS,
   CHARACTER_XP,
@@ -2218,6 +2266,7 @@ function cultivationSeed(fruit, participants, rng) {
   breedV3,
   canBreed,
   cappedTraits,
+  capsulePoolFor,
   characterLevel,
   choosePairAction,
   conflicts,

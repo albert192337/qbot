@@ -7,6 +7,7 @@
  */
 
 /** 桌宠窗基准边长（DIP），scale=1 时的正方形画布 */
+import {pairHeadroom} from '../shared/pair-layout';
 export const PET_SIZE = 360;
 
 export const PET_SCALE_MIN = 0.5;
@@ -32,8 +33,9 @@ export function petTargetSize(
 /** Fit the pair canvas on the same display, including negative-coordinate monitors. */
 export function pairWindowBounds(scale: number, origin: { x: number; y: number }, area: { x: number; y: number; width: number; height: number }) {
   const wanted = petTargetSize(scale, true);
-  const factor = Math.min(1, area.width / wanted.width, area.height / wanted.height);
-  const width = Math.floor(wanted.width * factor), height = Math.floor(wanted.height * factor);
+  const headroom = pairHeadroom(area.height);
+  const factor = Math.min(1, area.width / wanted.width, (area.height-headroom) / wanted.height);
+  const width = Math.floor(wanted.width * factor), height = Math.floor(wanted.height * factor + headroom);
   return { width, height, x: Math.max(area.x, Math.min(origin.x, area.x + area.width - width)),
     y: Math.max(area.y, Math.min(origin.y, area.y + area.height - height)) };
 }

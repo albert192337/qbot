@@ -1,0 +1,240 @@
+{
+  "simulation": true,
+  "model": "scripted mock; no API calls",
+  "events": [
+    {
+      "id": "511b82c1-c0e1-40c3-beb2-ac3910849c00",
+      "at": 1791680400000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "proposed",
+      "reason": "想和乙喝茶",
+      "target": "乙"
+    },
+    {
+      "id": "511b82c1-c0e1-40c3-beb2-ac3910849c00",
+      "at": 1791680400000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "rejected",
+      "reason": "用户选择暂时不了",
+      "target": "乙"
+    },
+    {
+      "id": "e78f06b7-fdb0-4ac3-828d-2d6ee2ca6653",
+      "at": 1791680700000,
+      "actor": "甲",
+      "behavior": "moment",
+      "source": "auto",
+      "outcome": "reserved",
+      "reason": "今天又有一段真实经历"
+    },
+    {
+      "id": "e78f06b7-fdb0-4ac3-828d-2d6ee2ca6653",
+      "at": 1791680700000,
+      "actor": "甲",
+      "behavior": "moment",
+      "source": "auto",
+      "outcome": "completed",
+      "reason": "今天又有一段真实经历"
+    },
+    {
+      "id": "97b65644-106f-4aad-8170-93c72ca522e0",
+      "at": 1791684000000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "proposed",
+      "reason": "想和乙喝茶",
+      "target": "乙"
+    },
+    {
+      "id": "97b65644-106f-4aad-8170-93c72ca522e0",
+      "at": 1791684000000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "approved",
+      "reason": "用户本次明确同意",
+      "target": "乙"
+    },
+    {
+      "id": "97b65644-106f-4aad-8170-93c72ca522e0",
+      "at": 1791684000000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "completed",
+      "reason": "想和乙喝茶",
+      "target": "乙"
+    },
+    {
+      "id": "d1539fee-ead2-447d-b96a-9726c9b8d3d6",
+      "at": 1791687600000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "proposed",
+      "reason": "想和乙喝茶",
+      "target": "乙"
+    },
+    {
+      "id": "d1539fee-ead2-447d-b96a-9726c9b8d3d6",
+      "at": 1791687720000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "expired",
+      "reason": "未获回复，申请已过期",
+      "target": "乙"
+    },
+    {
+      "id": "b0f64e3a-73c5-4c66-9dae-cd03a5466243",
+      "at": 1791691200000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "proposed",
+      "reason": "想和乙喝茶",
+      "target": "乙"
+    },
+    {
+      "id": "b0f64e3a-73c5-4c66-9dae-cd03a5466243",
+      "at": 1791691200000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "cancelled",
+      "reason": "同意时申请已过期或条件变化",
+      "target": "乙"
+    },
+    {
+      "id": "81c66ccd-1936-4f8d-8f42-d0afff2e1ed2",
+      "at": 1791695100000,
+      "actor": "甲",
+      "behavior": "moment",
+      "source": "auto",
+      "outcome": "reserved",
+      "reason": "今天又有一段真实经历"
+    },
+    {
+      "id": "81c66ccd-1936-4f8d-8f42-d0afff2e1ed2",
+      "at": 1791695100000,
+      "actor": "甲",
+      "behavior": "moment",
+      "source": "auto",
+      "outcome": "completed",
+      "reason": "今天又有一段真实经历"
+    },
+    {
+      "id": "4e624c1f-b931-4c30-8998-b08f2a322f9c",
+      "at": 1791695100000,
+      "actor": "甲",
+      "behavior": "invite",
+      "source": "auto",
+      "outcome": "proposed",
+      "reason": "邀请乙来玩",
+      "target": "乙"
+    },
+    {
+      "id": "4e624c1f-b931-4c30-8998-b08f2a322f9c",
+      "at": 1791695100000,
+      "actor": "甲",
+      "behavior": "invite",
+      "source": "auto",
+      "outcome": "approved",
+      "reason": "用户本次明确同意",
+      "target": "乙"
+    },
+    {
+      "id": "4e624c1f-b931-4c30-8998-b08f2a322f9c",
+      "at": 1791695100000,
+      "actor": "甲",
+      "behavior": "invite",
+      "source": "auto",
+      "outcome": "completed",
+      "reason": "邀请乙来玩",
+      "target": "乙"
+    },
+    {
+      "id": "70917c6c-b703-42e5-9072-14374997f673",
+      "at": 1791698400000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "proposed",
+      "reason": "想和乙喝茶",
+      "target": "乙"
+    },
+    {
+      "id": "70917c6c-b703-42e5-9072-14374997f673",
+      "at": 1791698400000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "approved",
+      "reason": "用户本次明确同意",
+      "target": "乙"
+    },
+    {
+      "id": "70917c6c-b703-42e5-9072-14374997f673",
+      "at": 1791698400000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "failed",
+      "reason": "模拟离线",
+      "target": "乙"
+    },
+    {
+      "id": "805235fa-7222-4409-bc4f-ca71d1ade4d9",
+      "at": 1791702000000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "proposed",
+      "reason": "想和乙喝茶",
+      "target": "乙"
+    },
+    {
+      "id": "805235fa-7222-4409-bc4f-ca71d1ade4d9",
+      "at": 1791702000000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "approved",
+      "reason": "用户本次明确同意",
+      "target": "乙"
+    },
+    {
+      "id": "805235fa-7222-4409-bc4f-ca71d1ade4d9",
+      "at": 1791702000000,
+      "actor": "甲",
+      "behavior": "pair",
+      "source": "auto",
+      "outcome": "completed",
+      "reason": "想和乙喝茶",
+      "target": "乙"
+    },
+    {
+      "id": "f224ed15-00d4-48a2-9937-959b7fbda84d",
+      "at": 1791709500000,
+      "actor": "甲",
+      "behavior": "moment",
+      "source": "auto",
+      "outcome": "reserved",
+      "reason": "今天又有一段真实经历"
+    },
+    {
+      "id": "f224ed15-00d4-48a2-9937-959b7fbda84d",
+      "at": 1791709500000,
+      "actor": "甲",
+      "behavior": "moment",
+      "source": "auto",
+      "outcome": "completed",
+      "reason": "今天又有一段真实经历"
+    }
+  ]
+}

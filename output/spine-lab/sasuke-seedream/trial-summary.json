@@ -1,0 +1,56 @@
+{
+  "calls": [
+    {
+      "stage": "target",
+      "seconds": 37.2,
+      "status": 200,
+      "usage": {
+        "generated_images": 1,
+        "output_tokens": 16384,
+        "total_tokens": 16384
+      }
+    },
+    {
+      "stage": "parts",
+      "seconds": 56.8,
+      "status": 200,
+      "usage": {
+        "generated_images": 1,
+        "output_tokens": 16384,
+        "total_tokens": 16384
+      }
+    },
+    {
+      "stage": "parts2",
+      "seconds": 50.6,
+      "status": 200,
+      "usage": {
+        "generated_images": 1,
+        "output_tokens": 16384,
+        "total_tokens": 16384
+      }
+    }
+  ],
+  "imageRequests": 3,
+  "imageCount": 3,
+  "totalModelWallSeconds": 144.6,
+  "chargedCNY": null,
+  "reason": "Plan endpoint provided usage but no monetary receipt",
+  "automatedEndToEnd": false,
+  "manualInterventions": [
+    "Prompt revision after bad sheet",
+    "Selection of head and legs from v1, torso from v2",
+    "Mirror complete arm to replace incomplete opposite arm",
+    "Chroma key threshold and connected components",
+    "Template initial placement and manual eye adjustment"
+  ],
+  "rejected": [
+    "v1 torso duplicates sleeves, one arm incomplete",
+    "v2 changed hairstyle, both leg assets contain two legs"
+  ],
+  "knownLimitations": [
+    "Rigid short sleeve silhouette",
+    "Not an upload-identity fidelity test; source identity specified as text",
+    "No production integration or 39-state semantic mapping"
+  ]
+}

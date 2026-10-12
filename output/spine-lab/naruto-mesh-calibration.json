@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "slot": "躯干上部",
+  "bones": [
+    "body_2",
+    "body_1"
+  ],
+  "maxRebindError": 1.2710574864626038e-13,
+  "vertexCount": 1089,
+  "removedTorsoDeformTimelines": 0,
+  "reason": "Replace folded template triangles with a regular UV grid fitted to the torso core, and rebind chest/waist. Original vertex positions outside the fitted plane are intentionally not preserved."
+}

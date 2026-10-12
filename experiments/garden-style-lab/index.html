@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌边花园 · 三种小样</title><link rel="stylesheet" href="./style.css"><script type="importmap">{"imports":{"three":"/vendor/three.module.js","three/addons/":"/vendor/addons/"}}</script></head>
+<body>
+<div class="wallpaper"><div class="orb orb-one"></div><div class="orb orb-two"></div><div class="horizon"></div></div>
+<main class="shell">
+ <header><div class="brand"><span class="brand-mark">❋</span><div><b>桌边花园</b><span>三个方向，一片小小的生机。</span></div></div><div class="header-actions"><button id="wallpaper" title="切换背景">◐ 背景</button><button id="desktop">放到真实桌面 ↗</button></div></header>
+ <section class="workbench">
+  <div class="intro"><span class="eyebrow">GARDEN STUDY / 01</span><h1>让花园，长在桌边。</h1><p id="description">手绘植物和柔软草坡，轻轻摇晃。</p></div>
+  <div class="mode-tabs" role="tablist" aria-label="花园表现方式">
+   <button role="tab" data-mode="2d" aria-selected="true"><span>01</span><b>绘本 2D</b><small>草地与植物都是平面</small></button>
+   <button role="tab" data-mode="hybrid" aria-selected="false"><span>02</span><b>立体草地 + 手绘植物</b><small>像摆在草坪里的小纸偶</small></button>
+   <button role="tab" data-mode="3d" aria-selected="false"><span>03</span><b>玩具 3D</b><small>圆润模型，真实的前后层次</small></button>
+  </div>
+  <div class="controls">
+   <div class="stage-buttons" role="group" aria-label="成长阶段"><button data-stage="new" aria-pressed="true">一小片新芽</button><button data-stage="grown" aria-pressed="false">丰盛的花园</button></div>
+   <label class="toggle"><input id="wind" type="checkbox" checked>微风</label>
+   <label class="toggle"><input id="mutate" type="checkbox">变异</label>
+   <button id="grow">看它长大 ↗</button>
+   <button id="reset">重来</button>
+  </div>
+  <div class="view-controls"><label>转个角度 <input id="angle" type="range" min="-28" max="28" value="0"><output id="angle-value">0°</output></label><label>俯视一点 <input id="elevation" type="range" min="12" max="34" value="21"></label><button id="recenter">回正</button><span id="view-note">2D 使用固定视角</span></div>
+ </section>
+ <div class="desktop-icons" aria-hidden="true"><div><i>▣</i><span>工作</span></div><div><i>▤</i><span>随手记</span></div></div>
+ <aside class="note-window"><div class="note-title"><span>✎ 今日随手记</span><span>−　□　×</span></div><div class="note-content"><span class="note-date">A LITTLE ROOM TO GROW</span><p>留一点空白，<br>等一颗种子发芽。</p><div class="note-rule"></div><small>工作照常，花园慢慢长大。</small></div></aside>
+ <div class="scene-caption"><span class="status-dot"></span><span id="scene-label">新手 · 3 株嫩芽</span><span class="divider">/</span><span>点一下植物，摸摸小兔</span></div>
+</main>
+<div id="garden"><canvas id="flat"></canvas><div id="space"></div><div id="plant-buttons" aria-label="花园里的植物"></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div class="taskbar"><span class="windows-mark">⊞</span><span class="search-pill">⌕ 搜索</span><span>▰</span><span>◉</span><span>▤</span><div class="taskbar-right">⌃　♧　◔　<span>10:24<br><small>花园体验小样</small></span></div></div>
+<div id="overlay-label"><span id="overlay-mode">花园小样</span><button id="close-overlay">收起 ×</button></div>
+<div id="error" role="alert" hidden></div>
+<script type="module" src="./main.js"></script>
+</body></html>

@@ -1,0 +1,21 @@
+{
+  "reviewer": "assistant_review",
+  "status": "fail",
+  "evidence": [
+    "joint-details.jpg",
+    "2-5.png"
+  ],
+  "issues": [
+    {
+      "part": "leg",
+      "action": "ship_spine_run",
+      "frame": 5,
+      "finding": "Shin collapses into thin strip; sandal appears separated. Landmark agreement alone did not detect this."
+    },
+    {
+      "part": "head/body",
+      "finding": "Prototype proportions and shoulder seams still need artistic approval."
+    }
+  ],
+  "automatedVisionApi": false
+}

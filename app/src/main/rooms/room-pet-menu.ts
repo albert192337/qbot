@@ -1,7 +1,7 @@
 import { BrowserWindow, Menu, dialog, ipcMain } from 'electron';
 import { findRoomPetMemberId, createLoungeWindow } from '../windows';
 import { getMemberSnapshot } from './room-pets';
-import { waveAt, leaveRoom } from './rooms';
+import { waveAt, leaveRoom, supportsIconFight } from './rooms';
 import { PAIR_INTERACTIONS } from '../../shared/pair-interaction';
 import { setMemberHidden, desktopHidden, memberHidden } from '../desktop-visibility';
 
@@ -9,7 +9,7 @@ async function interactions() {
   const { CHARACTER_UNLOCKS, currentGrowth, characterLevel } = await import('../../shared/garden-life');
   const { getGarden } = await import('../garden/service');
   const level=characterLevel(currentGrowth(await getGarden())?.xp??0);
-  return PAIR_INTERACTIONS.map(k=>{const unlock=CHARACTER_UNLOCKS.find(u=>u.kind===k.id);return {...k,level:unlock&&level<unlock.level?unlock.level:undefined};});
+  return PAIR_INTERACTIONS.filter(k=>k.id!=='fight'||supportsIconFight()).map(k=>{const unlock=CHARACTER_UNLOCKS.find(u=>u.kind===k.id);return {...k,level:unlock&&level<unlock.level?unlock.level:undefined};});
 }
 async function interact(memberId:string,kind:import('../../shared/pair-interaction').PairKind):Promise<string> {
   if(desktopHidden()||memberHidden(memberId)||!getMemberSnapshot(memberId))throw Error('房友暂时不可见');
@@ -39,7 +39,7 @@ export function registerRoomPetMenu(): void {
     try { level = characterLevel(currentGrowth(await getGarden())?.xp ?? 0); } catch { /* Server still validates every invitation. */ }
     if (win.isDestroyed() || !getMemberSnapshot(memberId)) return;
     const local = !!getTestGuest(memberId);
-    const items: Electron.MenuItemConstructorOptions[] = PAIR_INTERACTIONS.map(kind => {
+    const items: Electron.MenuItemConstructorOptions[] = PAIR_INTERACTIONS.filter(k=>k.id!=='fight'||supportsIconFight()).map(kind => {
       const unlock = CHARACTER_UNLOCKS.find(u => u.kind === kind.id);
       const locked = !!unlock && level < unlock.level;
       return {label: kind.label + (locked ? `（角色 Lv.${unlock!.level} 解锁）` : ''), enabled: !locked,

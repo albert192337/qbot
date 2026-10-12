@@ -1,0 +1,105 @@
+{
+  "ok": true,
+  "dispatches": 1,
+  "modelCalls": 0,
+  "playback": [
+    {
+      "id": "3cd64174-2b4e-416d-b794-2638cf455c81",
+      "outcome": "started"
+    },
+    {
+      "id": "3cd64174-2b4e-416d-b794-2638cf455c81",
+      "outcome": "started"
+    },
+    {
+      "id": "3cd64174-2b4e-416d-b794-2638cf455c81",
+      "outcome": "started"
+    },
+    {
+      "id": "3cd64174-2b4e-416d-b794-2638cf455c81",
+      "outcome": "completed"
+    }
+  ],
+  "events": [
+    {
+      "id": "2e3c839e-756d-40f2-841f-353bdeb0d295",
+      "at": 1791737908837,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "proposed",
+      "reason": "用户指令：指令双人打闹",
+      "target": "guest"
+    },
+    {
+      "id": "2e3c839e-756d-40f2-841f-353bdeb0d295",
+      "at": 1791737909094,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "rejected",
+      "reason": "用户选择暂时不了",
+      "target": "guest"
+    },
+    {
+      "id": "3cd64174-2b4e-416d-b794-2638cf455c81",
+      "at": 1791737909201,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "proposed",
+      "reason": "用户指令：指令双人打闹",
+      "target": "guest"
+    },
+    {
+      "id": "3cd64174-2b4e-416d-b794-2638cf455c81",
+      "at": 1791737909312,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "approved",
+      "reason": "用户本次明确同意",
+      "target": "guest"
+    },
+    {
+      "id": "3cd64174-2b4e-416d-b794-2638cf455c81",
+      "at": 1791737909313,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "sent",
+      "reason": "用户指令：指令双人打闹",
+      "target": "guest"
+    },
+    {
+      "id": "42aa393d-db74-438f-9969-1dbfba650a23",
+      "at": 1791737924683,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "proposed",
+      "reason": "用户指令：指令双人打闹",
+      "target": "guest"
+    },
+    {
+      "id": "42aa393d-db74-438f-9969-1dbfba650a23",
+      "at": 1791737924793,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "cancelled",
+      "reason": "同意时申请已过期或条件变化",
+      "target": "guest"
+    }
+  ],
+  "checks": [
+    "real chat form and production handler",
+    "no key / free mode off",
+    "exact named approval",
+    "decline does nothing",
+    "immediate explicit retry",
+    "double consent once",
+    "fight natural completion",
+    "stale consent cancelled"
+  ]
+}

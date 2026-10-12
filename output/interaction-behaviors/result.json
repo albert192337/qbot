@@ -1,0 +1,166 @@
+{
+  "ok": true,
+  "dispatches": 3,
+  "modelCalls": 5,
+  "model": "local deterministic mock; no paid API",
+  "desktop": {
+    "source": "shell",
+    "count": 154,
+    "gameMatches": [
+      "逆水寒手游"
+    ]
+  },
+  "playback": [
+    {
+      "id": "4732d4b1-7555-4e7f-9a1e-06fedaa38442",
+      "outcome": "started"
+    },
+    {
+      "id": "4732d4b1-7555-4e7f-9a1e-06fedaa38442",
+      "outcome": "started"
+    },
+    {
+      "id": "4732d4b1-7555-4e7f-9a1e-06fedaa38442",
+      "outcome": "completed"
+    },
+    {
+      "id": "a8dbbae3-16e4-44e7-bdcf-9f15330d803f",
+      "outcome": "started"
+    },
+    {
+      "id": "a8dbbae3-16e4-44e7-bdcf-9f15330d803f",
+      "outcome": "completed"
+    },
+    {
+      "id": "39415ed3-4e03-4ec8-b484-7581ea13be83",
+      "outcome": "started"
+    },
+    {
+      "id": "39415ed3-4e03-4ec8-b484-7581ea13be83",
+      "outcome": "cancelled"
+    }
+  ],
+  "events": [
+    {
+      "id": "0dfc0f96-de58-490a-815f-18be411ab3dc",
+      "at": 1791737312414,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "proposed",
+      "reason": "",
+      "target": "guest"
+    },
+    {
+      "id": "0dfc0f96-de58-490a-815f-18be411ab3dc",
+      "at": 1791737312695,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "rejected",
+      "reason": "用户选择暂时不了",
+      "target": "guest"
+    },
+    {
+      "id": "4732d4b1-7555-4e7f-9a1e-06fedaa38442",
+      "at": 1791737312796,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "proposed",
+      "reason": "",
+      "target": "guest"
+    },
+    {
+      "id": "4732d4b1-7555-4e7f-9a1e-06fedaa38442",
+      "at": 1791737312910,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "approved",
+      "reason": "用户本次明确同意",
+      "target": "guest"
+    },
+    {
+      "id": "4732d4b1-7555-4e7f-9a1e-06fedaa38442",
+      "at": 1791737312911,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "sent",
+      "reason": "",
+      "target": "guest"
+    },
+    {
+      "id": "7e5f36a9-2494-4eac-abc1-1abdc8a36a7e",
+      "at": 1791737323399,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "proposed",
+      "reason": "",
+      "target": "guest"
+    },
+    {
+      "id": "7e5f36a9-2494-4eac-abc1-1abdc8a36a7e",
+      "at": 1791737323509,
+      "actor": "host",
+      "behavior": "invite",
+      "source": "user",
+      "outcome": "cancelled",
+      "reason": "同意时申请已过期或条件变化",
+      "target": "guest"
+    },
+    {
+      "id": "a8dbbae3-16e4-44e7-bdcf-9f15330d803f",
+      "at": 1791737323615,
+      "actor": "host",
+      "behavior": "iconPlay",
+      "source": "user",
+      "outcome": "reserved",
+      "reason": "",
+      "target": "game"
+    },
+    {
+      "id": "a8dbbae3-16e4-44e7-bdcf-9f15330d803f",
+      "at": 1791737323617,
+      "actor": "host",
+      "behavior": "iconPlay",
+      "source": "user",
+      "outcome": "sent",
+      "reason": "",
+      "target": "game"
+    },
+    {
+      "id": "39415ed3-4e03-4ec8-b484-7581ea13be83",
+      "at": 1791737327247,
+      "actor": "host",
+      "behavior": "iconPlay",
+      "source": "user",
+      "outcome": "reserved",
+      "reason": "",
+      "target": "game"
+    },
+    {
+      "id": "39415ed3-4e03-4ec8-b484-7581ea13be83",
+      "at": 1791737327249,
+      "actor": "host",
+      "behavior": "iconPlay",
+      "source": "user",
+      "outcome": "sent",
+      "reason": "",
+      "target": "game"
+    }
+  ],
+  "checks": [
+    "ordinary chat form to production parser",
+    "named consent without command prefix",
+    "decline and repeated consent",
+    "pair natural completion",
+    "stale consent cancelled",
+    "named icon finite playback",
+    "gesture cancellation",
+    "OS desktop namespace enumeration",
+    "no success small text"
+  ]
+}

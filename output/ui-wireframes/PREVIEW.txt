@@ -1,0 +1,5 @@
+QBot interactive prototype
+
+Run node serve.cjs in this folder, then open http://127.0.0.1:24379/ .
+The 3D ES modules require localhost; opening index.html via file:// does not load them.
+All actions use session-only sample data. No production game services or saves are connected.

@@ -244,6 +244,13 @@ export type GardenResult = {
     error: string;
 };
 export interface GardenApi {
+    onWorkspace(cb:(active:boolean)=>void):()=>void;
+    showVisit(owner: string|null): Promise<void>;
+    onVisit(cb:(visit:import('./garden-life').GardenVisit|null)=>void):()=>void;
+    focusPlot(index:number):void;
+    onFocusPlot(cb:(index:number)=>void):()=>void;
+    selectSeed(seed: string|null): void;
+    onSeed(cb:(seed:string|null)=>void):()=>void;
     interact(target:string,kind:import('./pair-interaction').PairKind):Promise<void>;
     answerInteraction(id:string,accept:boolean,response?:'happy'|'heart'|'wave'):Promise<void>;
     onInteraction(cb:(event:{kind:string;caption:string;effect:string;experience?:import('./experience-progress').ExperienceGain})=>void):()=>void;
@@ -267,6 +274,9 @@ export interface GardenApi {
     scenePlacement(placement: import('./garden-scene-layout').GardenScenePlacement | null): void;
     open(page: string): void;
     ignoreMouse(ignore: boolean): void;
+    onDesktopPointer(cb:(point:{x:number;y:number;double:boolean})=>void):()=>void;
+    desktopFailed(message:string):void;
+    onDesktopStatus(cb:(message:string)=>void):()=>void;
     onAnchor(cb: (anchor: {
         farm?: {left:number;baseline:number};
         performer?: {left:number;right:number;top:number;bottom:number};

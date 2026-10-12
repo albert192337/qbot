@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-11T15:09:38.763Z",
+  "ok": true,
+  "pid": 37936,
+  "petVisible": true,
+  "logHandler": true,
+  "approvalHandler": true,
+  "renderer": {
+    "autonomyApi": true,
+    "logEntries": 8
+  }
+}

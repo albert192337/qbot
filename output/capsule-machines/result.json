@@ -1,0 +1,43 @@
+{
+  "ok": true,
+  "models": [
+    "女巫魔药锅",
+    "万圣壁炉",
+    "古堡烛光吊灯",
+    "南瓜囚灯",
+    "笑脸南瓜堆",
+    "幽夜烛台",
+    "女巫书堆"
+  ],
+  "requests": [
+    {
+      "type": "capsuleDraw3d",
+      "count": 1
+    },
+    {
+      "type": "capsuleDraw3d",
+      "count": 10
+    },
+    {
+      "type": "capsuleDraw3d",
+      "count": 1
+    }
+  ],
+  "checks": [
+    "separate pools",
+    "machine image loaded",
+    "single transaction on double click",
+    "real GLB models x7",
+    "animated pixels",
+    "pause and drag",
+    "ten rewards",
+    "reopen without dialog stacking",
+    "mobile",
+    "reduced motion",
+    "Esc",
+    "server error without false reward",
+    "model failure fallback",
+    "old server blocked"
+  ],
+  "errors": []
+}

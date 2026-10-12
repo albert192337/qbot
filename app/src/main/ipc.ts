@@ -1,3 +1,8 @@
+import { registerDesktopPanel } from './desktop-panel';
+import { conversationFor } from './conversation-memory';
+import { resizePetChat } from './windows';
+import { validateFurniture3dInventory } from '../shared/halloween-furniture';
+import { validateRoom3d } from '../shared/room3d';
 import { getRoom3d, saveRoom3d } from './room3d-store';
 import { setRoomRenderMode } from './windows';
 import { workIdleMilliseconds } from './work-input';
@@ -80,6 +85,7 @@ import { registerStickerLibraryIpc } from './sticker-library-ipc';
 import { getIdlePlan } from './idle-plan';
 
 export function registerIpc(): void {
+  registerDesktopPanel();
   registerDesktopVisibility();
   registerPetHints();
   registerDesktopOverlays((id,kind)=>id===getPetWindow()?.webContents.id||(kind==='speech'&&id===getBubbleWindow()?.webContents.id)||(kind==='cultivation'&&isGardenStrip(id)));
@@ -110,6 +116,8 @@ export function registerIpc(): void {
   registerGardenIpc();
   ipcMain.on('petChat:open', () => openPetChat());
   ipcMain.on('petChat:close', () => closePetChat());
+  ipcMain.on('petChat:resize', (ev,expanded) => resizePetChat(ev.sender.id,expanded===true));
+  ipcMain.handle('petChat:history', async () => {const actor=(await getSettings()).activeCharacter??'default';return {actor,lines:conversationFor(actor)};});
   ipcMain.handle('petChat:send', (_ev, text: unknown) => sendPetChat(text));
   // ── hatch ──────────────────────────────────────────────
   ipcMain.handle(
@@ -153,7 +161,8 @@ export function registerIpc(): void {
   let pairWriting = false;
   ipcMain.handle('characters:pairDialogue', async (_ev, guestId: string, kind: import('../shared/pair-interaction').PairKind) => {
     const { PAIR_INTERACTIONS } = await import('../shared/pair-interaction');
-    if (pairWriting || typeof guestId !== 'string' || !PAIR_INTERACTIONS.some(k => k.id === kind)) return [];
+    if (typeof guestId !== 'string' || !PAIR_INTERACTIONS.some(k => k.id === kind)) return [];
+    if (pairWriting) return (await import('../shared/pair-interaction')).pairBeats(kind).map(b=>b.caption);
     pairWriting = true;
     try {
       const s = await getSettings();
@@ -161,10 +170,16 @@ export function registerIpc(): void {
       const [host, guest] = await Promise.all([getCharacter(s.activeCharacter), getCharacter(guestId)]);
       if (!host || !guest) return [];
       const { writePairDialogue } = await import('./pair-dialogue');
-      const lines = await writePairDialogue(s.arkApiKey, kind, host.manifest, guest.manifest);
+      const {relationships,localPerson}=await import('./relationships');
+      const {relationshipKey,relationshipStage}=await import('../shared/relationships');
+      const a=localPerson(host).id,b=localPerson(guest).id;
+      const pair=(await relationships.snapshot()).relationships.find(r=>relationshipKey(...r.people)===relationshipKey(a,b));
+      const relationshipContext=(id:string)=>pair?{stage:relationshipStage(pair.points).label,settings:pair.settings[id],memories:pair.memories.slice(0,5)}:{stage:'初次相识'};
+      const lines = await writePairDialogue(s.freeMode?s.arkApiKey:undefined, kind, host.manifest, guest.manifest,{host:relationshipContext(a),guest:relationshipContext(b)});
       const latest = await getSettings();
       const [h, g] = await Promise.all([getCharacter(s.activeCharacter), getCharacter(guestId)]);
       if (!h || !g || latest.activeCharacter !== s.activeCharacter || latest.arkApiKey !== s.arkApiKey ||
+          latest.freeMode !== s.freeMode ||
           h.manifest.persona !== host.manifest.persona || g.manifest.persona !== guest.manifest.persona ||
           h.manifest.name !== host.manifest.name || g.manifest.name !== guest.manifest.name) return [];
       return lines;
@@ -234,7 +249,7 @@ export function registerIpc(): void {
   // ── room ───────────────────────────────────────────────
   // 旧的小房间调用兼容到统一联机空间；房间场景由联机空间内的展示模式控制。
   ipcMain.handle('room:get3d',()=>getRoom3d());
-  ipcMain.handle('room:save3d',async (_ev,state)=>{const saved=await saveRoom3d(state);sendToWindows('room:3dChanged',saved);return saved;});
+  ipcMain.handle('room:save3d',async (_ev,state)=>{const checked=validateRoom3d(state);if(checked.layout.some(p=>p.asset.startsWith('halloween-'))){const garden=await (await import('./garden/service')).getGarden();validateFurniture3dInventory(checked.layout,garden.economy?.furniture??{});}const saved=await saveRoom3d(checked);sendToWindows('room:3dChanged',saved);return saved;});
   ipcMain.on('room:open', () => createLoungeWindow());
   ipcMain.on('room:openDecorEditor', () => createConsoleWindow('furnish'));
   ipcMain.on('room:openTea3d', () => openTea3dPreview());
@@ -544,6 +559,7 @@ export function registerIpc(): void {
   // ── perception 感知层（阶段 A：事件流/账本/行为史/决策日志）──
   ipcMain.handle('perception:get', () => getSnapshot());
   ipcMain.on('perception:report', (_ev, kind: PerceptionInteractKind) => {
+    if(_ev.sender!==getPetWindow()?.webContents||!['click','drag_start','drag_end','sign_show','sign_hide','petting_end'].includes(kind))return;
     const now = Date.now();
     void emitEvent({ type: 'interact', at: now, kind });
   });

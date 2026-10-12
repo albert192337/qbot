@@ -9,6 +9,11 @@ export function gardenWeatherStatus(state: Pick<GardenState, 'v3' | 'testWeather
     const realm = state.v3.realm ?? 'garden', hour = Math.floor(now / 3600000);
     const event = (h: number) => ({ id: `v3:${realm}:${h}`, kind: hourlyWeather(h, realm), start: h * 3600000, end: (h + 1) * 3600000 });
     status.hourly = { current: event(hour), next: event(hour + 1) };
+    // The existing calendar guarantees a special hour within each 13-hour cycle.
+    for (let h = hour + 1; h <= hour + 13; h++) {
+      const upcoming = event(h);
+      if (upcoming.kind !== 'sunny') { status.hourly.nextSpecial = upcoming; break; }
+    }
   }
   const test = state.testWeather;
   status.test = test && test.start <= now && now < test.end ? test : null;

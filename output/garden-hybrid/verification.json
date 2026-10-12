@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "checks": [
+    "native mouse hit test passes transparent strip and rejects foreground application",
+    "production stages and unrevealed appearance privacy",
+    "native coordinates: shake; real harvest; repeated harvest blocked",
+    "empty sow entry; growing, mystery and kept crops open details",
+    "all-species sowing through existing rules updates desktop",
+    "hybrid -> old 2D -> old 3D -> hybrid preserves all state",
+    "reduced motion settles without a continuous rendering loop",
+    "close and canceled startup leave no hidden renderer",
+    "680px display fits every real plot"
+  ],
+  "actions": [
+    {
+      "type": "harvest",
+      "plot": 0
+    }
+  ],
+  "errors": [],
+  "scope": "Production renderer, preload, native layer and local rules; isolated state; pointer injected at bridge; no real account crops harvested"
+}

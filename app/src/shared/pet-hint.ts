@@ -1,7 +1,8 @@
-export type PetHint = { kind: 'wish' | 'interaction' | 'speech'; icon?: string; text: string; title?: string; experience?: import('./experience-progress').ExperienceGain; invitation?:{id:string;expiresAt:number} };
+export type PetHint = { kind: 'wish' | 'interaction' | 'speech'; icon?: string; text: string; title?: string; experience?: import('./experience-progress').ExperienceGain; invitation?:{id:string;expiresAt:number;approval?:boolean} };
 export type PetHintAction = 'open'|'dismiss'|{invitationId:string;accept:boolean};
 type Rect = { x: number; y: number; width: number; height: number };
 export const HINT_SIZE = {width: 240, height: 112};
+export const APPROVAL_SIZE = {width: 320, height: 200};
 import {headProgressWidth} from './head-progress-size';
 export const EXPERIENCE_SIZE = {width:180,height:76};
 export const experienceHintSize=(actorWidth:number)=>({...EXPERIENCE_SIZE,width:headProgressWidth(actorWidth)});

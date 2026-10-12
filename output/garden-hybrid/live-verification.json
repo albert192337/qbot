@@ -1,0 +1,17 @@
+{
+  "pid": 39084,
+  "mode": "hybrid",
+  "rendered": {
+    "ready": "true",
+    "plants": 5,
+    "frames": 5
+  },
+  "controls": {
+    "hybrid": "true",
+    "old": true,
+    "oldPlots": 0
+  },
+  "rendererHidden": true,
+  "alwaysOnTop": false,
+  "assetsUnchanged": true
+}

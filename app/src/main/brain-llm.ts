@@ -16,7 +16,7 @@ import { getPerchObservation } from './perch-observation';
  */
 import { getSettings } from './config';
 import { getPetMessage } from './pet-message';
-import { conversationFor, lastUserAt, shouldPauseAutomatic } from './conversation-memory';
+import { conversationFor, lastUserAt, shouldPauseAutomatic,isInputActive } from './conversation-memory';
 import { getCharacter } from './characters';
 import { brainActions } from './brain-actions';
 import { applyIdleDecision,getIdlePlan } from './idle-plan';
@@ -47,6 +47,9 @@ let wired = false;
 let lastThinkAt: number | null = null;
 let inFlight = false;
 let lastHarvestReactionAt: number | null = null;
+let lastInteractionAt:number|null=null;
+let interactionRevision=0;
+let interactionTimer:ReturnType<typeof setTimeout>|undefined;
 /** 行为执行回调（由执行器注册；与规则脑共用一个） */
 let executeCallback: ((script: BehaviorScript) => void) | null = null;
 
@@ -64,6 +67,15 @@ export function wireBrain(): void {
   }).catch(() => {}); }, 30_000).unref();
 
   onPerceptionChanged((ev) => {
+    if(ev.type==='interact'||ev.type==='presence'){
+      interactionRevision++;
+      if(interactionTimer)clearTimeout(interactionTimer);
+      if(ev.type==='presence'||['click','drag_end','petting_end'].includes(ev.kind)){
+        const label=ev.type==='presence'?(ev.kind==='return'?'用户回到电脑':`真实访客到场：${ev.target??''}`):({click:'用户点击角色',drag_end:'用户放下角色',petting_end:'用户刚结束抚摸'} as Record<string,string>)[ev.kind];
+        interactionTimer=setTimeout(()=>{void think(`interaction:${ev.kind}`,label);},ev.type==='presence'?3500:1500);
+      }
+      return;
+    }
     // 只在「有意义的边沿」思考：切应用 / agent 跑完 / 离会 / 放歌 / 启动。
     // 高频/无意义事件（meeting 入会、music 暂停、拖拽中）不触发。
     if (shouldThinkForEvent(ev)) {
@@ -90,28 +102,32 @@ function shouldThinkForEvent(ev: PerceptionEvent): boolean {
 }
 
 /** 一次思考：节流 → 检查开关/key → 构造上下文 → 调模型 → 解析 → 执行或降级 */
-async function think(trigger: string): Promise<void> {
+async function think(trigger: string,interactionEvent?:string): Promise<void> {
   const now = Date.now();
   const settings = await getSettings();
   const interval = brainInterval(settings.behaviorMode);
   const harvest = trigger === 'garden_highlight';
-  if (!shouldThink(now, harvest ? lastHarvestReactionAt : lastThinkAt, harvest ? 120000 : interval)) { brainGate('冷却中，未调用', (harvest ? lastHarvestReactionAt ?? now : lastThinkAt ?? now) + (harvest ? 120000 : interval)); return; }
+  const reactive=!!interactionEvent,requestRevision=interactionRevision;
+  const last=reactive?lastInteractionAt:harvest?lastHarvestReactionAt:lastThinkAt;
+  const gap=reactive?30000:harvest?120000:interval;
+  if (!shouldThink(now,last,gap)) { brainGate('冷却中，未调用',(last??now)+gap); return; }
   if (inFlight) { brainGate('已有请求进行中，未重复调用'); return; }
 
   const characterId = settings.activeCharacter ?? 'default';
-  if (trigger !== 'debug' && shouldPauseAutomatic(characterId)) { brainGate('正在聊天或刚聊完，暂不主动打扰'); return; }
+  if (trigger !== 'debug' && (reactive?isInputActive(characterId):shouldPauseAutomatic(characterId))) { brainGate('正在聊天或输入，暂不打扰'); return; }
   const userAtRequest = lastUserAt(characterId);
-  // 自由模式开关 + 有 key 才思考（陪伴模式纯规则脑）
-  if (!settings.freeMode || !settings.arkApiKey) { brainGate(!settings.freeMode ? '自由模式未开启' : '尚未配置 API Key'); return; }
+  // Environmental autonomy uses the existing switch; direct interaction can respond with a configured key.
+  if ((!reactive&&!settings.freeMode) || !settings.arkApiKey) { brainGate(!settings.arkApiKey ? '尚未配置 API Key' : '自由模式未开启'); return; }
   if (inFlight) return;
 
   inFlight = true;
-  if (harvest) lastHarvestReactionAt = now;
-  lastThinkAt = now; // 占用冷却（哪怕这次失败也不立刻重试，避免坏 key 刷请求）
+  if(reactive)lastInteractionAt=now;
+  else {if (harvest) lastHarvestReactionAt = now;lastThinkAt = now;}
   const callId = await beginBrainCall(trigger);
   brainGate('正在调用 LLM');
   try {
-    const input = await buildInput('auto');
+    const input = await buildInput(reactive?'interaction':'auto');
+    input.interactionEvent=interactionEvent;
     input.reactingToHarvest = harvest;
     const messages = buildBrainMessages(input);
     await updateBrainCall(callId, '已请求', { input: { endpoint: `${ARK_BASE_URL}/chat/completions`, model: BRAIN_MODEL, temperature: 0.8, messages, context: input } });
@@ -137,7 +153,7 @@ async function think(trigger: string): Promise<void> {
 
     if ((await initUserMemory()).revision !== input.memoryRevision) return;
     await updateBrainCall(callId, '收到原始输出', { raw });
-    const decision = parseBrainResponse(raw, input.availableIntents,input.idleCandidates?.map(a=>a.id));
+    const decision = parseBrainResponse(raw, input.availableIntents,input.idleCandidates?.map(a=>a.id),input.behaviorOpportunities?.map(o=>o.id));
     await updateBrainCall(callId, decision ? (decision.do ? '模型选择行动' : '模型选择不行动') : '输出解析失败', { decision });
     if (!decision) {
       void recordDecision({
@@ -174,8 +190,15 @@ async function think(trigger: string): Promise<void> {
     // 组装行为脚本（模型只给扁平字段，主进程拼 DSL + 校验）
     // 请求期间可能切换角色或删除动作，执行前再次核对，不把旧动作发给新角色。
     const latest = await buildInput();
-    if (latest.memoryRevision !== input.memoryRevision || latest.characterId !== characterId || lastUserAt(characterId) !== userAtRequest) {
+    if (latest.memoryRevision !== input.memoryRevision || latest.characterId !== characterId || lastUserAt(characterId) !== userAtRequest || reactive&&(requestRevision!==interactionRevision||isInputActive(characterId))) {
       await updateBrainCall(callId, '已取消过时的主动回应：角色切换或用户开始聊天');
+      return;
+    }
+    if (!reactive&&!(await getSettings()).freeMode) return;
+    if (decision.behavior) {
+      const opportunity=input.behaviorOpportunities?.find(o=>o.id===decision.behavior);
+      const accepted=opportunity && await (await import('./interaction-behaviors')).performInteractionBehavior(characterId,opportunity,decision.thought,reactive?'interaction':'auto');
+      await updateBrainCall(callId,accepted?'行为已交给授权或执行流程':'行为条件已变化或达到限额，未执行');
       return;
     }
     if (decision.action && !latest.availableIntents.includes(decision.action)) decision.action = undefined;
@@ -214,6 +237,7 @@ async function think(trigger: string): Promise<void> {
       selected: { action: 'llm-brain', text: decision.say ?? decision.message ?? decision.action },
     });
     script.meta.traceId = callId;
+    if(reactive)script.meta.id='llm-interaction';
     script.meta.characterId = characterId;
     script.meta.conversationAt = userAtRequest;
     await updateBrainCall(callId, executeCallback ? '提交执行器' : '执行器未就绪');
@@ -246,7 +270,7 @@ function buildScript(d: { action?: string; say?: string; message?: string; expre
 }
 
 /** 从当前全局状态构造喂给模型的上下文 */
-export async function buildInput(memoryMode?: 'chat' | 'auto', query = ''): Promise<BrainInput> {
+export async function buildInput(memoryMode?: 'chat' | 'auto' | 'interaction', query = ''): Promise<BrainInput> {
   const memory = await initUserMemory();
   await memory.flush();
   const settings = await getSettings();
@@ -292,11 +316,12 @@ export async function buildInput(memoryMode?: 'chat' | 'auto', query = ''): Prom
     .slice(0, 5);
 
   return {
+    ...(memoryMode ? await (await import('./interaction-behaviors')).buildInteractionContext(memoryMode==='chat'?'user':memoryMode).catch(()=>({behaviorOpportunities:[],desktopObjects:{items:[],source:'unavailable' as const}})) : {}),
     currentMessage: !getPetMessage()?.characterId || getPetMessage()?.characterId === (settings.activeCharacter ?? 'default') ? getPetMessage()?.text : undefined,
     perchObservation: settings.freeMode && settings.behaviorMode === 'free' ? getPerchObservation() : null,
     idleCandidates,idlePlan:getIdlePlan(settings.activeCharacter??'default'),
     memoryRevision: memory.revision,
-    userMemories: memoryMode ? await memory.select(settings.activeCharacter ?? 'default', memoryMode, query) : [],
+    userMemories: memoryMode ? await memory.select(settings.activeCharacter ?? 'default', memoryMode==='interaction'?'auto':memoryMode, query) : [],
     behaviorMode: settings.behaviorMode ?? 'companion',
     gardenHighlights: (snap.events ?? []).filter((e): e is Extract<PerceptionEvent, { type: 'garden_highlight' }> => e.type === 'garden_highlight' && Date.now() - e.at < 2 * 3600000).slice(0, 5).map(e => ({ at: e.at, summary: e.summary })),
     personaName,

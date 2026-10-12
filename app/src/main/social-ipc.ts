@@ -136,7 +136,7 @@ export function registerSocialIpc(steamService: () => Pick<ReturnType<typeof get
 }
 
 export async function interactTestGuest(id: string, kind: PairKind): Promise<void> {
-    const intents = {heart:'heart', tea:'tea', chat:'talk', wave:'wave',flower:'wave',photo:'happy',relay:'talk',celebrate:'happy'} as const;
+    const intents = {fight:'wave',heart:'heart', tea:'tea', chat:'talk', wave:'wave',flower:'wave',photo:'happy',relay:'talk',celebrate:'happy'} as const;
     if (!Object.hasOwn(intents, kind)) throw new Error('未知互动');
     const {CHARACTER_UNLOCKS,currentGrowth,characterLevel}=await import('../shared/garden-life');
     const unlock=CHARACTER_UNLOCKS.find(u=>u.kind===kind);
@@ -154,5 +154,5 @@ export async function interactTestGuest(id: string, kind: PairKind): Promise<voi
     if (!Rooms.getTestGuest(id)) return;
     if (host && guest.source === '角色库' && host.dirId !== guest.character.dirId)
       await relationships.record(localPerson(host),localPerson(guest.character),kind,`local:${randomUUID()}`);
-    Rooms.replyTestGuest(id, ({heart:'小心心收到了！',tea:'好呀，一起喝杯茶。',chat:'嗯嗯，我在听。',wave:'嗨！见到你真好。',flower:'喜欢这朵花！',photo:'一起留下纪念！',relay:'轮到我啦！',celebrate:'一起庆祝！'})[kind]);
+    Rooms.replyTestGuest(id, ({fight:'好啦，休战！',heart:'小心心收到了！',tea:'好呀，一起喝杯茶。',chat:'嗯嗯，我在听。',wave:'嗨！见到你真好。',flower:'喜欢这朵花！',photo:'一起留下纪念！',relay:'轮到我啦！',celebrate:'一起庆祝！'})[kind]);
 }

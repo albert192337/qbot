@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "checks": [
+    "locked until won",
+    "all seven real rewards",
+    "live inventory refresh",
+    "duplicate placement rejected",
+    "save and reload",
+    "ceiling and floor coexist",
+    "rotate remove undo",
+    "all models loaded",
+    "capsule theme and thumbnails",
+    "all seven published odds",
+    "older server keeps original pool"
+  ],
+  "stats": {
+    "calls": 16,
+    "triangles": 136742,
+    "geometries": 16,
+    "textures": 12,
+    "models": 15,
+    "dirty": true
+  },
+  "errors": []
+}

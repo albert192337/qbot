@@ -10,6 +10,7 @@ import type { Progress } from '../../../shared/ipc-types';
 import { toast } from './_studio-shared';
 import { mountMemoryPanel } from './memory-panel';
 import { mountJournalPrompts } from './journal-prompts';
+import { mountBehaviorLog } from './behavior-log';
 import { hasDirtyControls } from './_studio-shared';
 export function hasUnsavedChanges():boolean { return hasDirtyControls(root); }
 export async function discardChanges():Promise<void> {const host=root?.querySelector<HTMLElement>('[data-journal-editor]');if(host)await mountJournalPrompts(host);}
@@ -31,6 +32,7 @@ export async function mount(host: HTMLElement): Promise<void> {
   <div class="conn-card">
     <h3>种植画面</h3>
     <div class="btn-row" role="group" aria-label="种植画面">
+      <button class="btn" data-garden-render="hybrid" aria-pressed="false">桌边草地</button>
       <button class="btn" data-garden-render="2d" aria-pressed="false">2D 手绘种植</button>
       <button class="btn" data-garden-render="3d" aria-pressed="false">3D 草莓 / 菠萝</button>
       <button class="btn ghost" id="dev-open-garden">打开土地</button>
@@ -131,13 +133,15 @@ export async function mount(host: HTMLElement): Promise<void> {
   host.querySelector('#dev-open-garden')?.addEventListener('click',()=>window.qbot.garden.open('plots'));
   host.querySelectorAll<HTMLButtonElement>('[data-garden-render]').forEach(b=>b.addEventListener('click',async()=>{
     const buttons=host.querySelectorAll<HTMLButtonElement>('[data-garden-render]');buttons.forEach(x=>x.disabled=true);
-    try{await window.qbot.settings.set({gardenRenderMode:b.dataset.gardenRender==='3d'?'3d':'2d'});renderMode(await window.qbot.settings.get());}
+    try{await window.qbot.settings.set({gardenRenderMode:b.dataset.gardenRender==='hybrid'?'hybrid':b.dataset.gardenRender==='3d'?'3d':'2d'});renderMode(await window.qbot.settings.get());}
     catch{toast(host,'种植画面切换失败，请重试');}
     finally{buttons.forEach(x=>x.disabled=false);}
   }));
   const journalHost=document.createElement('div');journalHost.className='conn-card';journalHost.dataset.journalEditor='';
   host.querySelector('.studio-body')!.prepend(journalHost);await mountJournalPrompts(journalHost);
   const memoryHost = document.createElement('div');
+  const behaviorLog=document.createElement('div');behaviorLog.className='conn-card';
+  host.querySelector('.studio-body')!.prepend(behaviorLog);mountBehaviorLog(behaviorLog);
   host.querySelector('.studio-body')!.prepend(memoryHost);
   memoryPanel?.dispose();
   memoryPanel = mountMemoryPanel(memoryHost, true);

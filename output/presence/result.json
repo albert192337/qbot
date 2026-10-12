@@ -1,0 +1,137 @@
+{
+  "ok": true,
+  "events": [
+    {
+      "actor": "host",
+      "kind": "attention",
+      "action": "idle",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "attention",
+      "action": "idle",
+      "outcome": "completed"
+    },
+    {
+      "actor": "host",
+      "kind": "resume",
+      "action": "tea",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "attention",
+      "action": "idle",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "attention",
+      "action": "idle",
+      "outcome": "cancelled"
+    },
+    {
+      "actor": "host",
+      "kind": "resume",
+      "action": "tea",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "return",
+      "action": "talk_happy",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "return",
+      "action": "talk_happy",
+      "outcome": "completed"
+    },
+    {
+      "actor": "host",
+      "kind": "resume",
+      "action": "tea",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "visitor",
+      "action": "talk_happy",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "visitor",
+      "action": "talk_happy",
+      "outcome": "completed"
+    },
+    {
+      "actor": "host",
+      "kind": "resume",
+      "action": "tea",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "resume",
+      "action": "tea",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "attention",
+      "action": "idle",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "attention",
+      "action": "idle",
+      "outcome": "cancelled"
+    },
+    {
+      "actor": "host",
+      "kind": "attention",
+      "action": "idle",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "attention",
+      "action": "idle",
+      "outcome": "cancelled"
+    },
+    {
+      "actor": "host",
+      "kind": "attention",
+      "action": "listen",
+      "outcome": "started"
+    },
+    {
+      "actor": "host",
+      "kind": "attention",
+      "action": "listen",
+      "outcome": "completed"
+    },
+    {
+      "actor": "host",
+      "kind": "resume",
+      "action": "tea",
+      "outcome": "started"
+    }
+  ],
+  "checks": [
+    "actual input listener",
+    "listen action distinct from idle plan",
+    "blur resumes",
+    "reply resumes",
+    "return greeting",
+    "visitor greeting",
+    "pair resumes",
+    "new command wins",
+    "hidden cancels",
+    "Spine resume"
+  ]
+}

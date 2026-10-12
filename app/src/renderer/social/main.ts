@@ -1,5 +1,6 @@
 import { mountContacts } from './contacts';
 import './style.css';
+import '../ui/legacy-c.css';
 import { ChatView } from './chat';
 import {PAIR_INTERACTIONS} from '../../shared/pair-interaction';
 import { mountSteam } from './steam';

@@ -36,8 +36,9 @@ app.whenReady().then(async()=>{try{
   const p=await js(`(()=>{const e=document.querySelector(${JSON.stringify(selector)}),r=e.getBoundingClientRect();return {x:Math.round(Number(e.dataset.screenX)||r.x+r.width/2),y:Math.round(Number(e.dataset.screenY)||r.y+r.height/2)}})()`);
   win.webContents.sendInputEvent({type:'mouseMove',...p});win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...p});win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...p});await wait(200);
  };
- await win.loadFile(path.join(root,'output/garden-scene-app/garden/index.html'),{query:{view:'strip'}});
+ await win.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'strip'}});
  win.showInactive();
+ await until(()=>js(`document.querySelector('.farm-scene')?.dataset.groundModel==='ready'`),'imported grass bed');
  win.webContents.send('garden:anchor',{left:1050,right:1230,top:500,bottom:740,farm:{left:350,baseline:750}});
  await until(()=>js(`document.querySelector('.farm-scene')?.dataset.sceneReady==='true'&&Number(document.querySelector('.farm-scene').dataset.models)>=4`),'models loaded');
  await js(`document.body.style.setProperty('background','#b7cedb','important')`);
@@ -97,7 +98,7 @@ app.whenReady().then(async()=>{try{
  win.hide();await wait(200);win.showInactive();await until(()=>js(`Number(document.querySelector('.farm-scene').dataset.draws)>${Number(draws)}`),'visibility recovery');
  const failed=new BrowserWindow({width:1000,height:700,show:false,transparent:true,frame:false,webPreferences:{...prefs,partition:'garden-scene-missing-model'}});
  failed.webContents.session.webRequest.onBeforeRequest((d,cb)=>cb({cancel:d.url.endsWith('.glb')||/^https?:/.test(d.url)}));
- await failed.loadFile(path.join(root,'output/garden-scene-app/garden/index.html'),{query:{view:'strip'}});failed.showInactive();
+ await failed.loadFile(path.join(root,'app/out/renderer/garden/index.html'),{query:{view:'strip'}});failed.showInactive();
  await until(()=>failed.webContents.executeJavaScript(`document.querySelector('.farm-scene')?.dataset.assetFallback==='true'`),'missing model fallback');
  await wait(300);fs.writeFileSync(path.join(out,'missing-model.png'),(await failed.webContents.capturePage()).toPNG());failed.close();
  assert.deepEqual(errors,[]);

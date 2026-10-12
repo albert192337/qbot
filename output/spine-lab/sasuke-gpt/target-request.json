@@ -1,0 +1,10 @@
+{
+  "method": "bundled imagegen CLI",
+  "startedAt": "2026-10-11T21:32:05.6646261+08:00",
+  "provider": "aiartmirror",
+  "billing": "unknown",
+  "reference": "naruto-target-v4-rig.png",
+  "model": "gpt-image-2",
+  "prompt": "target-prompt.txt",
+  "stage": "target"
+}

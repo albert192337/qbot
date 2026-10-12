@@ -56,7 +56,9 @@ export async function chatComplete(opts: ChatOpts): Promise<string> {
   } = opts;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timer:ReturnType<typeof setTimeout>;
+  const deadline=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(new LlmError('network: response timeout',true));},timeoutMs);});
+  const request=async()=>{
   let res: Response;
   try {
     opts.onTrace?.('HTTP 请求', JSON.stringify({ model, messages, temperature }));
@@ -75,8 +77,6 @@ export async function chatComplete(opts: ChatOpts): Promise<string> {
       err instanceof Error ? `network: ${err.message}` : 'network error',
       true,
     );
-  } finally {
-    clearTimeout(timer);
   }
 
   const body = await res.text();
@@ -92,6 +92,8 @@ export async function chatComplete(opts: ChatOpts): Promise<string> {
     throw new LlmError('response missing message content', false);
   }
   return text;
+  };
+  try{return await Promise.race([request(),deadline]);}finally{clearTimeout(timer!);}
 }
 
 /** 带一次重试的 chat（仅 retryable 错误重试一次，间隔 2s） */

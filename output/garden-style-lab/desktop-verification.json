@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "status": {
+    "status": true,
+    "ordered": true,
+    "frames": 3,
+    "handle": "10033378",
+    "parent": "65998",
+    "icons": "66004"
+  },
+  "applicationClickRejected": true,
+  "desktopCoordinateShake": true,
+  "desktopCoordinateHarvestSync": true,
+  "scope": "Coordinate events injected at native bridge; physical mouse hook and desktop icon clicks require user desktop check"
+}

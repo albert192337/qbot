@@ -1,5 +1,13 @@
 # 实时 Spine 桌宠试用
 
+## 2026-10-11：双臂校准修订
+
+张起灵（hood）和吴邪同时降低双侧袖根，保留腕端高度，分别记录在 `hood-calibration.json` / `wuxie-calibration.json`。重新打包后运行 `node scripts/calibrate-spine-sleeves.cjs`，从原网格 UV 平面重建规则袖网格，按实际肘部位置混合上下臂权重，减少折角；该脚本只写两人的手臂附件。依赖 Electron、Playwright 和本地预览服务。贴图打包会覆盖骨骼，须先打包再校准。
+
+修订已同步项目内 `app/resources/presets/spine-wuxie/spine` 和 `spine-zhangqiling/spine`，未覆盖用户已安装角色；现有 seedPresets 跳过已存在角色。两人各 178 动作有限值检查通过，七类动作四分位及放大截图见 `output/spine-lab/hood-sleeves-final` / `wuxie-sleeves-final`。原衣身的局部下摆尖角仍可见，本次范围为双臂。
+
+正式 renderer 隔离回归运行到了最后的联机房间步骤：两人各 22 动作、双人注视/换边、睡觉、摸摸和视频切换已执行通过；房间步骤因现行页面与旧测试夹具不匹配，缺少 `decor:get` 等处理器并报 0/2 canvas，整个脚本未通过。没有把旧 `live/verification.json` 当作本轮通过证据，也未重启正式客户端。
+
 2026-09-26。预置「Spine 吴邪」「Spine 张起灵」，右键 → 切换角色，沿用现有切角保存与角色通知。启动时由 seedPresets 安装缺少的预置包，不覆盖既有用户角色。
 
 ## 播放与互动

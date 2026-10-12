@@ -1,0 +1,7 @@
+65998 Progman pid=13048 visible=True cloak=0 rect=0,0,2560,1440 style=96000000 ex=00200080
+  66004 SHELLDLL_DefView pid=13048 visible=True cloak=0 rect=0,0,2560,1440 style=56010000 ex=00080000
+    66006 SysListView32 pid=13048 visible=True cloak=0 rect=0,0,2560,1440 style=56003A40 ex=00000000
+      66010 SysHeader32 pid=13048 visible=False cloak=0 rect=0,0,0,0 style=400108C2 ex=00000000
+  5445510 WindowsForms10.STATIC.app.0.2bd8cfc_r8_ad1 pid=51992 visible=True cloak=0 rect=0,834,2561,1393 style=50000000 ex=080800A0
+  265144 WorkerW pid=13048 visible=True cloak=0 rect=0,0,2560,1440 style=58000000 ex=00000000
+  525092 OimeTsfNotifyWindow pid=13048 visible=False cloak=0 rect=0,0,0,0 style=40000000 ex=00000000

@@ -1,5 +1,12 @@
 // World units: metres, +Y up, furniture fronts face +Z. Save data never contains meshes.
 export const CATALOG = [
+  {id:'halloween-candles',name:'幽夜烛台',category:'light',w:.5,d:.32,collectible:true},
+  {id:'halloween-books',name:'女巫书堆',category:'decor',w:.65,d:.8,collectible:true},
+  {id:'halloween-lantern',name:'南瓜囚灯',category:'light',w:1.2,d:1.29,collectible:true},
+  {id:'halloween-pumpkins',name:'笑脸南瓜堆',category:'decor',w:2.1,d:.74,collectible:true},
+  {id:'halloween-fireplace',name:'万圣壁炉',category:'cabinet',w:2.7,d:1.42,collectible:true},
+  {id:'halloween-chandelier',name:'古堡烛光吊灯',category:'hanging',w:1.9,d:1.45,y:1.72,collectible:true},
+  {id:'halloween-cauldron',name:'女巫魔药锅',category:'decor',w:1.35,d:1.22,collectible:true},
   {id:'jade-sofa',name:'青竹软榻',category:'seat',w:2.7,d:1.05,seats:[[-.62,.64,.05],[.62,.64,.05]]},
   {id:'walnut-bench',name:'月白长榻',category:'seat',w:2.7,d:1.05,seats:[[-.62,.64,.05],[.62,.64,.05]]},
   {id:'tea-table',name:'青瓷茶几',category:'table',w:2,d:1.05},
@@ -23,7 +30,7 @@ export function extent(p){const a=BY_ID[p.asset],c=Math.abs(Math.cos(p.angle)),s
 export function legal(p,others){
   if(!BY_ID[p.asset]||![p.x,p.z,p.angle].every(Number.isFinite))return false;
   const e=extent(p);if(Math.abs(p.x)+e.x>4.4||Math.abs(p.z)+e.z>2.55)return false;
-  return BY_ID[p.asset].category==='rug'||others.every(q=>{if(q.key===p.key||BY_ID[q.asset]?.category==='rug')return true;const f=extent(q);return Math.abs(p.x-q.x)>=e.x+f.x+.035||Math.abs(p.z-q.z)>=e.z+f.z+.035;});
+  return BY_ID[p.asset].category==='rug'||others.every(q=>{if(q.key===p.key||BY_ID[q.asset]?.category==='rug'||(BY_ID[q.asset]?.category==='hanging')!==(BY_ID[p.asset].category==='hanging'))return true;const f=extent(q);return Math.abs(p.x-q.x)>=e.x+f.x+.035||Math.abs(p.z-q.z)>=e.z+f.z+.035;});
 }
 export function restore(raw){
   if(!Array.isArray(raw)||raw.length>40)return structuredClone(DEFAULT_LAYOUT);

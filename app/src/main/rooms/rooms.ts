@@ -109,6 +109,8 @@ let pettingSupported = false;
 let pettingContinuous = false;
 let contactsSupported = false;
 let gardenSupported = false;
+let iconFightSupported = false;
+export function supportsIconFight():boolean{return iconFightSupported && ws?.readyState===WS_OPEN;}
 let contactSnapshot: ContactSnapshot = {available:false, reason:'点击刷新连接朋友列表', people:[], invitations:[]};
 let worldCache: RoomChatMsg[] = [];
 let worldSubscribed = false;
@@ -344,7 +346,7 @@ async function hello(generation: number): Promise<void> {
   const identity = readContactCache(activeUrl!);
   const character = settings.activeCharacter ? await getCharacter(settings.activeCharacter) : null;
   const ack = await request(
-    { t: 'hello', pairDialogue: 1, companionChat: 1, protoVer: PROTO_VER, nickname, memberId: identity.id || settings.roomsMemberId, contactToken: identity.token, character: character?.manifest.name },
+    { t: 'hello', pairDialogue: 1, pairEffects:1, companionChat: 1, protoVer: PROTO_VER, nickname, memberId: identity.id || settings.roomsMemberId, contactToken: identity.token, character: character?.manifest.name },
     'hello:ack',
   );
   if (generation !== connectionGeneration) throw new Error('连接已取消');
@@ -353,6 +355,7 @@ async function hello(generation: number): Promise<void> {
   pettingContinuous = Number(ack.petting) >= 2;
   contactsSupported = ack.contacts === 1;
   gardenSupported = ack.garden === 1;
+  iconFightSupported = ack.pairEffects === 1;
   RoomPets.setContactRealm(activeUrl!);
   contactSnapshot = {...(readContactCache(activeUrl!).snapshot || {people:[],invitations:[]}),available:false,reason:'正在读取朋友列表'};
   if (contactsSupported && typeof ack.contactToken === 'string') saveContactCache(activeUrl!, {id:String(ack.memberId), token:ack.contactToken});

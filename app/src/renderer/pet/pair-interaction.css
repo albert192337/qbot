@@ -1,8 +1,13 @@
 @import '../speech-bubble.css';
+.pair-icon-copy{position:absolute;left:var(--from);top:44%;width:34px;height:34px;font-size:30px;object-fit:contain;opacity:0;filter:drop-shadow(0 2px 3px #59423566);animation:pair-icon-toss 2.1s ease-in-out both}
+.pair-effects[data-thrower=guest] .pair-icon-copy{animation-name:pair-icon-return}
+@keyframes pair-icon-toss{0%{left:var(--from);top:44%;opacity:0;transform:rotate(-20deg)}15%{opacity:1}50%{top:13%;transform:rotate(180deg)}90%{opacity:1}100%{left:var(--to);top:44%;opacity:0;transform:rotate(340deg)}}
+@keyframes pair-icon-return{0%{left:var(--to);top:44%;opacity:0;transform:rotate(20deg)}15%{opacity:1}50%{top:13%;transform:rotate(-180deg)}90%{opacity:1}100%{left:var(--from);top:44%;opacity:0;transform:rotate(-340deg)}}
+@media(prefers-reduced-motion:reduce){.pair-icon-copy{animation:none;left:50%;top:28%;opacity:1}.pair-icon-copy:not(:first-child){display:none}}
 
 body.visit-mode.pair-mode { display:block; }
 body.visit-mode.pair-mode #stage, body.visit-mode.pair-mode #visitor-stage {
-  position:absolute; top:10%; width:46%; height:82%; margin:0; transform:none;
+  position:absolute; top:calc(var(--pair-headroom, 240px) + (100% - var(--pair-headroom, 240px)) * .1); width:46%; height:calc((100% - var(--pair-headroom, 240px)) * .82); margin:0; transform:none;
 }
 body.pair-mode #stage { left:10%; }
 body.pair-mode #visitor-stage { left:44%; }
@@ -15,14 +20,15 @@ body.visit-mode.pair-mode.flip-visitor #visitor-stage > canvas { transform:scale
 body.pair-mode #pet-hud, body.pair-mode .signboard { visibility:hidden; }
 #pair-interaction { --from:33%; --to:67%; position:absolute; inset:0; z-index:10; pointer-events:none; color:#594235; font:13px 'Microsoft YaHei',sans-serif; }
 body.pair-swapped #pair-interaction { --from:67%; --to:33%; }
-.pair-caption { position:absolute; bottom:78%; transform:translateX(-50%); max-width:min(64%,320px); width:max-content; }
+.pair-caption { position:absolute; transform:translateX(-50%); max-width:min(calc(100% - 16px),320px); width:max-content; }
 .pair-caption[data-speaker='host'] { left:var(--from); }
 .pair-caption[data-speaker='guest'] { left:var(--to); }
-.pair-toolbar { position:absolute; bottom:2px; left:50%; transform:translateX(-50%); display:flex; align-items:center; justify-content:center; gap:4px; max-width:98%; flex-wrap:wrap; pointer-events:auto; background:#fff9eff2; border-radius:12px; padding:4px; }
+.pair-toolbar { position:absolute; left:50%; transform:translateX(-50%); display:flex; align-items:center; justify-content:center; gap:4px; width:max-content; max-width:calc(100% - 24px); flex-wrap:wrap; pointer-events:auto; background:#fff9eff2; border-radius:12px; padding:4px; }
 .pair-toolbar button { cursor:pointer; border:1px solid #cbb5a0; background:#fff9ef; color:#594235; border-radius:8px; padding:4px 7px; white-space:nowrap; font:inherit; }
 .pair-toolbar button:hover { background:#ffe3d6; }
-.pair-names { max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
-.pair-effects { position:absolute; inset:0; }
+.pair-capturing .pair-toolbar, .pair-capturing .pair-caption { visibility:hidden; }
+.pair-names { flex-basis:100%; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+.pair-effects { position:absolute; inset:var(--pair-headroom, 240px) 0 0; }
 #pair-interaction[data-recipient=true] .pair-effects { --from:67%; --to:33%; }
 body.pair-swapped #pair-interaction[data-recipient=true] .pair-effects { --from:33%; --to:67%; }
 .pair-heart { position:absolute; opacity:0; left:var(--from); top:43%; color:#ef6c96; font-size:34px; filter:drop-shadow(0 2px 2px #fff); animation:pair-send-heart 2.3s ease-in-out both; }

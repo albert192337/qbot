@@ -1,5 +1,31 @@
 # 公共房间服务部署（rooms）
 
+## 2026-10-11：主动行为与图标打闹已发布
+
+- 用户授权发布、重启，并明确要求保存本次提供的服务器账号。23:07:08（北京时间）更新 `server.mjs` 和 `generated/garden-core.cjs`；其余线上根目录模块校验未变。新增 `pairEffects=1` 能力及双方客户端兼容检查，保留现有花园和双扭蛋规则。
+- 比对线上文件，服务端仅增加能力协商/拒绝旧客户端；核心仅新增图标打闹三拍和 Spine 动作映射。正式模块副本通过真实 WebSocket 双人台词、冒名拒绝、离房后取消、旧客户端拒绝打闹及新版双方开演。25 份存档在隔离副本中验证，停服后再复制最新数据复验；余额、物品、地块和保底保持。
+- 备份 `/root/qbot-autonomy-20261011-230530/`；原代码 `server.before.mjs`、`core.before.cjs`。完整停服数据 `state-before.tgz`（0600），SHA256 `4ad5fd00f5add4aa7faccfd367338b22a0b5e6d1bbc98a303c8651477c77cf7c`。发布脚本失败会恢复旧代码并启动服务，保留当前玩家数据。
+- 发布 SHA256：server `fd930ceba1d6317fb6e9d4c39ce7b7c50956f277fdcd4c4bfe7ac867695d4349`；core `07daee5d3752ce3958af3480f6888369ff83b8438a4d9f1bd1cc613e918adb58`。
+- 公网 TLS 握手确认 `pairEffects=1`；三陪伴房、素材/花园读取、双扭蛋能力回归通过。rooms/market/generation 全部 active，rooms `NRestarts=0`。公网巡检无聊天、邀请、购买或抽取；完整双人协议在隔离副本验证。
+- 正式客户端已于23:00:37重启，新版实例 PID 37936；本轮确认桌宠可见、主进程授权/日志处理器与 renderer API 已加载，实际日志可读取。核验文件 `output/autonomy-deploy/client-verification.json`。没有发布新安装包。
+- 回退：停止 qbot-rooms，将上述两份 before 文件恢复至 `/opt/qbot-rooms/server.mjs` 和 `/opt/qbot-rooms/generated/garden-core.cjs`，然后启动。保留当前玩家存档，不以历史备份覆盖上线后新增数据。
+
+### 本机部署登录（用户授权保存）
+
+- 服务器 `root@14.103.59.73`。Windows 用户加密凭据位于 `C:/Users/Administrator/AppData/Local/QBot/deployment/rooms-server.credential.xml`，使用 DPAPI，仅当前 Windows 用户可解密；密码未写入仓库或文档。
+- 同目录 `remote.ps1` 复用该凭据和既有 SSH 主机密钥校验；例如 `& "$env:LOCALAPPDATA/QBot/deployment/remote.ps1" ssh root@14.103.59.73 'systemctl is-active qbot-rooms'`。支持 `scp` 模式。认证助手仅响应此服务器 root 账号的密码提示，不读取其他账号凭据。
+
+## 2026-10-11：2D / 3D 双扭蛋机已上线
+
+- 用户授权上线并提供临时 SSH 登录，沿用本机已保存的主机密钥校验；密码仅用于临时终端登录，未保存。21:07:22（北京时间）发布 `generated/garden-core.cjs`，其余线上根目录模块 SHA256 校验未变。
+- 发布 SHA256：`48eee37109b79d4c23d03185a281c680c630b3520d68921fdfc8d615d2ce30f6`。2D / 3D 独立奖池及保底生效，3D 首期七件万圣家具；旧客户端继续使用 2D 奖池。
+- 24 份真实存档的隔离副本迁移通过；停服后重新复制最新数据并再次验证，余额、家具、外观、原抽数/保底与地块保留。候选运行线上现有模块加新核心，通过双机台回执重放、重启、账号隔离及经济/外观回归。
+- 完整停服备份 `/root/qbot-dual-capsule-20261011-210641/state-before.tgz`（0600），SHA256 `4da2bf85dda6aad96163dd77fe76d700d751c995ee408623d2bd56b4c3cc3ff6`；旧规则为同目录 `core.before.cjs`，候选和预演副本保留。
+- 公网 TLS 巡检确认 `capsuleMachineRevision=1`、独立 `capsule3d` 计数，旧混合奖池标识已退出。独立巡检账号未购买、充值或抽奖。rooms/market/generation 全部 active，rooms NRestarts=0。
+- 回退：停止 qbot-rooms，将备份的 `core.before.cjs` 安装回 `/opt/qbot-rooms/generated/garden-core.cjs` 后启动。保留当前玩家存档，不覆盖上线后的新增奖励与余额。发布步骤内置失败恢复旧核心并启动服务。
+- 本地客户端已构建但本次未重启；重启桌宠加载新界面即可使用双机台与 3D 特效。未发布安装包。
+- 验证脚本：`scripts/preflight-capsule-machines.mjs`、`scripts/test-capsule-server.mjs`、`scripts/verify-capsule-online.mjs`。
+
 ## 2026-09-30：外观商城、奖池与独占装配已上线
 
 - 09:40:37（北京时间）更新 generated/garden-core.cjs，其余线上模块校验未变。月蚀之门、步生花可购买／抽取与单角色独占装配；蓝焰仍为试用。

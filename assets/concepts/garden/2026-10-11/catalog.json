@@ -1,0 +1,42 @@
+{
+  "purpose": "花园视觉概念库",
+  "date": "2026-10-11",
+  "revision": 2,
+  "generation": "built-in image_gen",
+  "status": "概念参考，尚非可直接使用的分层植物素材或3D模型",
+  "userPreference": {
+    "tryFirst": [
+      "A",
+      "C"
+    ],
+    "retain": [
+      "A",
+      "B",
+      "C"
+    ],
+    "ground": "柔软、简洁、可爱的连续绿色草地，贴住桌面底边；避免写实泥土、碎石和密集杂草",
+    "progression": "每组上图新手，下图后期变异花园",
+    "implementation": "用户已要求试做纯2D、3D草地+2D植物、纯3D三个交互小样，最终路线待体验后选择。独立小样见 experiments/garden-style-lab，单株参考图见 assets/concepts/garden/plants-v1。"
+  },
+  "items": [
+    {
+      "id": "A",
+      "file": "A-storybook-2d-v2.png",
+      "style": "绘本2D",
+      "priority": "优先尝试"
+    },
+    {
+      "id": "B",
+      "file": "B-clay-2-5d-v2.png",
+      "style": "软陶2.5D",
+      "priority": "保留参考"
+    },
+    {
+      "id": "C",
+      "file": "C-miniature-3d-v2.png",
+      "style": "玩具3D",
+      "priority": "优先尝试"
+    }
+  ],
+  "prompts": "generation-prompts-v2.txt"
+}

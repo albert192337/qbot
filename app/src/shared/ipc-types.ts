@@ -95,7 +95,7 @@ export interface Settings {
   /** 显示控制台中的开发者工具入口（默认 false） */
   developerMode?: boolean;
   /** Visual renderer only; both modes share the existing garden save. */
-  gardenRenderMode?: '2d' | '3d';
+  gardenRenderMode?: '2d' | '3d' | 'hybrid';
   gardenOnline?: boolean;
 }
 
@@ -245,15 +245,17 @@ export interface PetMenuActionEntry {
 }
 
 /** pet 窗口报告的交互类型（感知层 interact 事件） */
-export type PerceptionInteractKind = 'click' | 'drag_start' | 'drag_end' | 'sign_show' | 'sign_hide';
+export type PerceptionInteractKind = 'click' | 'drag_start' | 'drag_end' | 'sign_show' | 'sign_hide' | 'petting_end';
 
 /** 原生右键菜单点选后回渲染端执行的命令 */
 export type PetMenuCommand =
+  | {type:'iconPlay';actor:string;requestId:string;image:string}
+  | {type:'iconEnd';requestId:string}
   | { type: 'workMode' }
   | { type:'networkPhoto'; guest:CharacterMeta }
-  | { type:'networkPair'; partner?:string; kind:import('./pair-interaction').PairKind; recipient:boolean; guest:CharacterMeta; lines?:string[] }
-  | { type: 'pair'; kind: import('./pair-interaction').PairKind; guestId: string }
-  | { type: 'pairEnd' }
+  | { type:'networkPair'; partner?:string; kind:import('./pair-interaction').PairKind; recipient:boolean; guest:CharacterMeta; lines?:string[];icons?:string[];requestId?:string }
+  | { type: 'pair'; kind: import('./pair-interaction').PairKind; guestId: string; requestId?: string }
+  | { type: 'pairEnd'; requestId?: string }
   | { type: 'speak' }
   | { type: 'play'; action: string }
   /** 弹举牌输入框（纯本地的牌子） */
@@ -445,6 +447,13 @@ export type CraftResult =
   | { ok: false; error: string };
 
 export interface QBotApi {
+  panel: {
+    ignoreMouse(ignore: boolean): void;
+    open(page: import('./panel-layout').DesktopPanelPage): void;
+    navigate(page: import('./panel-layout').DesktopPanelPage): void;
+    close(): void;
+    onPage(cb: (page: import('./panel-layout').DesktopPanelPage) => void): () => void;
+  };
   appearances:{preview(id:string):Promise<void>;foot(x:number,y:number,size:number):void;onFoot(cb:(p:{x:number;y:number;size:number})=>void):()=>void};
   desktop: {
     openMenu(): void;
@@ -458,6 +467,7 @@ export interface QBotApi {
     onPeerControlsClose(cb: () => void): () => void;
     openPeerControls(): void;
   };
+  autonomy: import('./behavior-catalog').AutonomyApi;
   overlays: {
     hint(value:import('./pet-hint').PetHint|null):void;
     onHint(cb:(value:import('./pet-hint').PetHint)=>void):()=>void;
@@ -684,13 +694,16 @@ export interface QBotApi {
     /** bubble 窗订阅：agent 一次性提示消息 */
     onMessage(cb: (msg: AgentMessage) => void): () => void;
   };
+  presence: import('./pet-presence').PresenceApi;
   bubble: {
     reportBounds(bounds: { left: number; right: number; top: number; bottom: number } | null): void;
     ignoreMouse(ignore: boolean): void;
     onReward(cb: (items: import('./garden').GardenRewardItem[]) => void): () => void;
     openChat(): void;
     closeChat(): void;
-    sendChat(text: string): Promise<{ ok: boolean; error?: string }>;
+    resizeChat(expanded: boolean): void;
+    history(): Promise<{actor:string;lines:Array<{at:number;role:'user'|'assistant';text:string}>}>;
+    sendChat(text: string): Promise<{ ok: boolean; error?: string; message?:string }>;
     onThinking(cb: (thinking: boolean) => void): () => void;
     say(text: string, durationMs: number): void;
     getWorkIdleMs(): Promise<number>;

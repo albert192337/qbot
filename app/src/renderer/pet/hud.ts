@@ -1,6 +1,6 @@
 import { GARDEN_ICON } from './toolbar-icons';
 import { attachWeatherButton } from './weather-button';
-import { EYE_ICON } from './desktop-visibility';
+import { uiIcon } from '../ui/icons';
 /**
  * 桌宠窗底部 HUD —— 点数药丸 + 宝箱按钮。
  * 纯 DOM 构造，不依赖 Player / StateMachine。
@@ -90,24 +90,19 @@ export class ProgressHud {
     chat.addEventListener('pointerdown', e => e.stopPropagation());
     chat.addEventListener('click', e => { e.stopPropagation(); window.qbot.bubble.openChat(); });
     this.root.appendChild(chat);
+    const phone=document.createElement('button');phone.className='hud-chat';phone.title='手机';phone.setAttribute('aria-label','手机');phone.innerHTML=uiIcon('phone');
+    phone.onpointerdown=e=>e.stopPropagation();phone.onclick=e=>{e.stopPropagation();window.qbot.panel.open('phone');};this.root.append(phone);
     this.root.appendChild(this.pill);
     this.root.appendChild(this.chestBtn);
     const garden = document.createElement('button');
     garden.className = 'hud-chat hud-garden'; garden.title = '展开 / 收起花园'; garden.setAttribute('aria-label', '展开或收起花园');
     garden.innerHTML = GARDEN_ICON;
     garden.addEventListener('pointerdown', e => e.stopPropagation());
-    garden.addEventListener('click', e => { e.stopPropagation(); window.qbot.garden.toggle(); });
+    garden.addEventListener('click', e => { e.stopPropagation(); window.qbot.panel.open('garden'); });
     this.root.appendChild(garden);
-    for (const [page,label,svg] of [
-      ['travel','世界旅行','<circle cx="16" cy="16" r="12" fill="#add7c6" stroke="#594235" stroke-width="2"/><path d="m8 8 8-3 3 7-5 4 4 7-6 4-5-10z" fill="#739970"/>'],
-      ['moments','旅行朋友圈','<rect x="4" y="4" width="24" height="25" rx="4" fill="#fff1d4" stroke="#594235" stroke-width="2"/><path d="M8 9h16v13H8z" fill="#b1d1c5"/><path d="m8 22 6-9 4 6 3-3 3 6" fill="#7d9c79"/>'],
-    ]) {
-      const b=document.createElement('button');b.className='hud-chat';b.title=label;b.setAttribute('aria-label',label);b.innerHTML=`<svg viewBox="0 0 32 32">${svg}</svg>`;
-      b.addEventListener('pointerdown',e=>e.stopPropagation());b.addEventListener('click',e=>{e.stopPropagation();window.qbot.garden.open(page);});this.root.append(b);
-    }
-    const stopWeather=attachWeatherButton(this.root,window.qbot.garden);
-    const hide=document.createElement('button');hide.className='hud-chat hud-hide';hide.title='显示／隐藏';hide.setAttribute('aria-label',hide.title);hide.setAttribute('aria-haspopup','menu');hide.innerHTML=EYE_ICON;
-    hide.onpointerdown=e=>e.stopPropagation();hide.onclick=e=>{e.stopPropagation();window.qbot.desktop.openMenu();};this.root.append(hide);
+    const stopWeather=attachWeatherButton(garden,window.qbot.garden,true);
+    const menu=document.createElement('button');menu.className='hud-chat';menu.title='菜单';menu.setAttribute('aria-label','菜单');menu.innerHTML=uiIcon('menu');
+    menu.onpointerdown=e=>e.stopPropagation();menu.onclick=e=>{e.stopPropagation();window.qbot.panel.open('menu');};this.root.append(menu);
     window.addEventListener('pagehide',stopWeather,{once:true});
     const stopGardenHint = attachGardenHint(garden, window.qbot.garden);
     window.addEventListener('pagehide', stopGardenHint, { once: true });

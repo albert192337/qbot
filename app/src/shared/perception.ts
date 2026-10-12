@@ -54,7 +54,8 @@ export type PerceptionEvent =
   | { type: 'agent'; at: number; activity: string; sessions: number }
   | { type: 'meeting'; at: number; inMeeting: boolean }
   | { type: 'music'; at: number; playing: boolean; title?: string; artist?: string }
-  | { type: 'interact'; at: number; kind: 'click' | 'drag_start' | 'drag_end' | 'sign_show' | 'sign_hide' }
+  | { type: 'interact'; at: number; kind: 'click' | 'drag_start' | 'drag_end' | 'sign_show' | 'sign_hide' | 'petting_end' }
+  | { type: 'presence'; at:number; kind:'return'|'visitor'; target?:string }
   | { type: 'startup'; at: number };
 
 /** 某应用一天的统计（账本的最小单元） */

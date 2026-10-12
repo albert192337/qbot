@@ -1,4 +1,4 @@
-import { CROPS, CAPSULE, CAPSULE_POOL, RETIRED_FURNITURE, type CapsuleReward, FURNITURE_SHOP, furnitureOffers, SOCIAL_WISHES, SOCIAL_TRIPS, REGIONAL_FURNITURE } from '../../shared/social-economy';
+import { CROPS, CAPSULE, capsulePoolFor, RETIRED_FURNITURE, type CapsuleReward, FURNITURE_SHOP, furnitureOffers, SOCIAL_WISHES, SOCIAL_TRIPS, REGIONAL_FURNITURE } from '../../shared/social-economy';
 import { gardenDay,dailyRandom } from '../../shared/garden-life';
 import { SPECIES, type GardenState, type GardenCommand, type GardenReveal, type Trait } from '../../shared/garden';
 import { geneSlots, recordGarden, v3Value,weekKey } from '../../shared/garden-v3';
@@ -19,6 +19,14 @@ export function enableSocialEconomy(s:GardenState,now:number):boolean {
 export function refreshSocial(s:GardenState,now:number):void {
   const e=s.economy;if(!e)return;const day=Math.max(e.day,gardenDay(now));
   e.appearances??={owned:{},equipped:{}};
+  // Old clients use this flag to advertise the former mixed pool. Their draw
+  // command now uses the 2D pool, so only publish the new dual-machine flag.
+  delete e.furniture3dRevision;
+  if(e.capsuleMachineRevision!==1){
+    if(e.lastCapsule)e.lastCapsule2d??=e.lastCapsule;
+    e.capsuleMachineRevision=1;
+  }
+  e.capsule3d??={rareMisses:0,epicMisses:0,draws:0};
   if(e.capsuleRevision!==2){
     for(const id of RETIRED_FURNITURE)delete e.furniture[id];
     if(e.furnitureReservation&&RETIRED_FURNITURE.includes(e.furnitureReservation.item))delete e.furnitureReservation;
@@ -126,23 +134,25 @@ export function socialTransition(s:GardenState,c:GardenCommand,now:number,rng:Ra
       e.topUpDay=e.day;e.tokens+=CAPSULE.topUp;
       return reveal('模拟充值完成',`测试代币 +${CAPSULE.topUp}。没有真实付款，每天可测试一次。`);
     }
-    case 'capsuleDraw':{
+    case 'capsuleDraw':case 'capsuleDraw3d':{
       if(c.count!==1&&c.count!==10)throw Error('请选择单抽或十连');
+      const machine=c.type==='capsuleDraw3d'?'3d':'2d',progress=machine==='3d'?e.capsule3d!:e;
       const cost=c.count*CAPSULE.cost;if(e.tokens<cost)throw Error('测试代币不足，可使用模拟充值');
       const names:string[]=[],rewards:CapsuleReward[]=[];e.tokens-=cost;
       for(let i=0;i<c.count;i++){
         const roll=rng.random();let tier:'common'|'rare'|'epic'=roll<.70?'common':roll<.95?'rare':'epic';
-        if(e.epicMisses>=CAPSULE.epicPity-1)tier='epic';else if(e.rareMisses>=CAPSULE.rarePity-1&&tier==='common')tier='rare';
-        const pool=CAPSULE_POOL.filter(x=>x.tier===tier);let pick=rng.random()*100;const item=pool.find(x=>(pick-=x.weight)<0)??pool[pool.length-1];
+        if(progress.epicMisses>=CAPSULE.epicPity-1)tier='epic';else if(progress.rareMisses>=CAPSULE.rarePity-1&&tier==='common')tier='rare';
+        const pool=capsulePoolFor(e,machine).filter(x=>x.tier===tier);let pick=rng.random()*100;const item=pool.find(x=>(pick-=x.weight)<0)??pool[pool.length-1];
         let duplicateTokens:number|undefined;
         if(item.kind==='appearance'){const cosmetic=appearance(item.item)!;if(e.appearances!.owned[cosmetic.id]){duplicateTokens=cosmetic.duplicateTokens;e.tokens+=duplicateTokens;}else e.appearances!.owned[cosmetic.id]=true;}
         else if(item.kind==='furniture'){e.furniture[item.item]=(e.furniture[item.item]??0)+item.count;recordGarden(s,now,'furniture',`扭蛋机带回${item.name}`);}
         else if(item.kind==='seed'){for(let n=0;n<item.count;n++)s.seeds.push({id:rng.id(),species:item.item as keyof typeof CROPS,genes:[],bred:false});}
         else s.fertilizers[item.item as keyof typeof s.fertilizers]=(s.fertilizers[item.item as keyof typeof s.fertilizers]??0)+item.count;
-        e.rareMisses=tier==='common'?e.rareMisses+1:0;e.epicMisses=tier==='epic'?0:e.epicMisses+1;e.draws++;
+        progress.rareMisses=tier==='common'?progress.rareMisses+1:0;progress.epicMisses=tier==='epic'?0:progress.epicMisses+1;progress.draws++;
         names.push(`${item.name} ×${item.count}${duplicateTokens?`（重复转换 ${duplicateTokens} 代币）`:''}`);rewards.push({...item,...(duplicateTokens?{duplicateTokens}:{})});
       }
-      e.lastCapsule={id:rng.id(),at:now,rewards};
+      e.lastCapsule={id:rng.id(),at:now,machine,rewards};
+      if(machine==='3d')e.capsule3d!.lastCapsule=e.lastCapsule;else e.lastCapsule2d=e.lastCapsule;
       return reveal('扭蛋打开了',names.join('、')+' · 已收入背包与收藏。');
     }
     case 'socialWish':{
@@ -171,6 +181,7 @@ export function socialTransition(s:GardenState,c:GardenCommand,now:number,rng:Ra
 export function validateSocial(s:GardenState):void {
   const e=s.economy;if(!e)return;
   const n=(x:unknown)=>Number.isSafeInteger(x)&&Number(x)>=0;
+  if(e.capsule3d&&(!n(e.capsule3d.draws)||!n(e.capsule3d.rareMisses)||e.capsule3d.rareMisses>=10||!n(e.capsule3d.epicMisses)||e.capsule3d.epicMisses>=20))throw Error('3D 扭蛋记录损坏');
   if(e.appearances){const a=e.appearances;if(!a.owned||!a.equipped||Object.entries(a.owned).some(([id,v])=>!appearance(id)||v!==true)||Object.entries(a.equipped).some(([id,actor])=>!appearance(id)||!a.owned[id as keyof typeof a.owned]||typeof actor!=='string'||!Object.hasOwn(s.life?.characters??{},actor)))throw Error('外观收藏或装配记录损坏');}
   if(e.version!==4||!e.furniture||!e.purchases||!e.tutorial||!Array.isArray(e.notifications)||!Array.isArray(e.weatherHistory)||!Array.isArray(e.wishClaims)||!e.wishBaseline||!n(e.day)||!n(e.tokens)||!n(e.draws)||!n(e.rareMisses)||e.rareMisses>=10||!n(e.epicMisses)||e.epicMisses>=20||Object.values(e.furniture).some(x=>!n(x)))throw Error('新版社交经济存档损坏');
   if(e.furnitureReservation&&(!n(e.furnitureReservation.price)||e.furnitureReservation.price===0||!n(e.furnitureReservation.expiresAt)||(!FURNITURE_SHOP.some(x=>x.id===e.furnitureReservation!.item)&&!RETIRED_FURNITURE.includes(e.furnitureReservation.item))||typeof e.furnitureReservation.owner!=='string'))throw Error('家具预留记录损坏');

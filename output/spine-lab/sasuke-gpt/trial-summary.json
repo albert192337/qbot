@@ -1,0 +1,39 @@
+{
+  "provider": "aiartmirror compatible API",
+  "requestedModel": "gpt-image-2",
+  "execution": "bundled imagegen CLI edit",
+  "builtinImagegen": false,
+  "generatedImages": 3,
+  "cliInvocations": 3,
+  "verifiedHttpRequestCount": null,
+  "apiWaitSecondsFromCli": 93.3,
+  "processWallSeconds": 70.2,
+  "chargedCNY": null,
+  "usage": null,
+  "automatedEndToEnd": false,
+  "crossVersionSelection": false,
+  "mirroredParts": false,
+  "manualSteps": [
+    "prompt and visual inspection",
+    "chroma thresholds",
+    "arm size and far-arm position",
+    "shorten torso hem",
+    "template geometry calibration"
+  ],
+  "targetApproval": "assistant-reviewed experiment draft; user final approval pending",
+  "shoulderRevision": {
+    "version": 3,
+    "v2VisualRejectedByUser": true,
+    "pipeline": [
+      "pack",
+      "calibrate-naruto-mesh",
+      "auto-spine-shoulders",
+      "layer-spine-sleeve-caps"
+    ],
+    "handDisplacement": "profile now adjusts neutral hand spread; v2 zero-displacement assumption superseded",
+    "layering": "near cap behind torso, forearm foreground",
+    "extraImageCallsThisRevision": 0,
+    "generalAutomaticQC": false,
+    "visualApproval": "pending"
+  }
+}

@@ -12,6 +12,8 @@ window.qbot.overlays.onHint(value=>{
   document.getElementById('text')!.textContent=value.text;
   open.disabled=value.kind!=='wish';close.hidden=value.kind!=='wish';
   invitation=value.invitation;actions.hidden=!invitation||invitation.expiresAt<=Date.now();root.classList.toggle('invitation',!!invitation);
+  root.classList.toggle('approval',!!invitation?.approval);
+  actions.firstElementChild!.textContent=invitation?.approval?'同意':'一起玩';
 });
 open.onclick=()=>window.qbot.overlays.hintAction('open');close.onclick=()=>window.qbot.overlays.hintAction('dismiss');
 setInterval(()=>{if(invitation&&invitation.expiresAt<=Date.now()){root.hidden=true;window.qbot.overlays.hintHover(false);}},250);

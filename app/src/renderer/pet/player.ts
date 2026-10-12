@@ -31,6 +31,8 @@ export class Player {
   private manifest: Manifest | null = null;
   private requested: string | null = null;
   private selected: string | null = null;
+  private lastAction='idle';
+  getCurrentAction():string {return this.selected??this.requested??this.lastAction;}
   private videos = new Map<string, HTMLVideoElement>();
   private current: string | null = null;
   /** 非循环动作的安全超时：防止 ended 不触发导致状态机卡死 */
@@ -155,8 +157,8 @@ export class Player {
   }
 
   /** 播放并强制循环（串门聊天的 talk 动作需要一直循环，不靠 ended 推进） */
-  playLooping(action: PlayableId): void {
-    this.playImpl(action, true);
+  playLooping(action: PlayableId, usePool = true): void {
+    this.playImpl(action, true, false, usePool);
   }
 
   /** Let the idle director reconsider only after a complete clip, including the idle alias. */
@@ -197,6 +199,7 @@ export class Player {
 
   private playImpl(action: PlayableId, forceLoop: boolean, forceOnce = false, usePool = true, workTyping?: boolean): void {
     if(this.suspended)return;
+    this.lastAction=action;
     this.endWork();
     if(this.spine&&this.manifest?.spine?.actions[action]){
       this.generation++;this.cancelAttempt?.();this.cancelAttempt=null;this.clearSafetyTimer();

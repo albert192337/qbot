@@ -1,0 +1,109 @@
+{
+  "expressions": [
+    {
+      "id": "neutral",
+      "animated": true
+    },
+    {
+      "id": "attentive",
+      "animated": true
+    },
+    {
+      "id": "thinking",
+      "animated": true
+    },
+    {
+      "id": "focused",
+      "animated": true
+    },
+    {
+      "id": "happy",
+      "animated": true
+    },
+    {
+      "id": "excited",
+      "animated": true
+    },
+    {
+      "id": "laughing",
+      "animated": true
+    },
+    {
+      "id": "proud",
+      "animated": true
+    },
+    {
+      "id": "shy",
+      "animated": true
+    },
+    {
+      "id": "confused",
+      "animated": true
+    },
+    {
+      "id": "suspicious",
+      "animated": true
+    },
+    {
+      "id": "angry",
+      "animated": true
+    },
+    {
+      "id": "annoyed",
+      "animated": true
+    },
+    {
+      "id": "sad",
+      "animated": true
+    },
+    {
+      "id": "scared",
+      "animated": true
+    },
+    {
+      "id": "surprised",
+      "animated": true
+    },
+    {
+      "id": "bored",
+      "animated": true
+    },
+    {
+      "id": "drowsy",
+      "animated": true
+    },
+    {
+      "id": "sleeping",
+      "animated": true
+    },
+    {
+      "id": "waking",
+      "animated": true
+    },
+    {
+      "id": "wink_left",
+      "animated": true
+    },
+    {
+      "id": "wink_right",
+      "animated": true
+    },
+    {
+      "id": "playful",
+      "animated": true
+    }
+  ],
+  "transitions": 529,
+  "errors": [],
+  "checks": [
+    "click labels",
+    "replay",
+    "pause/resume",
+    "eye-only geometry",
+    "sleep override/recovery",
+    "removed IDs rejected",
+    "reduced motion",
+    "narrow viewport"
+  ],
+  "scope": "Runtime checks and captures; visual review separately required."
+}

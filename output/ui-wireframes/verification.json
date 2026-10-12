@@ -1,0 +1,190 @@
+{
+  "date": "2026-10-11",
+  "localScreens": 120,
+  "uniqueScreens": 120,
+  "explicitNavigationTargets": 646,
+  "missingTargets": 0,
+  "browserErrors": 0,
+  "checkedFlows": [
+    "手机首页到房间和布置",
+    "手机首页到补给站",
+    "单抽请求自动切换到揭晓",
+    "底部桌宠面板向上展开",
+    "单人聊天无公共私人切换",
+    "加入多人房间后显示公共私人切换",
+    "美术参考页两张截图和分析正常显示"
+  ],
+  "limitations": [
+    "Figma仅116个可编辑页面，尚未写入交互连线及最终修订",
+    "原型使用示例数据，不连接实际服务",
+    "未逐页人工检查120个状态"
+  ],
+  "visualStudies": {
+    "variants": 2,
+    "screensPerVariant": 3,
+    "directionBPage": "verified",
+    "screenshotsChecked": [
+      "手机 A/B 并排",
+      "花园 A/B 并排",
+      "扭蛋 A/B 并排",
+      "扭蛋 B 单独",
+      "美术方向 B"
+    ],
+    "interactionsChecked": [
+      "界面切换",
+      "并排/单独切换",
+      "十连模拟结果"
+    ],
+    "browserErrors": 0,
+    "figmaSynced": false
+  },
+  "nativeDesktopRevision": {
+    "checked": [
+      "主界面无工具栏底板",
+      "现有角色视频正常显示",
+      "现有气泡/输入样式",
+      "半透明记录展开与消息显示",
+      "表情选择后发送模拟回复",
+      "底部展开无重叠"
+    ],
+    "realMessagesSent": false,
+    "productionChanges": false,
+    "figmaSynced": false
+  },
+  "unifiedVisualStyle": {
+    "sharedRenderer": true,
+    "checked": [
+      "手机首页",
+      "扭蛋大面板",
+      "角色创建表单",
+      "菜单小面板"
+    ],
+    "noProductionChanges": true,
+    "figmaSynced": false
+  },
+  "navigationRefinement": {
+    "checked": [
+      "Garden title without decorative icon",
+      "Menu right header eye/sound/close order",
+      "Show/hide and mute toggle in place, state retained across settings tab",
+      "Character root market entry and return route",
+      "Moments travel post, like retention, photo return and feed return",
+      "Travel map without journal button"
+    ],
+    "screenCount": 120,
+    "brokenTargets": [],
+    "browserErrors": 0,
+    "productionChanges": false,
+    "figmaSynced": false
+  },
+  "topIconTextNavigation": {
+    "updated": "2026-10-12",
+    "status": "Local prototype complete; Figma pending",
+    "screens": [
+      "G0",
+      "M0",
+      "T0",
+      "T1",
+      "T2",
+      "R0",
+      "S0",
+      "S6",
+      "M0H"
+    ],
+    "changes": [
+      "Garden shortcuts moved above the plots, immediately below heading",
+      "Garden and menu primary navigation share icon plus label buttons",
+      "Primary navigation kept outside scrolling body",
+      "Existing top back buttons retained"
+    ],
+    "checked": [
+      "Garden screenshot: four labels and plots fit",
+      "Backpack open and return",
+      "Menu screenshot with selected multiplayer tab",
+      "Settings tab navigation"
+    ],
+    "figmaSynced": false,
+    "productionChanges": false
+  },
+  "artDirectionC": {
+    "date": "2026-10-12",
+    "status": "Local visual study complete; Figma pending",
+    "screens": [
+      "菜单",
+      "花园",
+      "手机首页"
+    ],
+    "basis": "Existing warm paper, dark brown contour, hand-drawn colored icons and Microsoft YaHei type",
+    "changes": [
+      "Borderless icon-label category navigation with a short sage active underline",
+      "Menu: lightweight friend list with avatars, illustrated room entry, compact local interaction row",
+      "Garden: ripe fruit, young plants and dashed empty plot distinguished; harvest primary action",
+      "Phone: small organic color patches behind icons, restrained device contour and spacing"
+    ],
+    "viewModes": [
+      "界面特写",
+      "桌面效果"
+    ],
+    "interaction": "Existing prototype navigation retained; separate C style layer",
+    "files": [
+      "direction-c.js",
+      "direction-c.css"
+    ],
+    "checked": [
+      "Menu visual hierarchy and no unnecessary body scrollbar",
+      "Garden four plots and top shortcuts",
+      "Phone app grid",
+      "Desktop-size child panel",
+      "Switching back to original prototype removes C decorations"
+    ],
+    "browserErrors": 0,
+    "figmaSynced": false,
+    "productionChanges": false
+  },
+  "spatialInteractionRevision": {
+    "date": "2026-10-12",
+    "status": "Local interactive WebGL prototype complete; Figma pending",
+    "implementation": "Independent left 3D viewport + right contextual inventory panel, Three.js bundled locally; mock data only",
+    "files": [
+      "spaces.js",
+      "spaces.css",
+      "vendor/three.module.js",
+      "vendor/three.core.js",
+      "vendor/three-LICENSE.txt"
+    ],
+    "garden": [
+      "Default seed backpack",
+      "Select seed then click 3D plot; decrement inventory after planting",
+      "Upcoming rainbow icon and countdown in header; current-weather HUD badge removed until active",
+      "Select plant for contextual care/harvest",
+      "Friend visit switches 3D owner; own planting disabled; help status retained; home returns to own garden"
+    ],
+    "room": [
+      "Default visit mode",
+      "Choose inventory item to enter placement preview",
+      "Raycast floor placement with bounds and collision checks",
+      "Edit mode enables selection of existing furniture",
+      "Move/rotate/reclaim tools near selected furniture",
+      "Escape cancels pending placement without inventory loss",
+      "Finish returns to visit; separate per-role room data in fixture"
+    ],
+    "checked": [
+      "Plant strawberry: quantity 8 to 7 and plot 4 contains new seedling",
+      "Visit friend and help; return home preserves planted plot",
+      "Room initial visit has no edit hotspots",
+      "Place potted plant: quantity 5 to 4",
+      "Rotate and move plant to new floor position",
+      "Reclaim plant: quantity 4 to 5",
+      "Select again then Escape: quantity remains 5",
+      "Finish removes edit hotspots",
+      "No browser console errors during checked flows"
+    ],
+    "limitations": [
+      "Simplified placeholder geometry, not production GLB scene",
+      "Session-only mock state; reload/reset clears it",
+      "No game/server/save/social side effects"
+    ],
+    "figmaSynced": false,
+    "productionChanges": false
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "source": "parts-v1.png",
+  "boxes": [
+    [
+      26,
+      35,
+      323,
+      303
+    ],
+    [
+      416,
+      89,
+      601,
+      301
+    ],
+    [
+      780,
+      78,
+      889,
+      334
+    ],
+    [
+      122,
+      395,
+      230,
+      649
+    ],
+    [
+      425,
+      398,
+      558,
+      679
+    ],
+    [
+      788,
+      402,
+      921,
+      682
+    ],
+    [
+      149,
+      801,
+      204,
+      905
+    ],
+    [
+      485,
+      799,
+      540,
+      903
+    ],
+    [
+      820,
+      850,
+      881,
+      868
+    ]
+  ],
+  "mirroredParts": [],
+  "manual": [
+    "prompt and visual review",
+    "chroma thresholds",
+    "template placement and calibration"
+  ],
+  "background": "local chroma key extraction, not native alpha"
+}

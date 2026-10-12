@@ -1,0 +1,11 @@
+{
+  "billing": "unknown",
+  "startedAt": "2026-10-11T21:33:30.9934912+08:00",
+  "stage": "parts",
+  "reference": "target-v1.png",
+  "model": "gpt-image-2",
+  "method": "bundled imagegen CLI",
+  "targetReview": "assistant inspected; experiment draft, not user-approved new target",
+  "prompt": "parts-prompt.txt",
+  "provider": "aiartmirror"
+}

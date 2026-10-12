@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {mkdtempSync} from 'node:fs';import {tmpdir} from 'node:os';import path from 'node:path';import {randomUUID} from 'node:crypto';
+import {Gardens} from '../rooms/garden.mjs';
+const now=Date.UTC(2026,9,11,8),contacts={people:{owner:{nickname:'owner'},other:{nickname:'other'}},areFriends:()=>true};
+const file=path.join(mkdtempSync(path.join(tmpdir(),'qbot-capsule-server-')),'gardens.json');let db=new Gardens(file,contacts,()=>now);
+const get=()=>db.handle('owner',{action:'get',actor:'one'}).state;
+const snapshot=()=>JSON.parse(JSON.stringify(get()));
+const act=(command,operation=`${now}-${randomUUID()}`)=>db.handle('owner',{action:'act',actor:'one',command,operation});
+get();db.ensure('owner').state.economy.tokens=1200;
+const operation=`${now}-${randomUUID()}`,command={type:'capsuleDraw3d',count:10};
+act(command,operation);const result=snapshot();act(command,operation);assert.deepEqual(snapshot(),result);assert.equal(result.economy.capsule3d.draws,10);assert.equal(result.economy.draws,0);assert.equal(result.economy.capsule3d.lastCapsule.rewards.length,10);
+db=new Gardens(file,contacts,()=>now);act(command,operation);assert.deepEqual(snapshot(),result);
+act({type:'capsuleDraw',count:1});const two=snapshot();assert.equal(two.economy.draws,1);assert.deepEqual(two.economy.capsule3d,result.economy.capsule3d);assert.equal(two.economy.capsuleMachineRevision,1);assert.equal(two.economy.furniture3dRevision,undefined);
+assert.equal(db.ensure('other').state.economy.capsule3d.draws,0);
+assert.throws(()=>act({type:'capsuleDraw3d',count:2}));assert.deepEqual(snapshot(),two);
+console.log('PASS dual capsule server: replay-safe ten draw, restart, separate counters/history, old-client pool compatibility and player isolation');

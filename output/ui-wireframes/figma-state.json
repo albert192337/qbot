@@ -1,0 +1,71 @@
+{
+  "fileKey": "brggx0sImwv9TEXePrPvcG",
+  "createdNodeIds": [
+    "2:2",
+    "2:3",
+    "2:38",
+    "2:39",
+    "2:40",
+    "2:41",
+    "2:42",
+    "2:43"
+  ],
+  "mutatedNodeIds": [
+    "0:1"
+  ],
+  "pages": {
+    "prototype": "0:1",
+    "components": "2:2",
+    "reference": "2:3"
+  },
+  "variables": {
+    "paper": "VariableID:2:6",
+    "surface": "VariableID:2:8",
+    "muted": "VariableID:2:10",
+    "border": "VariableID:2:12",
+    "ink": "VariableID:2:14",
+    "secondary": "VariableID:2:16",
+    "accent": "VariableID:2:18",
+    "gap": "VariableID:2:19",
+    "padding": "VariableID:2:20",
+    "radius": "VariableID:2:21"
+  },
+  "styles": {
+    "caption": "S:1c6e1799fb31037aaab7905f0fdda9ca23238202,",
+    "body": "S:aab100cef5bcb0572d3bb15fefa63d6e7b71233a,",
+    "label": "S:330ded06a94131c810f175c1abcd8986e3ce96a6,",
+    "heading": "S:7231e7b615aa57d30e8f060c4061e0ddfbd4abe3,",
+    "title": "S:ab88e08c3db3f679a296f5e1b622a227bac60a90,"
+  },
+  "components": {
+    "default": {
+      "id": "2:38",
+      "labelKey": "Label#2:0"
+    },
+    "selected": {
+      "id": "2:40",
+      "labelKey": "Label#2:1"
+    },
+    "disabled": {
+      "id": "2:42",
+      "labelKey": "Label#2:2"
+    }
+  },
+  "imported": {
+    "home": "2:32",
+    "check": "2:34",
+    "plus": "2:36"
+  },
+  "collection": "VariableCollectionId:2:4",
+  "font": "Noto Sans SC",
+  "discovery": {
+    "codeConnect": "none",
+    "existingScreens": "empty",
+    "library": "Simple Design System: imported Home/Check/Plus; compact Chinese wireframe buttons created locally"
+  },
+  "counts": {
+    "buttons": 3,
+    "textStyles": 5,
+    "variables": 17
+  }
+}

@@ -8,10 +8,11 @@ import { beginBrainCall, updateBrainCall } from './brain-log';
 import { execute } from './behavior-executor';
 import { buildChatMessages, parseChatReply } from './pet-chat-rules';
 import { beginChatThinking } from './bubble';
+import {commandText} from './pet-command-rules';
 
 let busy = false;
 /** 主动对话独立于自由模式和自动思考冷却；同一时刻仅接受一条。 */
-export async function sendPetChat(text: unknown): Promise<{ ok: boolean; error?: string }> {
+export async function sendPetChat(text: unknown): Promise<{ ok: boolean; error?: string; message?:string }> {
   if (typeof text !== 'string' || !text.trim() || text.length > 1000) return { ok: false, error: '请输入 1～1000 字。' };
   if (busy) return { ok: false, error: '正在回复上一句话，请稍等。' };
   busy = true;
@@ -20,6 +21,11 @@ export async function sendPetChat(text: unknown): Promise<{ ok: boolean; error?:
   let stopThinking = () => {};
   try {
     const settings = await getSettings();
+    if(commandText(text)!==null){
+      character=settings.activeCharacter??'default';setChatting(character,true);
+      rememberConversation(character,{at:Date.now(),role:'user',source:'chat',text:text.trim()});
+      return await (await import('./pet-command')).sendPetCommand(text.trim(),character);
+    }
     if (!settings.arkApiKey) return { ok: false, error: '请先在设置中配置 LLM API Key。' };
     stopThinking = beginChatThinking();
     character = settings.activeCharacter ?? 'default';
@@ -34,15 +40,22 @@ export async function sendPetChat(text: unknown): Promise<{ ok: boolean; error?:
       onTrace: (stage, detail) => { void updateBrainCall(traceId, stage, {}, detail); },
     });
     await updateBrainCall(traceId, '收到原始输出', { raw });
-    const decision = parseChatReply(raw, input.availableIntents,input.idleCandidates?.map(a=>a.id));
+    const decision = parseChatReply(raw, input.availableIntents,input.idleCandidates?.map(a=>a.id),input.behaviorOpportunities?.map(o=>o.id));
     if (!decision) throw new Error('回复格式不完整，请重试。');
     await updateBrainCall(traceId, '聊天动作决策', { decision });
     if ((await getSettings()).activeCharacter !== settings.activeCharacter) throw new Error('角色已切换，请与当前角色重新对话。');
     const latest = await buildInput();
     if (latest.memoryRevision !== input.memoryRevision) throw new Error('记忆已更新，请重新发送这句话。');
     if (decision.action && !latest.availableIntents.includes(decision.action)) decision.action = undefined;
+    if(decision.behavior){
+      const choice=input.behaviorOpportunities?.find(o=>o.id===decision.behavior);
+      const accepted=choice&&await (await import('./interaction-behaviors')).performInteractionBehavior(character,choice,decision.thought,'user');
+      await updateBrainCall(traceId,accepted?'行为已交给授权或执行流程':'行为对象或场景已变化，未执行');
+      await queueMemoryExtraction(character,text.trim(),settings.arkApiKey,userAt).catch(console.error);
+      return accepted?{ok:true}:{ok:false,error:'现在无法做这个行为，请稍后重试。'};
+    }
     applyIdleDecision(character,decision,latest.idleCandidates?.map(a=>a.id)??[]);
-    execute({ meta: { id: 'llm-chat', source: 'llm', priority: 100, reason: '用户主动聊天', traceId, characterId: character },
+    if(decision.lines.length||decision.action||decision.message)execute({ meta: { id: 'llm-chat', source: 'llm', priority: 100, reason: '用户主动聊天', traceId, characterId: character },
       steps: [...(decision.message ? [{ op: 'sign' as const, text: decision.message }] : []),
         ...decision.lines.map(line => ({ op: 'say' as const, text: line, expression: decision.expression })),
         ...(decision.action ? [{ op: 'play' as const, action: decision.action, loops: 1 }] : [])] });

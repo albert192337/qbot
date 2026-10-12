@@ -1,6 +1,8 @@
+import '../ui/embedded-bridge';
+import { uiIcon } from '../ui/icons';
 import {renderAppearanceShop} from './appearance-shop';
 import { renderCharacterHeader } from './character-header';
-import { renderCapsule,renderSocialGuide,renderSocialWeather,renderSocialTravel } from './social-economy';
+import { renderCapsule,renderSocialGuide,renderSocialWeather,renderSocialTravel,renderTripHistory } from './social-economy';
 import type { CharacterMeta } from '../../shared/ipc-types';
 import { MAX_GARDEN_PLOTS, FRUIT_DRAG_TYPE, emptyPlots, feedingWish, unlockedPlots, visiblePlot } from '../../shared/garden-progression';
 import { renderWeatherCard, updateWeatherCountdown } from './weather-card';
@@ -30,18 +32,43 @@ import {headAllows,type HeadOverlay} from '../../shared/desktop-overlays';
 import {renderAppraisal,renderProvenance,renderV3Breeding,renderNotebook,renderV3Weather} from './v3';
 import {V3_XP,AFFINITIES,speciesLevel,fertilizerDescription,scoreOf} from '../../shared/garden-v3';
 import './v3.css';
+import '../ui/legacy-c.css';
+import './companion.css';
 const sprout = new URL('./assets/sprout.png', import.meta.url).href;
 const api = window.qbot.garden;
 const root = document.querySelector<HTMLElement>('#app')!;
+const compact = new URLSearchParams(location.search).has('compact');
+document.body.classList.toggle('garden-compact',compact);
 const strip = new URLSearchParams(location.search).get('view') === 'strip';
+// Window controls must survive page changes, loading states and content scrolling.
+if (!strip && !compact && window === window.top) {
+    const bar = document.createElement('div');
+    bar.className = 'garden-window-bar';
+    const title = document.createElement('span');
+    title.textContent = '小小花园';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = '关闭 ×';
+    close.setAttribute('aria-label', '关闭花园窗口');
+    close.title = '关闭花园窗口 · Esc';
+    close.onclick = () => window.close();
+    bar.append(title, close);
+    document.body.prepend(bar);
+    document.body.classList.add('garden-window');
+    document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('dialog[open]')) return;
+        event.preventDefault();
+        window.close();
+    });
+}
 window.qbot.overlays.onChanged(s=>{document.body.dataset.headOverlay=s.winner??'';if(strip){positionQuest();requestAnimationFrame(syncStripMouse);}});
-let render3d=false;
+let render3d=false,renderHybrid=false;
 let changingRenderMode=false;
-async function changeRenderMode(): Promise<void> {
+async function changeRenderMode(mode?:'2d'|'3d'|'hybrid'): Promise<void> {
     if(changingRenderMode)return;
     changingRenderMode=true;
     try {
-        await window.qbot.settings.set({gardenRenderMode:render3d?'2d':'3d'});
+        await window.qbot.settings.set({gardenRenderMode:mode??(render3d||renderHybrid?'2d':'3d')});
         // Apply the persisted setting even when an older main process does not
         // include garden windows in its broadcast registry.
         setRenderMode(await window.qbot.settings.get());
@@ -65,11 +92,12 @@ function previewSpecimen(index:number){
 let farmAnchor = { left: 54, baseline: innerHeight - 66 };
 let farmSceneBounds: DOMRect | undefined;
 function setRenderMode(settings: {gardenRenderMode?: string}): void {
-    const next=settings.gardenRenderMode==='3d';
-    if(next===render3d)return;
+    if(!('gardenRenderMode' in settings))return;
+    const next=settings.gardenRenderMode==='3d',hybrid=settings.gardenRenderMode==='hybrid';
+    if(next===render3d&&hybrid===renderHybrid)return;
     farmScene?.dispose(); farmScene=undefined; farmSceneBounds=undefined; farmSceneFailed=false;
     if(strip)api.scenePlacement(null);
-    render3d=next;document.body.classList.toggle('garden-3d',next);render();
+    render3d=next;renderHybrid=hybrid;document.body.classList.toggle('garden-3d',next);document.body.classList.toggle('garden-hybrid',hybrid);quickPlot=null;render();
 }
 window.qbot.settings.onChanged(setRenderMode);
 void window.qbot.settings.get().then(setRenderMode).catch(()=>{});
@@ -105,6 +133,18 @@ function feedFruit(id: string, actor: string | undefined) {
 const buySelection = new Map<string, number>();
 const sellSelection = new Set<string>();
 let selectedSpecies: Species = 'lotus';
+let selectedSeed:string|null=null;
+api.onWorkspace(active=>{document.body.classList.toggle('garden-workspace',active);});
+let visitedScene:import('../../shared/garden-life').GardenVisit|null=null,visitPlot:number|undefined;
+api.onVisit(visit=>{visitedScene=visit;selectedSeed=null;quickPlot=null;if(strip)render();});
+api.onFocusPlot(index=>{if(compact&&page.startsWith('visit:')){visitPlot=index;render();}});
+api.onSeed(seed=>{selectedSeed=seed;if(compact)render();});
+window.addEventListener('pagehide',()=>{if(compact){api.selectSeed(null);void api.showVisit(null);}});
+async function plantSelected(index:number):Promise<boolean>{
+  if(!selectedSeed||state?.plots[index]||!state?.seeds.some(s=>s.id===selectedSeed))return false;
+  const seed=selectedSeed;selectedSeed=null;api.selectSeed(null);await act({type:'plant',plot:index,seed});return true;
+}
+
 let quickPlot: number | null = null;
 let petBounds = { left: 370, right: 730, top: 180, bottom: 540 };
 let performerBounds:typeof petBounds|undefined;
@@ -219,7 +259,7 @@ function breedingCandidates(): Produce[] {
     const inPlot=state!.plots.some(p=>p?.id===parentId);
     return allParents().filter(p=>p.id!==parentId&&(state!.economy||(inPlot?state!.produce.some(x=>x.id===p.id):state!.plots.some(x=>x?.id===p.id))));
 }
-function go(next: string): void { if(strip){api.open(next);return;} document.querySelectorAll('.result-popup').forEach(n=>n.remove()); page = next; parentId = null; buyMode = sellMode = false; buySelection.clear(); sellSelection.clear(); render(); }
+function go(next: string): void { if(compact&&!next.startsWith('visit:')&&page.startsWith('visit:')){visitedScene=null;visitPlot=undefined;void api.showVisit(null);} if(compact&&next.startsWith('visit:')&&!page.startsWith('visit:')){visitPlot=undefined;api.selectSeed(null);void api.showVisit(next.slice(6)).catch(e=>notice(String(e)));} if(strip){api.open(next);return;} document.querySelectorAll('.result-popup').forEach(n=>n.remove()); page = next; parentId = null; buyMode = sellMode = false; buySelection.clear(); sellSelection.clear(); render(); }
 function allParents(): Produce[] { return [...state!.produce, ...state!.plots.filter((p): p is Plant => !!p && p.readyAt <= Date.now())].filter(p=>canBreed(p)&&!('batch'in p&&(p as Plant).batch?.candidates.length)&&(!state!.v3?.appraisals[p.id]||state!.v3.appraisals[p.id].done)); }
 async function act(command: GardenCommand, onSuccess?:()=>void): Promise<void> {
     if(render3d&&(command.type==='plant'||command.type==='plantMany')&&!supportsGarden3D(state?.seeds.find(s=>s.id===command.seed)?.species)){
@@ -232,6 +272,7 @@ async function act(command: GardenCommand, onSuccess?:()=>void): Promise<void> {
     try {
         const r = await api.act(command);
         if (!r.ok) {
+            if(command.type==='capsuleDraw'||command.type==='capsuleDraw3d')throw Error(r.error);
             notice(r.error === '不支持的花园操作' ? '花园版本已更新，请重启桌宠后再试' : r.error);
             await refresh(true);
             return;
@@ -250,20 +291,18 @@ async function act(command: GardenCommand, onSuccess?:()=>void): Promise<void> {
             quickPlot = command.plot;
         }
         if (strip && command.type === 'plant') { harvestedParent = null; harvestedByPlot.delete(command.plot); }
-        if (command.type === 'sell' || command.type === 'sellMany')
-            notice('已出售，花园币已到账');
-        if (command.type === 'buy' || command.type === 'buyMany')
-            notice('已放进背包');
-        if (command.type === 'travelNext') notice('到达新的目的地');
-        if (command.type === 'fertilize')
-            notice('施肥成功');
-        if (r.reveal && command.type !== 'feed') {
+
+
+
+
+        if (r.reveal && command.type !== 'feed' && command.type !== 'capsuleDraw' && command.type !== 'capsuleDraw3d') {
             if (strip && (r.reveal.seed || r.reveal.produce)) { quickResult = r.reveal; if (quickPlot === null) quickPlot = 0; }
             else reveal(r.reveal);
         }
     }
     catch (e) {
         notice(e instanceof Error ? e.message : String(e));
+        if(command.type==='capsuleDraw'||command.type==='capsuleDraw3d')throw e;
     }
     finally {
         busy = false;
@@ -307,11 +346,13 @@ function renderStrip(): void {
     const sides = [el('section', undefined, 'soil-side single')];
     const scenePlots: FarmPlot[]=[], sceneButtons: HTMLButtonElement[]=[];
     sides[0].style.gridTemplateColumns = `repeat(${MAX_GARDEN_PLOTS}, minmax(0, 1fr))`;
-    state!.plots.forEach((p, i) => {
-        if (!state!.cultivationVisit && !visiblePlot(state!, i)) return;
+    (visitedScene?.plots??state!.plots).forEach((p, i) => {
+        if(renderHybrid)return;
+        if (!visitedScene && !state!.cultivationVisit && !visiblePlot(state!, i)) return;
         const b = button('', () => {
-            quickPlot = i; parentId = null; quickResult = null; harvestedParent = harvestedByPlot.get(i) ?? null;
-            render();
+            if(visitedScene){api.focusPlot(i);return;}
+            if(selectedSeed&&!p){void plantSelected(i);return;}
+            api.open(`plot:${i}`);
         }, 'plot');
         b.disabled=!!state!.cultivationVisit;
         b.setAttribute('aria-label', `${i + 1}号土地${p ? ` ${SPECIES[p.species].name}` : ' 种植'}`);
@@ -331,9 +372,9 @@ function renderStrip(): void {
             a.dataset.plant = p.id;
             a.addEventListener('click', event => {
                 event.stopPropagation();
+                if(visitedScene){api.focusPlot(i);return;}
                 if (busy||state!.cultivationVisit) return;
-                quickPlot = i; parentId = null; quickResult = null; harvestedParent = null;
-                render();
+                api.open(`plot:${i}`);
             });
             b.append(a);
             if(needsReveal(p)&&cultivationActive(p))b.append(el('span','🔎','research-mark'));
@@ -388,7 +429,10 @@ function renderStrip(): void {
     const collapse = button('×', () => api.collapse(), 'strip-collapse');
     collapse.title = '收起农场'; collapse.setAttribute('aria-label', '收起农场');
     controls.append(handle, tools, harvest, sow, collapse);
-    const mode=button(render3d?'2D':'3D',()=>{void changeRenderMode();},'strip-mode');
+    harvest.hidden=!!visitedScene;sow.hidden=!!visitedScene;
+    handle.hidden=renderHybrid;
+    const hybrid=button('桌边',()=>void changeRenderMode(renderHybrid?'2d':'hybrid'),'strip-hybrid');hybrid.setAttribute('aria-pressed',String(renderHybrid));hybrid.title='3D 草地与 2D 植物';controls.insertBefore(hybrid,collapse);
+    const mode=button(renderHybrid?'原版':render3d?'2D':'3D',()=>{void changeRenderMode();},'strip-mode');
     mode.title=render3d?'切回手绘花园':'切换立体花园';mode.setAttribute('aria-label','切换种植画面');controls.insertBefore(mode,collapse);
     if(sceneActive){
         for(const [label,title,action] of [['↶','向左旋转',()=>farmScene?.rotate(-1)],['↷','向右旋转',()=>farmScene?.rotate(1)],['⌂','视角回正',()=>farmScene?.reset()],['−','缩小花园',()=>farmScene?.zoom(-1)],['＋','放大花园',()=>farmScene?.zoom(1)]] as const){
@@ -413,11 +457,11 @@ function renderStrip(): void {
     if(farmScene){
         if(!farmScene.element.isConnected)root.append(farmScene.element);
         farmScene.update(scenePlots,sceneButtons,quickPlot);farmScene.place(farmAnchor.left,farmAnchor.baseline);
-    }else root.append(...sides);
+    }else if(!renderHybrid)root.append(...sides);
     root.append(controls,quest);
     if(cultivationHint&&!cultivationHint.isConnected)root.append(cultivationHint);
     tick(false);
-    renderQuickMenu();
+    if(!visitedScene)renderQuickMenu();
     requestAnimationFrame(syncStripMouse);
 }
 
@@ -528,9 +572,11 @@ function render(): void {
     if (page === 'travel' || page === 'moments') {
         const content = el('section');
         if(state.economy&&page==='travel')renderSocialTravel(content,state,characters,act,go);else renderTravel(content,state,page,act,go,busy,render);
+        if(page==='moments')renderTripHistory(content,state,characters);
         root.replaceChildren(content);
         return;
     }
+    if(compact){renderCompact();return;}
     const head = renderCharacterHeader({state, characters, busy, act, switchActor, feed:feedFruit, notice});
     const nav = el('nav', undefined, 'tabs');
     for (const [id, name] of [['bag', '背包'], ['shop', '商店'], ['book', '植物图鉴']]) {
@@ -546,7 +592,9 @@ function render(): void {
     const lifeContext={state,act,go,refresh:()=>refresh(true),notice,busy,plantArt};
     if(state.life?.pending&&page!=='sprays')content.append(button('继续处理喷雾结果',()=>go('sprays'),'primary'));
     if(state.economy&&(page==='plots'||page==='bag'))renderSocialGuide(content,state,act,go);
-    if(page==='capsule'){renderAppearanceShop(content,state,act);renderCapsule(content,state,act);}
+    if(page==='capsule'){renderCapsule(content,state,act);}
+    else if(page==='appearance')renderAppearanceShop(content,state,act);
+    else if(page==='goals')renderSocialGuide(content,state,act,go);
     else if(page==='notebook'&&state.v3)renderNotebook(content,state,act,go);
     else if(page==='daily'||page==='shop'){
         const tabs=el('nav',undefined,'tabs shop-tabs');tabs.setAttribute('aria-label','商店分类');
@@ -555,6 +603,7 @@ function render(): void {
     }
     else if(page==='sprays')renderSprays(content,lifeContext);
     else if(page==='friends')renderFriends(content,lifeContext);
+    else if(page.startsWith('friendshop:'))renderVisit(content,{...lifeContext,shopOnly:true},page.slice(11));
     else if(page.startsWith('visit:'))renderVisit(content,lifeContext,page.slice(6));
     else if (page === 'sow')
         renderSowing(content);
@@ -565,7 +614,8 @@ function render(): void {
     else
         renderBag(content);
     const foot = el('footer');
-    const display=button(render3d?'3D · 切回手绘':'手绘 · 试试3D',()=>{void changeRenderMode();},'garden-render-toggle');
+    const hybridDisplay=button('桌边草地',()=>void changeRenderMode('hybrid'),'garden-hybrid-toggle');hybridDisplay.setAttribute('aria-pressed',String(renderHybrid));foot.append(hybridDisplay);
+    const display=button(renderHybrid?'切回原版':render3d?'3D · 切回手绘':'手绘 · 试试3D',()=>{void changeRenderMode();},'garden-render-toggle');
     display.setAttribute('aria-label','切换种植画面'); foot.append(display);
     foot.append(el('span', state.rehearsal?'本地试演 · 全部为模拟资产 · 退出试演后恢复正式花园':state.online?'联机花园 · 由服务器保存':'本地花园 · 离线继续生长 · 成熟不枯萎'));
     if(!state.online||state.rehearsal)foot.append(button('测试：立即成熟', () => void act({ type: 'mature' }), 'test-button'));
@@ -601,11 +651,11 @@ function renderSowing(host: HTMLElement): void {
     if (!state!.seeds.length) host.append(button('去商店',()=>go('shop'),'primary'));
 }
 function renderPlots(host: HTMLElement): void {
-    host.append(button('批量播种',()=>go('sow'),'primary'));
+    if(!compact)host.append(button('批量播种',()=>go('sow'),'primary'));
     const plots = el('div', undefined, 'plot-picker');
     for (let i = 0; i < state!.plots.length; i++) if (visiblePlot(state!, i))
         plots.append(button(`${i + 1}号 ${state!.plots[i] ? SPECIES[state!.plots[i]!.species].name : '空地'}`, () => go(`plot:${i}`), page === `plot:${i}` ? 'active' : ''));
-    host.append(plots, button(`一键采摘 · ${state!.plots.filter(p=>p && p.readyAt<=Date.now() && !p.keep && !needsReveal(p)).length}`, () => void act({type:'harvestMany'}), 'primary', !state!.plots.some(p=>p && p.readyAt<=Date.now() && !p.keep && !needsReveal(p))));
+    if(!compact)host.append(plots, button(`一键采摘 · ${state!.plots.filter(p=>p && p.readyAt<=Date.now() && !p.keep && !needsReveal(p)).length}`, () => void act({type:'harvestMany'}), 'primary', !state!.plots.some(p=>p && p.readyAt<=Date.now() && !p.keep && !needsReveal(p))));
     const index = page.startsWith('plot:') ? Number(page.split(':')[1]) : 0;
     const p = state!.plots[index];
     if (!p && index >= unlockedPlots(state!)) { host.append(el('p', `新版花园使用四块土地，已有作物可以继续收获。`)); return; }
@@ -620,6 +670,7 @@ function renderPlots(host: HTMLElement): void {
     }
     const detail = el('article', undefined, 'plant-detail');
     const img = plantArt(p);
+    if(compact)img.hidden=true;
     img.dataset.detailPlant = p.id;
     const info = el('div');
     info.append(el('div', `${index + 1} 号土地 / ${p.bred ? '已繁育' : needsReveal(p)?'待培育揭晓':canBreed(p)?'可繁育一次':'金色起可繁育'}`, 'eyebrow'), el('h2', SPECIES[p.species].name));
@@ -900,6 +951,7 @@ api.onAnchor(({ left, right, bottom, top, side, performer, farm }) => {
     tick(false);
     positionQuick();
 });
+api.onDesktopStatus(message=>notice(message));
 api.onChanged(() => void refresh());
 window.qbot.characters.onActivated(() => { actorRevision++; if(!switchingActor)void refresh(true); void loadCharacters(); });
 void loadCharacters();
@@ -964,5 +1016,32 @@ function positionQuest(): void {
     const baseline=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--baseline'))||petBounds.bottom-25;
     controls.style.left=`${Math.max(8,Math.min(farmSceneBounds?.left??left,innerWidth-controls.offsetWidth-8))}px`;
     controls.style.top=`${Math.max(8,Math.min(innerHeight-controls.offsetHeight-8,(farmSceneBounds?.bottom??baseline)+12))}px`;
+    if(renderHybrid){controls.style.left='24px';controls.style.top=`${innerHeight-controls.offsetHeight-12}px`;}
 }
 window.addEventListener('pagehide',()=>farmScene?.dispose(),{once:true});
+
+let bagTab='seeds';
+function renderCompact():void {
+ if(!state)return;
+ const nav=el('nav',undefined,'companion-nav');
+ for(const [id,label,icon] of [['bag','背包','bag'],['book','图鉴','book'],['shop','商店','market'],['friends','朋友','friends']]){
+   const b=button('',()=>id==='shop'?api.open('shop'):go(id));b.innerHTML=uiIcon(icon);b.append(el('span',label));b.setAttribute('aria-selected',String(page===id));nav.append(b);
+ }
+ const content=el('section',undefined,'content');const ctx={state,act,go,refresh:()=>refresh(true),notice,busy,plantArt,spatial:true,plot:visitPlot};
+ if(page==='bag'||page==='plots'){
+   const tabs=el('nav',undefined,'companion-subnav');for(const [id,label] of [['seeds','种子'],['produce','收获'],['supplies','道具']])tabs.append(button(label,()=>{bagTab=id;render();},bagTab===id?'active':''));content.append(tabs);
+   if(bagTab==='seeds'){
+     const grid=el('div',undefined,'companion-seeds');
+     for(const {seed,count} of groupSeeds(state.seeds)){const b=button('',()=>{selectedSeed=selectedSeed===seed.id?null:seed.id;api.selectSeed(selectedSeed);render();});b.append(art(seed.species,seed.genes,1,'seed'),el('strong',SPECIES[seed.species].name),el('small','×'+count));b.className='companion-seed';b.setAttribute('aria-pressed',String(selectedSeed===seed.id));b.title=SPECIES[seed.species].name;b.disabled=busy||(render3d&&!supportsGarden3D(seed.species));if(render3d&&!supportsGarden3D(seed.species))b.title+=' · 手绘／桌边模式';grid.append(b);}content.append(grid);
+     if(!state.seeds.length)content.append(button('商店',()=>api.open('shop')));
+   }else{renderBag(content);content.classList.add('bag-'+bagTab);}
+ } else if(page==='book')renderBook(content);
+ else if(page==='friends')renderFriends(content,ctx);
+ else if(page.startsWith('visit:'))renderVisit(content,ctx,page.slice(6));
+ else if(page.startsWith('plot:')){content.append(button('← 背包',()=>go('bag')));renderPlots(content);}
+ else if(page==='sprays')renderSprays(content,ctx);
+ else renderBag(content);
+ root.replaceChildren(nav,content);
+ if(parentId)breeding(content);
+ tick(false);
+}

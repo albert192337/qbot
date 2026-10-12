@@ -1,6 +1,6 @@
 import {BrowserWindow,ipcMain,screen} from 'electron';
 import path from 'node:path';
-import {HINT_SIZE,experienceHintSize,experienceHintPosition,exteriorHintPosition,type PetHint} from '../shared/pet-hint';
+import {HINT_SIZE,APPROVAL_SIZE,experienceHintSize,experienceHintPosition,exteriorHintPosition,type PetHint} from '../shared/pet-hint';
 import {desktopActorVisible,trackDesktopWindow,allowDesktopWindow,onDesktopVisibilityChanged} from './desktop-visibility';
 import {moveFixedSize} from './fixed-window';
 import {attachPetWindowLayer} from './pet-window-layer';
@@ -11,9 +11,9 @@ export function registerPetHints():void {
   const sync=(owner:BrowserWindow)=>{
     const state=hints.get(owner);if(!state||state.win.isDestroyed())return;
     const xp=state.value?.experience;
-    const position=(xp?experienceHintPosition:exteriorHintPosition)(owner.getBounds(),screen.getDisplayMatching(owner.getBounds()).workArea);
+    const size=xp?experienceHintSize(owner.getBounds().width):state.value?.invitation?.approval?APPROVAL_SIZE:HINT_SIZE;
+    const position=xp?experienceHintPosition(owner.getBounds(),screen.getDisplayMatching(owner.getBounds()).workArea):exteriorHintPosition(owner.getBounds(),screen.getDisplayMatching(owner.getBounds()).workArea,size);
     if(!state.ready||!state.value||!desktopActorVisible(owner)||!position){state.win.hide();return;}
-    const size=xp?experienceHintSize(owner.getBounds().width):HINT_SIZE;
     const bounds=state.win.getBounds();
     moveFixedSize(state.win,position.x,position.y,size,Math.abs(bounds.width-size.width)>1||Math.abs(bounds.height-size.height)>1);
     state.win.webContents.send('hint:changed',state.value);
@@ -37,7 +37,7 @@ export function registerPetHints():void {
       if(process.env.ELECTRON_RENDERER_URL)void win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/pet-hint/index.html`);
       else void win.loadFile(path.join(__dirname,'../renderer/pet-hint/index.html'));
     }
-    const invitation=value?.kind==='interaction'&&typeof value.invitation?.id==='string'&&Number.isFinite(value.invitation.expiresAt)&&value.invitation.expiresAt>Date.now()?{id:value.invitation.id.slice(0,200),expiresAt:value.invitation.expiresAt}:undefined;
+    const invitation=value?.kind==='interaction'&&typeof value.invitation?.id==='string'&&Number.isFinite(value.invitation.expiresAt)&&value.invitation.expiresAt>Date.now()?{id:value.invitation.id.slice(0,200),expiresAt:value.invitation.expiresAt,approval:value.invitation.approval===true}:undefined;
     const xp=value?.experience;
     const experience=value?.kind==='interaction'&&xp&&typeof xp.actor==='string'&&Number.isFinite(xp.from)&&Number.isFinite(xp.to)&&xp.from>=0&&xp.to>xp.from?{actor:xp.actor.slice(0,200),from:xp.from,to:xp.to}:undefined;
     state.value=value?{kind:value.kind,text:value.text.slice(0,200),icon:typeof value.icon==='string'?value.icon.slice(0,20):'',title:typeof value.title==='string'?value.title.slice(0,200):'',invitation,experience}:null;

@@ -1,4 +1,5 @@
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font:14px/1.5 'Microsoft YaHei',sans-serif;user-select:none}
+#hint.approval{max-width:308px;max-height:188px}.approval #text{-webkit-line-clamp:6}.approval #invitation-actions button{padding:6px 14px;font-size:14px}
 #hint.has-experience{width:100%;max-width:none;height:76px;max-height:none;background:transparent;border:0;box-shadow:none;padding:0;pointer-events:none}
 .has-experience>#open,.has-experience>#dismiss,.has-experience>#invitation-actions{display:none!important}
 #experience{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:0 4px 2px;box-sizing:border-box}
