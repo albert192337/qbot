@@ -21,7 +21,7 @@ async function content(){
  if(page==='garden'){gardenPage('bag','花园');back.hidden=true;return;}
  if(page==='phone'){
    title.textContent='手机';const grid=el('div','','c-grid');body.append(grid);
-   const apps:[string,string,()=>unknown][]=[['我的房间','home',()=>navigate('room')],['朋友圈','moments',()=>gardenPage('moments','朋友圈')],['旅行','travel',()=>gardenPage('travel','旅行')],['关系','friends',()=>external('relationships')],['扭蛋机','capsule',()=>api.garden.open('capsule')],['记忆','book',()=>external('memory')]];
+   const apps:[string,string,()=>unknown][]=[['我的房间','home',()=>navigate('room')],['朋友圈','moments',()=>gardenPage('moments','朋友圈')],['旅行','travel',()=>gardenPage('travel','旅行')],['关系','friends',()=>external('relationships')],['扭蛋机','capsule',()=>api.garden.open('capsule')],['宝箱弹珠','bag',()=>api.pinball.open()],['记忆','book',()=>external('memory')]];
    for(const [label,icon,run] of apps){const b=button(label,icon,run,'c-app');b.append(el('span',label));grid.append(b);}return;
  }
  title.textContent='菜单';

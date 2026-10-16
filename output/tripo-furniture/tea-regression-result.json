@@ -1,0 +1,34 @@
+{
+  "ok": true,
+  "checks": [
+    "eight independent models",
+    "two live Spine characters",
+    "two seat anchors",
+    "model replacement preserves seats",
+    "native furniture dragging",
+    "rotation and undo",
+    "saved layout reload",
+    "three camera modes and two floors",
+    "occupied seat removal",
+    "concept sheet",
+    "680px layout",
+    "existing video character switching and playback",
+    "switch disposes prior media",
+    "transparent desktop window with current unsaved state",
+    "desktop hit regions and close",
+    "desktop camera locked while zoom remains available",
+    "editor camera and wall visibility inherited",
+    "side walls toggle and centered front view",
+    "floor and cushion contact shadows",
+    "native near-overhead orbit and wider side angle"
+  ],
+  "stats": {
+    "calls": 52,
+    "triangles": 134054,
+    "geometries": 54,
+    "textures": 15,
+    "models": 12,
+    "dirty": true
+  },
+  "errors": []
+}

@@ -18,8 +18,6 @@ import { randomDelay, step, type PetState, type StepContext } from './state-mach
 import { Signboard } from './signboard';
 import { ProgressHud } from './hud';
 import { isStaleProgress } from './hud-format';
-import { POINTS_PER_BOX } from '../../shared/furniture';
-import { DECOR_BY_ID } from '../furniture/catalog';
 import { DEFAULT_VOICE_SETTINGS, Speaker, type VoiceSettings } from './voice/speak';
 import { PairInteraction } from './pair-interaction';
 import { PAIR_INTERACTIONS, pairActions, pairBeats, type PairKind } from '../../shared/pair-interaction';
@@ -152,29 +150,19 @@ let lastProgress: import('../../shared/ipc-types').Progress | null = null;
 
 hud.onChestClick = () => void doOpenBox();
 
+let lastPinball: import('../../shared/ipc-types').PinballSummary | null = null;
+const stopPinball=window.qbot.pinball?.onChanged(p=>{lastPinball=p;hud.setPinball(p);if(hudBusy)hud.chestBtn.disabled=true;});
+if(stopPinball)window.addEventListener('pagehide',stopPinball,{once:true});
+void window.qbot.pinball?.get().then(p=>{lastPinball=p;hud.setPinball(p);}).catch(e=>hud.toast(String(e.message??e)));
 async function doOpenBox(): Promise<void> {
-  if (hudBusy) return;
-  hudBusy = true;
-  hud.chestBtn.disabled = true;
-  try {
-    const r = await window.qbot.progress.openBox();
-    if (r.ok) {
-      hud.playOpen();
-      hud.floatSpend(POINTS_PER_BOX);
-      lastProgress = r.progress;
-      hud.setProgress(r.progress);
-      const decor = DECOR_BY_ID.get(r.stickerId);
-      const name = r.gardenReward ?? decor?.name ?? r.stickerId;
-      if (!r.gardenItems?.length) window.qbot.bubble.say(`开出了「${name}」`, 20000);
-    } else {
-      hud.toast(r.error);
-    }
-  } catch (e) {
-    hud.toast(e instanceof Error ? e.message : String(e));
-  } finally {
-    hudBusy = false;
-    if (lastProgress) hud.setProgress(lastProgress);
-  }
+  if(hudBusy)return;
+  hudBusy=true;hud.chestBtn.disabled=true;
+  try{
+    const rect=hud.chestBtn.getBoundingClientRect();
+    const result=await window.qbot.pinball.openChest({x:rect.x+rect.width/2,y:rect.y+rect.height/2});
+    lastPinball=result;hud.setPinball(result);hud.playOpen();
+  }catch(e){hud.toast(e instanceof Error?e.message:String(e));}
+  finally{hudBusy=false;if(lastPinball)hud.setPinball(lastPinball);}
 }
 
 window.qbot.progress.onChanged((p) => {

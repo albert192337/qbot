@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "checks": [
+    "four assets loaded",
+    "independent placement",
+    "save and reload",
+    "remove and undo",
+    "no renderer errors"
+  ],
+  "stats": {
+    "calls": 16,
+    "triangles": 205341,
+    "geometries": 16,
+    "textures": 17,
+    "models": 12,
+    "dirty": true
+  }
+}

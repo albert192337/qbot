@@ -1,0 +1,12 @@
+import * as T from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+const scene=new T.Scene();scene.background=new T.Color('#242731');
+const camera=new T.PerspectiveCamera(40,innerWidth/innerHeight,.01,1000);
+const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.toneMapping=T.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
+scene.add(new T.HemisphereLight(0xffffff,0x687080,2));const light=new T.DirectionalLight(0xffe5ca,3);light.position.set(4,8,6);scene.add(light);
+let model;const reset=()=>{camera.position.set(7,4,9);controls.target.set(0,2,0);controls.update();};reset();
+document.querySelector('#reset').onclick=reset;document.querySelector('#rotate').onclick=()=>controls.autoRotate=!controls.autoRotate;document.querySelector('#wire').onclick=()=>model?.traverse(o=>{if(o.isMesh)for(const m of Array.isArray(o.material)?o.material:[o.material])m.wireframe=!m.wireframe;});
+new GLTFLoader().load('./model.glb',g=>{model=g.scene;const box=new T.Box3().setFromObject(model),size=box.getSize(new T.Vector3()),center=box.getCenter(new T.Vector3()),scale=6/Math.max(size.x,size.y,size.z);model.scale.setScalar(scale);model.position.set(-center.x*scale,-box.min.y*scale,-center.z*scale);scene.add(model);let meshes=0,triangles=0;model.traverse(o=>{if(o.isMesh){meshes++;triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;}});document.querySelector('#info').textContent=`${meshes} 个网格 · ${Math.round(triangles).toLocaleString()} 个三角面`;window.previewResult={ready:true,meshes,triangles,originalSize:size.toArray()};},undefined,e=>{document.querySelector('#info').textContent='加载失败：'+e.message;window.previewResult={error:String(e)};});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera);});

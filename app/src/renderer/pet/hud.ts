@@ -38,6 +38,7 @@ export class ProgressHud {
   private previousBoxes: number | null = null;
   private openingTimer: ReturnType<typeof setTimeout> | null = null;
   private progress: Progress | null = null;
+  private pinball: import('../../shared/ipc-types').PinballSummary | null = null;
 
   onChestClick: () => void = () => {};
 
@@ -115,6 +116,7 @@ export class ProgressHud {
   /** 幂等更新：走 shouldTween 门控，防回弹 */
   setProgress(p: Progress): void {
     this.progress = p;
+    if(this.pinball)return;
     const pts = p.points ?? 0;
     const boxes = Math.min(DEFAULT_MAX_BOXES, p.boxes ?? 0);
     if (this.previousBoxes !== null) {
@@ -148,6 +150,17 @@ export class ProgressHud {
     this.lastPoints = pts;
   }
 
+  setPinball(p: import('../../shared/ipc-types').PinballSummary): void {
+    this.pinball=p;
+    this.chestBtn.hidden=false;this.chestBtn.disabled=p.balls<1;
+    this.chestBtn.title=`开宝箱 · ${p.balls}/${p.cap} 弹珠`;
+    this.chestBtn.setAttribute('aria-label',this.chestBtn.title);
+    this.dots.textContent=String(p.balls);
+    this.dots.style.fontSize='10px';this.dots.style.color='#815b2c';
+    if(this.tweenRaf!==null){cancelAnimationFrame(this.tweenRaf);this.tweenRaf=null;}
+    this.numEl.textContent=formatPoints(p.coins);this.pill.title='弹珠金币';
+  }
+
   playOpen(): void {
     if (this.openingTimer) clearTimeout(this.openingTimer);
     this.chestArt.innerHTML = OPEN_CHEST_SVG;
@@ -159,7 +172,7 @@ export class ProgressHud {
       this.openingTimer = null;
       this.chestArt.innerHTML = CHEST_SVG;
       this.chestBtn.classList.remove('opening');
-      if (this.progress) this.setProgress(this.progress);
+      if(this.pinball)this.setPinball(this.pinball);else if (this.progress) this.setProgress(this.progress);
     }, 850);
   }
 

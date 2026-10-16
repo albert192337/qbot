@@ -45,3 +45,8 @@ __pycache__/
 
 # Temporary appearance deployment bundle
 output/appearance-release.tgz
+
+# Isolated desktop pinball runtime, native geometry and screenshots
+output/desktop-pinball/
+output/desktop-pinball-concepts/native-*
+output/tripo-furniture/furniture-profile/

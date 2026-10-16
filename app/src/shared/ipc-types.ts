@@ -446,7 +446,15 @@ export type CraftResult =
     }
   | { ok: false; error: string };
 
+export interface PinballSummary { balls:number; coins:number; cap:number; refillAt:number; keys:number }
+
 export interface QBotApi {
+  pinball: {
+    get(): Promise<PinballSummary>;
+    open(): Promise<void>;
+    openChest(point?: {x:number;y:number}): Promise<PinballSummary>;
+    onChanged(cb:(summary:PinballSummary)=>void):()=>void;
+  };
   panel: {
     ignoreMouse(ignore: boolean): void;
     open(page: import('./panel-layout').DesktopPanelPage): void;

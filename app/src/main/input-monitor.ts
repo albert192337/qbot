@@ -1,3 +1,4 @@
+import {addPinballKeys} from './pinball/index.mjs';
 /**
  * 全局键盘敲击**计数**（Windows 专属）——「敲键盘 +1 点」的数据来源。
  *
@@ -93,6 +94,7 @@ function handleLine(line: string): void {
   if (typeof keys !== 'number' || !Number.isFinite(keys) || keys <= 0) return;
   if (keys > MAX_KEYS_PER_REPORT) return;
   void addKeystrokes(keys);
+  addPinballKeys(keys);
 }
 
 function scheduleRespawn(): void {

@@ -20,6 +20,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
+          'desktop-pinball': resolve(__dirname, 'src/renderer/desktop-pinball/index.html'),
           'appearance-preview': resolve(__dirname, 'src/renderer/appearance-preview/index.html'),
           'appearance-overlay': resolve(__dirname, 'src/renderer/appearance-overlay/index.html'),
           tea3d: resolve(__dirname, 'src/renderer/tea3d/index.html'),

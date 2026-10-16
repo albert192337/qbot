@@ -1,0 +1,30 @@
+{
+  "before": {
+    "summary": {
+      "balls": 30,
+      "coins": 90380,
+      "cap": 30,
+      "refillAt": 1792142825224,
+      "keys": 0
+    },
+    "chestVisible": true,
+    "title": "开宝箱 · 30/30 弹珠"
+  },
+  "state": {
+    "formal": true,
+    "ready": true,
+    "icons": 179,
+    "coins": 90380,
+    "balls": 30,
+    "temporaryPanel": false
+  },
+  "after": {
+    "balls": 30,
+    "coins": 90380,
+    "cap": 30,
+    "refillAt": 1792142825224,
+    "keys": 0
+  },
+  "legacyCoins": 90380,
+  "noDebitOnOpen": true
+}

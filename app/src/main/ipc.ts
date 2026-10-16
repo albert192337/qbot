@@ -1,3 +1,4 @@
+import {registerDesktopPinball} from './pinball/index.mjs';
 import { registerDesktopPanel } from './desktop-panel';
 import { conversationFor } from './conversation-memory';
 import { resizePetChat } from './windows';
@@ -86,6 +87,7 @@ import { getIdlePlan } from './idle-plan';
 
 export function registerIpc(): void {
   registerDesktopPanel();
+  registerDesktopPinball();
   registerDesktopVisibility();
   registerPetHints();
   registerDesktopOverlays((id,kind)=>id===getPetWindow()?.webContents.id||(kind==='speech'&&id===getBubbleWindow()?.webContents.id)||(kind==='cultivation'&&isGardenStrip(id)));

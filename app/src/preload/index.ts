@@ -4,6 +4,12 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { RoomChatMsg, RoomMember, RoomSizePreset, RoomsDisplayMode, RoomsStatus, RoomWave, LinkMode, AgentMessage, AgentStatus, CharacterMeta, CustomActionEvent, HatchProgress, LinkAssetProgress, LinkPeerCharacter, MeetingStatus, MusicStatus, PetMenuCommand, Progress, QBotApi, Settings } from '../shared/ipc-types';
 
 const api: QBotApi = {
+  pinball: {
+    get:()=>ipcRenderer.invoke('pinball:summary'),
+    open:()=>ipcRenderer.invoke('pinball:open'),
+    openChest:point=>ipcRenderer.invoke('pinball:openChest',point),
+    onChanged:cb=>{const fn=(_e:unknown,s:import('../shared/ipc-types').PinballSummary)=>cb(s);ipcRenderer.on('pinball:summary',fn);return()=>ipcRenderer.removeListener('pinball:summary',fn);},
+  },
   panel: {
     ignoreMouse: ignore => ipcRenderer.send('panel:ignore',ignore),
     open: page => ipcRenderer.send('panel:open',page),
@@ -576,3 +582,14 @@ const api: QBotApi = {
 };
 
 contextBridge.exposeInMainWorld('qbot', api);
+
+// Same renderer contract as the independent preview. Main guards every overlay command.
+contextBridge.exposeInMainWorld('pinball',{
+ get:()=>ipcRenderer.invoke('pinball:get'),
+ icon:(id:string)=>ipcRenderer.invoke('pinball:icon',id),
+ launch:(x:number,count=1)=>ipcRenderer.invoke('pinball:launch',x,count),
+ assign:(id:string,type:string)=>ipcRenderer.invoke('pinball:assign',id,type),
+ rects:(rects:unknown)=>ipcRenderer.send('pinball:rects',rects),
+ close:()=>ipcRenderer.send('pinball:close'),
+ subscribe:(cb:(data:unknown)=>void)=>{const fn=(_e:unknown,data:unknown)=>cb(data);ipcRenderer.on('pinball:state',fn);return()=>ipcRenderer.removeListener('pinball:state',fn);},
+});

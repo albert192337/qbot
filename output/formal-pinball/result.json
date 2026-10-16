@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "checks": [
+    "actual pet HUD uses formal pinball inventory, not legacy boxes/points",
+    "native pet click emits one ball from pet origin; real Shell icons load; no old charge or temporary shelf",
+    "closing overlay keeps pet alive; reopening resumes saved session without spending or redrawing",
+    "non-overlay renderer cannot invoke simulation or alter icon assignments",
+    "second pet opening debits exactly once; result returns to real HUD; both old wallet and garden untouched"
+  ],
+  "profile": "C:\\Users\\LIUCHA~1\\AppData\\Local\\Temp\\qbot-formal-pinball-8erwgQ",
+  "summary": {
+    "balls": 18,
+    "coins": 640,
+    "rounds": 2,
+    "unlocked": []
+  },
+  "icons": 179
+}
